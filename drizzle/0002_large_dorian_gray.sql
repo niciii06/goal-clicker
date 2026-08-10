@@ -1,0 +1,1 @@
+ALTER TABLE `coop_rooms` ADD `shared_features_json` text DEFAULT '{}' NOT NULL;

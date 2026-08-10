@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1785836440686,
+      "tag": "0000_pretty_scarecrow",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1785842530305,
+      "tag": "0001_conscious_maginty",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785845447004,
+      "tag": "0002_large_dorian_gray",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1785847361560,
+      "tag": "0003_omniscient_shinko_yamashiro",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1786088798484,
+      "tag": "0004_tricky_la_nuit",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1786348760316,
+      "tag": "0005_sharp_albert_cleary",
+      "breakpoints": true
+    }
+  ]
+}
