@@ -14,6 +14,8 @@ test("squad drag and drop keeps click controls, positions and multiplayer action
   assert.match(pageSource, /function handleSquadDrop/);
   assert.match(pageSource, /canStarXIPlayerFillSlot\(source\.playerId, target\.index, activeFormationPositions\)/);
   assert.match(pageSource, /source\.area === "bench"[\s\S]*substitutionsUsed < STAR_XI_MAX_SUBSTITUTIONS/);
+  assert.match(pageSource, /sentOffPlayerIds\.includes\(outgoingPlayerId\)/);
+  assert.match(pageSource, /can not be replaced|kann nach einer Roten Karte nicht ausgewechselt werden/);
   assert.match(pageSource, /sendCoopAction\("star-lineup"/);
   assert.match(pageSource, /sendCoopAction\("star-bench"/);
   assert.match(pageSource, /Spieler ziehen und einrasten lassen · Anklicken bleibt möglich/);

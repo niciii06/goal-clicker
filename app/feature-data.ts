@@ -1,4 +1,7 @@
 import { FC26_STAR_PROFILES, type StarPosition } from "./fc26-player-pool";
+import { getFC27Positions } from "./fc27-positions";
+import { getFC27Rating } from "./fc27-ratings";
+import { getFunnyPlayerName } from "./funny-player-names";
 
 export type { StarPosition } from "./fc26-player-pool";
 
@@ -28,6 +31,7 @@ export type ClubProfile = {
 export type TournamentId = "stadium" | "champions" | "world";
 export type CupStrategyId = "angriff" | "konter" | "ballbesitz";
 export type CupMatchPhase = "regular" | "extra-time" | "penalties";
+export type CupMatchMode = "tournament" | "season";
 export type PenaltyDirection = "left" | "center" | "right";
 
 export type GoalBoostState = {
@@ -39,6 +43,7 @@ export type GoalBoostState = {
 
 export type CupState = {
   active: boolean;
+  mode: CupMatchMode;
   phase: CupMatchPhase;
   tournamentId: TournamentId;
   round: number;
@@ -54,15 +59,26 @@ export type CupState = {
   opponent: string;
   opponentRating: number;
   opponentStrategyId: CupStrategyId;
+  opponentIds: string[];
   strategyId: CupStrategyId;
   substitutionsUsed: number;
+  matchMomentum: number;
   originalLineupIds: string[];
   originalBenchIds: string[];
   playerEnteredAt: Record<string, number>;
   playerExitedAt: Record<string, number>;
   playerMatchPositions: Record<string, StarPosition>;
   lastGoal: CupGoalEvent | null;
+  lastInjury: CupInjuryEvent | null;
   matchEvents: CupGoalEvent[];
+  cardEvents: CupCardEvent[];
+  injuryEvents: CupInjuryEvent[];
+  sentOffPlayerIds: string[];
+  suspendedPlayerIds: string[];
+  injuredPlayerIds: Record<string, number>;
+  matchPaused: boolean;
+  pendingNextRound: boolean;
+  nextTournamentAt: number;
   penaltyHomeScore: number;
   penaltyAwayScore: number;
   penaltyHomeTaken: number;
@@ -71,6 +87,7 @@ export type CupState = {
   penaltyEvents: CupPenaltyEvent[];
   penaltyMessage: string;
   allTimeScorers: Record<string, number>;
+  allTimeAppearances: Record<string, number>;
 };
 
 export type CupGoalEvent = {
@@ -83,6 +100,31 @@ export type CupGoalEvent = {
   homeScore: number;
   awayScore: number;
   ratingImpacts: Record<string, number>;
+};
+
+export type CupCardEvent = {
+  id: string;
+  side: "home" | "away";
+  playerId: string | null;
+  player: string;
+  reason: string;
+  card: "red";
+  minute: number;
+  createdAt: number;
+  homeScore: number;
+  awayScore: number;
+};
+
+export type CupInjuryEvent = {
+  id: string;
+  playerId: string;
+  player: string;
+  reason: string;
+  matches: number;
+  minute: number;
+  createdAt: number;
+  homeScore: number;
+  awayScore: number;
 };
 
 export type CupPenaltyEvent = {
@@ -110,6 +152,7 @@ export type StarXIPlayer = {
   rating: number;
   price: number;
   accent: string;
+  isCustom?: boolean;
   cardType?: "base" | "icon" | "legendary";
   packWeight?: number;
 };
@@ -136,6 +179,7 @@ export type StarFormationDefinition = {
 
 export type StarXIState = {
   ownedIds: string[];
+  fragments: number;
   lineupIds: string[];
   benchIds: string[];
   formationId: StarFormationId;
@@ -164,15 +208,18 @@ export type StarPackOpening = {
   packName: string;
   player: StarXIPlayer;
   duplicate: boolean;
-  compensation: number;
+  fragmentCompensation: number;
+  source?: "pack" | "custom-draw";
 };
 
 export type StarPackReveal = StarPackOpening & {
   openedAt: number;
   openedBy: string;
+  troll: boolean;
 };
 
 export type TournamentOpponent = {
+  id: string;
   name: string;
   rating: number;
   strategyId: CupStrategyId;
@@ -186,6 +233,7 @@ export type TournamentDefinition = {
   trophyIcon: string;
   description: string;
   minimumRating: number;
+  rounds: number;
   opponents: readonly TournamentOpponent[];
   accent: string;
 };
@@ -221,17 +269,126 @@ export type RandomEvent = {
   createdAt: number;
 };
 
+export type TransferInsiderOutcome = "loan" | "sale" | "failed" | "return";
+
+export type TransferLoan = {
+  playerId: string;
+  club: string;
+  status: "pending" | "active";
+  tournamentId: TournamentId | null;
+  createdAt: number;
+};
+
+export type TransferSquadVacancy = {
+  area: "lineup" | "bench";
+  index: number;
+  requiredPlayers: number;
+  createdAt: number;
+};
+
+export type TransferInsiderEvent = {
+  id: string;
+  outcome: TransferInsiderOutcome;
+  playerId: string | null;
+  playerName: string | null;
+  club: string;
+  headline: string;
+  message: string;
+  reason: string;
+  fee: number;
+  createdAt: number;
+};
+
+export type TransferSagaState = {
+  loans: TransferLoan[];
+  vacancies: TransferSquadVacancy[];
+  archive: TransferInsiderEvent[];
+  latestEvent: TransferInsiderEvent | null;
+  lastFailedReason: string;
+  nextAt: number;
+  deadlineDayStartedAt: number;
+  deadlineDayEndsAt: number;
+};
+
+export type TournamentGazetteIssue = {
+  id: string;
+  headline: string;
+  strapline: string;
+  body: string;
+  tone: "champion" | "exit";
+  tournamentId: TournamentId;
+  opponent: string;
+  homeScore: number;
+  awayScore: number;
+  completedRound: number;
+  tieBreak: boolean;
+  createdAt: number;
+};
+
+export type TournamentCompletionSummary = {
+  tournamentId: TournamentId;
+  tournamentWon: boolean;
+  completedRound: number;
+  opponent: string;
+  homeScore: number;
+  awayScore: number;
+  tieBreak: boolean;
+};
+
+export type SeasonTableRow = {
+  id: string;
+  name: string;
+  rating: number;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  points: number;
+};
+
+export type SeasonMatchHistoryEntry = {
+  id: string;
+  division: number;
+  matchday: number;
+  opponent: string;
+  opponentRating: number;
+  clubScore: number;
+  opponentScore: number;
+  outcome: "win" | "draw" | "loss";
+  completedSeason: boolean;
+  seasonOutcome: "promoted" | "relegated" | "stayed" | "hall-of-fame" | null;
+  createdAt: number;
+};
+
+export type SeasonModeState = {
+  division: number;
+  highestDivision: number;
+  matchday: number;
+  table: SeasonTableRow[];
+  lastTable: SeasonTableRow[];
+  lastResult: string;
+  lastMatchAt: number;
+  history: SeasonMatchHistoryEntry[];
+  hallOfFame: boolean;
+  prestigeCount: number;
+};
+
 export type GameFeatures = {
   schemaVersion: number;
   transferMarket: TransferMarketState;
   starXI: StarXIState;
   club: ClubProfile;
   cup: CupState;
+  seasonMode: SeasonModeState;
   goalBoost: GoalBoostState;
   missions: CoopMission[];
   history: MatchHistoryEntry[];
   randomEvent: RandomEvent | null;
   starPackReveal: StarPackReveal | null;
+  transferSaga: TransferSagaState;
+  gazetteIssues: TournamentGazetteIssue[];
   nextEventAt: number;
   nextVarAt: number;
 };
@@ -247,6 +404,15 @@ export const CLUB_BADGES = ["⚽", "🦅", "🔥", "🦁", "⭐", "🛡️"];
 export const CLUB_COLORS = ["#0071e3", "#1d1d1f", "#e85d04", "#16845b", "#8b5cf6", "#d12c54"];
 export const CUP_MATCH_DURATION_MS = 180000;
 export const CUP_EXTRA_TIME_DURATION_MS = 60000;
+export const TOURNAMENT_COOLDOWN_MS = 5 * 60 * 1000;
+export const RED_CARD_CHANCE_PER_SECOND = 0.0012;
+export const CUP_INJURY_CHANCE_PER_SECOND = 0.00065;
+export const CUP_MIN_INJURY_MATCHES = 1;
+export const CUP_MAX_INJURY_MATCHES = 3;
+export const RED_CARD_MATCH_RATING_DROP = 6;
+export const CUP_RED_CARD_MOMENTUM_DROP = 8;
+export const CUP_MAX_MOMENTUM = 12;
+export const CUP_MOMENTUM_RATING_WEIGHT = 0.45;
 export const TOURNAMENT_GOAL_BOOST_DURATION_MS = 180000;
 export const TOURNAMENT_GOAL_BOOST_MULTIPLIERS: Readonly<Record<TournamentId, number>> = {
   stadium: 1.5,
@@ -255,9 +421,21 @@ export const TOURNAMENT_GOAL_BOOST_MULTIPLIERS: Readonly<Record<TournamentId, nu
 };
 export const STAR_PACK_ROLL_DURATION_MS = 8000;
 export const STAR_XI_SQUAD_SIZE = 11;
-export const STAR_XI_BENCH_SIZE = 7;
+export const STAR_XI_BENCH_SIZE = 12;
 export const STAR_XI_MAX_SUBSTITUTIONS = 5;
-export const GAME_FEATURES_SCHEMA_VERSION = 1;
+export const GAME_FEATURES_SCHEMA_VERSION = 3;
+export const SEASON_MODE_DIVISION_COUNT = 15;
+export const SEASON_MODE_MATCHES_PER_SEASON = 10;
+export const SEASON_MODE_TABLE_SIZE = 6;
+export const TRANSFER_EVENT_MIN_DELAY_MS = 480000;
+export const TRANSFER_EVENT_MAX_DELAY_MS = 720000;
+export const TRANSFER_LOAN_CHANCE = 0.30;
+export const TRANSFER_SALE_CHANCE = 0.10;
+export const TRANSFER_PAID_SALE_CHANCE = 0.60;
+export const TRANSFER_DEADLINE_LOAN_CHANCE = 0.60;
+export const TRANSFER_DEADLINE_EVENT_MIN_DELAY_MS = 45000;
+export const TRANSFER_DEADLINE_EVENT_MAX_DELAY_MS = 75000;
+export const PACK_TROLL_CHANCE = 0.05;
 export const STAR_POSITIONS: readonly StarPosition[] = ["TW", "LV", "LAV", "IV", "RV", "RAV", "ZDM", "ZM", "ZOM", "LM", "RM", "LF", "RF", "MS", "ST"];
 export const STAR_POSITION_NAMES: Record<StarPosition, string> = {
   TW: "Torwart",
@@ -331,18 +509,29 @@ export function getStarFormation(id: unknown) {
 }
 
 export const STAR_XI_FORMATION_POSITIONS: readonly StarPosition[] = getStarFormation("433").slots.map((slot) => slot.position);
-export const TOURNAMENTS: readonly TournamentDefinition[] = [
+export const TOURNAMENT_OPPONENT_MULTIPLIER = 4;
+const TOURNAMENT_SEEDS: readonly TournamentDefinition[] = [
   {
     id: "stadium",
     label: "Stadionpokal",
     trophyName: "Stadionpokal",
     trophyIcon: "🏆",
-    description: "Drei Spiele am Stück und faire Gegner für deine erste Star XI.",
+    description: "Drei Spiele am Stück · 12 mögliche Gegner für deine erste Star XI.",
     minimumRating: 55,
+    rounds: 3,
     opponents: [
-      { name: "FC Winterthure", rating: 58, strategyId: "ballbesitz", scorers: ["Matteo Di Giusto", "Aldin Turkes", "Nishan Burkart"] },
-      { name: "BSC Young Burs", rating: 63, strategyId: "angriff", scorers: ["Cédric Ittan", "Joël Monteiroh", "Filip Ugrinic"] },
-      { name: "FC Basilea", rating: 68, strategyId: "konter", scorers: ["Xherdan Shaqiry", "Albian Ajati", "Kevin Carloso"] },
+      { id: "stadium-servette-genevois", name: "Servette Genevois", rating: 56, strategyId: "ballbesitz", scorers: ["Dereck Kutesa", "Enzo Crivelli", "Miroslav Stevanovic"] },
+      { id: "stadium-fc-sionais", name: "FC Sionais", rating: 57, strategyId: "konter", scorers: ["Benjamin Kololli", "Dejan Sorgic", "Joël Schmied"] },
+      { id: "stadium-fc-thoune", name: "FC Thoune", rating: 57, strategyId: "angriff", scorers: ["Marc Gut", "Miguel Castroman", "Kreshnik Hajrizi"] },
+      { id: "stadium-fc-winterthure", name: "FC Winterthure", rating: 58, strategyId: "ballbesitz", scorers: ["Matteo Di Giusto", "Aldin Turkes", "Nishan Burkart"] },
+      { id: "stadium-fc-luzerne", name: "FC Luzerne", rating: 59, strategyId: "konter", scorers: ["Lars Villiger", "Luca Jaquez", "Pius Dorn"] },
+      { id: "stadium-fc-st-gallo", name: "FC St. Gallo", rating: 60, strategyId: "angriff", scorers: ["Chadrac Akolo", "Willem Geubbels", "Jordi Quintilla"] },
+      { id: "stadium-fc-lausanne", name: "FC Lausanne", rating: 60, strategyId: "ballbesitz", scorers: ["Alvyn Sanches", "Kaly Sene", "Brighton Labeau"] },
+      { id: "stadium-grasshopper-zurich", name: "Grasshopper Zürich", rating: 61, strategyId: "konter", scorers: ["Giotto Morandi", "Pascal Schürpf", "Awer Mabil"] },
+      { id: "stadium-fc-lugano", name: "FC Lugano", rating: 62, strategyId: "angriff", scorers: ["Mattia Bottani", "Shkelqim Vladi", "Ignacio Aliseda"] },
+      { id: "stadium-bsc-young-burs", name: "BSC Young Burs", rating: 63, strategyId: "angriff", scorers: ["Cédric Ittan", "Joël Monteiroh", "Filip Ugrinic"] },
+      { id: "stadium-fc-zurique", name: "FC Zurique", rating: 64, strategyId: "ballbesitz", scorers: ["Jonathan Okita", "Bledian Krasniqi", "Antonio Marchesano"] },
+      { id: "stadium-fc-basilea", name: "FC Basilea", rating: 68, strategyId: "konter", scorers: ["Xherdan Shaqiry", "Albian Ajati", "Kevin Carloso"] },
     ],
     accent: "#16845b",
   },
@@ -351,13 +540,26 @@ export const TOURNAMENTS: readonly TournamentDefinition[] = [
     label: "Champions Cup",
     trophyName: "Champions Pokal",
     trophyIcon: "🏆",
-    description: "Vier Runden gegen Clubs auf internationalem Topniveau.",
+    description: "Vier Runden · 16 mögliche Gegner auf internationalem Topniveau.",
     minimumRating: 74,
+    rounds: 4,
     opponents: [
-      { name: "Borussia Dortmundt", rating: 76, strategyId: "ballbesitz", scorers: ["Serhou Girassy", "Karim Adejemi", "Julian Brandto"] },
-      { name: "AC Milana", rating: 80, strategyId: "angriff", scorers: ["Rafael Leao", "Kristjan Pulisik", "Santiago Gimenez"] },
-      { name: "Atlético Madrido", rating: 84, strategyId: "konter", scorers: ["Antwan Griezman", "Julián Alvares", "Alexander Sorloth"] },
-      { name: "Arsenal Londra", rating: 88, strategyId: "ballbesitz", scorers: ["Bukayo Sako", "Martin Odegard", "Kai Hawertz"] },
+      { id: "champions-benfica-lissabonne", name: "Benfica Lissabonne", rating: 74, strategyId: "ballbesitz", scorers: ["Angel Di Maria", "Vangelis Pavlidis", "Rafa Silvaz"] },
+      { id: "champions-ajax-amsterdamo", name: "Ajax Amsterdamo", rating: 74, strategyId: "angriff", scorers: ["Brian Brobbey", "Steven Berghuiss", "Kenneth Taylor"] },
+      { id: "champions-porto-alegre", name: "Porto Alegre", rating: 75, strategyId: "konter", scorers: ["Pepê Costao", "Samu Omorodion", "Galeno"] },
+      { id: "champions-psv-eindhoven", name: "PSV Eindhoven", rating: 75, strategyId: "ballbesitz", scorers: ["Luuk de Jong", "Noa Lang", "Johan Bakayoko"] },
+      { id: "champions-borussia-dortmundt", name: "Borussia Dortmundt", rating: 76, strategyId: "ballbesitz", scorers: ["Serhou Girassy", "Karim Adejemi", "Julian Brandto"] },
+      { id: "champions-rb-leipziga", name: "RB Leipziga", rating: 77, strategyId: "angriff", scorers: ["Benjamin Sesko", "Lois Openda", "Xavi Simons"] },
+      { id: "champions-napoli-italiano", name: "Napoli Italiano", rating: 77, strategyId: "konter", scorers: ["Romelu Lukaku", "Khvicha Kvaradona", "Scott McTominay"] },
+      { id: "champions-juventus-turino", name: "Juventus Turino", rating: 78, strategyId: "ballbesitz", scorers: ["Dusan Vlahovic", "Kenan Yildiz", "Teun Koopmeiners"] },
+      { id: "champions-monaco-asm", name: "AS Monaco", rating: 78, strategyId: "konter", scorers: ["Folarin Balogun", "Takumi Minamino", "Breel Embolo"] },
+      { id: "champions-chelsea-londra", name: "Chelsea Londra", rating: 79, strategyId: "angriff", scorers: ["Cole Palmer", "Nicolas Jackson", "Christopher Nkunku"] },
+      { id: "champions-inter-milano", name: "Inter Milano", rating: 79, strategyId: "ballbesitz", scorers: ["Lautaro Martinezo", "Marcus Thuram", "Nicolo Barella"] },
+      { id: "champions-tottenham-hotspur", name: "Tottenham Hotspur", rating: 80, strategyId: "konter", scorers: ["Heung-min Son", "James Maddison", "Dominic Solanke"] },
+      { id: "champions-ac-milana", name: "AC Milana", rating: 80, strategyId: "angriff", scorers: ["Rafael Leao", "Kristjan Pulisik", "Santiago Gimenez"] },
+      { id: "champions-barceloneta", name: "FC Barceloneta", rating: 82, strategyId: "ballbesitz", scorers: ["Robert Lewandowski", "Lamine Yamalo", "Raphinha"] },
+      { id: "champions-atletico-madrido", name: "Atlético Madrido", rating: 84, strategyId: "konter", scorers: ["Antwan Griezman", "Julián Alvares", "Alexander Sorloth"] },
+      { id: "champions-arsenal-londra", name: "Arsenal Londra", rating: 88, strategyId: "ballbesitz", scorers: ["Bukayo Sako", "Martin Odegard", "Kai Hawertz"] },
     ],
     accent: "#0071e3",
   },
@@ -366,22 +568,64 @@ export const TOURNAMENTS: readonly TournamentDefinition[] = [
     label: "Weltmeisterschaft",
     trophyName: "Weltpokal",
     trophyIcon: "🌍",
-    description: "Sechs Runden am Stück gegen die stärksten Teams der Welt.",
+    description: "Sechs Runden · 24 mögliche Gegner aus der Weltspitze.",
     minimumRating: 86,
+    rounds: 6,
     opponents: [
-      { name: "Paris Saint German", rating: 88, strategyId: "angriff", scorers: ["Ousmane Dembelé", "Khvicha Kvaradona", "Bradley Barcolá"] },
-      { name: "Liverpuhl FC", rating: 91, strategyId: "ballbesitz", scorers: ["Mohamed Salahm", "Luis Diazo", "Darwin Nunez"] },
-      { name: "Bayern Münchan", rating: 94, strategyId: "konter", scorers: ["Harry Kané", "Jamal Musiala", "Michael Olisé"] },
-      { name: "Manchester Cité", rating: 96, strategyId: "ballbesitz", scorers: ["Erling Haland", "Phil Fodenh", "Kevin de Bruyne"] },
-      { name: "Real Madreto", rating: 98, strategyId: "angriff", scorers: ["Kylian Mbappo", "Vinícius Juniora", "Jude Bellingam"] },
-      { name: "Galácticos XI", rating: 99, strategyId: "konter", scorers: ["Cristiano Rinaldo", "Lionel Messy", "Ronaldo Nazárioh"] },
+      { id: "world-napoli-italiano", name: "Napoli Italiano", rating: 86, strategyId: "konter", scorers: ["Romelu Lukaku", "Khvicha Kvaradona", "Scott McTominay"] },
+      { id: "world-benfica-lissabonne", name: "Benfica Lissabonne", rating: 86, strategyId: "ballbesitz", scorers: ["Angel Di Maria", "Vangelis Pavlidis", "Rafa Silvaz"] },
+      { id: "world-porto-alegre", name: "Porto Alegre", rating: 86, strategyId: "angriff", scorers: ["Pepê Costao", "Samu Omorodion", "Galeno"] },
+      { id: "world-psv-eindhoven", name: "PSV Eindhoven", rating: 86, strategyId: "ballbesitz", scorers: ["Luuk de Jong", "Noa Lang", "Johan Bakayoko"] },
+      { id: "world-ajax-amsterdam", name: "Ajax Amsterdam", rating: 86, strategyId: "konter", scorers: ["Brian Brobbey", "Steven Berghuiss", "Kenneth Taylor"] },
+      { id: "world-galatasaray", name: "Galatasaray", rating: 86, strategyId: "angriff", scorers: ["Victor Osimhen", "Mauro Icardi", "Dries Mertens"] },
+      { id: "world-borussia-dortmundt", name: "Borussia Dortmundt", rating: 87, strategyId: "ballbesitz", scorers: ["Serhou Girassy", "Karim Adejemi", "Julian Brandto"] },
+      { id: "world-tottenham-hotspur", name: "Tottenham Hotspur", rating: 87, strategyId: "konter", scorers: ["Heung-min Son", "James Maddison", "Dominic Solanke"] },
+      { id: "world-juventus-turino", name: "Juventus Turino", rating: 87, strategyId: "ballbesitz", scorers: ["Dusan Vlahovic", "Kenan Yildiz", "Teun Koopmeiners"] },
+      { id: "world-inter-miami", name: "Inter Miami", rating: 87, strategyId: "angriff", scorers: ["Lionel Messy", "Luis Suarezo", "Jordi Alba"] },
+      { id: "world-paris-saint-german", name: "Paris Saint German", rating: 88, strategyId: "angriff", scorers: ["Ousmane Dembelé", "Khvicha Kvaradona", "Bradley Barcolá"] },
+      { id: "world-chelsea-londra", name: "Chelsea Londra", rating: 88, strategyId: "ballbesitz", scorers: ["Cole Palmer", "Nicolas Jackson", "Christopher Nkunku"] },
+      { id: "world-ac-milana", name: "AC Milana", rating: 88, strategyId: "konter", scorers: ["Rafael Leao", "Kristjan Pulisik", "Santiago Gimenez"] },
+      { id: "world-bayer-leverkusen", name: "Bayer Leverkusen", rating: 88, strategyId: "ballbesitz", scorers: ["Florian Wirtz", "Victor Boniface", "Patrik Schick"] },
+      { id: "world-atletico-madrido", name: "Atlético Madrido", rating: 89, strategyId: "konter", scorers: ["Antwan Griezman", "Julián Alvares", "Alexander Sorloth"] },
+      { id: "world-manchester-united", name: "Manchester United", rating: 89, strategyId: "angriff", scorers: ["Bruno Fernandes", "Rasmus Hojlundo", "Alejandro Garnacho"] },
+      { id: "world-inter-milano", name: "Inter Milano", rating: 90, strategyId: "ballbesitz", scorers: ["Lautaro Martinezo", "Marcus Thuram", "Nicolo Barella"] },
+      { id: "world-arsenal-londra", name: "Arsenal Londra", rating: 90, strategyId: "ballbesitz", scorers: ["Bukayo Sako", "Martin Odegard", "Kai Hawertz"] },
+      { id: "world-liverpuhl-fc", name: "Liverpuhl FC", rating: 91, strategyId: "ballbesitz", scorers: ["Mohamed Salahm", "Luis Diazo", "Darwin Nunez"] },
+      { id: "world-fc-barceloneta", name: "FC Barceloneta", rating: 92, strategyId: "angriff", scorers: ["Robert Lewandowski", "Lamine Yamalo", "Raphinha"] },
+      { id: "world-bayern-muenchan", name: "Bayern Münchan", rating: 94, strategyId: "konter", scorers: ["Harry Kané", "Jamal Musiala", "Michael Olisé"] },
+      { id: "world-manchester-cite", name: "Manchester Cité", rating: 96, strategyId: "ballbesitz", scorers: ["Erling Haland", "Phil Fodenh", "Kevin de Bruyne"] },
+      { id: "world-real-madreto", name: "Real Madreto", rating: 98, strategyId: "angriff", scorers: ["Kylian Mbappo", "Vinícius Juniora", "Jude Bellingam"] },
+      { id: "world-galacticos-xi", name: "Galácticos XI", rating: 99, strategyId: "konter", scorers: ["Cristiano Rinaldo", "Lionel Messy", "Ronaldo Nazárioh"] },
     ],
     accent: "#c69214",
   },
 ];
 
+export const TOURNAMENTS: readonly TournamentDefinition[] = TOURNAMENT_SEEDS.map((tournament) => ({
+  ...tournament,
+  opponents: tournament.opponents.map((opponent) => ({
+    ...opponent,
+    scorers: opponent.scorers.map((scorer) => getFunnyPlayerName(scorer, `tournament-scorer:${scorer}`, { position: "ST", rating: opponent.rating })),
+  })),
+}));
+
 export function getRandomEventDelay(random = Math.random()) {
   return 60000 + Math.floor(Math.max(0, Math.min(0.999999, random)) * 120000);
+}
+
+export function getTransferEventDelay(random = Math.random()) {
+  const roll = Math.max(0, Math.min(0.999999, random));
+  return TRANSFER_EVENT_MIN_DELAY_MS + Math.floor(roll * (TRANSFER_EVENT_MAX_DELAY_MS - TRANSFER_EVENT_MIN_DELAY_MS));
+}
+
+export function getTransferDeadlineEventDelay(random = Math.random()) {
+  const roll = Math.max(0, Math.min(0.999999, random));
+  return TRANSFER_DEADLINE_EVENT_MIN_DELAY_MS + Math.floor(roll * (TRANSFER_DEADLINE_EVENT_MAX_DELAY_MS - TRANSFER_DEADLINE_EVENT_MIN_DELAY_MS));
+}
+
+export function shouldTriggerPackTroll(player: StarXIPlayer, random: () => number = Math.random) {
+  const eligible = player.rating >= 86 || player.cardType === "icon" || player.cardType === "legendary";
+  return eligible && Math.max(0, Math.min(0.999999, Number(random()) || 0)) < PACK_TROLL_CHANCE;
 }
 
 export const TRANSFER_PLAYERS: TransferPlayer[] = [
@@ -398,6 +642,7 @@ export const TRANSFER_PLAYERS: TransferPlayer[] = [
 const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
   {
     id: "star-goat-nicu",
+    isCustom: true,
     name: "GOAT Nicu",
     position: "ST",
     positions: ["TW", "LV", "LAV", "IV", "RV", "RAV", "ZDM", "ZM", "ZOM", "LM", "RM", "LF", "RF", "MS", "ST"],
@@ -409,10 +654,11 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
   },
   {
     id: "star-flurin-fabrice",
+    isCustom: true,
     name: "Flurin Fabrice",
     position: "ZM",
     positions: ["ZM"],
-    rating: 67,
+    rating: 69,
     price: 1000,
     accent: "#8e8e93",
     cardType: "legendary",
@@ -420,6 +666,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
   },
   {
     id: "star-benxli",
+    isCustom: true,
     countryCode: "CH",
     name: "Benxli",
     position: "TW",
@@ -432,6 +679,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
   },
   {
     id: "star-maetthu",
+    isCustom: true,
     name: "Mätthu",
     position: "TW",
     positions: ["TW"],
@@ -442,6 +690,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
   },
   {
     id: "star-champ-simu",
+    isCustom: true,
     name: "Champ Simu",
     position: "IV",
     positions: ["IV"],
@@ -452,10 +701,11 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
   },
   {
     id: "star-silvuz",
+    isCustom: true,
     countryCode: "CH",
     name: "Silvuz",
     position: "LF",
-    positions: ["LF", "LM"],
+    positions: ["LF", "LM", "RF"],
     rating: 100,
     price: 5000000000,
     accent: "#d71920",
@@ -463,6 +713,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
   },
   {
     id: "star-nedu-mann-yesss",
+    isCustom: true,
     countryCode: "BA",
     name: "Nedu Mann Yesss",
     position: "ZM",
@@ -473,7 +724,65 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
     cardType: "legendary",
     packWeight: 0.02,
   },
+  {
+    id: "star-di-santo",
+    isCustom: true,
+    countryCode: "NL",
+    name: "Di Santo",
+    position: "ST",
+    positions: ["ST"],
+    rating: 100,
+    price: 5000000000,
+    accent: "#f36c21",
+    cardType: "legendary",
+    packWeight: 0.02,
+  },
 ];
+
+// The YB cards are kept in the shared pool as well. Two of
+// them already exist in the imported base dataset; the source-id list below
+// covers the complete YB set so it cannot silently lose a player when the
+// dataset changes.
+export const YB_FC26_SOURCE_IDS = [
+  "215556", "260272", "258924", "220665", "251617", "256726", "234913", "225853",
+  "229900", "193468", "251532", "252526", "225533", "258230", "270371", "75499", "257319",
+] as const;
+
+type YBPlayerSeed = readonly [sourceId: string, name: string, rating: number, positions: readonly StarPosition[], countryCode?: string];
+
+const YB_FC26_PLAYER_SEEDS: readonly YBPlayerSeed[] = [
+  ["215556", "Edimilson Fernandis", 74, ["ZDM", "IV", "ZM"], "CH"],
+  ["258924", "Joël Monteiroh", 73, ["LM", "RM", "ZM", "LF"], "CH"],
+  ["220665", "Gregory Wüthricha", 73, ["IV"], "CH"],
+  ["251617", "Armin Gigovik", 72, ["ZM", "ZDM"], "BA"],
+  ["234913", "Christian Fassnachtt", 72, ["RM", "LM", "ST", "RF"], "CH"],
+  ["225853", "Rayan Ravelosonn", 71, ["ZM", "ZDM"]],
+  ["229900", "Sandro Lauperr", 70, ["IV", "ZDM", "ZM"], "CH"],
+  ["193468", "Loris Benitto", 70, ["IV"], "CH"],
+  ["251532", "Meschack Eliá", 70, ["ST"]],
+  ["252526", "Darian Malesz", 70, ["RM", "LM", "ZOM", "ST"], "CH"],
+  ["225533", "Chris Bediaa", 70, ["ST"], "CI"],
+  ["258230", "Jaouen Hadjamm", 69, ["LV"], "FR"],
+  ["270371", "Ryan Andrewz", 68, ["RV", "RM"], "EN"],
+  ["75499", "Dominik Pechh", 68, ["ZM"], "CZ"],
+  ["257319", "Alan Virginiuz", 68, ["RM", "LM", "RF"], "FR"],
+];
+
+const YB_FC26_PLAYERS: StarXIPlayer[] = YB_FC26_PLAYER_SEEDS.map(([sourceId, name, previousRating, positions, countryCode]) => {
+  const rating = getFC27Rating(sourceId, previousRating);
+  const updatedPositions = getFC27Positions(sourceId, positions);
+  return {
+    id: `yb-${sourceId}`,
+    sourceId,
+    countryCode,
+    name: getFunnyPlayerName(name, `yb-${sourceId}`, { position: updatedPositions[0], rating }),
+    position: updatedPositions[0],
+    positions: [...updatedPositions],
+    rating,
+    price: Math.round(Math.min(1500000000, 5000 * 1.28 ** (rating - 70))),
+    accent: "#f4c400",
+  };
+});
 
 // The imported FC26 base-player dataset does not contain Ultimate Team ICON
 // items. This separate pool contains the full 129-player FC26 Icon roster.
@@ -614,7 +923,7 @@ const FC26_ICON_DATA = [
 const FC26_ICON_PLAYERS: StarXIPlayer[] = FC26_ICON_DATA.map(([id, name, rating, countryCode, positions]) => ({
   id: `icon-${id}`,
   countryCode,
-  name,
+  name: getFunnyPlayerName(name, `icon-${id}`, { position: positions[0], rating }),
   position: positions[0],
   positions: [...positions],
   rating,
@@ -627,6 +936,7 @@ const FC26_ICON_PLAYERS: StarXIPlayer[] = FC26_ICON_DATA.map(([id, name, rating,
 export const STAR_XI_PLAYERS: StarXIPlayer[] = [
   ...SPECIAL_STAR_XI_PLAYERS,
   ...FC26_ICON_PLAYERS,
+  ...YB_FC26_PLAYERS,
   ...FC26_STAR_PROFILES.map((profile) => ({
     id: profile.id,
     sourceId: profile.sourceId,
@@ -639,12 +949,28 @@ export const STAR_XI_PLAYERS: StarXIPlayer[] = [
   })),
 ];
 
+export const STAR_XI_BASE_CARD_COUNT = FC26_STAR_PROFILES.length + YB_FC26_PLAYERS.length;
+export const STAR_XI_ICON_CARD_COUNT = FC26_ICON_PLAYERS.length;
+export const STAR_XI_SPECIAL_CARD_COUNT = SPECIAL_STAR_XI_PLAYERS.length;
+export const STAR_XI_TOTAL_CARD_COUNT = STAR_XI_PLAYERS.length;
+
 const STAR_XI_PLAYER_BY_ID = new Map(STAR_XI_PLAYERS.map((player) => [player.id, player]));
 
+export const STAR_XI_CUSTOM_PLAYERS = STAR_XI_PLAYERS.filter((player) => player.isCustom === true);
+export const STAR_XI_RANDOM_CUSTOM_CARD_COST = 25000;
+
+export function getStarXIFragmentCompensation(player: StarXIPlayer) {
+  const ratingStep = Math.max(1, Math.min(34, Math.floor(player.rating) - 66));
+  if (player.isCustom) return ratingStep * 600;
+  if (player.cardType === "icon") return ratingStep * 75;
+  if (player.cardType === "legendary") return ratingStep * 150;
+  return ratingStep * 15;
+}
+
 export const STAR_PACKS: readonly StarPackDefinition[] = [
-  { id: "scout", label: "Scout Pack", price: 30000, description: "Früh verfügbar und ideal zum Aufbau, starke Karten bleiben extrem selten", odds: [{ label: "Standard 67–79", minRating: 67, maxRating: 79, chance: 0.9 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.09 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.009 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.00099 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.00001 }] },
-  { id: "elite", label: "Elite Pack", price: 250000000, description: "Midgame Pack mit besseren Chancen, aber ohne geschenkte Topelf", odds: [{ label: "Standard 67–79", minRating: 67, maxRating: 79, chance: 0.55 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.38 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.06 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.0099 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.0001 }] },
-  { id: "legend", label: "Legenden Pack", price: 5000000000, description: "Teures Endgame Risiko mit klar besseren, aber weiterhin seltenen Topkarten", odds: [{ label: "Standard 67–79", minRating: 67, maxRating: 79, chance: 0.18 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.42 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.34 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.05 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.01 }] },
+  { id: "scout", label: "Scout Pack", price: 25000, description: "Früh verfügbar und ideal zum Aufbau, starke Karten bleiben extrem selten", odds: [{ label: "Standard 65–79", minRating: 65, maxRating: 79, chance: 0.9 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.09 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.009 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.00099 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.00001 }] },
+  { id: "elite", label: "Elite Pack", price: 250000000, description: "Midgame Pack mit besseren Chancen, aber ohne geschenkte Topelf", odds: [{ label: "Standard 65–79", minRating: 65, maxRating: 79, chance: 0.55 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.38 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.06 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.0099 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.0001 }] },
+  { id: "legend", label: "Legenden Pack", price: 5000000000, description: "Teures Endgame Risiko mit klar besseren, aber weiterhin seltenen Topkarten", odds: [{ label: "Standard 65–79", minRating: 65, maxRating: 79, chance: 0.18 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.42 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.34 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.05 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.01 }] },
 ];
 
 const PACK_POSITION_GROUPS = [
@@ -672,8 +998,299 @@ function clamp(value: number, minimum: number, maximum: number) {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
+const SEASON_DIVISION_LABELS = [
+  "Kreisliga",
+  "2. Liga",
+  "1. Liga",
+  "Regionalliga",
+  "Challenge League",
+  "Super League",
+  "Conference League",
+  "Europa League",
+  "Europa League Elite",
+  "Champions League",
+  "Champions League Elite",
+  "Weltliga",
+  "Weltliga Elite",
+  "Global League",
+  "Hall of Fame",
+] as const;
+
+const SEASON_OPPONENT_NAMES = [
+  "FC Tabellenkeller",
+  "SV Unentschieden",
+  "Real Zufall",
+  "FC Arbeitszeitbetrug",
+  "Inter Timeout",
+] as const;
+
+export function getSeasonModeDivisionLabel(division: number) {
+  const index = Math.max(1, Math.min(SEASON_MODE_DIVISION_COUNT, Math.floor(Number(division) || 1))) - 1;
+  return SEASON_DIVISION_LABELS[index] ?? SEASON_DIVISION_LABELS[0];
+}
+
+function getSeasonOpponentRating(division: number, index: number) {
+  return Math.round(clamp(54 + (Math.max(1, division) - 1) * 3 + index * 2, 54, 99));
+}
+
+function createSeasonTable(division: number, clubName: string): SeasonTableRow[] {
+  return [
+    { id: "club", name: clubName || "FC Goal", rating: 0 },
+    ...SEASON_OPPONENT_NAMES.map((name, index) => ({ id: `season-opponent-${index + 1}`, name, rating: getSeasonOpponentRating(division, index + 1) })),
+  ].map((team) => ({ ...team, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 }));
+}
+
+function normalizeSeasonTable(raw: unknown, division: number, clubName: string) {
+  const saved = Array.isArray(raw) ? raw.map(asRecord) : [];
+  return createSeasonTable(division, clubName).map((fallback) => {
+    const source = saved.find((candidate) => candidate.id === fallback.id) ?? {};
+    return {
+      id: fallback.id,
+      name: fallback.id === "club" ? clubName || fallback.name : safeString(source.name, fallback.name).slice(0, 42),
+      rating: fallback.id === "club" ? 0 : Math.max(1, Math.min(99, Math.floor(Number(source.rating) || fallback.rating))),
+      played: Math.max(0, Math.floor(Number(source.played) || 0)),
+      wins: Math.max(0, Math.floor(Number(source.wins) || 0)),
+      draws: Math.max(0, Math.floor(Number(source.draws) || 0)),
+      losses: Math.max(0, Math.floor(Number(source.losses) || 0)),
+      goalsFor: Math.max(0, Math.floor(Number(source.goalsFor) || 0)),
+      goalsAgainst: Math.max(0, Math.floor(Number(source.goalsAgainst) || 0)),
+      points: Math.max(0, Math.floor(Number(source.points) || 0)),
+    };
+  });
+}
+
+function sortSeasonTable(table: readonly SeasonTableRow[]) {
+  return [...table].sort((first, second) => second.points - first.points
+    || (second.goalsFor - second.goalsAgainst) - (first.goalsFor - first.goalsAgainst)
+    || second.goalsFor - first.goalsFor
+    || (first.id === "club" ? -1 : second.id === "club" ? 1 : first.name.localeCompare(second.name)));
+}
+
+export function initialSeasonMode(clubName = "FC Goal"): SeasonModeState {
+  const table = createSeasonTable(1, clubName);
+  return {
+    division: 1,
+    highestDivision: 1,
+    matchday: 0,
+    table,
+    lastTable: table,
+    lastResult: "Die Saison wartet auf ihren ersten Anpfiff.",
+    lastMatchAt: 0,
+    history: [],
+    hallOfFame: false,
+    prestigeCount: 0,
+  };
+}
+
+export function normalizeSeasonModeState(value: unknown, clubName = "FC Goal", legacyCompletedSeasons = 0): SeasonModeState {
+  const source = asRecord(value);
+  const hasSavedSeasonMode = Object.keys(source).length > 0;
+  const legacyDivision = Math.min(SEASON_MODE_DIVISION_COUNT, Math.max(1, Math.floor(Number(legacyCompletedSeasons) || 0) + 1));
+  const division = Math.min(SEASON_MODE_DIVISION_COUNT, Math.max(1, Math.floor(Number(source.division) || (hasSavedSeasonMode ? 1 : legacyDivision))));
+  const highestDivision = Math.max(division, Math.min(SEASON_MODE_DIVISION_COUNT, Math.max(1, Math.floor(Number(source.highestDivision) || (hasSavedSeasonMode ? division : legacyDivision)))));
+  const legacyHallOfFame = !hasSavedSeasonMode && Number(legacyCompletedSeasons) >= SEASON_MODE_DIVISION_COUNT - 1;
+  const history = (Array.isArray(source.history) ? source.history : []).map((item) => asRecord(item)).map((item, index): SeasonMatchHistoryEntry | null => {
+    const outcome = item.outcome === "win" || item.outcome === "draw" || item.outcome === "loss" ? item.outcome : null;
+    if (!outcome) return null;
+    const seasonOutcome = item.seasonOutcome === "promoted" || item.seasonOutcome === "relegated" || item.seasonOutcome === "stayed" || item.seasonOutcome === "hall-of-fame" ? item.seasonOutcome : null;
+    return {
+      id: safeString(item.id, `season-match-${index}`),
+      division: Math.max(1, Math.min(SEASON_MODE_DIVISION_COUNT, Math.floor(Number(item.division) || division))),
+      matchday: Math.max(1, Math.min(SEASON_MODE_MATCHES_PER_SEASON, Math.floor(Number(item.matchday) || 1))),
+      opponent: safeString(item.opponent, "Unbekannter Gegner").slice(0, 42),
+      opponentRating: Math.max(1, Math.min(99, Math.floor(Number(item.opponentRating) || 54))),
+      clubScore: Math.max(0, Math.min(20, Math.floor(Number(item.clubScore) || 0))),
+      opponentScore: Math.max(0, Math.min(20, Math.floor(Number(item.opponentScore) || 0))),
+      outcome,
+      completedSeason: item.completedSeason === true,
+      seasonOutcome,
+      createdAt: Math.max(1, Math.floor(Number(item.createdAt) || Date.now())),
+    };
+  }).filter((item): item is SeasonMatchHistoryEntry => Boolean(item)).slice(-30);
+  const table = normalizeSeasonTable(source.table, division, clubName);
+  const lastTable = normalizeSeasonTable(source.lastTable, division, clubName);
+  return {
+    division,
+    highestDivision,
+    matchday: Math.max(0, Math.min(SEASON_MODE_MATCHES_PER_SEASON - 1, Math.floor(Number(source.matchday) || 0))),
+    table,
+    lastTable,
+    lastResult: safeString(source.lastResult, initialSeasonMode(clubName).lastResult).slice(0, 220),
+    lastMatchAt: Math.max(0, Math.floor(Number(source.lastMatchAt) || 0)),
+    history,
+    hallOfFame: source.hallOfFame === true || legacyHallOfFame,
+    prestigeCount: Math.max(0, Math.floor(Number(source.prestigeCount) || 0)),
+  };
+}
+
+function rollSeasonScore(strength: number, random: () => number) {
+  const expected = clamp(0.55 + strength * 0.035, 0.2, 3.8);
+  let score = 0;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const chance = clamp(expected / (attempt + 2.2), 0.035, 0.84);
+    if (boundedRandom(random) < chance) score += 1;
+  }
+  return score;
+}
+
+function updateSeasonTableRow(row: SeasonTableRow, goalsFor: number, goalsAgainst: number) {
+  const won = goalsFor > goalsAgainst;
+  const draw = goalsFor === goalsAgainst;
+  return {
+    ...row,
+    played: row.played + 1,
+    wins: row.wins + (won ? 1 : 0),
+    draws: row.draws + (draw ? 1 : 0),
+    losses: row.losses + (!won && !draw ? 1 : 0),
+    goalsFor: row.goalsFor + goalsFor,
+    goalsAgainst: row.goalsAgainst + goalsAgainst,
+    points: row.points + (won ? 3 : draw ? 1 : 0),
+  };
+}
+
+export function getSeasonModeNextOpponent(value: unknown, clubName = "FC Goal") {
+  const state = normalizeSeasonModeState(value, clubName);
+  const opponentIndex = (state.matchday % (SEASON_MODE_TABLE_SIZE - 1)) + 1;
+  const opponent = state.table.find((team) => team.id === `season-opponent-${opponentIndex}`) ?? state.table[1];
+  const strategyIds: readonly CupStrategyId[] = ["ballbesitz", "konter", "angriff"];
+  return {
+    id: opponent?.id ?? `season-opponent-${opponentIndex}`,
+    name: opponent?.name ?? "Unbekannter Gegner",
+    rating: opponent?.rating ?? getSeasonOpponentRating(state.division, opponentIndex),
+    strategyId: strategyIds[(opponentIndex - 1) % strategyIds.length] ?? "ballbesitz",
+  };
+}
+
+export function recordSeasonModeMatch(value: unknown, clubScore: number, opponentScore: number, clubName = "FC Goal", now = Date.now(), random: () => number = Math.random, opponentId?: string) {
+  const state = normalizeSeasonModeState(value, clubName);
+  if (state.hallOfFame) return { state, played: false, entry: null as SeasonMatchHistoryEntry | null };
+  const matchday = state.matchday + 1;
+  const nextOpponent = getSeasonModeNextOpponent(state, clubName);
+  const opponent = state.table.find((team) => team.id === opponentId) ?? state.table.find((team) => team.id === nextOpponent.id) ?? state.table[1];
+  const safeClubScore = Math.max(0, Math.min(20, Math.floor(Number(clubScore) || 0)));
+  const safeOpponentScore = Math.max(0, Math.min(20, Math.floor(Number(opponentScore) || 0)));
+  const opponentRating = opponent?.rating ?? nextOpponent.rating;
+  const outcome: SeasonMatchHistoryEntry["outcome"] = safeClubScore > safeOpponentScore ? "win" : safeClubScore === safeOpponentScore ? "draw" : "loss";
+  let table = state.table.map((team) => team.id === "club" ? updateSeasonTableRow({ ...team, name: clubName || team.name }, safeClubScore, safeOpponentScore) : team.id === opponent?.id ? updateSeasonTableRow(team, safeOpponentScore, safeClubScore) : team);
+  const backgroundTeams = table.filter((team) => team.id !== "club" && team.id !== opponent?.id);
+  for (let index = 0; index + 1 < backgroundTeams.length; index += 2) {
+    const first = backgroundTeams[index];
+    const second = backgroundTeams[index + 1];
+    const firstScore = rollSeasonScore(first.rating - second.rating + 1, random);
+    const secondScore = rollSeasonScore(second.rating - first.rating - 1, random);
+    table = table.map((team) => team.id === first.id ? updateSeasonTableRow(team, firstScore, secondScore) : team.id === second.id ? updateSeasonTableRow(team, secondScore, firstScore) : team);
+  }
+  const lastTable = sortSeasonTable(table);
+  const completedSeason = matchday >= SEASON_MODE_MATCHES_PER_SEASON;
+  let seasonOutcome: SeasonMatchHistoryEntry["seasonOutcome"] = null;
+  let nextDivision = state.division;
+  let nextHighestDivision = state.highestDivision;
+  let hallOfFame = false;
+  let lastResult = `${safeClubScore}:${safeOpponentScore} gegen ${opponent?.name ?? nextOpponent.name}. ${matchday} von ${SEASON_MODE_MATCHES_PER_SEASON} Saisonspielen gespielt.`;
+  if (completedSeason) {
+    const position = lastTable.findIndex((team) => team.id === "club") + 1;
+    if (state.division === SEASON_MODE_DIVISION_COUNT && position <= 2) {
+      hallOfFame = true;
+      seasonOutcome = "hall-of-fame";
+      nextDivision = SEASON_MODE_DIVISION_COUNT;
+      lastResult = `Hall of Fame erreicht. Dein Club beendet die Saison auf Platz ${position}.`;
+    } else if (position <= 2 && state.division < SEASON_MODE_DIVISION_COUNT) {
+      seasonOutcome = "promoted";
+      nextDivision = state.division + 1;
+      lastResult = `Saison beendet: Platz ${position} und Aufstieg in Saison ${nextDivision}.`;
+    } else if (position >= SEASON_MODE_TABLE_SIZE - 1 && state.division > 1) {
+      seasonOutcome = "relegated";
+      nextDivision = state.division - 1;
+      lastResult = `Saison beendet: Platz ${position} und Abstieg in Saison ${nextDivision}.`;
+    } else {
+      seasonOutcome = "stayed";
+      lastResult = `Saison beendet: Platz ${position}. Dein Club bleibt in ${getSeasonModeDivisionLabel(state.division)}.`;
+    }
+    nextHighestDivision = Math.max(nextHighestDivision, nextDivision);
+  }
+  const entry: SeasonMatchHistoryEntry = {
+    id: `season-match-${now}-${matchday}`,
+    division: state.division,
+    matchday,
+    opponent: opponent?.name ?? nextOpponent.name,
+    opponentRating,
+    clubScore: safeClubScore,
+    opponentScore: safeOpponentScore,
+    outcome,
+    completedSeason,
+    seasonOutcome,
+    createdAt: now,
+  };
+  const nextState: SeasonModeState = {
+    ...state,
+    division: nextDivision,
+    highestDivision: nextHighestDivision,
+    matchday: completedSeason ? 0 : matchday,
+    table: completedSeason && !hallOfFame ? createSeasonTable(nextDivision, clubName) : lastTable,
+    lastTable,
+    lastResult,
+    lastMatchAt: now,
+    history: [...state.history, entry].slice(-30),
+    hallOfFame,
+  };
+  return { state: nextState, played: true, entry };
+}
+
+export function playSeasonModeMatch(value: unknown, starRating: number, clubName = "FC Goal", now = Date.now(), random: () => number = Math.random) {
+  const state = normalizeSeasonModeState(value, clubName);
+  if (state.hallOfFame) return { state, played: false, entry: null as SeasonMatchHistoryEntry | null };
+  const opponent = getSeasonModeNextOpponent(state, clubName);
+  const homeAdvantage = state.matchday % 2 === 0 ? 1.5 : -1.5;
+  const clubScore = rollSeasonScore((Number(starRating) || 55) - opponent.rating + homeAdvantage, random);
+  const opponentScore = rollSeasonScore((opponent.rating - (Number(starRating) || 55)) - homeAdvantage, random);
+  return recordSeasonModeMatch(state, clubScore, opponentScore, clubName, now, random, opponent.id);
+}
+
+export function startSeasonPrestige(value: unknown, clubName = "FC Goal", now = Date.now()) {
+  const state = normalizeSeasonModeState(value, clubName);
+  if (!state.hallOfFame) return state;
+  const freshTable = createSeasonTable(1, clubName);
+  return {
+    ...state,
+    division: 1,
+    matchday: 0,
+    table: freshTable,
+    lastTable: freshTable,
+    lastResult: `Prestige ${state.prestigeCount + 1} gestartet. Die Jagd auf die Hall of Fame beginnt von vorn.`,
+    lastMatchAt: now,
+    hallOfFame: false,
+    prestigeCount: state.prestigeCount + 1,
+  };
+}
+
 export function getStarXIPlayer(id: string) {
   return STAR_XI_PLAYER_BY_ID.get(id);
+}
+
+export function drawRandomStarXICustomCard(state: StarXIState, random = Math.random) {
+  const next = normalizeStarXIState(state);
+  const cost = STAR_XI_RANDOM_CUSTOM_CARD_COST;
+  if (next.fragments < cost || STAR_XI_CUSTOM_PLAYERS.length === 0) {
+    return { state: next, drawn: false, cost, player: null, duplicate: false, fragmentCompensation: 0, source: "custom-draw" as const };
+  }
+  const roll = clamp(Number(random()) || 0, 0, 0.999999999);
+  const player = STAR_XI_CUSTOM_PLAYERS[Math.floor(roll * STAR_XI_CUSTOM_PLAYERS.length)];
+  const duplicate = next.ownedIds.includes(player.id);
+  next.fragments -= cost;
+  const fragmentCompensation = duplicate ? getStarXIFragmentCompensation(player) : 0;
+  if (duplicate) next.fragments += fragmentCompensation;
+  else next.ownedIds = addStarXIPlayer(next, player.id).ownedIds;
+  return {
+    state: next,
+    drawn: true,
+    cost,
+    packId: "legend" as const,
+    packName: "Spezialkarten-Zug",
+    player,
+    duplicate,
+    fragmentCompensation,
+    source: "custom-draw" as const,
+  };
 }
 
 function uniqueKnownStarIds(ids: unknown) {
@@ -703,15 +1320,17 @@ function normalizeFormationPositions(value: unknown) {
   });
 }
 
-function normalizeLineupSlots(ownedIds: string[], rawLineupIds: unknown, formationPositions: readonly StarPosition[]) {
+function normalizeLineupSlots(ownedIds: string[], rawLineupIds: unknown, formationPositions: readonly StarPosition[], blockedIds: ReadonlySet<string> = new Set()) {
   const lineupIds = Array.from({ length: STAR_XI_SQUAD_SIZE }, () => "");
   const requested = Array.isArray(rawLineupIds) ? rawLineupIds : [];
   const used = new Set<string>();
   const displaced: string[] = [];
+  const preservedEmptySlots = new Set<number>();
 
   for (let index = 0; index < STAR_XI_SQUAD_SIZE; index += 1) {
     const rawId = requested[index];
-    const id = typeof rawId === "string" && ownedIds.includes(rawId) ? rawId : "";
+    if (rawId === "" || (typeof rawId === "string" && blockedIds.has(rawId))) preservedEmptySlots.add(index);
+    const id = typeof rawId === "string" && ownedIds.includes(rawId) && !blockedIds.has(rawId) ? rawId : "";
     if (!id || used.has(id)) continue;
     if (canStarXIPlayerFillSlot(id, index, formationPositions)) {
       lineupIds[index] = id;
@@ -721,9 +1340,9 @@ function normalizeLineupSlots(ownedIds: string[], rawLineupIds: unknown, formati
     }
   }
 
-  const candidates = [...displaced, ...ownedIds.filter((id) => !used.has(id) && !displaced.includes(id))];
+  const candidates = [...displaced, ...ownedIds.filter((id) => !used.has(id) && !displaced.includes(id) && !blockedIds.has(id))];
   for (const id of candidates) {
-    const openIndex = lineupIds.findIndex((current, index) => !current && canStarXIPlayerFillSlot(id, index, formationPositions));
+    const openIndex = lineupIds.findIndex((current, index) => !current && !preservedEmptySlots.has(index) && canStarXIPlayerFillSlot(id, index, formationPositions));
     if (openIndex < 0) continue;
     lineupIds[openIndex] = id;
     used.add(id);
@@ -731,20 +1350,22 @@ function normalizeLineupSlots(ownedIds: string[], rawLineupIds: unknown, formati
   return lineupIds;
 }
 
-function normalizeBenchSlots(ownedIds: string[], lineupIds: string[], rawBenchIds: unknown) {
+function normalizeBenchSlots(ownedIds: string[], lineupIds: string[], rawBenchIds: unknown, blockedIds: ReadonlySet<string> = new Set()) {
   const benchIds = Array.from({ length: STAR_XI_BENCH_SIZE }, () => "");
   const requested = Array.isArray(rawBenchIds) ? rawBenchIds : [];
   const used = new Set(lineupIds.filter(Boolean));
+  const preservedEmptySlots = new Set<number>();
   for (let index = 0; index < STAR_XI_BENCH_SIZE; index += 1) {
     const rawId = requested[index];
-    const id = typeof rawId === "string" && ownedIds.includes(rawId) ? rawId : "";
+    if (rawId === "" || (typeof rawId === "string" && blockedIds.has(rawId))) preservedEmptySlots.add(index);
+    const id = typeof rawId === "string" && ownedIds.includes(rawId) && !blockedIds.has(rawId) ? rawId : "";
     if (!id || used.has(id)) continue;
     benchIds[index] = id;
     used.add(id);
   }
   for (const id of ownedIds) {
-    if (used.has(id)) continue;
-    const openIndex = benchIds.findIndex((current) => !current);
+    if (used.has(id) || blockedIds.has(id)) continue;
+    const openIndex = benchIds.findIndex((current, index) => !current && !preservedEmptySlots.has(index));
     if (openIndex < 0) break;
     benchIds[openIndex] = id;
     used.add(id);
@@ -752,17 +1373,29 @@ function normalizeBenchSlots(ownedIds: string[], lineupIds: string[], rawBenchId
   return benchIds;
 }
 
-export function normalizeStarXIState(value: unknown): StarXIState {
+export function normalizeStarXIState(value: unknown, blockedPlayerIds: readonly string[] = []) {
   const source = asRecord(value);
   const ownedIds = uniqueKnownStarIds(source.ownedIds);
+  const fragments = Math.max(0, Math.floor(Number(source.fragments) || 0));
+  const blockedIds = new Set(blockedPlayerIds);
   const requestedPositions = normalizeFormationPositions(source.formationPositions);
   const formation = STAR_FORMATIONS.find((item) => item.id === source.formationId)
     ?? STAR_FORMATIONS.find((item) => item.slots.every((slot, index) => slot.position === requestedPositions[index]))
     ?? getStarFormation("433");
   const formationPositions = formation.slots.map((slot) => slot.position);
-  const lineupIds = normalizeLineupSlots(ownedIds, source.lineupIds, formationPositions);
-  const benchIds = normalizeBenchSlots(ownedIds, lineupIds, source.benchIds);
-  return { ownedIds, lineupIds, benchIds, formationId: formation.id, formationPositions };
+  const lineupIds = normalizeLineupSlots(ownedIds, source.lineupIds, formationPositions, blockedIds);
+  const benchIds = normalizeBenchSlots(ownedIds, lineupIds, source.benchIds, blockedIds);
+  return { ownedIds, fragments, lineupIds, benchIds, formationId: formation.id, formationPositions };
+}
+
+export function removeStarXIPlayersFromSquad(state: StarXIState, playerIds: readonly string[], removeFromLineup = true) {
+  const next = normalizeStarXIState(state);
+  const blocked = new Set(playerIds);
+  if (!blocked.size) return next;
+  const lineupIds = removeFromLineup ? next.lineupIds.map((id) => blocked.has(id) ? "" : id) : [...next.lineupIds];
+  const used = new Set(lineupIds.filter(Boolean));
+  const benchIds = next.benchIds.map((id) => blocked.has(id) || used.has(id) ? "" : id);
+  return { ...next, lineupIds, benchIds };
 }
 
 export function addStarXIPlayer(state: StarXIState, playerId: string) {
@@ -778,9 +1411,10 @@ export function addStarXIPlayer(state: StarXIState, playerId: string) {
   return next;
 }
 
-export function setStarXIStarter(state: StarXIState, lineupIndex: number, playerId: string) {
+export function setStarXIStarter(state: StarXIState, lineupIndex: number, playerId: string, blockedPlayerIds: readonly string[] = []) {
   const next = normalizeStarXIState(state);
-  if (!Number.isInteger(lineupIndex) || lineupIndex < 0 || lineupIndex >= STAR_XI_SQUAD_SIZE || !next.ownedIds.includes(playerId) || !canStarXIPlayerFillSlot(playerId, lineupIndex, next.formationPositions)) return next;
+  const blocked = new Set(blockedPlayerIds);
+  if (!Number.isInteger(lineupIndex) || lineupIndex < 0 || lineupIndex >= STAR_XI_SQUAD_SIZE || blocked.has(playerId) || !next.ownedIds.includes(playerId) || !canStarXIPlayerFillSlot(playerId, lineupIndex, next.formationPositions)) return next;
   const lineupIds = [...next.lineupIds];
   const currentPlayerId = lineupIds[lineupIndex];
   const otherLineupIndex = lineupIds.indexOf(playerId);
@@ -792,42 +1426,226 @@ export function setStarXIStarter(state: StarXIState, lineupIndex: number, player
     lineupIds[lineupIndex] = playerId;
     const benchIndex = next.benchIds.indexOf(playerId);
     if (benchIndex >= 0) {
-      if (currentPlayerId) next.benchIds[benchIndex] = currentPlayerId;
-      else next.benchIds = next.benchIds.filter((id) => id !== playerId);
+      if (currentPlayerId && !blocked.has(currentPlayerId)) next.benchIds[benchIndex] = currentPlayerId;
+      else next.benchIds[benchIndex] = "";
     }
   }
   next.lineupIds = lineupIds;
-  return normalizeStarXIState(next);
+  return blocked.size ? removeStarXIPlayersFromSquad(next, blockedPlayerIds, false) : normalizeStarXIState(next);
 }
 
-export function setStarXIFormation(state: StarXIState, formationId: StarFormationId) {
+export function setStarXIFormation(state: StarXIState, formationId: StarFormationId, blockedPlayerIds: readonly string[] = []) {
   const next = normalizeStarXIState(state);
   const formation = STAR_FORMATIONS.find((item) => item.id === formationId);
   if (!formation || formation.id === next.formationId) return next;
   const formationPositions = formation.slots.map((slot) => slot.position);
-  const lineupIds = normalizeLineupSlots(next.ownedIds, next.lineupIds, formationPositions);
-  const benchIds = normalizeBenchSlots(next.ownedIds, lineupIds, next.benchIds);
+  const blocked = new Set(blockedPlayerIds);
+  const lineupIds = normalizeLineupSlots(next.ownedIds, next.lineupIds, formationPositions, blocked);
+  const benchIds = normalizeBenchSlots(next.ownedIds, lineupIds, next.benchIds, blocked);
   return { ...next, formationId: formation.id, formationPositions, lineupIds, benchIds };
 }
 
-export function setStarXIBenchPlayer(state: StarXIState, benchIndex: number, playerId: string) {
+export function setStarXIBenchPlayer(state: StarXIState, benchIndex: number, playerId: string, blockedPlayerIds: readonly string[] = []) {
   const next = normalizeStarXIState(state);
-  if (!Number.isInteger(benchIndex) || benchIndex < 0 || benchIndex >= STAR_XI_BENCH_SIZE || !next.ownedIds.includes(playerId) || next.lineupIds.includes(playerId)) return next;
+  if (!Number.isInteger(benchIndex) || benchIndex < 0 || benchIndex >= STAR_XI_BENCH_SIZE || blockedPlayerIds.includes(playerId) || !next.ownedIds.includes(playerId) || next.lineupIds.includes(playerId)) return next;
   const currentPlayerId = next.benchIds[benchIndex];
   const otherBenchIndex = next.benchIds.indexOf(playerId);
   if (otherBenchIndex >= 0) next.benchIds[otherBenchIndex] = currentPlayerId;
   next.benchIds[benchIndex] = playerId;
-  return normalizeStarXIState(next);
+  return blockedPlayerIds.length ? removeStarXIPlayersFromSquad(next, blockedPlayerIds, false) : normalizeStarXIState(next);
+}
+
+function compareStarXIPlayers(first: StarXIPlayer, second: StarXIPlayer) {
+  return second.rating - first.rating || first.id.localeCompare(second.id);
+}
+
+function isDedicatedStarXIGoalkeeper(player: StarXIPlayer) {
+  const positions = getStarXIPositions(player);
+  return positions.length > 0 && positions.every((position) => position === "TW");
+}
+
+function countBits(value: number) {
+  let count = 0;
+  let current = value;
+  while (current) {
+    current &= current - 1;
+    count += 1;
+  }
+  return count;
+}
+
+/**
+ * Finds the highest-rated valid assignment for the current formation.
+ *
+ * The dynamic program uses a bit for each of the eleven slots. Only the
+ * eleven highest-rated candidates for a slot are needed: an assignment can
+ * use at most ten other players to block those candidates, so a lower-ranked
+ * twelfth candidate can always be replaced by a free higher-ranked one.
+ */
+export function getBestStarXISelection(ownedIds: string[], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS, blockedPlayerIds: readonly string[] = []) {
+  const positions = Array.from({ length: STAR_XI_SQUAD_SIZE }, (_, index) => formationPositions[index] ?? STAR_XI_FORMATION_POSITIONS[index]);
+  const blocked = new Set(blockedPlayerIds);
+  const players = [...new Set(ownedIds)]
+    .map((id) => getStarXIPlayer(id))
+    .filter((player): player is StarXIPlayer => Boolean(player) && !blocked.has(player.id));
+  const candidateIds = new Set<string>();
+
+  for (const position of positions) {
+    players
+      .filter((player) => canStarXIPlayerPlayPosition(player, position))
+      .sort(compareStarXIPlayers)
+      .slice(0, STAR_XI_SQUAD_SIZE)
+      .forEach((player) => candidateIds.add(player.id));
+  }
+
+  const candidates = players.filter((player) => candidateIds.has(player.id)).sort(compareStarXIPlayers);
+  const stateCount = 1 << STAR_XI_SQUAD_SIZE;
+  let scores = new Float64Array(stateCount);
+  scores.fill(Number.NEGATIVE_INFINITY);
+  scores[0] = 0;
+  const scoreLayers: Float64Array[] = [scores];
+
+  for (const player of candidates) {
+    const nextScores = new Float64Array(scores);
+    const compatibleSlots = positions.reduce((mask, position, index) => canStarXIPlayerPlayPosition(player, position) ? mask | (1 << index) : mask, 0);
+    for (let mask = 0; mask < stateCount; mask += 1) {
+      if (!Number.isFinite(scores[mask])) continue;
+      let openSlots = compatibleSlots & ~mask;
+      while (openSlots) {
+        const slotBit = openSlots & -openSlots;
+        const nextMask = mask | slotBit;
+        const nextScore = scores[mask] + player.rating;
+        if (nextScore > nextScores[nextMask]) nextScores[nextMask] = nextScore;
+        openSlots ^= slotBit;
+      }
+    }
+    scores = nextScores;
+    scoreLayers.push(scores);
+  }
+
+  let bestMask = 0;
+  let bestCount = 0;
+  let bestRating = 0;
+  for (let mask = 0; mask < stateCount; mask += 1) {
+    const rating = scores[mask];
+    if (!Number.isFinite(rating)) continue;
+    const count = countBits(mask);
+    if (count > bestCount || (count === bestCount && rating > bestRating)) {
+      bestMask = mask;
+      bestCount = count;
+      bestRating = rating;
+    }
+  }
+
+  const lineupIds = Array.from({ length: STAR_XI_SQUAD_SIZE }, () => "");
+  let mask = bestMask;
+  for (let playerIndex = candidates.length; playerIndex > 0 && mask; playerIndex -= 1) {
+    const player = candidates[playerIndex - 1];
+    const currentScore = scoreLayers[playerIndex][mask];
+    if (currentScore === scoreLayers[playerIndex - 1][mask]) continue;
+    for (let slotIndex = 0; slotIndex < STAR_XI_SQUAD_SIZE; slotIndex += 1) {
+      const slotBit = 1 << slotIndex;
+      if (!(mask & slotBit)) continue;
+      if (!canStarXIPlayerPlayPosition(player, positions[slotIndex])) continue;
+      const previousMask = mask ^ slotBit;
+      const previousScore = scoreLayers[playerIndex - 1][previousMask];
+      if (!Number.isFinite(previousScore) || previousScore + player.rating !== currentScore) continue;
+      lineupIds[slotIndex] = player.id;
+      mask = previousMask;
+      break;
+    }
+  }
+  return lineupIds;
+}
+
+export function setBestStarXI(state: StarXIState, blockedPlayerIds: readonly string[] = []) {
+  const next = removeStarXIPlayersFromSquad(normalizeStarXIState(state), blockedPlayerIds);
+  const lineupIds = getBestStarXISelection(next.ownedIds, next.formationPositions, blockedPlayerIds);
+  const benchIds = getBestStarXIBenchSelection(next.ownedIds, lineupIds, next.formationPositions, blockedPlayerIds);
+  return { ...next, lineupIds, benchIds };
+}
+
+/**
+ * Builds a substitute bench that mirrors the role demand of the formation.
+ * Repeated positions stay repeated, so a back three reserves several centre
+ * backs instead of filling the bench with whichever midfielders rate highest.
+ */
+export function getBestStarXIBenchSelection(
+  ownedIds: string[],
+  lineupIds: readonly string[],
+  formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS,
+  blockedPlayerIds: readonly string[] = [],
+) {
+  const blocked = new Set(blockedPlayerIds);
+  const used = new Set(lineupIds.filter(Boolean));
+  const requiredPositions = formationPositions.slice(0, STAR_XI_SQUAD_SIZE);
+  const positionDemand = requiredPositions.reduce((counts, position) => {
+    counts[position] = (counts[position] ?? 0) + 1;
+    return counts;
+  }, {} as Partial<Record<StarPosition, number>>);
+  const activePositions = Object.keys(positionDemand) as StarPosition[];
+  const benchCandidates = [...new Set(ownedIds)]
+    .filter((playerId) => !used.has(playerId) && !blocked.has(playerId))
+    .map((playerId) => getStarXIPlayer(playerId))
+    .filter((player): player is StarXIPlayer => Boolean(player) && requiredPositions.some((position) => canStarXIPlayerPlayPosition(player, position)))
+    .sort(compareStarXIPlayers);
+
+  if (!requiredPositions.length || !benchCandidates.length) return Array.from({ length: STAR_XI_BENCH_SIZE }, () => "");
+  const selectedBenchPlayers: StarXIPlayer[] = [];
+  const selectedIds = new Set<string>();
+  const coverage = Object.fromEntries(activePositions.map((position) => [position, 0])) as Record<StarPosition, number>;
+  const demandOrder = requiredPositions
+    .map((position, index) => ({ position, index }))
+    .sort((first, second) => (positionDemand[first.position] ?? 0) - (positionDemand[second.position] ?? 0)
+      || benchCandidates.filter((player) => canStarXIPlayerPlayPosition(player, first.position)).length - benchCandidates.filter((player) => canStarXIPlayerPlayPosition(player, second.position)).length
+      || first.index - second.index);
+  const candidateScore = (player: StarXIPlayer, assignmentPosition?: StarPosition) => {
+    let score = player.rating * 10 + (assignmentPosition && player.position === assignmentPosition ? 30 : 0);
+    for (const position of activePositions) {
+      if (!canStarXIPlayerPlayPosition(player, position)) continue;
+      const demand = Math.max(1, positionDemand[position] ?? 1);
+      if (position !== assignmentPosition) score -= 35 / demand;
+      const excess = coverage[position] + 1 - demand;
+      if (excess > 0) score -= excess * 140;
+    }
+    return score;
+  };
+  const selectPlayer = (player: StarXIPlayer) => {
+    selectedIds.add(player.id);
+    selectedBenchPlayers.push(player);
+    for (const position of activePositions) if (canStarXIPlayerPlayPosition(player, position)) coverage[position] += 1;
+  };
+
+  for (const { position } of demandOrder) {
+    const player = benchCandidates
+      .filter((candidate) => !selectedIds.has(candidate.id) && canStarXIPlayerPlayPosition(candidate, position))
+      .sort((first, second) => candidateScore(second, position) - candidateScore(first, position) || compareStarXIPlayers(first, second))[0];
+    if (player) selectPlayer(player);
+  }
+
+  while (selectedBenchPlayers.length < STAR_XI_BENCH_SIZE) {
+    const dedicatedGoalkeeperSelected = selectedBenchPlayers.some(isDedicatedStarXIGoalkeeper);
+    const player = benchCandidates
+      .filter((candidate) => !selectedIds.has(candidate.id) && !(dedicatedGoalkeeperSelected && isDedicatedStarXIGoalkeeper(candidate)))
+      .sort((first, second) => candidateScore(second) - candidateScore(first) || compareStarXIPlayers(first, second))[0];
+    if (!player) break;
+    // Keep the earlier UCL-style rule: one dedicated substitute goalkeeper is enough.
+    selectPlayer(player);
+  }
+
+  return Array.from({ length: STAR_XI_BENCH_SIZE }, (_, index) => selectedBenchPlayers[index]?.id ?? "");
 }
 
 export function restoreStarXIAfterMatch(state: StarXIState, cup: CupState) {
   const next = normalizeStarXIState(state);
   if (cup.originalLineupIds.length !== STAR_XI_SQUAD_SIZE) return next;
-  return normalizeStarXIState({
+  const restored = {
     ...next,
     lineupIds: [...cup.originalLineupIds],
     benchIds: cup.originalBenchIds.length === STAR_XI_BENCH_SIZE ? [...cup.originalBenchIds] : next.benchIds,
-  });
+  };
+  const injuredIds = Object.entries(cup.injuredPlayerIds ?? {}).filter(([, matches]) => Number(matches) > 0).map(([playerId]) => playerId);
+  return removeStarXIPlayersFromSquad(restored, [...new Set([...cup.suspendedPlayerIds, ...injuredIds])]);
 }
 
 export function getStarXISelection(ownedIds: string[], lineupIds: string[] = []) {
@@ -882,15 +1700,55 @@ export function getCupPlayerMatchRating(cup: CupState, playerId: string, minute:
   return getStarXIPlayerMatchRating(playerId, cup.matchStartedAt, effectiveMinute, 0, enteredAtMinute, eventImpact + cleanSheetBoost, position);
 }
 
+export type CupSubstitutionImpact = {
+  cup: CupState;
+  incomingRating: number;
+  outgoingRating: number;
+  ratingDelta: number;
+  outgoingMatchRating: number;
+  momentumDelta: number;
+};
+
+export function applyCupSubstitution(cup: CupState, outgoingPlayerId: string | undefined, incomingPlayerId: string, minute: number): CupSubstitutionImpact {
+  const incoming = getStarXIPlayer(incomingPlayerId);
+  const outgoing = outgoingPlayerId ? getStarXIPlayer(outgoingPlayerId) : undefined;
+  if (!incoming || !outgoing) return { cup, incomingRating: incoming?.rating ?? 0, outgoingRating: outgoing?.rating ?? 0, ratingDelta: 0, outgoingMatchRating: 6.5, momentumDelta: 0 };
+
+  const substitutionMinute = Math.max(1, Math.min(120, Math.floor(Number(minute) || 1)));
+  const outgoingMatchRating = getCupPlayerMatchRating(cup, outgoing.id, substitutionMinute) ?? 6.5;
+  const ratingDelta = incoming.rating - outgoing.rating;
+  const ratingMomentum = clamp(ratingDelta * 0.18, -4, 4);
+  const formMomentum = clamp((6.5 - outgoingMatchRating) * 0.9, -2.2, 2.2);
+  const freshnessMomentum = substitutionMinute >= 75 ? 1.2 : substitutionMinute >= 60 ? 0.8 : 0.25;
+  const momentumDelta = Math.round(clamp(ratingMomentum + formMomentum + freshnessMomentum, -4.5, 4.5) * 10) / 10;
+  const nextMomentum = Math.round(clamp((Number(cup.matchMomentum) || 0) + momentumDelta, -CUP_MAX_MOMENTUM, CUP_MAX_MOMENTUM) * 10) / 10;
+  const allTimeAppearances = { ...(cup.allTimeAppearances ?? {}) };
+  allTimeAppearances[incoming.id] = Math.max(0, Math.floor(Number(allTimeAppearances[incoming.id]) || 0)) + 1;
+  const ratingLabel = `${ratingDelta >= 0 ? "+" : ""}${ratingDelta} OVR`;
+  const momentumLabel = `${momentumDelta >= 0 ? "+" : ""}${momentumDelta.toFixed(1)}`;
+  return {
+    cup: { ...cup, matchMomentum: nextMomentum, allTimeAppearances, matchPaused: false, lastResult: `Wechsel: ${incoming.name} für ${outgoing.name}. ${ratingLabel} · Momentum ${momentumLabel}.` },
+    incomingRating: incoming.rating,
+    outgoingRating: outgoing.rating,
+    ratingDelta,
+    outgoingMatchRating,
+    momentumDelta,
+  };
+}
+
 export function getStarXIEffectiveMatchRating(ownedIds: string[], lineupIds: string[], cup: CupState, minute: number) {
-  const starters = getStarXISelection(ownedIds, lineupIds);
+  const sentOff = new Set(cup.sentOffPlayerIds);
+  const injured = new Set(Object.entries(cup.injuredPlayerIds ?? {}).filter(([, matches]) => Number(matches) > 0).map(([playerId]) => playerId));
+  const starters = getStarXISelection(ownedIds, lineupIds).filter((player) => !sentOff.has(player.id) && !injured.has(player.id));
   if (!starters.length) return 55;
   const missing = STAR_XI_SQUAD_SIZE - starters.length;
   const effectiveTotal = starters.reduce((total, player) => {
     const liveForm = getCupPlayerMatchRating(cup, player.id, minute) ?? 6.4;
     return total + player.rating + (liveForm - 6.5) * 2.8;
   }, missing * 55);
-  return clamp(Math.round((effectiveTotal / STAR_XI_SQUAD_SIZE) * 10) / 10, 40, 100);
+  const squadRating = Math.round((effectiveTotal / STAR_XI_SQUAD_SIZE) * 10) / 10;
+  const momentumRating = (Number(cup.matchMomentum) || 0) * CUP_MOMENTUM_RATING_WEIGHT;
+  return clamp(squadRating - sentOff.size * RED_CARD_MATCH_RATING_DROP - injured.size * 3 + momentumRating, 40, 100);
 }
 
 export function getStarPack(id: string) {
@@ -899,6 +1757,71 @@ export function getStarPack(id: string) {
 
 export function getTournament(id: string) {
   return TOURNAMENTS.find((tournament) => tournament.id === id);
+}
+
+function boundedRandom(random: () => number) {
+  const value = Number(random());
+  return Number.isFinite(value) ? Math.max(0, Math.min(0.999999, value)) : 0;
+}
+
+export function getTournamentOpponentSchedule(tournament: TournamentDefinition, random = Math.random) {
+  const shuffled = [...tournament.opponents];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(boundedRandom(random) * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled.slice(0, tournament.rounds).map((opponent) => opponent.id);
+}
+
+function getTournamentOpponentById(tournament: TournamentDefinition, opponentId: string | undefined) {
+  return opponentId ? tournament.opponents.find((opponent) => opponent.id === opponentId) : undefined;
+}
+
+function getTournamentOpponentAt(tournament: TournamentDefinition, round: number, opponentIds: readonly string[] = [], savedName = "", savedRating = 0, allowSavedOpponent = true) {
+  const scheduledOpponent = getTournamentOpponentById(tournament, opponentIds[round]);
+  if (scheduledOpponent) return scheduledOpponent;
+  const savedOpponent = allowSavedOpponent
+    ? tournament.opponents.find((opponent) => opponent.name === savedName) ?? tournament.opponents.find((opponent) => savedRating > 0 && opponent.rating === savedRating)
+    : undefined;
+  const alreadyUsed = new Set(opponentIds.slice(0, Math.max(0, round)));
+  const unusedOpponent = tournament.opponents.find((opponent) => !alreadyUsed.has(opponent.id));
+  return savedOpponent ?? unusedOpponent ?? tournament.opponents[Math.min(Math.max(0, round), tournament.opponents.length - 1)] ?? tournament.opponents[0];
+}
+
+function normalizeTournamentOpponentSchedule(value: unknown, tournament: TournamentDefinition, round: number, savedName: string, savedRating: number, matchActive: boolean, pendingNextRound: boolean) {
+  if (!matchActive && !pendingNextRound) return [];
+  const validIds = new Set(tournament.opponents.map((opponent) => opponent.id));
+  const rawIds = Array.isArray(value) ? value.filter((id): id is string => typeof id === "string" && validIds.has(id)) : [];
+  const savedOpponent = tournament.opponents.find((opponent) => opponent.name === savedName) ?? tournament.opponents.find((opponent) => savedRating > 0 && opponent.rating === savedRating);
+  const uniqueIds = [...new Set(rawIds)];
+  const currentOpponentId = matchActive ? rawIds[round] ?? savedOpponent?.id : undefined;
+  const previousOpponentId = pendingNextRound ? rawIds[round - 1] ?? savedOpponent?.id : undefined;
+  const reservedIds = new Set([currentOpponentId, previousOpponentId].filter((id): id is string => Boolean(id)));
+  const schedule = uniqueIds.filter((id) => !reservedIds.has(id));
+  for (const opponent of tournament.opponents) {
+    if (schedule.length >= tournament.rounds) break;
+    if (!schedule.includes(opponent.id) && !reservedIds.has(opponent.id)) schedule.push(opponent.id);
+  }
+  if (previousOpponentId) {
+    schedule.splice(Math.min(Math.max(0, round - 1), schedule.length), 0, previousOpponentId);
+  }
+  if (currentOpponentId) {
+    schedule.splice(Math.min(Math.max(0, round), schedule.length), 0, currentOpponentId);
+  }
+  return schedule.slice(0, tournament.rounds);
+}
+
+function getCupOpponent(cup: CupState, tournament: TournamentDefinition) {
+  if (cup.mode === "season") {
+    return {
+      id: cup.opponentIds[0] ?? "season-opponent-1",
+      name: cup.opponent || "Unbekannter Gegner",
+      rating: Math.max(40, Math.min(99, cup.opponentRating || 54)),
+      strategyId: cup.opponentStrategyId || "ballbesitz",
+      scorers: [] as readonly string[],
+    };
+  }
+  return getTournamentOpponentAt(tournament, cup.round, cup.opponentIds, cup.opponent, cup.opponentRating);
 }
 
 export function getTournamentGoalBoostMultiplier(tournamentId: TournamentId) {
@@ -953,7 +1876,7 @@ export function getCupTacticalMatchup(strategyId: CupStrategyId, opponentStrateg
 
 export function getCupMatchStrength(cup: CupState, starRating: number) {
   const tournament = getTournament(cup.tournamentId) ?? TOURNAMENTS[0];
-  const opponent = tournament.opponents[cup.round] ?? tournament.opponents[tournament.opponents.length - 1];
+  const opponent = getCupOpponent(cup, tournament);
   const opponentRating = cup.opponentRating || opponent.rating;
   const opponentStrategyId = cup.opponentStrategyId || opponent.strategyId;
   const tactical = getCupTacticalMatchup(cup.strategyId, opponentStrategyId);
@@ -997,15 +1920,20 @@ export function openStarPack(packId: StarPackId, ownedIds: string[], random = Ma
     return weightedRoll <= 0;
   }) ?? selectionPool[selectionPool.length - 1] ?? STAR_XI_PLAYERS[0];
   const duplicate = ownedIdSet.has(player.id);
-  return { packId: pack.id, packName: pack.label, player, duplicate, compensation: duplicate ? Math.floor(pack.price * 0.35) : 0 };
+  return { packId: pack.id, packName: pack.label, player, duplicate, fragmentCompensation: duplicate ? getStarXIFragmentCompensation(player) : 0 };
 }
 
-function startTournamentRound(cup: CupState, tournament: TournamentDefinition, round: number, now: number, resetStrategy = false, homePlayers: readonly StarXIPlayer[] = [], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS): CupState {
-  const opponent = tournament.opponents[round] ?? tournament.opponents[tournament.opponents.length - 1];
+function startTournamentRound(cup: CupState, tournament: TournamentDefinition, round: number, now: number, resetStrategy = false, homePlayers: readonly StarXIPlayer[] = [], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS, allowSavedOpponent = true): CupState {
+  const opponent = getTournamentOpponentAt(tournament, round, cup.opponentIds, cup.opponent, cup.opponentRating, allowSavedOpponent);
   const playerEnteredAt = Object.fromEntries(homePlayers.map((player) => [player.id, 1]));
   const playerMatchPositions = Object.fromEntries(homePlayers.map((player, index) => [player.id, formationPositions[index] ?? player.position])) as Record<string, StarPosition>;
+  const allTimeAppearances = { ...(cup.allTimeAppearances ?? {}) };
+  homePlayers.forEach((player) => {
+    allTimeAppearances[player.id] = Math.max(0, Math.floor(Number(allTimeAppearances[player.id]) || 0)) + 1;
+  });
   return {
     ...cup,
+    mode: "tournament",
     tournamentId: tournament.id,
     round,
     active: true,
@@ -1018,13 +1946,20 @@ function startTournamentRound(cup: CupState, tournament: TournamentDefinition, r
     opponent: opponent.name,
     opponentRating: opponent.rating,
     opponentStrategyId: opponent.strategyId,
+    opponentIds: [...cup.opponentIds],
     strategyId: resetStrategy ? "konter" : cup.strategyId,
     substitutionsUsed: 0,
+    matchMomentum: 0,
     playerEnteredAt,
     playerExitedAt: {},
     playerMatchPositions,
     lastGoal: null,
+    lastInjury: null,
     matchEvents: [],
+    cardEvents: [],
+    injuryEvents: [],
+    sentOffPlayerIds: [],
+    matchPaused: false,
     penaltyHomeScore: 0,
     penaltyAwayScore: 0,
     penaltyHomeTaken: 0,
@@ -1032,13 +1967,83 @@ function startTournamentRound(cup: CupState, tournament: TournamentDefinition, r
     penaltyTurn: "home",
     penaltyEvents: [],
     penaltyMessage: "",
-    lastResult: `Runde ${round + 1} von ${tournament.opponents.length} gegen ${opponent.name} beginnt.`,
+    allTimeAppearances,
+    lastResult: `Runde ${round + 1} von ${tournament.rounds} gegen ${opponent.name} beginnt.`,
   };
 }
 
-export function beginCupMatch(cup: CupState, now = Date.now(), tournamentId = cup.tournamentId, homePlayers: readonly StarXIPlayer[] = [], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS, originalLineupIds: readonly string[] = homePlayers.map((player) => player.id), originalBenchIds: readonly string[] = []): CupState {
+export function beginCupMatch(cup: CupState, now = Date.now(), tournamentId = cup.tournamentId, homePlayers: readonly StarXIPlayer[] = [], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS, originalLineupIds: readonly string[] = homePlayers.map((player) => player.id), originalBenchIds: readonly string[] = [], random = Math.random): CupState {
   const tournament = getTournament(tournamentId) ?? TOURNAMENTS[0];
-  return startTournamentRound({ ...cup, round: 0, originalLineupIds: [...originalLineupIds], originalBenchIds: [...originalBenchIds] }, tournament, 0, now, true, homePlayers, formationPositions);
+  if (!cup.pendingNextRound && cup.nextTournamentAt > now) return cup;
+  if (cup.pendingNextRound && cup.tournamentId === tournament.id && cup.round < tournament.rounds) {
+    const hasStoredOpponentPlan = cup.opponentIds.some((opponentId) => tournament.opponents.some((opponent) => opponent.id === opponentId));
+    const opponentIds = normalizeTournamentOpponentSchedule(cup.opponentIds, tournament, cup.round, hasStoredOpponentPlan ? "" : cup.opponent, hasStoredOpponentPlan ? 0 : cup.opponentRating, false, true);
+    return startTournamentRound({
+      ...cup,
+      pendingNextRound: false,
+      opponentIds,
+      suspendedPlayerIds: [],
+      originalLineupIds: [...originalLineupIds],
+      originalBenchIds: [...originalBenchIds],
+    }, tournament, cup.round, now, false, homePlayers, formationPositions, false);
+  }
+  const opponentIds = getTournamentOpponentSchedule(tournament, random);
+  return startTournamentRound({ ...cup, round: 0, opponentIds, pendingNextRound: false, nextTournamentAt: 0, suspendedPlayerIds: [], originalLineupIds: [...originalLineupIds], originalBenchIds: [...originalBenchIds] }, tournament, 0, now, true, homePlayers, formationPositions);
+}
+
+export function beginSeasonCupMatch(cup: CupState, seasonValue: unknown, now = Date.now(), homePlayers: readonly StarXIPlayer[] = [], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS, originalLineupIds: readonly string[] = homePlayers.map((player) => player.id), originalBenchIds: readonly string[] = []): CupState {
+  const season = normalizeSeasonModeState(seasonValue);
+  const opponent = getSeasonModeNextOpponent(season);
+  const playerEnteredAt = Object.fromEntries(homePlayers.map((player) => [player.id, 1]));
+  const playerMatchPositions = Object.fromEntries(homePlayers.map((player, index) => [player.id, formationPositions[index] ?? player.position])) as Record<string, StarPosition>;
+  const allTimeAppearances = { ...(cup.allTimeAppearances ?? {}) };
+  homePlayers.forEach((player) => {
+    allTimeAppearances[player.id] = Math.max(0, Math.floor(Number(allTimeAppearances[player.id]) || 0)) + 1;
+  });
+  return {
+    ...cup,
+    mode: "season",
+    tournamentId: "stadium",
+    round: 0,
+    active: true,
+    phase: "regular",
+    matchStartedAt: now,
+    matchEndsAt: now + CUP_MATCH_DURATION_MS,
+    lastTickAt: now,
+    homeScore: 0,
+    awayScore: 0,
+    opponent: opponent.name,
+    opponentRating: opponent.rating,
+    opponentStrategyId: opponent.strategyId,
+    opponentIds: [opponent.id],
+    strategyId: cup.strategyId,
+    substitutionsUsed: 0,
+    matchMomentum: 0,
+    originalLineupIds: [...originalLineupIds],
+    originalBenchIds: [...originalBenchIds],
+    playerEnteredAt,
+    playerExitedAt: {},
+    playerMatchPositions,
+    lastGoal: null,
+    lastInjury: null,
+    matchEvents: [],
+    cardEvents: [],
+    injuryEvents: [],
+    sentOffPlayerIds: [],
+    suspendedPlayerIds: [],
+    matchPaused: false,
+    pendingNextRound: false,
+    nextTournamentAt: 0,
+    penaltyHomeScore: 0,
+    penaltyAwayScore: 0,
+    penaltyHomeTaken: 0,
+    penaltyAwayTaken: 0,
+    penaltyTurn: "home",
+    penaltyEvents: [],
+    penaltyMessage: "",
+    allTimeAppearances,
+    lastResult: `Spieltag ${season.matchday + 1} von ${SEASON_MODE_MATCHES_PER_SEASON} gegen ${opponent.name} beginnt.`,
+  };
 }
 
 const GOAL_POSITION_WEIGHTS: Record<StarPosition, number> = {
@@ -1142,6 +2147,48 @@ function getConcededGoalRatingImpacts(homePlayers: readonly StarXIPlayer[], form
   return impacts;
 }
 
+function selectRedCardedPlayer(homePlayers: readonly StarXIPlayer[], formationPositions: readonly StarPosition[], random: () => number) {
+  const candidates = homePlayers.map((player, index) => {
+    const position = formationPositions[index] ?? player.position;
+    const ratingRisk = 1 + (100 - clamp(player.rating, 67, 100)) / 45;
+    return { player, weight: (DEFENSIVE_FAULT_WEIGHTS[position] ?? 0.2) * ratingRisk };
+  });
+  return selectWeightedPlayer(candidates, random);
+}
+
+function getRedCardReason(position: StarPosition, random: () => number) {
+  const reasons = position === "TW"
+    ? ["Handspiel ausserhalb des Strafraums", "Notbremse"]
+    : position === "IV" || position === "LV" || position === "LAV" || position === "RV" || position === "RAV" || position === "ZDM"
+      ? ["Notbremse", "grobes Foulspiel", "Tätlichkeit"]
+      : ["grobes Foulspiel", "Tätlichkeit", "Handspiel auf der Linie"];
+  const index = Math.floor(clamp(random(), 0, 0.999999) * reasons.length);
+  return reasons[index] ?? reasons[0];
+}
+
+function selectInjuredPlayer(homePlayers: readonly StarXIPlayer[], formationPositions: readonly StarPosition[], random: () => number) {
+  const candidates = homePlayers.map((player, index) => {
+    const position = formationPositions[index] ?? player.position;
+    const positionRisk = position === "TW" ? 0.65 : position === "IV" || position === "LV" || position === "LAV" || position === "RV" || position === "RAV" ? 1.25 : position === "ZDM" || position === "ZM" ? 1.1 : 0.9;
+    const ratingRisk = 0.85 + (100 - clamp(player.rating, 67, 100)) / 100;
+    return { player, weight: positionRisk * ratingRisk };
+  });
+  return selectWeightedPlayer(candidates, random);
+}
+
+function getInjuryReason(position: StarPosition, random: () => number) {
+  const reasons = position === "TW"
+    ? ["bei einer Parade umgeknickt", "mit dem Pfosten diskutiert und verloren", "nach einer spektakulären Landung liegen geblieben"]
+    : position === "IV" || position === "LV" || position === "LAV" || position === "RV" || position === "RAV"
+      ? ["nach einem Zweikampf am Boden geblieben", "die Wade zugemacht", "beim Klärungsversuch falsch aufgetreten"]
+      : ["einen Sprint etwas zu ernst genommen", "beim Pressing die Muskulatur überredet", "nach einem Dribbling medizinische Hilfe angefordert"];
+  return reasons[Math.floor(clamp(random(), 0, 0.999999) * reasons.length)] ?? reasons[0];
+}
+
+function decrementCupInjuries(injuredPlayerIds: Record<string, number>) {
+  return Object.fromEntries(Object.entries(injuredPlayerIds).map(([playerId, matches]) => [playerId, Math.max(0, Math.floor(Number(matches) || 0) - 1)]).filter(([, matches]) => matches > 0));
+}
+
 function getCupBaseResult(cup: CupState, starRating: number) {
   const tournament = getTournament(cup.tournamentId) ?? TOURNAMENTS[0];
   const strength = getCupMatchStrength(cup, starRating);
@@ -1154,34 +2201,58 @@ function getCupBaseResult(cup: CupState, starRating: number) {
     runEnded: false,
     nextRoundStarted: false,
     completedRound: cup.round + 1,
-    totalRounds: tournament.opponents.length,
+    totalRounds: cup.mode === "season" ? 1 : tournament.rounds,
     teamStrength: strength.teamStrength,
     opponentStrength: strength.opponentStrength,
     tacticalOutcome: strength.tactical.label,
   };
 }
 
-function finishCupRound(cup: CupState, starRating: number, won: boolean, now: number, tieBreak: boolean, homePlayers: readonly StarXIPlayer[] = [], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS) {
+function finishCupRound(cup: CupState, starRating: number, won: boolean, now: number, tieBreak: boolean) {
   const tournament = getTournament(cup.tournamentId) ?? TOURNAMENTS[0];
   const baseResult = getCupBaseResult(cup, starRating);
   const round = cup.round;
   const completedRound = round + 1;
-  const tournamentWon = won && completedRound >= tournament.opponents.length;
+  if (cup.mode === "season") {
+    const nextCup: CupState = {
+      ...cup,
+      active: false,
+      phase: "regular",
+      pendingNextRound: false,
+      nextTournamentAt: 0,
+      round: 0,
+      injuredPlayerIds: decrementCupInjuries(cup.injuredPlayerIds ?? {}),
+      matchPaused: false,
+      lastResult: `${cup.homeScore}:${cup.awayScore} gegen ${cup.opponent} beendet.`,
+    };
+    return { cup: nextCup, ...baseResult, finished: true, won, tieBreak, tournamentWon: false, runEnded: true, nextRoundStarted: false, completedRound: 1, seasonMatch: true };
+  }
+  const tournamentWon = won && completedRound >= tournament.rounds;
   const decisionLabel = tieBreak ? " im Elfmeterschiessen" : cup.phase === "extra-time" ? " nach Verlängerung" : "";
   const nextCup: CupState = {
     ...cup,
     wins: cup.wins + (won ? 1 : 0),
     best: Math.max(cup.best, won ? completedRound : round),
+    injuredPlayerIds: decrementCupInjuries(cup.injuredPlayerIds ?? {}),
+    matchPaused: false,
   };
 
   if (won && !tournamentWon) {
-    const restoredHomePlayers = cup.originalLineupIds.map((playerId) => getStarXIPlayer(playerId)).filter((player): player is StarXIPlayer => Boolean(player));
-    const nextRoundCup = startTournamentRound(nextCup, tournament, round + 1, now, false, restoredHomePlayers.length === STAR_XI_SQUAD_SIZE ? restoredHomePlayers : homePlayers, formationPositions);
-    nextRoundCup.lastResult = `Runde ${completedRound}${decisionLabel} gewonnen. Runde ${completedRound + 1} startet sofort.`;
-    return { cup: nextRoundCup, ...baseResult, finished: true, won: true, tieBreak, nextRoundStarted: true, completedRound };
+    nextCup.active = false;
+    nextCup.pendingNextRound = true;
+    nextCup.nextTournamentAt = 0;
+    nextCup.round = completedRound;
+    const suspendedNames = nextCup.suspendedPlayerIds.map((playerId) => getStarXIPlayer(playerId)?.name).filter((name): name is string => Boolean(name));
+    const replacementRequired = nextCup.suspendedPlayerIds.length > 0;
+    nextCup.lastResult = replacementRequired
+      ? `Runde ${completedRound}${decisionLabel} gewonnen. ${suspendedNames.join(", ") || "Ein Spieler"} muss vor der nächsten Partie ersetzt werden.`
+      : `Runde ${completedRound}${decisionLabel} gewonnen. Passe deine Aufstellung an und starte Runde ${completedRound + 1} manuell.`;
+    return { cup: nextCup, ...baseResult, finished: true, won: true, tieBreak, nextRoundStarted: false, completedRound, replacementRequired };
   }
 
   nextCup.active = false;
+  nextCup.pendingNextRound = false;
+  nextCup.nextTournamentAt = now + TOURNAMENT_COOLDOWN_MS;
   nextCup.round = 0;
   if (tournamentWon) nextCup.trophies = { ...nextCup.trophies, [tournament.id]: nextCup.trophies[tournament.id] + 1 };
   nextCup.lastResult = tournamentWon
@@ -1192,10 +2263,10 @@ function finishCupRound(cup: CupState, starRating: number, won: boolean, now: nu
 
 export function advanceCupMatch(cup: CupState, starRating: number, now = Date.now(), random = Math.random, homePlayers: readonly StarXIPlayer[] = [], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS) {
   const tournament = getTournament(cup.tournamentId) ?? TOURNAMENTS[0];
-  const opponent = tournament.opponents[cup.round] ?? tournament.opponents[tournament.opponents.length - 1];
-  const strength = getCupMatchStrength(cup, starRating);
+  const opponent = getCupOpponent(cup, tournament);
   const baseResult = getCupBaseResult(cup, starRating);
   if (!cup.active) return { cup, ...baseResult };
+  if (cup.matchPaused) return { cup, ...baseResult };
   if (cup.phase === "penalties") return { cup, ...baseResult };
   const endAt = Math.max(cup.matchStartedAt, Math.min(now, cup.matchEndsAt));
   const from = Math.max(cup.matchStartedAt, Math.min(cup.lastTickAt || cup.matchStartedAt, endAt));
@@ -1204,21 +2275,85 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
   let homeScore = cup.homeScore;
   let awayScore = cup.awayScore;
   let lastGoal = cup.lastGoal;
+  let lastInjury = cup.lastInjury;
   let matchEvents = [...cup.matchEvents];
+  let cardEvents = [...cup.cardEvents];
+  let injuryEvents = [...cup.injuryEvents];
+  const sentOffPlayerIds = [...cup.sentOffPlayerIds];
+  const suspendedPlayerIds = [...cup.suspendedPlayerIds];
+  const injuredPlayerIds = { ...(cup.injuredPlayerIds ?? {}) };
+  const playerExitedAt = { ...cup.playerExitedAt };
+  let activeHomePlayers = homePlayers.filter((player) => !sentOffPlayerIds.includes(player.id) && !(Number(injuredPlayerIds[player.id]) > 0));
   const allTimeScorers = { ...cup.allTimeScorers };
-  const strengthDifference = strength.teamStrength - strength.opponentStrength;
-  const homeExpectedGoals = clamp(0.55 + strength.teamStrength * 0.014 + strengthDifference * 0.07, 0.15, 5.2);
-  const awayExpectedGoals = clamp(0.55 + strength.opponentStrength * 0.014 - strengthDifference * 0.07, 0.15, 5.2);
-  const homeChance = homeExpectedGoals / 180;
-  const awayChance = awayExpectedGoals / 180;
+  let lastResult = cup.lastResult;
+  let currentStarRating = starRating;
+  let matchMomentum = clamp(Number(cup.matchMomentum) || 0, -CUP_MAX_MOMENTUM, CUP_MAX_MOMENTUM);
+  let matchPaused = false;
+  let processedUntil = endAt;
+  const getScoringChances = (liveStarRating: number) => {
+    const liveStrength = getCupMatchStrength(cup, liveStarRating);
+    const liveStrengthDifference = liveStrength.teamStrength - liveStrength.opponentStrength;
+    const homeExpectedGoals = clamp(0.55 + liveStrength.teamStrength * 0.014 + liveStrengthDifference * 0.07, 0.15, 5.2);
+    const awayExpectedGoals = clamp(0.55 + liveStrength.opponentStrength * 0.014 - liveStrengthDifference * 0.07, 0.15, 5.2);
+    return { homeChance: homeExpectedGoals / 180, awayChance: awayExpectedGoals / 180 };
+  };
+  let { homeChance, awayChance } = getScoringChances(currentStarRating);
   for (let second = 0; second < seconds; second += 1) {
-    const roll = random();
+    let redCardOccurred = false;
     const goalAt = from + (second + 1) * 1000;
+    processedUntil = goalAt;
     const minute = Math.min(120, Math.max(1, Math.floor((goalAt - cup.matchStartedAt) / 2000) + 1));
+    if (activeHomePlayers.length && !sentOffPlayerIds.length && random() < RED_CARD_CHANCE_PER_SECOND) {
+      const redCardedPlayer = selectRedCardedPlayer(activeHomePlayers, formationPositions, random);
+      if (redCardedPlayer) {
+        const redCardedPlayerIndex = homePlayers.findIndex((player) => player.id === redCardedPlayer.id);
+        const redCardReason = getRedCardReason(formationPositions[redCardedPlayerIndex] ?? redCardedPlayer.position, random);
+        sentOffPlayerIds.push(redCardedPlayer.id);
+        suspendedPlayerIds.push(redCardedPlayer.id);
+        playerExitedAt[redCardedPlayer.id] = minute;
+        const cardEvent: CupCardEvent = { id: `${goalAt}-${redCardedPlayer.id}-red`, side: "home", playerId: redCardedPlayer.id, player: redCardedPlayer.name, reason: redCardReason, card: "red", minute, createdAt: goalAt, homeScore, awayScore };
+        cardEvents = [...cardEvents, cardEvent].slice(-12);
+        activeHomePlayers = activeHomePlayers.filter((player) => player.id !== redCardedPlayer.id);
+        matchMomentum = clamp(matchMomentum - CUP_RED_CARD_MOMENTUM_DROP, -CUP_MAX_MOMENTUM, CUP_MAX_MOMENTUM);
+        currentStarRating = Math.max(40, currentStarRating - RED_CARD_MATCH_RATING_DROP - CUP_RED_CARD_MOMENTUM_DROP * CUP_MOMENTUM_RATING_WEIGHT);
+        ({ homeChance, awayChance } = getScoringChances(currentStarRating));
+        redCardOccurred = true;
+        lastResult = `Rote Karte für ${redCardedPlayer.name}. Das Momentum kippt, dein Team ist in Unterzahl. Die nächste Partie darf erst nach einem Ersatz starten.`;
+      }
+    }
+    const injuryRoll = random();
+    if (!redCardOccurred && activeHomePlayers.length && cup.substitutionsUsed < STAR_XI_MAX_SUBSTITUTIONS && injuryRoll > 0 && injuryRoll < CUP_INJURY_CHANCE_PER_SECOND) {
+      const injuredPlayer = selectInjuredPlayer(activeHomePlayers, formationPositions, random);
+      if (injuredPlayer) {
+        const injuredIndex = homePlayers.findIndex((player) => player.id === injuredPlayer.id);
+        const injuryMatches = CUP_MIN_INJURY_MATCHES + Math.floor(clamp(random(), 0, 0.999999) * (CUP_MAX_INJURY_MATCHES - CUP_MIN_INJURY_MATCHES + 1));
+        const injuryEvent: CupInjuryEvent = {
+          id: `${goalAt}-${injuredPlayer.id}-injury`,
+          playerId: injuredPlayer.id,
+          player: injuredPlayer.name,
+          reason: getInjuryReason(formationPositions[injuredIndex] ?? injuredPlayer.position, random),
+          matches: injuryMatches,
+          minute,
+          createdAt: goalAt,
+          homeScore,
+          awayScore,
+        };
+        injuredPlayerIds[injuredPlayer.id] = Math.max(Number(injuredPlayerIds[injuredPlayer.id]) || 0, injuryMatches);
+        playerExitedAt[injuredPlayer.id] = minute;
+        injuryEvents = [...injuryEvents, injuryEvent].slice(-12);
+        lastInjury = injuryEvent;
+        activeHomePlayers = activeHomePlayers.filter((player) => player.id !== injuredPlayer.id);
+        matchPaused = true;
+        currentStarRating = Math.max(40, currentStarRating - 5);
+        lastResult = `${injuredPlayer.name} ist verletzt (${injuryMatches} ${injuryMatches === 1 ? "Spiel" : "Spiele"}). Das Spiel ist pausiert. Ersetze den Spieler manuell.`;
+        break;
+      }
+    }
+    const roll = random();
     if (roll < homeChance) {
       homeScore += 1;
-      const scorer = selectHomeScorer(homePlayers, cup, minute, random, formationPositions, matchEvents);
-      const assist = selectHomeAssist(homePlayers, scorer?.id, formationPositions, random);
+      const scorer = selectHomeScorer(activeHomePlayers, cup, minute, random, formationPositions, matchEvents);
+      const assist = selectHomeAssist(activeHomePlayers, scorer?.id, formationPositions, random);
       const ratingImpacts: Record<string, number> = {};
       if (scorer) ratingImpacts[scorer.id] = 0.7;
       if (assist) ratingImpacts[assist.id] = (ratingImpacts[assist.id] ?? 0) + 0.25;
@@ -1229,14 +2364,16 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
       awayScore += 1;
       const opponentScorers = opponent.scorers.length ? opponent.scorers : [cup.opponent];
       const scorer = opponentScorers[Math.floor(Math.max(0, Math.min(0.999999, random())) * opponentScorers.length)] ?? cup.opponent;
-      const ratingImpacts = getConcededGoalRatingImpacts(homePlayers, formationPositions, random);
+      const ratingImpacts = getConcededGoalRatingImpacts(activeHomePlayers, formationPositions, random);
       lastGoal = { id: `${goalAt}-${homeScore}-${awayScore}-away`, side: "away", scorerId: null, scorer, minute, createdAt: goalAt, homeScore, awayScore, ratingImpacts };
       matchEvents = [...matchEvents, lastGoal].slice(-40);
     }
   }
-  const nextCup = { ...cup, homeScore, awayScore, lastTickAt: endAt, lastGoal, matchEvents, allTimeScorers };
-  if (now < cup.matchEndsAt) return { cup: nextCup, ...baseResult };
-  if (homeScore !== awayScore) return finishCupRound(nextCup, starRating, homeScore > awayScore, now, false, homePlayers, formationPositions);
+  const nextCup = { ...cup, homeScore, awayScore, lastTickAt: matchPaused ? processedUntil : endAt, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, playerExitedAt, allTimeScorers, lastResult, matchMomentum: Math.round(matchMomentum * 10) / 10, matchPaused };
+  const liveBaseResult = getCupBaseResult(cup, currentStarRating);
+  if (matchPaused) return { cup: nextCup, ...liveBaseResult };
+  if (now < cup.matchEndsAt) return { cup: nextCup, ...liveBaseResult };
+  if (homeScore !== awayScore) return finishCupRound(nextCup, currentStarRating, homeScore > awayScore, now, false);
 
   if (cup.phase === "regular") {
     return {
@@ -1246,7 +2383,7 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
         matchEndsAt: cup.matchEndsAt + CUP_EXTRA_TIME_DURATION_MS,
         lastResult: "90 Minuten vorbei. Es geht bis 120′ in die Verlängerung.",
       },
-      ...baseResult,
+      ...liveBaseResult,
     };
   }
 
@@ -1263,8 +2400,13 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
       penaltyMessage: "Nach 120′ steht es unentschieden. Du beginnst am Punkt.",
       lastResult: "Elfmeterschiessen. Wähle für jeden Versuch selbst eine Richtung.",
     },
-    ...baseResult,
+    ...liveBaseResult,
   };
+}
+
+export function resumeCupMatch(value: CupState) {
+  if (!value.active || !value.matchPaused) return value;
+  return { ...value, matchPaused: false, lastResult: "Die Partie läuft weiter. Die medizinische Abteilung beobachtet den Rest von der Seitenlinie." };
 }
 
 const PENALTY_DIRECTIONS: readonly PenaltyDirection[] = ["left", "center", "right"];
@@ -1296,7 +2438,7 @@ export function resolveCupPenalty(cup: CupState, starRating: number, direction: 
   const baseResult = getCupBaseResult(cup, starRating);
   if (!cup.active || cup.phase !== "penalties" || !PENALTY_DIRECTIONS.includes(direction)) return { cup, ...baseResult };
   const tournament = getTournament(cup.tournamentId) ?? TOURNAMENTS[0];
-  const opponent = tournament.opponents[cup.round] ?? tournament.opponents[tournament.opponents.length - 1];
+  const opponent = getCupOpponent(cup, tournament);
   let penaltyHomeScore = cup.penaltyHomeScore;
   let penaltyAwayScore = cup.penaltyAwayScore;
   let penaltyHomeTaken = cup.penaltyHomeTaken;
@@ -1357,7 +2499,7 @@ export function resolveCupPenalty(cup: CupState, starRating: number, direction: 
   const winner = getPenaltyWinner(penaltyHomeScore, penaltyAwayScore, penaltyHomeTaken, penaltyAwayTaken);
   if (winner === null) return { cup: nextCup, ...baseResult };
   nextCup.penaltyMessage = winner ? `${penaltyMessage} Das Elfmeterschiessen ist gewonnen.` : `${penaltyMessage} Das Elfmeterschiessen ist verloren.`;
-  return finishCupRound(nextCup, starRating, winner, now, true, homePlayers, formationPositions);
+  return finishCupRound(nextCup, starRating, winner, now, true);
 }
 
 const MISSION_TEMPLATES: Omit<CoopMission, "claimed">[] = [
@@ -1375,14 +2517,17 @@ export function initialGameFeatures(now = Date.now()): GameFeatures {
   return {
     schemaVersion: GAME_FEATURES_SCHEMA_VERSION,
     transferMarket: { offerIds: ["turbo", "wall", "maestro"], ownedIds: [] },
-    starXI: { ownedIds: [], lineupIds: Array.from({ length: STAR_XI_SQUAD_SIZE }, () => ""), benchIds: Array.from({ length: STAR_XI_BENCH_SIZE }, () => ""), formationId: "433", formationPositions: [...STAR_XI_FORMATION_POSITIONS] },
+    starXI: { ownedIds: [], fragments: 0, lineupIds: Array.from({ length: STAR_XI_SQUAD_SIZE }, () => ""), benchIds: Array.from({ length: STAR_XI_BENCH_SIZE }, () => ""), formationId: "433", formationPositions: [...STAR_XI_FORMATION_POSITIONS] },
     club: { name: "FC Goal", badge: "⚽", color: "#0071e3" },
-    cup: { active: false, phase: "regular", tournamentId: "stadium", round: 0, wins: 0, best: 0, trophies: { stadium: 0, champions: 0, world: 0 }, lastResult: "Noch kein Turnierspiel.", matchStartedAt: 0, matchEndsAt: 0, lastTickAt: 0, homeScore: 0, awayScore: 0, opponent: "", opponentRating: 58, opponentStrategyId: "ballbesitz", strategyId: "konter", substitutionsUsed: 0, originalLineupIds: [], originalBenchIds: [], playerEnteredAt: {}, playerExitedAt: {}, playerMatchPositions: {}, lastGoal: null, matchEvents: [], penaltyHomeScore: 0, penaltyAwayScore: 0, penaltyHomeTaken: 0, penaltyAwayTaken: 0, penaltyTurn: "home", penaltyEvents: [], penaltyMessage: "", allTimeScorers: {} },
+    cup: { active: false, mode: "season", phase: "regular", tournamentId: "stadium", round: 0, wins: 0, best: 0, trophies: { stadium: 0, champions: 0, world: 0 }, lastResult: "Noch kein Saisonspiel.", matchStartedAt: 0, matchEndsAt: 0, lastTickAt: 0, homeScore: 0, awayScore: 0, opponent: "", opponentRating: 58, opponentStrategyId: "ballbesitz", opponentIds: [], strategyId: "konter", substitutionsUsed: 0, matchMomentum: 0, originalLineupIds: [], originalBenchIds: [], playerEnteredAt: {}, playerExitedAt: {}, playerMatchPositions: {}, lastGoal: null, lastInjury: null, matchEvents: [], cardEvents: [], injuryEvents: [], sentOffPlayerIds: [], suspendedPlayerIds: [], injuredPlayerIds: {}, matchPaused: false, pendingNextRound: false, nextTournamentAt: 0, penaltyHomeScore: 0, penaltyAwayScore: 0, penaltyHomeTaken: 0, penaltyAwayTaken: 0, penaltyTurn: "home", penaltyEvents: [], penaltyMessage: "", allTimeScorers: {}, allTimeAppearances: {} },
+    seasonMode: initialSeasonMode("FC Goal"),
     goalBoost: { tournamentId: null, multiplier: 1, startedAt: 0, endsAt: 0 },
     missions: initialMissions(),
     history: [],
     randomEvent: null,
     starPackReveal: null,
+    transferSaga: { loans: [], vacancies: [], archive: [], latestEvent: null, lastFailedReason: "", nextAt: now + getTransferEventDelay(), deadlineDayStartedAt: 0, deadlineDayEndsAt: 0 },
+    gazetteIssues: [],
     nextEventAt: now + getRandomEventDelay(),
     nextVarAt: now + getRandomEventDelay(),
   };
@@ -1394,6 +2539,26 @@ function asRecord(value: unknown) {
 
 function safeString(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function normalizeTransferInsiderEvent(value: unknown): TransferInsiderEvent | null {
+  const source = asRecord(value);
+  const outcome: TransferInsiderOutcome | null = source.outcome === "loan" || source.outcome === "sale" || source.outcome === "failed" || source.outcome === "return" ? source.outcome : null;
+  const createdAt = Math.floor(Number(source.createdAt) || 0);
+  if (!outcome || createdAt <= 0) return null;
+  const playerId = typeof source.playerId === "string" && getStarXIPlayer(source.playerId) ? source.playerId : null;
+  return {
+    id: safeString(source.id, `transfer-${createdAt}`),
+    outcome,
+    playerId,
+    playerName: typeof source.playerName === "string" && source.playerName.trim() ? source.playerName.trim().slice(0, 120) : playerId ? getStarXIPlayer(playerId)?.name ?? null : null,
+    club: safeString(source.club, "Transfermarkt").slice(0, 42),
+    headline: safeString(source.headline, "Transfermeldung").slice(0, 80),
+    message: safeString(source.message, "Der Transfermarkt bewegt sich.").slice(0, 360),
+    reason: typeof source.reason === "string" ? source.reason.trim().slice(0, 160) : "",
+    fee: Math.max(0, Math.floor(Number(source.fee) || 0)),
+    createdAt,
+  };
 }
 
 function normalizeCupGoalEvent(value: unknown): CupGoalEvent | null {
@@ -1412,6 +2577,41 @@ function normalizeCupGoalEvent(value: unknown): CupGoalEvent | null {
     homeScore: Math.max(0, Math.floor(Number(source.homeScore) || 0)),
     awayScore: Math.max(0, Math.floor(Number(source.awayScore) || 0)),
     ratingImpacts,
+  };
+}
+
+function normalizeCupCardEvent(value: unknown): CupCardEvent | null {
+  const source = asRecord(value);
+  if (typeof source.id !== "string" || (source.side !== "home" && source.side !== "away") || source.card !== "red" || Number(source.createdAt) <= 0) return null;
+  const playerId = typeof source.playerId === "string" && getStarXIPlayer(source.playerId) ? source.playerId : null;
+  return {
+    id: safeString(source.id, "red-card-event"),
+    side: source.side,
+    playerId,
+    player: safeString(source.player, playerId ? getStarXIPlayer(playerId)?.name ?? "Spieler" : "Spieler"),
+    reason: safeString(source.reason, "grobes Foulspiel").slice(0, 90),
+    card: "red",
+    minute: Math.max(1, Math.min(120, Math.floor(Number(source.minute) || 1))),
+    createdAt: Math.floor(Number(source.createdAt)),
+    homeScore: Math.max(0, Math.floor(Number(source.homeScore) || 0)),
+    awayScore: Math.max(0, Math.floor(Number(source.awayScore) || 0)),
+  };
+}
+
+function normalizeCupInjuryEvent(value: unknown): CupInjuryEvent | null {
+  const source = asRecord(value);
+  const playerId = typeof source.playerId === "string" && getStarXIPlayer(source.playerId) ? source.playerId : "";
+  if (typeof source.id !== "string" || !playerId || Number(source.createdAt) <= 0) return null;
+  return {
+    id: safeString(source.id, "injury-event"),
+    playerId,
+    player: safeString(source.player, getStarXIPlayer(playerId)?.name ?? "Spieler"),
+    reason: safeString(source.reason, "musste verletzt vom Platz").slice(0, 110),
+    matches: Math.max(CUP_MIN_INJURY_MATCHES, Math.min(CUP_MAX_INJURY_MATCHES, Math.floor(Number(source.matches) || CUP_MIN_INJURY_MATCHES))),
+    minute: Math.max(1, Math.min(120, Math.floor(Number(source.minute) || 1))),
+    createdAt: Math.floor(Number(source.createdAt)),
+    homeScore: Math.max(0, Math.floor(Number(source.homeScore) || 0)),
+    awayScore: Math.max(0, Math.floor(Number(source.awayScore) || 0)),
   };
 }
 
@@ -1444,13 +2644,16 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
   const starXI = asRecord(source.starXI);
   const club = asRecord(source.club);
   const cup = asRecord(source.cup);
+  const clubName = safeString(club.name, defaults.club.name).slice(0, 22);
+  const seasonModeSource = asRecord(source.seasonMode);
+  const normalizedSeasonMode = normalizeSeasonModeState(seasonModeSource, clubName, Math.max(0, Math.floor(Number(source.seasons) || 0)));
   const goalBoostSource = asRecord(source.goalBoost);
   const rawMissions = Array.isArray(source.missions) ? source.missions : [];
   const missions = initialMissions().map((mission) => {
     const saved = asRecord(rawMissions.find((item) => asRecord(item).id === mission.id));
     return { ...mission, claimed: saved.claimed === true };
   });
-  const history = Array.isArray(source.history) ? source.history.map((item) => asRecord(item)).filter((item) => typeof item.title === "string").slice(-12).map((item, index) => ({
+  const history = Array.isArray(source.history) ? source.history.map((item) => asRecord(item)).filter((item) => typeof item.title === "string").slice(-30).map((item, index) => ({
     id: safeString(item.id, `history-${index}`),
     title: safeString(item.title, "Spielereignis"),
     detail: safeString(item.detail, ""),
@@ -1466,6 +2669,52 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     tone: randomEventSource.tone === "negative" || randomEventSource.tone === "positive" ? randomEventSource.tone : "neutral",
     createdAt: Number(randomEventSource.createdAt) || Date.now(),
   } : null;
+  const transferSagaSource = asRecord(source.transferSaga);
+  const knownStarOwnedIds = uniqueKnownStarIds(starXI.ownedIds);
+  const seenLoanIds = new Set<string>();
+  const loans = (Array.isArray(transferSagaSource.loans) ? transferSagaSource.loans : [])
+    .map((item) => asRecord(item))
+    .filter((item) => typeof item.playerId === "string" && knownStarOwnedIds.includes(item.playerId) && !seenLoanIds.has(item.playerId) && Boolean(getStarXIPlayer(item.playerId)))
+    .map((item) => {
+      const playerId = String(item.playerId);
+      seenLoanIds.add(playerId);
+      const tournamentId = item.status === "active" ? getTournament(String(item.tournamentId))?.id ?? null : null;
+      return {
+        playerId,
+        club: safeString(item.club, "Auswärtiger Club").slice(0, 42),
+        status: item.status === "active" ? "active" as const : "pending" as const,
+        tournamentId,
+        createdAt: Math.max(1, Math.floor(Number(item.createdAt) || Date.now())),
+      };
+    });
+  const latestTransferEvent = normalizeTransferInsiderEvent(transferSagaSource.latestEvent);
+  const archiveIds = new Set<string>();
+  const transferArchive = (Array.isArray(transferSagaSource.archive) ? transferSagaSource.archive : [])
+    .map(normalizeTransferInsiderEvent)
+    .filter((event): event is TransferInsiderEvent => Boolean(event) && event.outcome !== "failed")
+    .filter((event) => {
+      if (archiveIds.has(event.id)) return false;
+      archiveIds.add(event.id);
+      return true;
+    })
+    .slice(-30);
+  const deadlineDayStartedAt = Math.max(0, Math.floor(Number(transferSagaSource.deadlineDayStartedAt) || 0));
+  const deadlineDayEndsAt = Math.max(deadlineDayStartedAt, Math.floor(Number(transferSagaSource.deadlineDayEndsAt) || 0));
+  const transferSaga: TransferSagaState = {
+    loans,
+    vacancies: (Array.isArray(transferSagaSource.vacancies) ? transferSagaSource.vacancies : []).map((item) => asRecord(item)).filter((item) => item.area === "lineup" || item.area === "bench").map((item) => ({
+      area: item.area as TransferSquadVacancy["area"],
+      index: Math.floor(Number(item.index)),
+      requiredPlayers: Math.max(1, Math.min(STAR_XI_SQUAD_SIZE + STAR_XI_BENCH_SIZE, Math.floor(Number(item.requiredPlayers) || 1))),
+      createdAt: Math.max(1, Math.floor(Number(item.createdAt) || Date.now())),
+    })).filter((item) => item.index >= 0 && item.index < (item.area === "lineup" ? STAR_XI_SQUAD_SIZE : STAR_XI_BENCH_SIZE)).slice(-20),
+    archive: transferArchive,
+    latestEvent: latestTransferEvent,
+    lastFailedReason: typeof transferSagaSource.lastFailedReason === "string" ? transferSagaSource.lastFailedReason.trim().slice(0, 160) : latestTransferEvent?.outcome === "failed" ? latestTransferEvent.reason : "",
+    nextAt: Number(transferSagaSource.nextAt) > 0 ? Number(transferSagaSource.nextAt) : defaults.transferSaga.nextAt,
+    deadlineDayStartedAt,
+    deadlineDayEndsAt,
+  };
   const starPackRevealSource = asRecord(source.starPackReveal);
   const starPack = getStarPack(String(starPackRevealSource.packId));
   const starPlayerSource = asRecord(starPackRevealSource.player);
@@ -1475,28 +2724,68 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     packName: safeString(starPackRevealSource.packName, starPack.label).slice(0, 32),
     player: starPlayer,
     duplicate: starPackRevealSource.duplicate === true,
-    compensation: Math.max(0, Math.floor(Number(starPackRevealSource.compensation) || 0)),
+    fragmentCompensation: Math.max(0, Math.floor(Number(starPackRevealSource.fragmentCompensation) || 0)),
+    source: starPackRevealSource.source === "custom-draw" ? "custom-draw" : "pack",
     openedAt: Math.floor(Number(starPackRevealSource.openedAt)),
     openedBy: safeString(starPackRevealSource.openedBy, "Mitspieler").slice(0, 22),
+    troll: starPackRevealSource.troll === true,
   } satisfies StarPackReveal : null;
+  const gazetteIssues = (Array.isArray(source.gazetteIssues) ? source.gazetteIssues : [])
+    .map((item) => asRecord(item))
+    .map((item): TournamentGazetteIssue | null => {
+      const tournamentId = getTournament(String(item.tournamentId))?.id;
+      const createdAt = Math.floor(Number(item.createdAt) || 0);
+      if (!tournamentId || createdAt <= 0) return null;
+      return {
+        id: safeString(item.id, `gazette-${createdAt}`),
+        headline: safeString(item.headline, "DAS TURNIER IST ENTSCHEIDEN").slice(0, 100),
+        strapline: safeString(item.strapline, "Die Goal Gazette berichtet.").slice(0, 180),
+        body: safeString(item.body, "Ein Turnier voller Geschichten ist beendet.").slice(0, 420),
+        tone: item.tone === "champion" ? "champion" : "exit",
+        tournamentId,
+        opponent: safeString(item.opponent, "Unbekannter Gegner").slice(0, 80),
+        homeScore: Math.max(0, Math.floor(Number(item.homeScore) || 0)),
+        awayScore: Math.max(0, Math.floor(Number(item.awayScore) || 0)),
+        completedRound: Math.max(1, Math.floor(Number(item.completedRound) || 1)),
+        tieBreak: item.tieBreak === true,
+        createdAt,
+      };
+    })
+    .filter((issue): issue is TournamentGazetteIssue => Boolean(issue))
+    .slice(-12);
   const ownedIds = Array.isArray(market.ownedIds) ? market.ownedIds.filter((id): id is string => typeof id === "string" && TRANSFER_PLAYERS.some((player) => player.id === id)) : [];
   const offerIds = Array.isArray(market.offerIds) ? market.offerIds.filter((id): id is string => typeof id === "string" && TRANSFER_PLAYERS.some((player) => player.id === id)).slice(0, 3) : [];
-  const normalizedStarXI = normalizeStarXIState(starXI);
   const matchStartedAt = Math.max(0, Number(cup.matchStartedAt) || 0);
   const matchEndsAt = Math.max(0, Number(cup.matchEndsAt) || 0);
   const lastTickAt = Math.max(matchStartedAt, Number(cup.lastTickAt) || matchStartedAt);
+  const matchMomentum = Math.round(clamp(Number(cup.matchMomentum) || 0, -CUP_MAX_MOMENTUM, CUP_MAX_MOMENTUM) * 10) / 10;
   const lastGoal = normalizeCupGoalEvent(cup.lastGoal);
+  const lastInjury = normalizeCupInjuryEvent(cup.lastInjury);
   const matchEvents = Array.isArray(cup.matchEvents) ? cup.matchEvents.map(normalizeCupGoalEvent).filter((event): event is CupGoalEvent => Boolean(event)).slice(-40) : lastGoal ? [lastGoal] : [];
+  const cardEvents = Array.isArray(cup.cardEvents) ? cup.cardEvents.map(normalizeCupCardEvent).filter((event): event is CupCardEvent => Boolean(event)).slice(-12) : [];
+  const injuryEvents = Array.isArray(cup.injuryEvents) ? cup.injuryEvents.map(normalizeCupInjuryEvent).filter((event): event is CupInjuryEvent => Boolean(event)).slice(-12) : lastInjury ? [lastInjury] : [];
+  const sentOffPlayerIds = uniqueKnownStarIds(cup.sentOffPlayerIds);
+  const suspendedPlayerIds = uniqueKnownStarIds(cup.suspendedPlayerIds);
+  const injuredPlayerIds = Object.fromEntries(Object.entries(asRecord(cup.injuredPlayerIds)).filter(([playerId, matches]) => Boolean(getStarXIPlayer(playerId)) && Number.isFinite(Number(matches)) && Number(matches) > 0).map(([playerId, matches]) => [playerId, Math.max(CUP_MIN_INJURY_MATCHES, Math.min(CUP_MAX_INJURY_MATCHES, Math.floor(Number(matches))))]));
   const penaltyEvents = Array.isArray(cup.penaltyEvents) ? cup.penaltyEvents.map(normalizeCupPenaltyEvent).filter((event): event is CupPenaltyEvent => Boolean(event)).slice(-40) : [];
   const allTimeScorers = Object.fromEntries(Object.entries(asRecord(cup.allTimeScorers)).filter(([playerId, goals]) => Boolean(getStarXIPlayer(playerId)) && Number.isFinite(Number(goals)) && Number(goals) > 0).map(([playerId, goals]) => [playerId, Math.max(0, Math.floor(Number(goals)))]));
+  const allTimeAppearances = Object.fromEntries(Object.entries(asRecord(cup.allTimeAppearances)).filter(([playerId, appearances]) => Boolean(getStarXIPlayer(playerId)) && Number.isFinite(Number(appearances)) && Number(appearances) > 0).map(([playerId, appearances]) => [playerId, Math.max(0, Math.floor(Number(appearances)))]));
+  Object.entries(allTimeScorers).forEach(([playerId, goals]) => {
+    if (!allTimeAppearances[playerId]) allTimeAppearances[playerId] = goals > 0 ? 1 : 0;
+  });
+  const mode: CupMatchMode = cup.mode === "tournament" || cup.mode === "season" ? cup.mode : cup.active === true || cup.pendingNextRound === true ? "tournament" : "season";
   const tournament = getTournament(String(cup.tournamentId)) ?? TOURNAMENTS[0];
   const tournamentId = tournament.id;
   const active = cup.active === true && matchEndsAt > 0;
+  const pendingNextRound = cup.pendingNextRound === true && !active && (mode === "season" || (Number(cup.round) >= 0 && Number(cup.round) < tournament.rounds));
+  const nextTournamentAt = Math.max(0, Math.floor(Number(cup.nextTournamentAt) || 0));
+  const loanedPlayerIds = transferSaga.loans.map((loan) => loan.playerId);
+  const normalizedStarXI = removeStarXIPlayersFromSquad(normalizeStarXIState(starXI, loanedPlayerIds), [...new Set([...suspendedPlayerIds, ...Object.keys(injuredPlayerIds)])], !active);
   const normalizeSavedSquadSlots = (value: unknown, size: number) => {
     const slots = Array.isArray(value) ? value : [];
     return Array.from({ length: size }, (_, index) => {
       const playerId = slots[index];
-      return typeof playerId === "string" && normalizedStarXI.ownedIds.includes(playerId) && Boolean(getStarXIPlayer(playerId)) ? playerId : "";
+      return typeof playerId === "string" && normalizedStarXI.ownedIds.includes(playerId) && !loanedPlayerIds.includes(playerId) && Boolean(getStarXIPlayer(playerId)) ? playerId : "";
     });
   };
   const savedOriginalLineupIds = normalizeSavedSquadSlots(cup.originalLineupIds, STAR_XI_SQUAD_SIZE);
@@ -1504,8 +2793,18 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
   const savedOriginalBenchIds = normalizeSavedSquadSlots(cup.originalBenchIds, STAR_XI_BENCH_SIZE);
   const originalBenchIds = savedOriginalBenchIds.some(Boolean) || Array.isArray(cup.originalBenchIds) ? savedOriginalBenchIds : active ? [...normalizedStarXI.benchIds] : [];
   const phase: CupMatchPhase = cup.phase === "extra-time" || cup.phase === "penalties" ? cup.phase : "regular";
-  const round = active ? Math.max(0, Math.min(tournament.opponents.length - 1, Math.floor(Number(cup.round) || 0))) : 0;
-  const roundOpponent = tournament.opponents[round] ?? tournament.opponents[0];
+  const round = mode === "season" ? 0 : active || pendingNextRound ? Math.max(0, Math.min(tournament.rounds - 1, Math.floor(Number(cup.round) || 0))) : 0;
+  const savedOpponentName = safeString(cup.opponent, "");
+  const savedOpponentRating = Math.floor(Number(cup.opponentRating) || 0);
+  const seasonOpponent = getSeasonModeNextOpponent(normalizedSeasonMode, clubName);
+  const opponentIds = mode === "season"
+    ? (Array.isArray(cup.opponentIds) ? cup.opponentIds.filter((id): id is string => typeof id === "string").slice(0, 1) : [])
+    : normalizeTournamentOpponentSchedule(cup.opponentIds, tournament, round, savedOpponentName, savedOpponentRating, active, pendingNextRound);
+  const roundOpponent = mode === "season"
+    ? { id: opponentIds[0] ?? seasonOpponent.id, name: savedOpponentName || seasonOpponent.name, rating: savedOpponentRating || seasonOpponent.rating, strategyId: cup.opponentStrategyId === "angriff" || cup.opponentStrategyId === "konter" || cup.opponentStrategyId === "ballbesitz" ? cup.opponentStrategyId : seasonOpponent.strategyId, scorers: [] as readonly string[] }
+    : getTournamentOpponentAt(tournament, round, opponentIds, savedOpponentName, savedOpponentRating, active);
+  const normalizedOpponentName = mode === "season" ? roundOpponent.name : (active || pendingNextRound) && opponentIds.length ? roundOpponent.name : savedOpponentName || roundOpponent.name;
+  const normalizedOpponentRating = mode === "season" ? Math.max(40, Math.min(99, roundOpponent.rating)) : (active || pendingNextRound) && opponentIds.length ? roundOpponent.rating : Math.max(40, Math.min(99, savedOpponentRating || roundOpponent.rating));
   const strategyId = CUP_STRATEGIES.some((strategy) => strategy.id === cup.strategyId) ? cup.strategyId as CupStrategyId : defaults.cup.strategyId;
   const opponentStrategyId = CUP_STRATEGIES.some((strategy) => strategy.id === cup.opponentStrategyId) ? cup.opponentStrategyId as CupStrategyId : roundOpponent.strategyId;
   const trophiesSource = asRecord(cup.trophies);
@@ -1540,13 +2839,16 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     schemaVersion: GAME_FEATURES_SCHEMA_VERSION,
     transferMarket: { offerIds: offerIds.length ? offerIds : defaults.transferMarket.offerIds, ownedIds: [...new Set(ownedIds)] },
     starXI: normalizedStarXI,
-    club: { name: safeString(club.name, defaults.club.name).slice(0, 22), badge: CLUB_BADGES.includes(String(club.badge)) ? String(club.badge) : defaults.club.badge, color: CLUB_COLORS.includes(String(club.color)) ? String(club.color) : defaults.club.color },
-    cup: { active, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].opponents.length, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: safeString(cup.opponent, roundOpponent.name), opponentRating: Math.max(40, Math.min(99, Math.floor(Number(cup.opponentRating) || roundOpponent.rating))), opponentStrategyId, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, matchEvents, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers },
+    club: { name: clubName, badge: CLUB_BADGES.includes(String(club.badge)) ? String(club.badge) : defaults.club.badge, color: CLUB_COLORS.includes(String(club.color)) ? String(club.color) : defaults.club.color },
+    cup: { active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && Boolean(lastInjury), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
+    seasonMode: normalizedSeasonMode,
     goalBoost,
     missions,
     history,
     randomEvent,
     starPackReveal,
+    transferSaga,
+    gazetteIssues,
     nextEventAt: Number(source.nextEventAt) > 0 ? Number(source.nextEventAt) : defaults.nextEventAt,
     nextVarAt: Number(source.nextVarAt) > 0 ? Number(source.nextVarAt) : defaults.nextVarAt,
   };
@@ -1558,6 +2860,7 @@ export function pauseGameFeatureTimers(value: unknown, pausedMs: number, now = D
   if (duration <= 0) return features;
   features.nextEventAt += duration;
   features.nextVarAt += duration;
+  features.transferSaga.nextAt += duration;
   if (features.cup.active) {
     features.cup.matchStartedAt += duration;
     features.cup.matchEndsAt += duration;
@@ -1569,6 +2872,317 @@ export function pauseGameFeatureTimers(value: unknown, pausedMs: number, now = D
     features.goalBoost.endsAt += duration;
   }
   return features;
+}
+
+const TRANSFER_INTERESTED_CLUBS = [
+  "Real Madreto",
+  "FC Barceloneta",
+  "Manchester Cité",
+  "Bayern Münchan",
+  "Liverpuhl FC",
+  "Paris Saint German",
+  "Inter Milano",
+  "Galácticos XI",
+  "Arsenal Londra",
+  "Atlético Madrido",
+] as const;
+
+const TRANSFER_FAILURE_REASONS = [
+  "der Medizincheck nicht bestanden wurde",
+  "die Gehaltsforderung in letzter Minute zu hoch war",
+  "die Unterlagen zu spät eingereicht wurden",
+  "der Berater plötzlich nicht mehr erreichbar war",
+  "sich die Clubs bei den Bonuszahlungen nicht einigen konnten",
+  "der Spieler beim Club bleiben wollte",
+  "auf dem Vertrag die falsche Unterschrift stand",
+  "der Flug zum Medizincheck annulliert wurde",
+  "die Dokumente beim falschen Club landeten",
+  "der Trainer sein Veto eingelegt hat",
+  "die Bildrechte ungeklärt blieben",
+  "die Transferfrist wenige Sekunden vorher ablief",
+  "der vorgesehene Tauschspieler abgesagt hat",
+  "eine Rückkaufklausel den Abschluss blockierte",
+  "das Faxgerät statt des Vertrags nur die Mittagskarte übertragen hat",
+  "der Vertrag im Drucker stecken blieb und anschliessend als Konfetti herauskam",
+  "der Spieler am Flughafen aus Versehen in den Ferienflieger nach Mallorca stieg",
+  "der Berater sein Handy in einem Fondue versenkt hat",
+  "Google Maps den Spieler zum Stadion des Erzrivalen geschickt hat",
+  "die Vereinskatze über die Tastatur lief und drei Nullen zur Ablöse hinzufügte",
+  "der neue Club nur mit Panini Stickern bezahlen wollte",
+  "die gewünschte Rückennummer bereits dem Maskottchen gehörte",
+  "der Spieler beim Fototermin das Trikot des falschen Clubs anzog",
+  "der Präsident beim Unterschreiben einen Stift ohne Tinte erwischte",
+  "die Präsentationsdrohne mit dem unterschriebenen Vertrag davongeflogen ist",
+  "der Übersetzer Leihe mit Leier verwechselt hat",
+  "der Spieler im falschen Gruppenchat schrieb, dass er eigentlich gar nicht wechseln wolle",
+  "beim Medizincheck eine Kontaktlinse verloren ging und dadurch die Deadline verpasst wurde",
+  "der Transferchef sein Passwort Transfer123 vergessen hat",
+  "die Unterschrift versehentlich auf einer Pizzaschachtel statt auf dem Vertrag landete",
+  "das Navi den Berater drei Stunden lang im Kreisverkehr festhielt",
+  "der Club beim Videoanruf den Katzenfilter nicht mehr ausschalten konnte",
+  "der Spieler glaubte, der Medizincheck sei ein Quiz, und nur Fussballfragen gelernt hatte",
+  "das Vereinsmaskottchen den Vertrag gefressen hat",
+  "die Siegespizza schon vor der Unterschrift geliefert wurde und alle die Deadline vergassen",
+  "der Transfer im letzten Moment an einer fehlenden Büroklammer scheiterte",
+  "der Spieler nur zugesagt hätte, wenn er Kapitän, Elfmeterspezialist und DJ wird",
+  "der Präsident die Ablöse versehentlich in Schweizer Franken statt in Goals eingetragen hat",
+  "der Scanner den Vertrag spiegelverkehrt gespeichert hat",
+  "die Clublegende aus Versehen auf Ablehnen statt auf Annehmen klickte",
+  "das neue Trikot beim Waschen auf Kindergrösse schrumpfte",
+  "der Spieler beim Verhandlungstermin in einem Escape Room eingeschlossen war",
+] as const;
+
+const GAZETTE_CHAMPION_HEADLINES = [
+  "DER POKAL GEHÖRT UNS",
+  "DIE NACHT GEHÖRT DEM CLUB",
+  "CHAMPIONS AUF DEM RASEN",
+  "EIN TURNIER, EIN THRON",
+  "DAS STADION BEBT NOCH IMMER",
+  "TROPHÄE GESICHERT, STIMME VERLOREN",
+  "DER BUS BRAUCHT EIN OFFENES DACH",
+  "KONFETTI BIS MORGEN FRÜH",
+] as const;
+
+const GAZETTE_EXIT_HEADLINES = [
+  "AUS, ABER NICHT LEISE",
+  "DER POKAL FÄHRT OHNE UNS",
+  "DRAMA BIS ZUM SCHLUSSPFIFF",
+  "HEUTE KEIN KONFETTI",
+  "DIE KABINE IST VERDÄCHTIG STILL",
+  "KNAPP DANEBEN IST AUCH VORBEI",
+  "DER TRAUM MACHT EINE PAUSE",
+  "ROMARIO SUCHT SCHON VERSTÄRKUNG",
+] as const;
+
+function transferRandomIndex(length: number, random: () => number) {
+  if (length <= 1) return 0;
+  return Math.floor(clamp(random(), 0, 0.999999) * length);
+}
+
+function getNextTransferFailureReason(previousReason: string, random: () => number) {
+  const available = TRANSFER_FAILURE_REASONS.filter((reason) => reason !== previousReason);
+  return available[transferRandomIndex(available.length, random)] ?? TRANSFER_FAILURE_REASONS[0];
+}
+
+function appendTransferArchive(features: GameFeatures, event: TransferInsiderEvent) {
+  if (event.outcome === "failed") return;
+  features.transferSaga.archive = [...features.transferSaga.archive.filter((item) => item.id !== event.id), event].slice(-30);
+}
+
+export function isTransferDeadlineDay(value: GameFeatures, now = Date.now()) {
+  return value.transferSaga.deadlineDayStartedAt > 0 && value.transferSaga.deadlineDayStartedAt <= now && value.transferSaga.deadlineDayEndsAt > now;
+}
+
+export function startTransferDeadlineDay(value: GameFeatures, now = Date.now(), random: () => number = Math.random) {
+  const features = normalizeGameFeatures(value);
+  const endsAt = features.cup.nextTournamentAt > now ? features.cup.nextTournamentAt : now + TOURNAMENT_COOLDOWN_MS;
+  features.transferSaga.deadlineDayStartedAt = now;
+  features.transferSaga.deadlineDayEndsAt = endsAt;
+  features.transferSaga.nextAt = Math.min(endsAt - 1, now + 5000 + Math.floor(clamp(random(), 0, 0.999999) * 10000));
+  return features;
+}
+
+export function publishTournamentGazette(value: GameFeatures, summary: TournamentCompletionSummary, now = Date.now(), random: () => number = Math.random) {
+  const features = normalizeGameFeatures(value);
+  const tournament = getTournament(summary.tournamentId) ?? TOURNAMENTS[0];
+  const pool = summary.tournamentWon ? GAZETTE_CHAMPION_HEADLINES : GAZETTE_EXIT_HEADLINES;
+  const previousHeadline = features.gazetteIssues.at(-1)?.headline ?? "";
+  const available = pool.filter((headline) => headline !== previousHeadline);
+  const headline = available[transferRandomIndex(available.length, random)] ?? pool[0];
+  const score = `${summary.homeScore}:${summary.awayScore}`;
+  const tieBreakLabel = summary.tieBreak ? " nach Elfmeterschiessen" : "";
+  const issue: TournamentGazetteIssue = {
+    id: `gazette-${now}-${summary.tournamentId}`,
+    headline,
+    strapline: summary.tournamentWon
+      ? `${features.club.name} gewinnt ${tournament.trophyName}${tieBreakLabel}.`
+      : `${features.club.name} scheidet in Runde ${summary.completedRound}${tieBreakLabel} aus.`,
+    body: summary.tournamentWon
+      ? `${score} gegen ${summary.opponent}. Die Trophäe ist da, die Fans feiern und der Platzwart hat das Konfetti offiziell aufgegeben.`
+      : `${score} gegen ${summary.opponent}. Der Traum endet diesmal früh, doch im Club Office läuft die Analyse bereits auf höchster Lautstärke.`,
+    tone: summary.tournamentWon ? "champion" : "exit",
+    tournamentId: summary.tournamentId,
+    opponent: summary.opponent,
+    homeScore: summary.homeScore,
+    awayScore: summary.awayScore,
+    completedRound: summary.completedRound,
+    tieBreak: summary.tieBreak,
+    createdAt: now,
+  };
+  features.gazetteIssues = [...features.gazetteIssues, issue].slice(-12);
+  addHistory(features, { title: `Goal Gazette · ${headline}`, detail: issue.strapline, tone: summary.tournamentWon ? "positive" : "negative" }, now);
+  return { features, issue };
+}
+
+export function completeTournamentRun(value: GameFeatures, summary: TournamentCompletionSummary, now = Date.now(), random: () => number = Math.random) {
+  let features = finishActiveTransferLoans(value, now).features;
+  features = startTransferDeadlineDay(features, now, random);
+  return publishTournamentGazette(features, summary, now, random).features;
+}
+
+export function getLoanedStarXIPlayerIds(features: GameFeatures) {
+  return features.transferSaga.loans.map((loan) => loan.playerId);
+}
+
+export function getUnavailableStarXIPlayerIds(features: GameFeatures) {
+  const injuredIds = Object.entries(features.cup.injuredPlayerIds ?? {}).filter(([, matches]) => Number(matches) > 0).map(([playerId]) => playerId);
+  return [...new Set([...features.cup.suspendedPlayerIds, ...injuredIds, ...getLoanedStarXIPlayerIds(features)])];
+}
+
+export function getOpenTransferSquadVacancies(features: GameFeatures) {
+  return features.transferSaga.vacancies.filter((vacancy) => {
+    const activeSquadSize = features.starXI.lineupIds.filter(Boolean).length + features.starXI.benchIds.filter(Boolean).length;
+    return activeSquadSize < vacancy.requiredPlayers;
+  });
+}
+
+export function activatePendingTransferLoans(value: GameFeatures, tournamentId: TournamentId) {
+  const features = normalizeGameFeatures(value);
+  features.transferSaga.loans = features.transferSaga.loans.map((loan) => loan.status === "pending" ? { ...loan, status: "active", tournamentId } : loan);
+  return features;
+}
+
+export function finishActiveTransferLoans(value: GameFeatures, now = Date.now()) {
+  const features = normalizeGameFeatures(value);
+  const returnedLoans = features.transferSaga.loans.filter((loan) => loan.status === "active");
+  if (!returnedLoans.length) return { features, event: null as TransferInsiderEvent | null };
+  const returnCompetition = features.cup.mode === "season" ? "der Saisonpartie" : "dem Turnier";
+  features.transferSaga.loans = features.transferSaga.loans.filter((loan) => loan.status !== "active");
+  const stillLoanedIds = getLoanedStarXIPlayerIds(features);
+  features.starXI = normalizeStarXIState(features.starXI, [...stillLoanedIds, ...features.cup.suspendedPlayerIds]);
+  const returnedNames = returnedLoans.map((loan) => getStarXIPlayer(loan.playerId)?.name).filter((name): name is string => Boolean(name));
+  const event: TransferInsiderEvent = {
+    id: `transfer-return-${now}`,
+    outcome: "return",
+    playerId: returnedLoans.length === 1 ? returnedLoans[0].playerId : null,
+    playerName: returnedNames.join(", ") || "Deine Leihspieler",
+    club: returnedLoans.length === 1 ? returnedLoans[0].club : "Leihstationen",
+    headline: "Leihspieler zurück",
+    message: `${returnedNames.join(", ") || "Deine Leihspieler"} ${returnedNames.length === 1 ? "ist" : "sind"} nach ${returnCompetition} wieder für deinen Club verfügbar.`,
+    reason: "Leihe beendet",
+    fee: 0,
+    createdAt: now,
+  };
+  features.transferSaga.latestEvent = event;
+  appendTransferArchive(features, event);
+  addHistory(features, { title: "Fabrizio Romario · Rückkehr", detail: event.message, tone: "positive" }, now);
+  return { features, event };
+}
+
+export function resolveTransferInsiderEvent(value: GameFeatures, random: () => number = Math.random, now = Date.now()) {
+  const features = normalizeGameFeatures(value);
+  const deadlineDay = isTransferDeadlineDay(features, now);
+  const loanChance = deadlineDay ? TRANSFER_DEADLINE_LOAN_CHANCE : TRANSFER_LOAN_CHANCE;
+  const eventRoll = clamp(random(), 0, 0.999999);
+  const requestedOutcome: "loan" | "sale" | "failed" = eventRoll < loanChance
+    ? "loan"
+    : eventRoll < loanChance + TRANSFER_SALE_CHANCE
+      ? "sale"
+      : "failed";
+  const club = TRANSFER_INTERESTED_CLUBS[transferRandomIndex(TRANSFER_INTERESTED_CLUBS.length, random)] ?? TRANSFER_INTERESTED_CLUBS[0];
+  const loanedIds = new Set(getLoanedStarXIPlayerIds(features));
+  const squadCandidateIds = [...new Set([...features.starXI.lineupIds, ...features.starXI.benchIds])]
+    .filter((playerId) => Boolean(playerId) && features.starXI.ownedIds.includes(playerId) && !loanedIds.has(playerId) && Boolean(getStarXIPlayer(playerId)));
+  const candidateStartIndex = transferRandomIndex(squadCandidateIds.length, random);
+  const matchInProgress = features.cup.active;
+  const candidateId: string | null = squadCandidateIds[candidateStartIndex] ?? null;
+  const player = candidateId ? getStarXIPlayer(candidateId) ?? null : null;
+  const outcome = requestedOutcome !== "failed" && player && !matchInProgress ? requestedOutcome : "failed";
+  let event: TransferInsiderEvent;
+  let goalDelta = 0;
+
+  if (outcome === "loan" && player) {
+    const lineupIndex = features.starXI.lineupIds.indexOf(player.id);
+    const benchIndex = features.starXI.benchIds.indexOf(player.id);
+    const requiredPlayers = features.starXI.lineupIds.filter(Boolean).length + features.starXI.benchIds.filter(Boolean).length;
+    const vacancy: TransferSquadVacancy = lineupIndex >= 0
+      ? { area: "lineup", index: lineupIndex, requiredPlayers, createdAt: now }
+      : { area: "bench", index: benchIndex, requiredPlayers, createdAt: now };
+    features.transferSaga.vacancies = [...getOpenTransferSquadVacancies(features), vacancy].slice(-20);
+    const competition = features.cup.mode === "season"
+      ? { current: "der laufenden Saisonpartie", next: "der nächsten kompletten Saisonpartie", article: "eine Saisonpartie" }
+      : { current: "des laufenden Turniers", next: "dem nächsten kompletten Turnier", article: "ein Turnier" };
+    const joinsCurrentTournament = features.cup.pendingNextRound;
+    features.transferSaga.loans = [...features.transferSaga.loans, { playerId: player.id, club, status: joinsCurrentTournament ? "active" : "pending", tournamentId: joinsCurrentTournament ? features.cup.tournamentId : null, createdAt: now }];
+    const blockedPlayerIds = [...getUnavailableStarXIPlayerIds(features)];
+    features.starXI = normalizeStarXIState(features.starXI, blockedPlayerIds);
+    event = {
+      id: `transfer-loan-${now}-${player.id}`,
+      outcome,
+      playerId: player.id,
+      playerName: player.name,
+      club,
+      headline: "Leihe bestätigt",
+      message: joinsCurrentTournament
+        ? `Fabrizio Romario meldet: ${player.name} wechselt auf Leihbasis zu ${club}, fehlt für den Rest ${competition.current} und kehrt danach zurück.`
+        : `Fabrizio Romario meldet: ${player.name} wechselt auf Leihbasis zu ${club} und fehlt deinem Club in ${competition.next}. Danach kehrt er zurück.`,
+      reason: joinsCurrentTournament ? `Leihe für den Rest ${competition.current}` : `Leihe für ${competition.article}`,
+      fee: 0,
+      createdAt: now,
+    };
+  } else if (outcome === "sale" && player) {
+    const lineupIndex = features.starXI.lineupIds.indexOf(player.id);
+    const benchIndex = features.starXI.benchIds.indexOf(player.id);
+    const requiredPlayers = features.starXI.lineupIds.filter(Boolean).length + features.starXI.benchIds.filter(Boolean).length;
+    const vacancy: TransferSquadVacancy = lineupIndex >= 0
+      ? { area: "lineup", index: lineupIndex, requiredPlayers, createdAt: now }
+      : { area: "bench", index: benchIndex, requiredPlayers, createdAt: now };
+    features.transferSaga.vacancies = [...getOpenTransferSquadVacancies(features), vacancy].slice(-20);
+    const paidSale = clamp(random(), 0, 0.999999) < TRANSFER_PAID_SALE_CHANCE;
+    const fee = paidSale ? Math.max(0, Math.floor(player.price)) : 0;
+    goalDelta = fee;
+    const soldState = {
+      ...features.starXI,
+      ownedIds: features.starXI.ownedIds.filter((playerId) => playerId !== player.id),
+      lineupIds: features.starXI.lineupIds.map((playerId) => playerId === player.id ? "" : playerId),
+      benchIds: features.starXI.benchIds.map((playerId) => playerId === player.id ? "" : playerId),
+    };
+    features.starXI = normalizeStarXIState(soldState, getUnavailableStarXIPlayerIds(features));
+    event = {
+      id: `transfer-sale-${now}-${player.id}`,
+      outcome,
+      playerId: player.id,
+      playerName: player.name,
+      club,
+      headline: paidSale ? "HERE WE GOAL" : "Ablösefreier Abgang",
+      message: paidSale
+        ? `Fabrizio Romario meldet: ${player.name} wechselt dauerhaft zu ${club}. Dein Club erhält ${fee.toLocaleString("de-CH")} Goals Ablöse.`
+        : `Fabrizio Romario meldet: ${player.name} wechselt dauerhaft und ablösefrei zu ${club}. Dein Club erhält keine Goals.`,
+      reason: paidSale ? "Verkauf mit Ablöse" : "Ablösefreier Wechsel",
+      fee,
+      createdAt: now,
+    };
+  } else {
+    const reason = getNextTransferFailureReason(features.transferSaga.lastFailedReason, random);
+    const playerName = player?.name ?? "einem angefragten Spieler";
+    event = {
+      id: `transfer-failed-${now}-${player?.id ?? "none"}`,
+      outcome: "failed",
+      playerId: player?.id ?? null,
+      playerName: player?.name ?? null,
+      club,
+      headline: "Deal geplatzt",
+      message: `Fabrizio Romario meldet: Der mögliche Wechsel von ${playerName} zu ${club} ist geplatzt, weil ${reason}.`,
+      reason,
+      fee: 0,
+      createdAt: now,
+    };
+    features.transferSaga.lastFailedReason = reason;
+  }
+
+  features.transferSaga.latestEvent = event;
+  appendTransferArchive(features, event);
+  const nextDelay = deadlineDay ? getTransferDeadlineEventDelay(random()) : getTransferEventDelay(random());
+  const deadlineCandidate = now + nextDelay;
+  features.transferSaga.nextAt = deadlineDay && deadlineCandidate >= features.transferSaga.deadlineDayEndsAt
+    ? features.transferSaga.deadlineDayEndsAt + getTransferEventDelay(random())
+    : deadlineCandidate;
+  addHistory(features, {
+    title: `Fabrizio Romario · ${event.headline}`,
+    detail: event.message,
+    tone: event.outcome === "sale" ? "negative" : event.outcome === "loan" ? "neutral" : "neutral",
+  }, now);
+  return { features, event, goalDelta };
 }
 
 export function getTransferPlayer(id: string) {
@@ -1647,5 +3261,5 @@ export function resolveVarEvent(goals: number, random = Math.random(), now = Dat
 }
 
 export function addHistory(features: GameFeatures, entry: Omit<MatchHistoryEntry, "id" | "timestamp">, now = Date.now()) {
-  features.history = [...features.history, { ...entry, id: `${now}-${Math.random().toString(36).slice(2, 7)}`, timestamp: now }].slice(-12);
+  features.history = [...features.history, { ...entry, id: `${now}-${Math.random().toString(36).slice(2, 7)}`, timestamp: now }].slice(-30);
 }

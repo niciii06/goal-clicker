@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { getSeasonPath, isSeasonContentUnlocked } from "../app/season-progression.ts";
+import { isSeasonContentUnlocked } from "../app/season-progression.ts";
 
 test("AZB bypasses season locks without changing normal progression", () => {
   assert.equal(isSeasonContentUnlocked(20, 0, true), true);
@@ -38,7 +38,6 @@ test("client and multiplayer server apply AZB to every season gated category", a
 
   assert.match(pageSource, /isSeasonContentUnlocked\(unlockSeason, displayGame\.seasons, hasFullTestAccess\)/);
   assert.match(pageSource, /isSeasonContentUnlocked\(getFormationUnlockSeason\(formation\.id\), displayGame\.seasons, hasFullTestAccess\)/);
-  assert.match(pageSource, /isSeasonContentUnlocked\(selectedTournamentUnlockSeason, displayGame\.seasons, hasFullTestAccess\)/);
 
   for (const unlockVariable of ["upgradeUnlockSeason", "formationUnlockSeason", "packUnlockSeason", "tournamentUnlockSeason"]) {
     const gameVariable = unlockVariable === "upgradeUnlockSeason" ? "(?:game|purchaseGame)" : "game";
@@ -57,25 +56,38 @@ test("lobby code history stays hidden while duplicate codes remain blocked", asy
   assert.doesNotMatch(pageSource, /bonusCodeRedeemed|silvanCodeRedeemed|coop-bonus-used/);
 });
 
-test("season path uses the current spendable goal balance", async () => {
-  const belowTarget = getSeasonPath(50000, 0);
-  assert.equal(belowTarget.target, 250000);
-  assert.equal(belowTarget.progress, 20);
-  assert.equal(belowTarget.canAdvance, false);
-
-  const atTarget = getSeasonPath(250000, 0);
-  assert.equal(atTarget.progress, 100);
-  assert.equal(atTarget.canAdvance, true);
-
+test("season mode uses the live match flow and table results instead of goal targets", async () => {
   const [pageSource, apiSource] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(pageSource, /getSeasonPath\(displayGame\.goals, displayGame\.seasons\)/);
-  assert.match(apiSource, /getSeasonPath\(game\.goals, game\.seasons\)/);
-  assert.doesNotMatch(pageSource, /getSeasonPath\(displayGame\.seasonGoals/);
-  assert.doesNotMatch(apiSource, /getSeasonPath\(game\.seasonGoals/);
+  assert.match(pageSource, /beginSeasonCupMatch\(features\.cup, features\.seasonMode/);
+  assert.match(apiSource, /beginSeasonCupMatch\(game\.features\.cup, game\.features\.seasonMode/);
+  assert.match(pageSource, /sendCoopAction\("cup-start", \{ mode: "season" \}\)/);
+  assert.match(apiSource, /payload\.mode === "season"/);
+  assert.match(pageSource, /recordSeasonModeMatch\(features\.seasonMode, features\.cup\.homeScore, features\.cup\.awayScore/);
+  assert.match(apiSource, /recordSeasonModeMatch\(game\.features\.seasonMode, game\.features\.cup\.homeScore, game\.features\.cup\.awayScore/);
+  assert.doesNotMatch(pageSource, /playSeasonModeMatch\(displayGame\.features\.seasonMode/);
+  assert.doesNotMatch(apiSource, /playSeasonModeMatch\(game\.features\.seasonMode/);
+  assert.doesNotMatch(pageSource, /seasonTarget|seasonPath/);
+  assert.doesNotMatch(apiSource, /seasonTarget|seasonPath/);
+});
+
+test("season match results open a large standings takeover", async () => {
+  const [pageSource, featureSource] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(pageSource, /season-standings-takeover/);
+  assert.match(pageSource, /displayGame\.features\.seasonMode\.lastTable/);
+  assert.match(pageSource, /TOR-DIFF\./);
+  assert.match(pageSource, /formatGoalDifference\(team\)/);
+  assert.match(pageSource, /seasonHistoryRef\.current/);
+  assert.match(pageSource, /Rangliste aktualisiert/);
+  assert.match(featureSource, /lastTable: SeasonTableRow\[\]/);
+  assert.match(featureSource, /lastTable,\n    lastResult/);
 });
 
 test("purchase surfaces always show full prices instead of missing amounts", async () => {
@@ -95,10 +107,15 @@ test("progress surfaces show full targets instead of remaining amounts", async (
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(pageSource, /`\$\{formatNumber\(seasonTarget\)\} aktuelle Tore benötigt`/);
+  assert.match(pageSource, /Saisonspiel starten/);
   assert.match(pageSource, /`\$\{formatNumber\(nextRank\.minimum\)\} Tore für \$\{nextRank\.name\}`/);
-  assert.match(pageSource, /`\$\{tournament\.minimumRating\} OVR benötigt`/);
+  assert.match(pageSource, /`\$\{seasonNextOpponent\.rating\} OVR/);
   assert.match(pageSource, /`\$\{STAR_XI_SQUAD_SIZE\} passende Startplätze erforderlich`/);
+  assert.match(pageSource, /tournament-picker/);
+  assert.match(pageSource, /season-competition-card/);
+  assert.match(pageSource, /startCup\(selectedTournament\.id\)/);
+  assert.match(pageSource, /TOURNAMENTS\.map/);
+  assert.doesNotMatch(pageSource, /LEGACY-MATCH|Neue Spiele starten ab jetzt direkt im Saisonmodus/);
   assert.doesNotMatch(pageSource, /seasonPath\.remaining|nextRank\.minimum - displayGame\.totalGoals/);
   assert.doesNotMatch(apiSource, /seasonPath\.remaining/);
 });

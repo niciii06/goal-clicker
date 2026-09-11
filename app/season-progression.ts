@@ -32,7 +32,7 @@ const UPGRADE_UNLOCK_SEASONS: Record<string, number> = {
 const PACK_UNLOCK_SEASONS: Record<string, number> = {
   scout: 1,
   elite: 5,
-  legend: 13,
+  legend: 10,
 };
 
 const TOURNAMENT_UNLOCK_SEASONS: Record<string, number> = {
@@ -83,17 +83,12 @@ export const SEASON_MILESTONES: readonly SeasonMilestone[] = [
   { season: 7, title: "Medienhaus", description: "Jedes Spiel wird in die ganze Welt übertragen.", rewards: ["Weltweite Übertragung", "Ballon-d'Or-Angreifer", "2 neue Formationen"] },
   { season: 8, title: "Weltmarke", description: "Der erste globale Partner steigt ein.", rewards: ["Globaler Sponsor", "2 neue Formationen"] },
   { season: 9, title: "Superclub", description: "Aus einem Verein wird ein internationales Netzwerk.", rewards: ["Superclub Netzwerk", "2 neue Formationen"] },
-  { season: 10, title: "Captain Era", description: "Ein Leader prägt die nächste Generation.", rewards: ["Kapitänsbinde", "2 neue Formationen"] },
+  { season: 10, title: "Captain Era", description: "Ein Leader prägt die nächste Generation.", rewards: ["Kapitänsbinde", "Legenden Pack", "2 neue Formationen"] },
   { season: 11, title: "Goldene Generation", description: "Deine Klicks werden zur echten Weltklasse.", rewards: ["Goldener Schuh", "2 neue Formationen"] },
   { season: 12, title: "Weltbühne", description: "Jetzt wartet das härteste Turnier im Spiel.", rewards: ["Weltmeisterschaft", "2 neue Formationen"] },
-  { season: 13, title: "Legendenjagd", description: "Die seltensten Karten kommen in Reichweite.", rewards: ["Legenden Pack", "Formation 5-2-3"] },
+  { season: 13, title: "Legendenjagd", description: "Die seltensten Karten kommen in Reichweite.", rewards: ["Formation 5-2-3"] },
   { season: 14, title: "Vereins Dynastie", description: "Dein Club verdient dauerhaft auf höchstem Niveau.", rewards: ["Vereins Dynastie", "Formation 5-3-2"] },
-  { season: 15, title: "Taktikmeister", description: "Die komplette Formationsbibliothek ist offen.", rewards: ["Formation 5-4-1", "Alle 29 Formationen"] },
-  { season: 16, title: "Sternstufe I", description: "Die späten Karrierestufen stärken den ganzen Club dauerhaft.", rewards: ["+1 Vereinsstern", "+2% alle Einnahmen"] },
-  { season: 17, title: "Sternstufe II", description: "Der Club sammelt weitere dauerhafte Stärke.", rewards: ["+1 Vereinsstern", "+2% alle Einnahmen"] },
-  { season: 18, title: "Sternstufe III", description: "Jede Einnahme profitiert vom nächsten Vereinsstern.", rewards: ["+1 Vereinsstern", "+2% alle Einnahmen"] },
-  { season: 19, title: "Sternstufe IV", description: "Die letzte Stufe vor der Hall of Fame beginnt.", rewards: ["+1 Vereinsstern", "+2% alle Einnahmen"] },
-  { season: 20, title: "Hall of Fame", description: "Die komplette Saisonkarriere ist gemeistert.", rewards: ["+2 Vereinssterne", "Hall of Fame Status"] },
+  { season: 15, title: "Hall of Fame", description: "Die höchste Saison ist erreicht. Dein Club gehört jetzt zur ewigen Elite.", rewards: ["Hall of Fame Status", "Prestige freigeschaltet", "Alle 29 Formationen"] },
 ] as const;
 
 export const MAX_CAREER_SEASON = SEASON_MILESTONES.length;

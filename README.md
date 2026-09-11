@@ -1,3 +1,14 @@
+# Goal Clicker
+
+Aktueller Spielcode mit Spielerpool, Saisons, Walkouts und Multiplayer.
+
+**Manuell bearbeiten und extern hosten:** [HOSTING.md](HOSTING.md).
+
+Die externe Cloudflare Konfiguration ist `wrangler.external.json`. Laufende
+Datenbankinhalte und Browser Spielstände sind separat zu übernehmen.
+
+## Ursprüngliche Sites Dokumentation
+
 # vinext-starter
 
 A clean full-stack starter running on

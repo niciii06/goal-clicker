@@ -1,3 +1,7 @@
+import { getFunnyPlayerName } from "./funny-player-names";
+import { getFC27Positions } from "./fc27-positions";
+import { getFC27CardAccent, getFC27Rating } from "./fc27-ratings";
+
 export type StarPosition =
   | "TW"
   | "LV"
@@ -24,9 +28,9 @@ export type FC26StarProfile = {
   accent: string;
 };
 
-// 1,498 launch-database profiles. Names are intentionally altered aliases; ratings and
-// playable positions match the corresponding EA SPORTS FC 26 launch player.
-export const FC26_STAR_PROFILES = [
+// 1,498 launch-database profiles. Stable IDs and aliases stay unchanged for save
+// compatibility; official FC27 ratings and playable positions are applied below.
+const FC26_STAR_PROFILE_SEEDS = [
   { id: "star-70-2", sourceId: "279188", name: "Š. Hrgovik", rating: 70, positions: ["LV", "RV", "LM"], accent: "#6e7781" },
   { id: "star-70-3", sourceId: "70497", name: "K. Karetsaz", rating: 70, positions: ["ZOM", "RF", "ZM"], accent: "#6e7781" },
   { id: "star-70-4", sourceId: "259465", name: "I. Jensem", rating: 70, positions: ["LM", "LF"], accent: "#6e7781" },
@@ -1526,3 +1530,15 @@ export const FC26_STAR_PROFILES = [
   { id: "star-fc26-249", sourceId: "209331", name: "M. Salav", rating: 91, positions: ["RM", "RF"], accent: "#c69214" },
   { id: "star-fc26-250", sourceId: "231747", name: "K. Mbappo", rating: 91, positions: ["ST", "LF", "LM"], accent: "#c69214" },
 ] as const satisfies readonly FC26StarProfile[];
+
+export const FC26_STAR_PROFILES: readonly FC26StarProfile[] = FC26_STAR_PROFILE_SEEDS.map((profile) => {
+  const rating = getFC27Rating(profile.sourceId, profile.rating);
+  const positions = getFC27Positions(profile.sourceId, profile.positions);
+  return {
+    ...profile,
+    positions,
+    rating,
+    accent: getFC27CardAccent(rating),
+    name: getFunnyPlayerName(profile.name, profile.id, { position: positions[0], rating }),
+  };
+});

@@ -97,9 +97,9 @@ const BLOND = "#d8bd73";
 type PhysicalBuild = "lean" | "normal" | "stocky" | "unique";
 type PhysicalProfile = readonly [heightCm: number, weightKg: number, bodyType: PhysicalBuild];
 
-// FC26 DataHub / SoFIFA 26 physical data. These values are kept separate from
+// Physical data for the base-card walkouts. These values are kept separate from
 // the hand-authored block-character styling so height and build stay tied to
-// the actual FC26 player record instead of being estimated from the portrait.
+// the player record instead of being estimated from the portrait.
 const FC26_PHYSICAL_BY_SOURCE_ID: Record<string, PhysicalProfile> = {
   "231747": [182, 75, "unique"],
   "209331": [175, 72, "unique"],
@@ -196,6 +196,14 @@ const FC26_PHYSICAL_BY_SOURCE_ID: Record<string, PhysicalProfile> = {
   "237238": [193, 88, "normal"],
   "230869": [190, 89, "normal"],
   "216393": [176, 72, "normal"],
+  "251570": [176, 71, "normal"],
+  "278046": [184, 78, "normal"],
+  "259532": [193, 85, "normal"],
+  "236772": [186, 74, "lean"],
+  "239231": [175, 66, "lean"],
+  "234577": [187, 81, "normal"],
+  "252154": [191, 83, "normal"],
+  "247090": [178, 76, "normal"],
 };
 
 function physicalScale(sourceId: string, fallbackHeight: number, fallbackBuild: number) {
@@ -210,7 +218,7 @@ function physicalScale(sourceId: string, fallbackHeight: number, fallbackBuild: 
   };
 }
 
-// Every FC26 walkout has its own fixed body and face profile. Nothing is rolled at
+// Every base-card walkout has its own fixed body and face profile. Nothing is rolled at
 // render time, so a player keeps the same recognisable block-character appearance.
 const RAW_PROFILES: readonly RawProfile[] = [
   ["231747", "FR", S4, "buzz", BLACK, "clean", "round", 1.00, 1.03, "arms"],
@@ -308,6 +316,14 @@ const RAW_PROFILES: readonly RawProfile[] = [
   ["237238", "SC", S1, "crop", BROWN, "stubble", "square", 1.02, 1.05, "fist"],
   ["230869", "ES", S1, "fade", BROWN, "full", "long", 1.05, 1.00, "fist"],
   ["216393", "BE", S2, "buzz", BLACK, "goatee", "round", 0.98, 0.96, "calm"],
+  ["251570", "FR", S3, "curls", BLACK, "short", "round", 0.97, 0.94, "point"],
+  ["278046", "ES", S1, "crop", BROWN, "clean", "long", 1.01, 0.96, "fist"],
+  ["259532", "ES", S1, "crop", BROWN, "short", "long", 1.07, 1.02, "fist"],
+  ["236772", "HU", S1, "medium", BROWN, "stubble", "long", 1.02, 0.94, "arms"],
+  ["239231", "ES", S1, "curls", BROWN, "short", "long", 0.95, 0.90, "arms"],
+  ["234577", "PT", S2, "crop", BLACK, "short", "square", 1.03, 1.00, "fist"],
+  ["252154", "IT", S1, "crop", BROWN, "stubble", "long", 1.06, 1.01, "fist"],
+  ["247090", "AR", S1, "crop", BLACK, "stubble", "angular", 0.98, 0.95, "fist"],
 ];
 
 const PROFILE_BY_SOURCE_ID = new Map(RAW_PROFILES.map((raw) => [raw[0], raw]));
@@ -353,13 +369,87 @@ const GOAT_PROFILE: WalkoutPresentation = {
 
 const SPECIAL_PROFILE_BY_PLAYER_ID: Record<string, WalkoutPresentation> = {
   "star-goat-nicu": GOAT_PROFILE,
-  "star-flurin-fabrice": { ...GOAT_PROFILE, hair: "curls", hairColor: BROWN, face: "round", height: .96, build: .9, celebration: "jump" },
+  "star-flurin-fabrice": {
+    ...GOAT_PROFILE,
+    hair: "medium",
+    hairColor: LIGHT_BROWN,
+    face: "long",
+    height: .98,
+    build: .84,
+    celebration: "jump",
+  },
   "star-benxli": { ...GOAT_PROFILE, hair: "buzz", hairColor: BROWN, beard: "clean", face: "square", height: 1.03, build: 1.05, celebration: "fist", kitPrimary: "#166534", kitSecondary: "#ffffff", boots: "#111111" },
-  "star-maetthu": { ...GOAT_PROFILE, hair: "crop", hairColor: BROWN, beard: "short", face: "square", height: 1.09, build: 1.06, celebration: "fist", kitPrimary: "#b9bec7", kitSecondary: "#ffffff", boots: "#111111" },
-  "star-champ-simu": { ...GOAT_PROFILE, hair: "fade", hairColor: BLACK, beard: "stubble", face: "angular", height: 1.08, build: 1.1, celebration: "arms", kitPrimary: "#b9bec7", kitSecondary: "#ffffff", boots: "#111111" },
+  "star-maetthu": {
+    ...GOAT_PROFILE,
+    skin: S1,
+    hair: "bald",
+    hairColor: BLACK,
+    beard: "full",
+    face: "round",
+    height: 1.03,
+    build: 1.1,
+    celebration: "arms",
+  },
+  "star-champ-simu": {
+    ...GOAT_PROFILE,
+    hair: "pony",
+    hairColor: BLACK,
+    beard: "short",
+    face: "long",
+    height: 1.06,
+    build: .92,
+    celebration: "arms",
+  },
   "star-silvuz": { ...GOAT_PROFILE, hair: "crop", hairColor: BROWN, beard: "clean", face: "oval", height: 1.04, build: .98, celebration: "point", kitPrimary: "#d71920", kitSecondary: "#ffffff", boots: "#ffffff" },
-  "star-nedu-mann-yesss": { ...GOAT_PROFILE, countryCode: "BA", country: "Bosnien und Herzegowina", flag: "🇧🇦", skin: S1, hair: "fade", hairColor: BLACK, beard: "short", face: "square", height: 1.03, build: 1.01, celebration: "arms", kitPrimary: "#0033a0", kitSecondary: "#ffcc00", boots: "#ffffff" },
+  "star-nedu-mann-yesss": {
+    ...GOAT_PROFILE,
+    countryCode: "BA",
+    country: "Bosnien und Herzegowina",
+    flag: "🇧🇦",
+    skin: S1,
+    hair: "slick",
+    hairColor: BLACK,
+    beard: "full",
+    face: "round",
+    height: 1.03,
+    build: 1.1,
+    celebration: "arms",
+    kitPrimary: "#0033a0",
+    kitSecondary: "#ffcc00",
+    boots: "#ffffff",
+  },
 };
+
+type WalkoutBodyProfile = Pick<WalkoutPresentation, "skin" | "hair" | "hairColor" | "beard" | "face" | "height" | "build" | "celebration">;
+
+// Di Santo's body is fixed from the supplied reference, while the kit remains
+// the regular in-game country kit instead of copying the reference clothing.
+const SPECIAL_BODY_PROFILE_BY_PLAYER_ID: Record<string, WalkoutBodyProfile> = {
+  "star-di-santo": {
+    skin: S2,
+    hair: "slick",
+    hairColor: BLACK,
+    beard: "short",
+    face: "angular",
+    height: 1.04,
+    build: 1.02,
+    celebration: "arms",
+  },
+};
+
+function fromSpecialBody(player: StarXIPlayer, body: WalkoutBodyProfile): WalkoutPresentation {
+  const countryCode = player.countryCode && COUNTRY[player.countryCode] ? player.countryCode : "CH";
+  const country = COUNTRY[countryCode];
+  return {
+    countryCode,
+    country: country.name,
+    flag: country.flag,
+    ...body,
+    kitPrimary: country.kit[0],
+    kitSecondary: country.kit[1],
+    boots: "#f5f5f5",
+  };
+}
 
 type IconAppearance = readonly [
   skin: string,
@@ -567,6 +657,8 @@ function fallbackProfile(player: StarXIPlayer): WalkoutPresentation {
 export function getWalkoutPresentation(player: StarXIPlayer) {
   const special = SPECIAL_PROFILE_BY_PLAYER_ID[player.id];
   if (special) return special;
+  const specialBody = SPECIAL_BODY_PROFILE_BY_PLAYER_ID[player.id];
+  if (specialBody) return fromSpecialBody(player, specialBody);
   const iconAppearance = ICON_APPEARANCE_BY_PLAYER_ID[player.id];
   if (iconAppearance) return fromIconAppearance(player, iconAppearance);
   const raw = player.sourceId ? PROFILE_BY_SOURCE_ID.get(player.sourceId) : undefined;

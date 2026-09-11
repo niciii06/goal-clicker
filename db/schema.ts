@@ -1,15 +1,6 @@
 import { sql } from "drizzle-orm";
 import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-export const leaderboardEntries = sqliteTable("leaderboard_entries", {
-  playerId: text("player_id").primaryKey(),
-  nickname: text("nickname").notNull(),
-  totalGoals: real("total_goals").notNull().default(0),
-  seasonGoals: real("season_goals").notNull().default(0),
-  minigameWins: integer("minigame_wins").notNull().default(0),
-  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-});
-
 export const coopRooms = sqliteTable("coop_rooms", {
   code: text("code").primaryKey(),
   roomName: text("room_name").notNull().default("Meine Welt"),

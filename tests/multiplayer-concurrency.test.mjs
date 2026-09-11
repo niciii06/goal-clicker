@@ -8,8 +8,12 @@ test("multiplayer state writes use a monotonic revision and retry stale actions"
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
   ]);
 
-  assert.match(apiSource, /sharedStateVersion: sql`\$\{coopRooms\.sharedStateVersion\} \+ 1`/);
-  assert.match(apiSource, /eq\(coopRooms\.sharedStateVersion, room\.sharedStateVersion\)/);
+  const databaseSource = await readFile(new URL("../db/index.ts", import.meta.url), "utf8");
+
+  assert.match(databaseSource, /shared_state_version.*shared_state_version \+ 1|apply_coop_click/);
+  assert.match(apiSource, /sharedStateVersion: room\.sharedStateVersion/);
+  assert.match(apiSource, /updateRoom\([\s\S]*sharedStateVersion: room\.sharedStateVersion/);
+  assert.match(apiSource, /applyClick\(code, role, amount, clickCount, timestamp\)/);
   assert.match(apiSource, /errorCode: "STALE_STATE"/);
   assert.match(pageSource, /data\.errorCode === "STALE_STATE"/);
   assert.match(pageSource, /room\.revision < current\.room\.revision/);
@@ -49,6 +53,22 @@ test("singleplayer and multiplayer tournaments never add direct goal rewards", a
   assert.doesNotMatch(pageSource, /result\.reward/);
   assert.match(apiSource, /if \(result\.tournamentWon\) game\.features\.goalBoost = startTournamentGoalBoost/);
   assert.match(pageSource, /if \(result\.tournamentWon\) features\.goalBoost = startTournamentGoalBoost/);
+});
+
+test("tournament cooldown stays server-safe while season matches share the game picker", async () => {
+  const [featureSource, apiSource, pageSource] = await Promise.all([
+    readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(featureSource, /TOURNAMENT_COOLDOWN_MS = 5 \* 60 \* 1000/);
+  assert.match(featureSource, /nextCup\.nextTournamentAt = now \+ TOURNAMENT_COOLDOWN_MS/);
+  assert.match(apiSource, /!game\.features\.cup\.pendingNextRound && game\.features\.cup\.nextTournamentAt > cupNow/);
+  assert.match(pageSource, /Saisonspiel starten/);
+  assert.match(pageSource, /tournamentCooldownActive/);
+  assert.match(pageSource, /season-competition-card/);
+  assert.match(pageSource, /startCup\(selectedTournament\.id\)/);
 });
 
 test("minimised multiplayer sessions receive a long passive grace period", async () => {
