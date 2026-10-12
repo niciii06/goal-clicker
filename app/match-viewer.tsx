@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getCupMatchMinute, getCupPlayerMatchRating, getStarFormation, getStarXIPlayer } from "./feature-data";
+import { getCupMatchMinute, getCupRegularDurationMs, getCupPlayerMatchRating, getStarFormation, getStarXIPlayer } from "./feature-data";
 import type { CupState, GameFeatures, StarPosition } from "./feature-data";
 
 type Team = "club" | "opponent";
@@ -48,10 +48,10 @@ function baseActors(features: GameFeatures, cup: CupState, minute: number, clubR
 
 function getVisualFrame(features: GameFeatures, wallNow: number, replay?: Replay) {
   const cup = features.cup;
-  const minute = replay ? replay.event.minute : getCupMatchMinute(cup, wallNow);
+  const minute = replay ? replay.event.minute : getCupMatchMinute(cup, cup.matchPaused ? cup.lastTickAt : wallNow);
   const clubRight = (minute <= 45) !== Boolean(cup.fixture?.away);
   const base = baseActors(features, cup, minute, clubRight);
-  const elapsed = Math.max(0, (wallNow - cup.matchStartedAt) / 1000);
+  const elapsed = Math.max(0, ((cup.matchPaused ? cup.lastTickAt : wallNow) - cup.matchStartedAt) / 1000);
   const turnover = Math.floor(elapsed / 16);
   const possession: Team = turnover % 2 === 0 ? "club" : "opponent";
   const teamRight = possession === "club" ? clubRight : !clubRight;
@@ -96,11 +96,18 @@ function getVisualFrame(features: GameFeatures, wallNow: number, replay?: Replay
       const targetX = goalRight ? 106 : -1;
       ball = { x: mix(goalRight ? 83 : 22, targetX, Math.min(1, age / 1.35)), y: mix(29, 34, Math.min(1, age / 1.35)) };
       status = age < 1.35 ? "Torschuss!" : "TOOOR!";
-      if (recent.playerId) {
-        const scorer = actors.find((p) => p.id === recent.playerId);
-        if (scorer) {
-          scorer.x = mix(scorer.x, goalRight ? 84 : 21, 0.65);
-          scorer.y = mix(scorer.y, 30, 0.65);
+      const scorer = actors.find((p) => p.id === recent.playerId);
+      if (scorer) {
+        scorer.x = mix(scorer.x, goalRight ? 84 : 21, 0.65);
+        scorer.y = mix(scorer.y, 30, 0.65);
+        if (age > 1.35) {
+          const progress = smooth((age - 1.35) / 2.1);
+          const nearest = actors.filter((p) => p.team === recent.side && p.id !== scorer.id && !p.goalkeeper)
+            .sort((a, b) => Math.hypot(a.x - scorer.x, a.y - scorer.y) - Math.hypot(b.x - scorer.x, b.y - scorer.y)).slice(0, 4);
+          nearest.forEach((teammate, index) => {
+            teammate.x = mix(teammate.x, scorer.x + (index % 2 ? 3 : -3), progress);
+            teammate.y = mix(teammate.y, scorer.y + (index < 2 ? -3 : 3), progress);
+          });
         }
       }
     } else if (recent.kind === "card") status = "Rote Karte";
@@ -151,6 +158,7 @@ export function LiveMatchViewer({ features, now, clubName, clubColor }: { featur
   const cup = features.cup;
   const frame = getVisualFrame(features, clock, replay);
   const history = getViewerEvents(cup).filter((event) => event.at <= clock);
+  const halfTimeTransition = !replay && cup.phase === "regular" && Math.abs(clock - cup.matchStartedAt - getCupRegularDurationMs(cup) / 2) < 1350;
   const visiting = Boolean(cup.fixture?.away);
   const home = visiting ? cup.opponent : clubName;
   const away = visiting ? clubName : cup.opponent;
@@ -166,6 +174,7 @@ export function LiveMatchViewer({ features, now, clubName, clubColor }: { featur
     <div className="gc-viewer-main">
       <div className="gc-viewer-pitch-shell">
         <div className="gc-viewer-pitch-head"><span><i className="gc-live-dot" /> {replay ? "WIEDERHOLUNG" : frame.status}</span><span>{getStarFormation(features.starXI.formationId).label} · 2D</span></div>
+        {halfTimeTransition && <div className="gc-viewer-half-time"><strong>HALBZEIT</strong><span>Seitenwechsel</span></div>}
         <svg className="gc-viewer-pitch" viewBox="-3 -3 111 74" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Taktische Draufsicht mit animierten Spielern, Ball und Spielfeld">
           <defs><pattern id="gc-grass" width="15" height="68" patternUnits="userSpaceOnUse"><rect width="15" height="68" fill="#207c4d"/><rect width="7.5" height="68" fill="#247f50"/></pattern></defs>
           <rect x="0" y="0" width="105" height="68" rx="1" fill="url(#gc-grass)" stroke="#d1f1da" strokeWidth=".65"/>
