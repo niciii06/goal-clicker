@@ -1435,3 +1435,8 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 .cup-goal-takeover .cup-goal-minute{font-size:9px}
 .cup-goal-takeover .event-takeover-dismiss{margin-top:8px;padding:8px 15px}
 @media(max-width:650px){.cup-goal-takeover{width:min(270px,calc(100vw - 24px));inset:auto 12px 12px auto}.cup-goal-takeover .cup-goal-card{padding:12px}}
+
+.gc-viewer-pitch-shell{position:relative}
+.gc-viewer-half-time{position:absolute;z-index:3;inset:37px 0 25px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:rgba(6,28,19,.86);pointer-events:none}
+.gc-viewer-half-time strong{font-size:clamp(14px,3vw,28px);letter-spacing:.15em;color:#e7fff1}
+.gc-viewer-half-time span{font-size:11px;color:#b6eac5;font-weight:750}
