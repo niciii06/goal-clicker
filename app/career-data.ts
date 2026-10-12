@@ -21,15 +21,46 @@ export type CareerState = {
   collectedIds: string[];
   claimedAlbumRewards: string[];
   milestoneCards: Record<string, string[]>;
+  milestoneCategories: Record<string, MilestoneCategory>;
 };
-export const CAREER_MILESTONES = [
+export const LEGACY_CAREER_MILESTONES = [
   { id: 'loyal', label: 'Vereinstreue', metric: 'appearances', target: 25, bonus: 1, accent: '#a3b9d6' },
   { id: 'scorer', label: 'Torjäger', metric: 'goals', target: 50, bonus: 2, accent: '#f2b44e' },
   { id: 'creator', label: 'Spielmacher', metric: 'assists', target: 30, bonus: 2, accent: '#80d1bf' },
   { id: 'hero', label: 'Clubheld', metric: 'motm', target: 10, bonus: 3, accent: '#c8a1fb' },
 ] as const;
+export type MilestoneCategory = 'goalkeeper' | 'defender' | 'midfielder' | 'winger' | 'striker';
+export type CareerMilestone = { id: string; label: string; metric: 'appearances' | 'minutes' | 'goals' | 'assists' | 'motm'; target: number; bonus: number; accent: string };
+const CATEGORY_TARGETS: Record<MilestoneCategory, Partial<Record<CareerMilestone['metric'], readonly number[]>>> = {
+  goalkeeper: { appearances: [10, 25, 100], minutes: [450, 1800, 9000] },
+  defender: { appearances: [10, 25, 100], goals: [1, 5, 15], assists: [2, 10, 30] },
+  midfielder: { appearances: [10, 25, 100], goals: [5, 20, 60], assists: [5, 20, 60] },
+  winger: { appearances: [10, 25, 100], goals: [5, 25, 75], assists: [5, 15, 50] },
+  striker: { appearances: [10, 25, 100], goals: [10, 30, 100], assists: [3, 10, 30] },
+};
+export const MILESTONE_METRIC_LABELS = { appearances: 'Einsätze', minutes: 'Spielminuten', goals: 'Tore', assists: 'Vorlagen', motm: 'Spieler-des-Spiels-Titel' };
+const metricNames = { appearances: 'Vereinstreue', minutes: 'Dauerbrenner', goals: 'Torjäger', assists: 'Vorlagengeber', motm: 'Clubheld' };
+const POSITION_MILESTONES = Object.fromEntries(Object.entries(CATEGORY_TARGETS).map(([category, metrics]) => [category, Object.entries(metrics).flatMap(([metric, targets]) => targets.map((target, tier) => ({ id: `position-${category}-${metric}-${tier+1}`, label: `${metricNames[metric as CareerMilestone['metric']]} ${tier+1}`, metric: metric as CareerMilestone['metric'], target, bonus: tier+1, accent: ['#a3b9d6','#80d1bf','#c8a1fb'][tier] })))])) as Record<MilestoneCategory, CareerMilestone[]>;
+export const CAREER_MILESTONES: readonly CareerMilestone[] = [...LEGACY_CAREER_MILESTONES, ...Object.values(POSITION_MILESTONES).flat()];
+export function getMilestoneCategory(player: StarXIPlayer): MilestoneCategory {
+  if (player.position === 'TW') return 'goalkeeper';
+  if (['IV','LV','RV','LAV','RAV'].includes(player.position)) return 'defender';
+  if (['ZDM','ZM','ZOM'].includes(player.position)) return 'midfielder';
+  if (['LM','RM','LF','RF','LW','RW'].includes(player.position)) return 'winger';
+  return 'striker';
+}
+export function getPlayerMilestones(career: CareerState, player: StarXIPlayer): readonly CareerMilestone[] {
+  return POSITION_MILESTONES[career.milestoneCategories[player.id] ?? getMilestoneCategory(player)];
+}
+function unlockPlayerMilestones(career: CareerState, player: StarXIPlayer) {
+  career.milestoneCategories[player.id] ??= getMilestoneCategory(player);
+  const stats = career.players[player.id] ?? emptyPlayerStats();
+  const ids = new Set(career.milestoneCards[player.id] ?? []);
+  for (const milestone of getPlayerMilestones(career, player)) if (stats[milestone.metric] >= milestone.target) ids.add(milestone.id);
+  if (ids.size) career.milestoneCards[player.id] = [...ids];
+}
 export function emptyPlayerStats(): PlayerCareerStats { return { appearances: 0, minutes: 0, goals: 0, assists: 0, ratingTotal: 0, ratedMatches: 0, motm: 0, subAppearances: 0, subRatingTotal: 0, subMinutes: 0, recent: [] }; }
-export function initialCareerState(): CareerState { return { version: 1, players: {}, seasonPlayers: {}, seasonNumber: 1, seasonMatches: 0, awards: [], reports: [], processedMatchIds: [], rivals: {}, collectedIds: [], claimedAlbumRewards: [], milestoneCards: {} }; }
+export function initialCareerState(): CareerState { return { version: 2, players: {}, seasonPlayers: {}, seasonNumber: 1, seasonMatches: 0, awards: [], reports: [], processedMatchIds: [], rivals: {}, collectedIds: [], claimedAlbumRewards: [], milestoneCards: {}, milestoneCategories: {} }; }
 function object(value: unknown): Record<string, unknown> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}; }
 function number(value: unknown, max = 1e9) { const n = Number(value); return Number.isFinite(n) ? Math.max(0, Math.min(max, n)) : 0; }
 function integer(value: unknown, max = 1e9) { return Math.floor(number(value, max)); }
@@ -64,8 +95,15 @@ export function normalizeCareerState(value: unknown, knownIds: readonly string[]
     }
   }
   next.milestoneCards = Object.fromEntries(Object.entries(object(source.milestoneCards)).filter(([id]) => getStarXIPlayer(id)).map(([id, ids]) => [id, Array.isArray(ids) ? [...new Set(ids.filter((m): m is string => CAREER_MILESTONES.some(def => def.id === m)))] : []]));
-  for (const [id, stats] of Object.entries(next.players)) {
-    for (const milestone of CAREER_MILESTONES) if (stats[milestone.metric] >= milestone.target) next.milestoneCards[id] = [...new Set([...(next.milestoneCards[id] || []), milestone.id])];
+  for (const id of new Set([...next.collectedIds, ...Object.keys(next.players), ...Object.keys(next.milestoneCards)])) {
+    const player = getStarXIPlayer(id)!;
+    const savedCategory = object(source.milestoneCategories)[id];
+    next.milestoneCategories[id] = typeof savedCategory === 'string' && Object.hasOwn(CATEGORY_TARGETS, savedCategory) ? savedCategory as MilestoneCategory : getMilestoneCategory(player);
+    // Grandfather all old entitlements exactly once; new progress uses only positional goals.
+    if (integer(source.version) < 2) for (const m of LEGACY_CAREER_MILESTONES) {
+      if ((next.players[id] ?? emptyPlayerStats())[m.metric] >= m.target) next.milestoneCards[id] = [...new Set([...(next.milestoneCards[id] ?? []), m.id])];
+    }
+    unlockPlayerMilestones(next, player);
   }
   for (const raw of Object.values(object(source.rivals)).slice(0, 300)) {
     const r = object(raw), opponent = text(r.opponent, 80); if (!opponent) continue;
@@ -161,9 +199,10 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
     career.players[p.playerId] = addStats(career.players[p.playerId],p,p.playerId===motmId);
     if (c.mode === 'season') career.seasonPlayers[p.playerId] = addStats(career.seasonPlayers[p.playerId],p,p.playerId===motmId);
     if (!career.collectedIds.includes(p.playerId)) career.collectedIds.push(p.playerId);
-    for (const m of CAREER_MILESTONES) if (career.players[p.playerId][m.metric] >= m.target && !(career.milestoneCards[p.playerId] || []).includes(m.id)) {
+    career.milestoneCategories[p.playerId] ??= getMilestoneCategory(getStarXIPlayer(p.playerId)!);
+    for (const m of getPlayerMilestones(career, getStarXIPlayer(p.playerId)!)) if (career.players[p.playerId][m.metric] >= m.target && !(career.milestoneCards[p.playerId] || []).includes(m.id)) {
       career.milestoneCards[p.playerId] = [...(career.milestoneCards[p.playerId] || []),m.id];
-      addHistory(features, { title: `${m.label}-Karte freigeschaltet`, detail: `${getStarXIPlayer(p.playerId)?.name} · ${m.target} ${m.metric==='goals'?'Tore':m.metric==='assists'?'Vorlagen':m.metric==='motm'?'Spieler-des-Spiels-Titel':'Einsätze'}. Die stärkste Version ist automatisch aktiv.`, tone: 'positive' });
+      addHistory(features, { title: `${m.label}-Karte freigeschaltet`, detail: `${getStarXIPlayer(p.playerId)?.name} · ${m.target} ${MILESTONE_METRIC_LABELS[m.metric]}. Die stärkste Version ist automatisch aktiv.`, tone: 'positive' });
     }
   }
   career.reports = [...career.reports,{ id, opponent: c.opponent, homeScore: c.homeScore, awayScore: c.awayScore, mode: c.mode, createdAt: now, motmId, derby: old.active, derbyReward, players }].slice(-8);
@@ -193,7 +232,8 @@ export type AlbumGroup = { id: string; label: string; total: number; collected: 
 export function getAlbumGroups(career: CareerState): AlbumGroup[] {
   const owned = new Set(career.collectedIds), claimed = new Set(career.claimedAlbumRewards);
   const definitions = [
-    { id:'base',label:'Alle Basiskarten',players:STAR_XI_PLAYERS.filter(p=>!p.isCustom&&p.cardType!=='icon'&&p.cardType!=='legendary'),reward:10000 },
+    { id:'base',label:'Alle Basiskarten',players:STAR_XI_PLAYERS.filter(p=>!p.id.startsWith('scrap-')&&!p.isCustom&&p.cardType!=='icon'&&p.cardType!=='legendary'),reward:10000 },
+    { id:'scrap',label:'Alle Schrottkarten',players:STAR_XI_PLAYERS.filter(p=>p.id.startsWith('scrap-')),reward:500 },
     { id:'icons',label:'Alle Icons',players:STAR_XI_PLAYERS.filter(p=>p.cardType==='icon'),reward:5000 },
     { id:'custom',label:'Alle Custom-Karten',players:STAR_XI_PLAYERS.filter(p=>p.isCustom),reward:5000 },
     { id:'legendary',label:'Alle legendären Karten',players:STAR_XI_PLAYERS.filter(p=>p.cardType==='legendary'),reward:5000 },

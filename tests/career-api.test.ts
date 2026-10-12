@@ -70,3 +70,23 @@ test('API bulk claim collects all complete groups once, including concurrent ind
  assert.equal(saved.career.claimedAlbumRewards.length,groups.length);
  const again=await action('album-claim',{groupId:'all'});assert.equal(again.status,409);assert.equal(JSON.parse(row.sharedFeaturesJson).starXI.fragments,expected);
 });
+
+test('API scrap purchases charge exactly once under concurrent requests, persist cards and reject outdated clients',async()=>{
+ setup();row.sharedCoins=7500;
+ const old=await action('star-pack',{packId:'scrap',protocol:4});assert.equal(old.status,426);assert.equal(row.sharedCoins,7500);
+ const results=await Promise.all([action('star-pack',{packId:'scrap'}),action('star-pack',{packId:'scrap'},'guest-player-123')]);
+ assert.equal(results.filter(r=>r.status===200).length,1);assert.equal(row.sharedCoins,0);
+ const saved=JSON.parse(row.sharedFeaturesJson);assert.equal(saved.starXI.ownedIds.length,1);assert.equal(saved.starPackReveal.packId,'scrap');assert.ok(saved.starPackReveal.player.rating<=64);
+ const fail=await action('star-pack',{packId:'scrap'});assert.notEqual(fail.status,200);assert.equal(row.sharedCoins,0);assert.equal(JSON.parse(row.sharedFeaturesJson).starXI.ownedIds.length,1);
+});
+test('API fresh weak eleven can actually start and finish a season game after eleven saved purchases',async()=>{
+ setup();row.sharedCoins=82500;
+ for(let i=0;i<11;i++) {const result=await action('star-pack',{packId:'scrap'});assert.equal(result.status,200,JSON.stringify(result.data));assert.equal(row.sharedCoins,82500-(i+1)*7500);assert.equal(result.data.room.game.features.starXI.ownedIds.length,i+1);}
+ let f=normalizeGameFeatures(JSON.parse(row.sharedFeaturesJson));assert.equal(f.starXI.lineupIds.filter(Boolean).length,11);
+ // Existing away-travel requirement is preserved; complete that same journey.
+ f.travel.journey=createJourney(fixtureFor(f,'season'),Date.now()-180000,()=>.9);row.sharedFeaturesJson=JSON.stringify(f);
+ const started=await action('cup-start',{mode:'season'});assert.equal(started.status,200,JSON.stringify(started.data));assert.equal(started.data.room.game.features.cup.active,true);
+ f=started.data.room.game.features;f.cup.homeScore=1;f.cup.awayScore=0;f.cup.lastTickAt=f.cup.matchEndsAt;f.cup.matchStartedAt=Date.now()-180001;f.cup.matchEndsAt=Date.now()-1;row.sharedFeaturesJson=JSON.stringify(f);
+ const finished=await action('cup-tick');assert.equal(finished.status,200);assert.equal(finished.data.room.game.features.cup.active,false);assert.equal(finished.data.room.game.features.career.reports.length,1);
+ const again=await action('cup-tick');assert.equal(again.data.room.game.features.career.reports.length,1);
+});

@@ -825,7 +825,7 @@ export async function POST(request: Request) {
       if (!isSeasonContentUnlocked(packUnlockSeason, game.seasons, testMode)) return jsonError(`Dieses Pack wird in Saison ${packUnlockSeason} freigeschaltet.`, 409);
       if (game.features.cup.active) return jsonError("Während eines Pokalspiels keine Packs öffnen.", 409);
       if (!testMode && game.goals < pack.price) return jsonError(`${pack.label} kostet ${pack.price.toLocaleString("de-CH")} Tore.`);
-      const opening = openStarPack(pack.id, game.features.starXI.ownedIds);
+      const opening = openStarPack(pack.id, game.features.starXI.ownedIds, Math.random, game.features.starXI.formationPositions);
       const openedAt = Date.now();
       const openedBy = roomPlayerName(room, role);
       const reveal = { ...opening, openedAt, openedBy, troll: shouldTriggerPackTroll(opening.player) };

@@ -44,7 +44,7 @@ test("pack odds are complete and remain intentionally conservative", () => {
   assert.ok(Math.abs(legend.odds.slice(2).reduce((sum, band) => sum + band.chance, 0) - 0.4) < 1e-9);
 
   const expectedHundredChances = { scout: 0.00001, elite: 0.0001, legend: 0.01 };
-  for (const pack of STAR_PACKS) {
+  for (const pack of STAR_PACKS.filter(pack => pack.id !== "scrap")) {
     const topWalkout = pack.odds.find((band) => band.minRating === 90 && band.maxRating === 99)!;
     const hundred = pack.odds.find((band) => band.minRating === 100 && band.maxRating === 100)!;
     assert.equal(hundred.chance, expectedHundredChances[pack.id as keyof typeof expectedHundredChances]);

@@ -3,7 +3,7 @@ import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beginSeasonCupMatch, initialGameFeatures, normalizeGameFeatures, pauseGameFeatureTimers, setBestStarXI, STAR_XI_PLAYERS, getStarXISelection, advanceCupMatch, getStarXIEffectiveMatchRating, recordSeasonModeMatch, startSeasonPrestige } from '../app/feature-data.ts';
-import { claimAlbumReward, emptyPlayerStats, getAlbumGroups, getCareerCard, getMatchRatingBreakdown, getPlayerForm, normalizeCareerState, prepareCareerMatch, recordCareerMatch, rivalryKey } from '../app/career-data.ts';
+import { claimAlbumReward, emptyPlayerStats, getAlbumGroups, getCareerCard, getMatchRatingBreakdown, getPlayerForm, getPlayerMilestones, normalizeCareerState, prepareCareerMatch, recordCareerMatch, rivalryKey } from '../app/career-data.ts';
 import { AlbumPanel, CareerPanel, MatchRatingsPanel } from '../app/career-panels.tsx';
 
 function fixture(now=1000000) {
@@ -56,8 +56,8 @@ test('short substitutions do not change persistent form, and form uses only five
 });
 test('special variants unlock at exact milestones, do not stack, and affect the next match',()=>{
  const f=fixture();const {scorer}=finishFixture(f);f.career.players[scorer]={...emptyPlayerStats(),goals:49,appearances:24};
- recordCareerMatch(f);assert.deepEqual(f.career.milestoneCards[scorer],['loyal','scorer']);
- const p=STAR_XI_PLAYERS.find(p=>p.id===scorer)!;const card=getCareerCard(f.career,p);assert.equal(card.bonus,Math.min(2,100-p.rating));
+ recordCareerMatch(f);const pGoals=getPlayerMilestones(f.career,STAR_XI_PLAYERS.find(p=>p.id===scorer)!);assert.deepEqual(f.career.milestoneCards[scorer],pGoals.filter(m=>f.career.players[scorer][m.metric]>=m.target).map(m=>m.id));
+ const p=STAR_XI_PLAYERS.find(p=>p.id===scorer)!;const card=getCareerCard(f.career,p);assert.equal(card.bonus,Math.min(Math.max(...pGoals.filter(m=>f.career.milestoneCards[scorer].includes(m.id)).map(m=>m.bonus)),100-p.rating));
  f.career.players[scorer].recent=[10,10,10,10,10];
  f.cup=beginSeasonCupMatch(f.cup,f.seasonMode,1200000,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions,f.starXI.lineupIds,f.starXI.benchIds);
  const neutral=getStarXIEffectiveMatchRating(f.starXI.ownedIds,f.starXI.lineupIds,f.cup,1);prepareCareerMatch(f);

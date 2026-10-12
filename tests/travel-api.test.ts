@@ -64,3 +64,19 @@ test('unregistered shared player and incomplete solo lineup cannot depart',async
  const f=setup();assert.equal((await action('travel-start',{mode:'season'},'stranger-12345')).status,403);f.starXI.ownedIds=[];f.starXI.lineupIds=[];
  assert.equal((await soloAction('depart',{features:f,mode:'season'})).status,409);assert.equal(fixtureFor(f,'season').away,true);
 });
+
+test('server season alternates home/away across all ten matchdays',async t=>{
+ let clock=Date.now();t.mock.method(Date,'now',()=>clock);
+ for(let day=0;day<10;day++){
+  setup(day);
+  const first=await action('cup-start',{mode:'season'});
+  if(day%2===0){assert.equal(first.status,200,`home matchday ${day+1}`);assert.equal(first.data.room!.game.features.travel.journey,null);}
+  else {
+   assert.equal(first.status,409,`away matchday ${day+1} needs travel`);
+   const departure=await action('travel-start',{mode:'season'});assert.equal(departure.status,200);
+   assert.equal(departure.data.room!.game.features.cup.active,false);
+   clock=departure.data.room!.game.features.travel.journey!.endsAt+1;
+   assert.equal((await action('cup-start',{mode:'season'})).status,200);
+  }
+ }
+});

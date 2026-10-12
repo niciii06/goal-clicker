@@ -18,7 +18,7 @@ export function normalizeTravel(value: unknown): TravelState {
 export function fixtureFor(features: GameFeatures, mode: 'season'|'tournament', tournamentId: TournamentId='stadium'): TravelFixture {
  if (mode==='season') {
   const s=features.seasonMode, o=getSeasonModeNextOpponent(s,features.club.name), index=Number(o.id.split('-').at(-1))-1, geo=seasonGeography(s.division,index);
-  return {id:`season:${s.prestigeCount}:${features.career.seasonNumber}:${s.division}:${s.matchday}:${s.history.at(-1)?.id||'initial'}`,mode,tournamentId:'stadium',opponentId:o.id,opponent:o.name,away:s.matchday>=5,region:geo.region,venue:geo.venue,schedule:[]};
+  return {id:`season:${s.prestigeCount}:${features.career.seasonNumber}:${s.division}:${s.matchday}:${s.history.at(-1)?.id||'initial'}`,mode,tournamentId:'stadium',opponentId:o.id,opponent:o.name,away:s.matchday%2===1,region:geo.region,venue:geo.venue,schedule:[]};
  }
  const c=features.cup, t=getTournament(tournamentId)!;
  const id=`cup:${t.id}:${c.pendingNextRound?c.matchStartedAt:c.nextTournamentAt}:${c.pendingNextRound?c.round:0}:${Object.values(c.trophies).reduce((a,b)=>a+b,0)}`;
@@ -107,5 +107,5 @@ export function travelGate(features:GameFeatures,fixture:TravelFixture,now:numbe
  if(now<current.endsAt)return 'Die Mannschaft ist noch unterwegs.';
  return null;
 }
-export function consumeTravel(features:GameFeatures,fixture:TravelFixture) { if(fixture.away&&features.travel.journey?.fixture.id===fixture.id)features.travel.journey.consumed=true; }
+export function consumeTravel(features:GameFeatures,fixture:TravelFixture) { if(features.travel.journey?.fixture.id===fixture.id)features.travel.journey.consumed=true; }
 export {HOME_VENUE,REGION_LABELS};

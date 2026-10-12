@@ -17,10 +17,10 @@ test('all tournament opponents have explicit geographical anchors',()=>{
  for(const t of TOURNAMENTS)for(const o of t.opponents){const v=tournamentVenue(o.id);assert.ok(v.city);assert.ok(Number.isFinite(v.lat));assert.ok(Number.isFinite(v.lon));}
  assert.throws(()=>tournamentVenue('not-a-real-club'));
 });
-test('home and away season schedule repeats each opponent once at each venue',()=>{
+test('season alternates home and away every matchday and faces each opponent at both venues',()=>{
  const f=ready(),home:string[]=[],away:string[]=[];
- for(let day=0;day<10;day++){f.seasonMode.matchday=day;const fixture=fixtureFor(f,'season');assert.equal(fixture.away,day>=5);(fixture.away?away:home).push(fixture.opponentId);}
- assert.deepEqual(home,away);
+ for(let day=0;day<10;day++){f.seasonMode.matchday=day;const fixture=fixtureFor(f,'season');assert.equal(fixture.away,day%2===1);(fixture.away?away:home).push(fixture.opponentId);}
+ assert.deepEqual([...home].sort(),[...away].sort());
 });
 test('away gate persists once, survives reload, waits for manual start and cannot be bypassed',()=>{
  const f=ready();f.seasonMode.matchday=5;const fixture=fixtureFor(f,'season');

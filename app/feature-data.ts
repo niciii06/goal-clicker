@@ -194,7 +194,7 @@ export type StarXIState = {
   formationPositions: StarPosition[];
 };
 
-export type StarPackId = "scout" | "elite" | "legend";
+export type StarPackId = "scrap" | "scout" | "elite" | "legend";
 
 export type StarPackOdds = {
   label: string;
@@ -943,6 +943,13 @@ const FC26_ICON_PLAYERS: StarXIPlayer[] = FC26_ICON_DATA.map(([id, name, rating,
   packWeight: 0.015,
 }));
 
+// Stable normal cards: IDs and ratings survive reloads through the existing catalogue.
+export const SCRAP_PLAYERS: StarXIPlayer[] = STAR_POSITIONS.flatMap((position, index) => Array.from({ length: 4 }, (_, variant) => ({
+  id: `scrap-${position.toLowerCase()}-${variant+1}`, name: `${['Reto Rost','Kevin Kreisliga','Ueli Umweg','Dario Dosenfuss'][variant]} (${position})`,
+  position, positions: [position], rating: 40 + (index * 7 + variant * 5) % 25,
+  price: 100, accent: '#8b8177', cardType: 'base' as const,
+})));
+
 export const STAR_XI_PLAYERS: StarXIPlayer[] = [
   ...SPECIAL_STAR_XI_PLAYERS,
   ...FC26_ICON_PLAYERS,
@@ -957,9 +964,10 @@ export const STAR_XI_PLAYERS: StarXIPlayer[] = [
     price: Math.round(Math.min(1500000000, 5000 * 1.28 ** (profile.rating - 70))),
     accent: profile.accent,
   })),
+  ...SCRAP_PLAYERS,
 ];
 
-export const STAR_XI_BASE_CARD_COUNT = FC26_STAR_PROFILES.length + YB_FC26_PLAYERS.length;
+export const STAR_XI_BASE_CARD_COUNT = FC26_STAR_PROFILES.length + YB_FC26_PLAYERS.length + SCRAP_PLAYERS.length;
 export const STAR_XI_ICON_CARD_COUNT = FC26_ICON_PLAYERS.length;
 export const STAR_XI_SPECIAL_CARD_COUNT = SPECIAL_STAR_XI_PLAYERS.length;
 export const STAR_XI_TOTAL_CARD_COUNT = STAR_XI_PLAYERS.length;
@@ -978,6 +986,7 @@ export function getStarXIFragmentCompensation(player: StarXIPlayer) {
 }
 
 export const STAR_PACKS: readonly StarPackDefinition[] = [
+  { id: "scrap", label: "Schrott-Pack", price: 7500, description: "Füsse aus Blei, aber elf müssen wir sein. Eine Basiskarte, freie Positionen zuerst, keine Duplikate solange verfügbar.", odds: [{ label: "Schrott 40–64", minRating: 40, maxRating: 64, chance: 1 }] },
   { id: "scout", label: "Scout Pack", price: 25000, description: "Früh verfügbar und ideal zum Aufbau, starke Karten bleiben extrem selten", odds: [{ label: "Standard 65–79", minRating: 65, maxRating: 79, chance: 0.9 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.09 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.009 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.00099 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.00001 }] },
   { id: "elite", label: "Elite Pack", price: 250000000, description: "Midgame Pack mit besseren Chancen, aber ohne geschenkte Topelf", odds: [{ label: "Standard 65–79", minRating: 65, maxRating: 79, chance: 0.55 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.38 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.06 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.0099 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.0001 }] },
   { id: "legend", label: "Legenden Pack", price: 5000000000, description: "Teures Endgame Risiko mit klar besseren, aber weiterhin seltenen Topkarten", odds: [{ label: "Standard 65–79", minRating: 65, maxRating: 79, chance: 0.18 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.42 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.34 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.05 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.01 }] },
@@ -1418,7 +1427,8 @@ export function addStarXIPlayer(state: StarXIState, playerId: string) {
     const openBenchIndex = next.benchIds.findIndex((id) => !id);
     if (openBenchIndex >= 0) next.benchIds[openBenchIndex] = playerId;
   }
-  return next;
+  // Completing a weak starter team may require moving an existing multi-position card.
+  return playerId.startsWith("scrap-") && next.lineupIds.some(id => !id) ? setBestStarXI(next) : next;
 }
 
 export function setStarXIStarter(state: StarXIState, lineupIndex: number, playerId: string, blockedPlayerIds: readonly string[] = []) {
@@ -1901,8 +1911,35 @@ export function getCupMatchStrength(cup: CupState, starRating: number) {
   };
 }
 
-export function openStarPack(packId: StarPackId, ownedIds: string[], random = Math.random): StarPackOpening {
-  const pack = getStarPack(packId) ?? STAR_PACKS[0];
+export function openStarPack(packId: StarPackId, ownedIds: string[], random = Math.random, formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS): StarPackOpening {
+  const pack = getStarPack(packId) ?? getStarPack("scout")!;
+  if (pack.id === 'scrap') {
+    const owned = new Set(ownedIds);
+    const unowned = SCRAP_PLAYERS.filter(p => !owned.has(p.id));
+    let pool = unowned.length ? unowned : SCRAP_PLAYERS;
+    const before = getBestStarXISelection(ownedIds, formationPositions).filter(Boolean).length;
+    if (before < STAR_XI_SQUAD_SIZE) {
+      // Augmenting-path matching measures usable slots, including multi-position players.
+      const countSlots = (players: StarXIPlayer[]) => {
+        const slots: (StarXIPlayer | undefined)[] = Array.from({ length: STAR_XI_SQUAD_SIZE });
+        const place = (player: StarXIPlayer, seen: Set<number>): boolean => {
+          for (let slot = 0; slot < slots.length; slot++) {
+            if (seen.has(slot) || !canStarXIPlayerPlayPosition(player, formationPositions[slot] ?? STAR_XI_FORMATION_POSITIONS[slot])) continue;
+            seen.add(slot);
+            if (!slots[slot] || place(slots[slot]!, seen)) { slots[slot] = player; return true; }
+          }
+          return false;
+        };
+        return players.reduce((count, player) => count + Number(place(player, new Set())), 0);
+      };
+      const players = [...owned].map(getStarXIPlayer).filter((p): p is StarXIPlayer => Boolean(p));
+      const useful = pool.filter(p => !owned.has(p.id) && countSlots([...players, p]) > before);
+      if (useful.length) pool = useful;
+    }
+    const player = pool[Math.floor(boundedRandom(random) * pool.length)];
+    const duplicate = owned.has(player.id);
+    return { packId: pack.id, packName: pack.label, player, duplicate, fragmentCompensation: duplicate ? getStarXIFragmentCompensation(player) : 0 };
+  }
   const roll = Math.max(0, Math.min(0.999999, random()));
   let cursor = 0;
   const odds = pack.odds.find((entry) => {

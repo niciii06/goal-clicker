@@ -30,6 +30,7 @@ const UPGRADE_UNLOCK_SEASONS: Record<string, number> = {
 };
 
 const PACK_UNLOCK_SEASONS: Record<string, number> = {
+  scrap: 1,
   scout: 1,
   elite: 5,
   legend: 10,
@@ -74,7 +75,7 @@ const FORMATION_UNLOCK_SEASONS: Record<string, number> = {
 };
 
 export const SEASON_MILESTONES: readonly SeasonMilestone[] = [
-  { season: 1, title: "Der Anpfiff", description: "Das Fundament für deinen neuen Club.", rewards: ["6 Basis Upgrades", "Scout Pack", "Stadionpokal", "4 Formationen"] },
+  { season: 1, title: "Der Anpfiff", description: "Das Fundament für deinen neuen Club.", rewards: ["6 Basis Upgrades", "Schrott-Pack", "Scout Pack", "Stadionpokal", "4 Formationen"] },
   { season: 2, title: "Nachwuchsprojekt", description: "Der Club beginnt, eigene Talente aufzubauen.", rewards: ["Nachwuchsakademie", "Distanzschütze", "2 neue Formationen"] },
   { season: 3, title: "Abendspiele", description: "Mehr Reichweite und neue taktische Möglichkeiten.", rewards: ["Flutlichtanlage", "Freistoss-Spezialist", "2 neue Formationen"] },
   { season: 4, title: "Scouting Netzwerk", description: "Dein Club sucht jetzt weit über die Region hinaus.", rewards: ["Talent Scouting", "2 neue Formationen"] },

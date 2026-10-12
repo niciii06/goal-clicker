@@ -1364,3 +1364,6 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 @keyframes travel-event-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 600px) { .travel-panel { padding: 14px; }.travel-heading h4 { font-size: 18px; }.travel-countdown { font-size: 22px; }.travel-details { grid-template-columns: 1fr; }.travel-map { min-height: 240px; }.travel-map-controls { gap: 3px; }.travel-map-controls button { padding: 4px 7px; } }
 @media (prefers-reduced-motion: reduce) { .travel-events p { animation: none; } }
+
+.star-pack-card.scrap { background: #eeeae5; border-color: #a89e93; }
+.star-pack-card.scrap .star-pack-icon { color: #766b60; filter: grayscale(1); }

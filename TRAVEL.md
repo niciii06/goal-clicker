@@ -9,7 +9,8 @@ Die 15 bestehenden Divisionen bleiben erhalten. Regionen: 1–2 Stadt Bern,
 9–10 Europa, 11–12 europäische Elite, 13–14 international, 15 Weltelite.
 Bestehende Tabellenpunkte, historische Gegnernamen und laufende Matches bleiben
 bestehen. Neue Saisonstarttabellen verwenden die geografischen Gegnerpools.
-Saisonspiele 1–5 sind Heimspiele, 6–10 die Rückspiele auswärts.
+Saisonspiele wechseln bei jedem Spieltag zwischen Heim und Auswärts.
+Spieltage 1, 3, 5, 7 und 9 sind Heimspiele; 2, 4, 6, 8 und 10 sind auswärts.
 Turnierrunden wechseln Auswärts/Heim ab, beginnend auswärts. Die bestehenden
 Turnierregeln, Stärken, Auslosungspools und Pausen bleiben erhalten.
 

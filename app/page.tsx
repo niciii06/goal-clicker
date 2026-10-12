@@ -583,6 +583,7 @@ function createClickResult(clickPower: number, lastClick: number, currentStreak:
 }
 
 function App() {
+  const packPurchaseRef = useRef(false);
   const travelActionRef = useRef(false);
   const [travelBusy, setTravelBusy] = useState(false);
   const [game, setGame] = useState<GameState>(initialGame);
@@ -1259,6 +1260,7 @@ function App() {
   }
 
   function dismissStarReveal() {
+    packPurchaseRef.current = false;
     if (starRevealTimerRef.current) window.clearTimeout(starRevealTimerRef.current);
     starRevealTimerRef.current = null;
     setStarWalkoutReady(false);
@@ -1688,6 +1690,7 @@ function App() {
   }
 
   async function buyStarPack(packId: StarPackId) {
+    if (packPurchaseRef.current || starReveal) return;
     const pack = getStarPack(packId);
     if (!pack) return;
     const unlockSeason = getPackUnlockSeason(pack.id);
@@ -1703,16 +1706,18 @@ function App() {
       showToast(`${pack.label} kostet ${formatNumber(pack.price)} Tore.`);
       return;
     }
+    packPurchaseRef.current = true;
     if (isCoopLive) {
       setCoopBusy(true);
       try {
         await sendCoopAction("star-pack", { packId: pack.id });
       } finally {
+        packPurchaseRef.current = false;
         setCoopBusy(false);
       }
       return;
     }
-      const opening = openStarPack(pack.id, displayGame.features.starXI.ownedIds);
+      const opening = openStarPack(pack.id, displayGame.features.starXI.ownedIds, Math.random, displayGame.features.starXI.formationPositions);
     const reveal: StarPackReveal = { packId: opening.packId, packName: opening.packName, player: opening.player, duplicate: opening.duplicate, fragmentCompensation: opening.fragmentCompensation, source: opening.source, openedAt: Date.now(), openedBy: "Du", troll: shouldTriggerPackTroll(opening.player) };
     setGame((current) => {
       const features = normalizeGameFeatures(current.features);
@@ -2790,7 +2795,7 @@ function App() {
                   <p>10 Spieltage · 5 Heimspiele und 5 Auswärtsspiele · {REGION_LABELS[regionForDivision(seasonMode.division)]}</p>
                   <div className="competition-card-route"><span>{seasonCareerComplete ? "PRESTIGE BEREIT" : `SPIELTAG ${seasonMode.matchday + 1} / ${SEASON_MODE_MATCHES_PER_SEASON}`}</span><strong>{seasonCareerComplete ? "★" : `★ ${displayGame.stars}`}</strong></div>
                   <div className="competition-card-opponent"><strong>{seasonCareerComplete ? "Hall of Fame erreicht" : seasonNextOpponent.name}</strong><small>{seasonCareerComplete ? "Alle Freischaltungen bleiben erhalten." : `${seasonNextOpponent.rating} OVR · Tabellenwertung nach dem Abpfiff`}</small></div>
-                  <span className="travel-home-label">{seasonMode.matchday < 5 ? "Heimspiel · Bümplizstrasse 45, Bern" : `Auswärtsspiel · ${fixtureFor(displayGame.features,"season").venue.city}`}</span><button className="mode-primary competition-card-action" onClick={() => void (seasonCareerComplete ? beginSeasonPrestige() : startSeasonCupMatch())} disabled={travelBusy || displayGame.features.cup.pendingNextRound || hasTransferSquadVacancy || suspendedPlayerOnSquad || (!seasonCareerComplete && !starXIComplete) || coopBusy}>{seasonCareerComplete ? "Prestige starten" : travelLabel(fixtureFor(displayGame.features,"season"))}</button>
+                  <span className="travel-home-label">{!fixtureFor(displayGame.features,"season").away ? "Heimspiel · Bümplizstrasse 45, Bern" : `Auswärtsspiel · ${fixtureFor(displayGame.features,"season").venue.city}`}</span><button className="mode-primary competition-card-action" onClick={() => void (seasonCareerComplete ? beginSeasonPrestige() : startSeasonCupMatch())} disabled={travelBusy || displayGame.features.cup.pendingNextRound || hasTransferSquadVacancy || suspendedPlayerOnSquad || (!seasonCareerComplete && !starXIComplete) || coopBusy}>{seasonCareerComplete ? "Prestige starten" : travelLabel(fixtureFor(displayGame.features,"season"))}</button>
                 </article>
                 {TOURNAMENTS.map((tournament) => {
                   const unlockSeason = getTournamentUnlockSeason(tournament.id);
@@ -2818,8 +2823,8 @@ function App() {
             <section className="trophy-room" aria-label="Gewonnene Pokale"><div className="trophy-room-heading"><div><p className="eyebrow">TROPHÄENRAUM</p><h4>Deine gewonnenen Pokale.</h4></div><span>{totalTrophies} GESAMT</span></div><div className="trophy-grid">{TOURNAMENTS.map((tournament) => { const count = displayGame.features.cup.trophies[tournament.id]; return <article className={`trophy-card${count > 0 ? " earned" : " locked"}`} key={`trophy-${tournament.id}`} style={{ "--trophy-accent": tournament.accent } as CSSProperties}><span className="trophy-icon" aria-hidden="true">{tournament.trophyIcon}</span><div><strong>{tournament.trophyName}</strong><small>{count > 0 ? `${count} Mal gewonnen` : `${tournament.rounds} Runden bis zum Pokal`}</small></div><b>{count}</b></article>; })}</div></section>
             <MatchRatingsPanel features={displayGame.features} minute={cupMatchMinute} />
             <section className="club-scorer-board" aria-label="Ewige Torschützenliste"><div className="club-scorer-heading"><div><p className="eyebrow">CLUBREKORDE / EWIG</p><h4>Deine drei besten Torschützen.</h4></div><span>ALLE SPIELE</span></div>{allTimeTopScorers.length ? <ol>{allTimeTopScorers.map(({ player, goals, appearances }, index) => <li key={`all-time-${player.id}`}><span>{index + 1}</span><div><strong>{player.name}</strong><small>{formatStarXIPositions(player)} · OVR {player.rating}</small></div><b>{goals} {goals === 1 ? "TOR" : "TORE"} · {appearances} {appearances === 1 ? "SPIEL" : "SPIELE"}</b></li>)}</ol> : <div className="club-scorer-empty"><strong>Die Rekordliste wartet.</strong><small>Das erste Tor eröffnet deine Klubgeschichte.</small></div>}</section>
-            <div className="starxi-pack-heading"><div><p className="eyebrow">STAR XI / PACKS</p><h4>{formatStableInteger(STAR_XI_TOTAL_CARD_COUNT)} Spieler. Jeder Pull zählt.</h4><small>{formatStableInteger(STAR_XI_BASE_CARD_COUNT)} Basiskarten mit FC27 Ratings und Positionen, alle {STAR_XI_ICON_CARD_COUNT} FC26 Icons und {STAR_XI_SPECIAL_CARD_COUNT} einzigartige Spezialkarten.</small></div><span>{ownedStarXIPlayers.length - loanedStarIds.length} Spieler im Team</span></div>
-            <div className="star-pack-grid">{STAR_PACKS.map((pack) => { const unlockSeason = getPackUnlockSeason(pack.id); const unlocked = isSeasonContentUnlocked(unlockSeason, displayGame.seasons, hasFullTestAccess); return <article className={`star-pack-card ${pack.id}${unlocked ? "" : " season-locked"}`} key={pack.id}><div className="star-pack-top"><span className="star-pack-icon">{unlocked ? "★" : "🔒"}</span><div><strong>{pack.label}</strong><small>{unlocked ? pack.description : `Freischaltung in Saison ${unlockSeason}`}</small></div><span className="star-pack-price">{unlocked ? hasInfiniteMoney ? "∞ TESTMODUS" : `${formatNumber(pack.price)} TORE` : `SAISON ${unlockSeason}`}</span></div><div className="star-pack-odds">{pack.odds.map((odd) => <span key={`${pack.id}-${odd.label}`}><em>{odd.label}</em><b>{formatPackChance(odd.chance)}</b></span>)}</div><button className="feature-buy-button" onClick={() => void buyStarPack(pack.id)} disabled={!unlocked || displayGame.features.cup.active || (!hasInfiniteMoney && displayGame.goals < pack.price) || coopBusy}>{!unlocked ? `Ab Saison ${unlockSeason}` : hasInfiniteMoney ? "∞ · Pack testen" : `${formatNumber(pack.price)} · Pack öffnen`}</button></article>; })}</div>
+            <div className="starxi-pack-heading"><div><p className="eyebrow">STAR XI / PACKS</p><h4>{formatStableInteger(STAR_XI_TOTAL_CARD_COUNT)} Spieler. Jeder Pull zählt.</h4><small>{formatStableInteger(STAR_XI_BASE_CARD_COUNT)} Basiskarten, davon 60 schwache Schrottkarten; die übrigen mit FC27 Ratings und Positionen, alle {STAR_XI_ICON_CARD_COUNT} FC26 Icons und {STAR_XI_SPECIAL_CARD_COUNT} einzigartige Spezialkarten.</small></div><span>{ownedStarXIPlayers.length - loanedStarIds.length} Spieler im Team</span></div>
+            <div className="star-pack-grid">{STAR_PACKS.map((pack) => { const unlockSeason = getPackUnlockSeason(pack.id); const unlocked = isSeasonContentUnlocked(unlockSeason, displayGame.seasons, hasFullTestAccess); return <article className={`star-pack-card ${pack.id}${unlocked ? "" : " season-locked"}`} key={pack.id}><div className="star-pack-top"><span className="star-pack-icon">{unlocked ? "★" : "🔒"}</span><div><strong>{pack.label}</strong><small>{unlocked ? pack.description : `Freischaltung in Saison ${unlockSeason}`}</small></div><span className="star-pack-price">{unlocked ? hasInfiniteMoney ? "∞ TESTMODUS" : `${formatNumber(pack.price)} TORE` : `SAISON ${unlockSeason}`}</span></div><div className="star-pack-odds">{pack.odds.map((odd) => <span key={`${pack.id}-${odd.label}`}><em>{odd.label}</em><b>{formatPackChance(odd.chance)}</b></span>)}</div><button className="feature-buy-button" onClick={() => void buyStarPack(pack.id)} disabled={!unlocked || displayGame.features.cup.active || (!hasInfiniteMoney && displayGame.goals < pack.price) || coopBusy || Boolean(starReveal)}>{!unlocked ? `Ab Saison ${unlockSeason}` : hasInfiniteMoney ? "∞ · Pack testen" : `${formatNumber(pack.price)} · Pack öffnen`}</button></article>; })}</div>
             <p className="star-pack-rarity-note">Icons stecken in ihrer jeweiligen Ratingstufe, sind darin aber nochmals deutlich seltener als normale Karten. Doppelte Karten geben je nach Rating und Kartentyp unterschiedlich viele Fragmente.</p>
             <section className="custom-card-shop" aria-label="Spezialkarten-Zug mit Fragmenten"><div className="custom-card-shop-heading"><div><p className="eyebrow">FRAGMENTE / SPEZIALKARTEN</p><h4>Zufällige Spezialkarte ziehen.</h4><small>Für 25’000 Fragmente bekommst du eine zufällige Custom-Karte. Einzelne Karten können nicht ausgewählt werden.</small></div><span>{formatNumber(displayGame.features.starXI.fragments)} FRAGMENTE</span></div><div className="custom-card-draw-row"><div><strong>Ein Spezialkarten-Zug</strong><small>Bei einer doppelten Karte gibt es automatisch Fragmente zurück.</small></div><button className="feature-buy-button" onClick={() => void drawRandomCustomCard()} disabled={displayGame.features.cup.active || (!hasInfiniteMoney && displayGame.features.starXI.fragments < STAR_XI_RANDOM_CUSTOM_CARD_COST) || coopBusy}>{hasInfiniteMoney ? "∞ · Zufallszug" : `${formatNumber(STAR_XI_RANDOM_CUSTOM_CARD_COST)} Fragmente · Ziehen`}</button></div><div className="custom-card-grid">{STAR_XI_CUSTOM_PLAYERS.map((player) => { const owned = displayGame.features.starXI.ownedIds.includes(player.id); return <article className={`custom-card${owned ? " owned" : ""}`} key={player.id} style={{ "--custom-accent": player.accent } as CSSProperties}><div className="custom-card-top"><span>CUSTOM</span><b>{player.rating}</b></div><strong>{player.name}</strong><small>{formatStarXIPositions(player)} · einzigartige Spezialkarte</small><p>{owned ? "Bereits im Club." : "Im Zufallszug enthalten."}</p></article>; })}</div></section>
             <div className="starxi-lineup-heading"><span>DEINE ELF / {activeFormation.label}</span><small>Spieler ziehen und einrasten lassen · Anklicken bleibt möglich</small></div>
