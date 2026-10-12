@@ -432,7 +432,7 @@ test("season fixtures use the live cup state and record the real final score", (
 
   assert.equal(started.mode, "season");
   assert.equal(started.active, true);
-  assert.equal(started.matchEndsAt, now + 180000);
+  assert.equal(started.matchEndsAt, now + 360000);
   assert.deepEqual(started.originalLineupIds, starXI.lineupIds);
   assert.deepEqual(started.originalBenchIds, starXI.benchIds);
   assert.equal(started.opponentIds.length, 1);
