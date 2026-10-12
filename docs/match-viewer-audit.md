@@ -1,41 +1,47 @@
-# 2D match viewer audit · 12 October 2026
+# Goal Clicker match viewer: Stage 3 extension
 
-## Source and publication
+Updated 12 October 2026. This supersedes the initial version-126 audit. The project now includes persisted match actions, full game lineups, fitness, standards, saves and direct match controls in addition to the six-minute clock.
 
-The existing GitHub implementation at `beaaf98ebdf342bda73d2699ffe4c9334febecea` was ahead of ChatGPT Site version 125. Its six-minute match clock, match viewer, styling and integration were imported, then audited and corrected. Existing external hosting scripts on GitHub are retained; this update targets the existing ChatGPT Site.
+## Completed behavior
 
-## Corrections
+* Regular play: 360 real seconds for 90 match minutes. Extra time: another 120 seconds for 30 match minutes. Saved three-minute matches retain their original schedule.
+* Match presentation: full-pitch Canvas renderer, all active players and a ball, proportionate 105 × 68 geometry, goalkeeper colors, jersey numbers, grass stripes, goals, penalty areas, arcs and center circle.
+* All 29 existing formations and their supported secondary positions. Actual injured, substituted and sent-off players disappear. Replay reconstruction retains the match formation, historic role slots and numbers across substitutions and later squad changes.
+* Both teams have game lineups, names, numbers, roles, fitness and ratings. Opponent game XIs are deterministically generated from existing card data with eligible positions and nearby ratings. They are fictional-game squads, not claims about real clubs' current rosters. Existing club-relative scoreboard fields are translated correctly for away fixtures.
+* Player motion is limited by speed and acceleration, with local separation, formation anchors, ball-oriented support, nearby pressing, defensive shape and tactical workloads. Available sprint and stamina attributes are reused; overall rating provides documented fallbacks when individual attributes do not exist.
+* Passing/carrying scenes cover short combinations, forward/through passes, wide crosses, lofted trajectories, backwards circulation and one-touch return passes. Counter and possession patterns differ; the defending team's own tactical strategy controls its pressing shape.
+* The authoritative match tick records corners, free kicks, throw-ins, unsuccessful shots, blocks, goalkeeper saves and yellow cards in a separate deterministic action stream. It never consumes the scoring engine's random source and never invents goals. Goal, injury and red-card decisions remain with the original match simulator.
+* Standards have separate setup and movement: corner delivery/header, a free-kick wall and shot, touchline throws, normal shots, saves, misses and goalkeeper distribution. Ball endpoints reflect the recorded outcome.
+* Goal metadata chooses position-appropriate finishes including one-on-ones, driven shots, long shots, headers/crosses, rebounds, corners, free kicks and penalties. Existing scorer and assist contributions remain authoritative. Captions show the scorer, minute and a recorded assist where available.
+* Goal scores are never inferred from ball coordinates. Live confirmed goals are presented with ball-in-net/celebration and restart; highlights reconstruct their buildup and finish without anticipating future official goals. Normal lead-in action is presentation, not another results engine.
+* Shootouts use the recorded shot/keeper directions and outcomes. Saves and misses cannot be rendered as goals. Shootout goals stay separate from regular career scoring and rewards.
+* Fitness is retained in the authoritative match state. Playing time, role, strategy and known stamina attributes determine workload. It freezes during injury pauses, survives refresh, and new substitutes enter at 100. It affects visual movement; existing result balance is preserved.
+* Statistics show recorded shots/on-target, saves, corners, free kicks, cards and clock-based action possession. Processing the same tick or restoring JSON cannot count them twice.
+* Existing live notes, tactics, injury pauses, suspensions and substitution eligibility remain in use. Tactics and compatible bench substitutions can now be requested directly inside the viewer through those same authorized handlers.
+* Live, fitness, ratings, statistics, tactics, substitutions and highlights tabs. A larger dialog view with Escape and focus trapping; touch player selection; full-pitch, ball-following and highlight cameras. Responsive layouts put the pitch first on smaller screens.
+* Replay is a separate, bounded presentation clock. It never alters the game, official score, rewards or match completion and returns to the live view automatically. Highlights stay available after the final whistle.
+* Canvas animation is independent of React's slower information refresh. It targets 60 FPS, reports measured render FPS, caps timestep/velocity, reduces motion on request and stops drawing in hidden tabs. Returning uses the current authoritative state; device FPS cannot decide a winner.
+* New multiplayer clients use protocol 8. Existing room data and seats are preserved; older clients get the standard reload message. Match events, fitness and statistics are saved with the existing room/save JSON; no schema migration or paid API is required.
 
-* Regular matches last 360 seconds; extra time adds 120 seconds. Existing three-minute saves retain their clock.
-* Goal, card and injury probabilities scale to match duration. Pack odds and reward amounts are unchanged.
-* Clock freezes during injury pauses. Polling preserves fractional second remainders instead of silently skipping simulation seconds.
-* Career reports use the actual match phase: 90 minutes for regular matches and 120 for extra time/penalties. Late substitutes no longer gain 30 phantom minutes or incorrectly update form.
-* Missed and saved penalties no longer enter the goal. Recorded penalty directions and outcomes drive the visualization.
-* Goalkeepers start near their own goal. Clubs switch ends at halftime and both extra-time boundaries.
-* Injured, sent-off and substituted players disappear from the live lineup. Replay rosters are reconstructed from recorded entry/exit minutes, including after the original lineup has been restored at full time.
-* Continuous formation-based passing and carrying trajectories connect ball movement with active player markers. Ground passes and lofted ball arcs have shared endpoints. Defensive targets follow shape, nearby pressing and current strategy.
-* Stable event identifiers, timestamps and deterministic cosmetic seeds make repeated rendering and refreshed states reproducible without changing official results.
-* Future events are not presented. Replays do not mutate game state and return automatically to live rendering after 6.5 seconds. The scoreboard continues to show the authoritative live result, with the replay minute separately labelled.
-* Replays remain accessible after full time. The SVG retains pitch proportions and accessible player titles, and respects reduced motion.
+## Architecture and compatibility
+
+`feature-data.ts` remains the scoring authority. `match-broadcast.ts` extends the saved event/fitness/statistics infrastructure. `match-viewer.tsx` maps lineups and recorded events to deterministic scenes and provides UI. `match-pitch-canvas.tsx` owns drawing and bounded cosmetic motion.
+
+The new fields are optional and validated. Legacy saves without them migrate on their next match tick. Roster selection is cached as bounded, deterministic, public card-data derivation; event and fitness state is never shared between matches.
+
+Pack probabilities, prices, career progression, transfer rules, home/away scheduling, tournament rules, prizes and currency reward amounts are unchanged. The six-minute version's career-minute bug, unsuccessful-penalty animation, pause-clock handling and fractional tick processing remain fixed.
 
 ## Verification
 
 * `npm run typecheck`: passed.
-* `npm run test`: passed, including the verified production build and artifact checks.
-* Complete automated suite: 176 tests passed, 0 failed (135 TypeScript tests and 41 JavaScript tests).
-* Added tests cover all 29 formations, unique actors, pitch bounds, goalkeeper location, home/away side changes, penalty outcomes, injury/red-card exclusions, historic replay roster, ball/player continuity, deterministic refresh, paused clocks, hidden future events, immutable replays, career minutes, fractional tick cadence and rendered scoreboard orientation.
-* Browser QA, mobile screenshots, device FPS and two-client visual synchronization were unavailable in this execution environment. API concurrency and multiplayer integration are covered by the automated suite.
+* Full `npm run test`: 188 passed, 0 failed, including 147 TypeScript tests and 41 JavaScript tests, production build and deployment artifact validation.
+* Focused viewer/broadcast checks rerun after final presentation refinements: all passed.
+* Tests cover all formations, source-card positional eligibility, clock/legacy timing, authoritative statistics and fitness, idempotent replayed ticks, refresh, substitutions/historic slots, hidden future events, standard/shot outcomes, goal-pattern normalization, immutable rendering, bounded motion, accessible markup and malformed saves.
+* Existing API integration and optimistic-concurrency tests cover shared room actions, rewards, kickoff/completion, migrations, transfers, packs and progression.
+* `scripts/render-match-qa.ts` generated 480 frames using the production Canvas drawing functions. Representative build-up, corner/header, free-kick/save and missed-shot frames were inspected. The optional QA script uses the execution environment's `@napi-rs/canvas`; it is not an app dependency or build requirement.
 
-## Scope limitations relative to the complete Stage 3 specification
+## Verification limits
 
-This is an improved event-driven tactical match viewer, not a completed full Stage 3 football action engine.
+Actual browser input, mobile screenshots, two simultaneous human client views and real-device FPS were unavailable because the supported managed browser-control capability was not available. Automated HTML, motion, event, API and saved-state checks plus offline production-rendered frames do not replace those device checks.
 
-* Opponent IDs identify clubs; the authoritative engine does not provide an actual opponent eleven. Their markers have positional labels rather than invented real identities, ratings or fitness.
-* Fitness is explicitly labelled an estimated visual workload and has no added gameplay effect; an authoritative stamina system has not been introduced.
-* There are no authoritative shot/save, corner, free-kick or yellow-card events. Dedicated sequences and official statistics for these cannot be claimed as implemented. Recorded shootout saves are visualized.
-* Passing and carrying are deterministic presentation trajectories, not a continuous physical football simulation. Goal scenes are reconstructed once a goal is officially recorded, with a short labelled presentation cut. Replays are reconstructed scenes, not recordings of a simulated physical trajectory.
-* Shirt numbers are stable formation slot labels, because source data has no shirt numbers. Historic substitutions between identical role slots can only be reconstructed to the recorded role, not an unavailable historic slot identifier.
-* Animation targets approximately 30 updates per second. A 60 FPS performance target has not been measured or verified. Camera zoom and highlight camera controls are not implemented.
-* Tactics and substitutions continue through the existing authorized controls and positional eligibility logic; no duplicate gameplay bonuses or parallel match engine were added.
-
-These limitations remain explicit rather than being described as complete Stage 3 delivery.
+The motion is an event-driven 2D presentation with formation/tactical behavior. Replays reconstruct recorded scenes rather than store full video. Existing scoring outcomes remain authoritative. No unverified real-world opponent roster or unavailable FC27 technical attribute is asserted.
