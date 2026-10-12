@@ -424,13 +424,31 @@ export type MissionProgressSource = {
 
 export const CLUB_BADGES = ["⚽", "🦅", "🔥", "🦁", "⭐", "🛡️"];
 export const CLUB_COLORS = ["#0071e3", "#1d1d1f", "#e85d04", "#16845b", "#8b5cf6", "#d12c54"];
-export const CUP_MATCH_DURATION_MS = 180000;
-export const CUP_EXTRA_TIME_DURATION_MS = 60000;
+export const CUP_MATCH_DURATION_MS = 360000;
+export const CUP_EXTRA_TIME_DURATION_MS = 120000;
 export const TOURNAMENT_COOLDOWN_MS = 5 * 60 * 1000;
 export const RED_CARD_CHANCE_PER_SECOND = 0.0012;
 export const CUP_INJURY_CHANCE_PER_SECOND = 0.00065;
 export const CUP_MIN_INJURY_MATCHES = 1;
 export const CUP_MAX_INJURY_MATCHES = 3;
+
+// Preserve the clock of matches saved before the six-minute update.
+export function getCupRegularDurationMs(cup: Pick<CupState, "matchStartedAt" | "matchEndsAt" | "phase">) {
+  const total = Math.max(0, cup.matchEndsAt - cup.matchStartedAt);
+  if (cup.phase === "regular") return total >= 60000 ? total : CUP_MATCH_DURATION_MS;
+  // Legacy extra time totals 240 seconds; new extra time totals 480.
+  return total > 300000 ? CUP_MATCH_DURATION_MS : 180000;
+}
+
+export function getCupMatchMinute(cup: Pick<CupState, "matchStartedAt" | "matchEndsAt" | "phase">, now: number) {
+  if (!cup.matchStartedAt) return 1;
+  if (cup.phase === "penalties") return 120;
+  const regular = getCupRegularDurationMs(cup);
+  const elapsed = Math.max(0, now - cup.matchStartedAt);
+  if (cup.phase === "regular" || elapsed <= regular)
+    return Math.max(1, Math.min(90, Math.floor(elapsed / (regular / 90)) + 1));
+  return Math.max(91, Math.min(120, 90 + Math.floor((elapsed - regular) / ((regular / 3) / 30)) + 1));
+}
 export const RED_CARD_MATCH_RATING_DROP = 6;
 export const CUP_RED_CARD_MOMENTUM_DROP = 8;
 export const CUP_MAX_MOMENTUM = 12;
@@ -2374,7 +2392,8 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
   if (cup.phase === "penalties") return { cup, ...baseResult };
   const endAt = Math.max(cup.matchStartedAt, Math.min(now, cup.matchEndsAt));
   const from = Math.max(cup.matchStartedAt, Math.min(cup.lastTickAt || cup.matchStartedAt, endAt));
-  const phaseSeconds = cup.phase === "extra-time" ? CUP_EXTRA_TIME_DURATION_MS / 1000 : CUP_MATCH_DURATION_MS / 1000;
+  const regularSeconds = getCupRegularDurationMs(cup) / 1000;
+  const phaseSeconds = cup.phase === "extra-time" ? regularSeconds / 3 : regularSeconds;
   const seconds = Math.min(phaseSeconds, Math.max(0, Math.floor((endAt - from) / 1000)));
   let homeScore = cup.homeScore;
   let awayScore = cup.awayScore;
@@ -2399,15 +2418,15 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
     const liveStrengthDifference = liveStrength.teamStrength - liveStrength.opponentStrength;
     const homeExpectedGoals = clamp(0.55 + liveStrength.teamStrength * 0.014 + liveStrengthDifference * 0.07, 0.15, 5.2);
     const awayExpectedGoals = clamp(0.55 + liveStrength.opponentStrength * 0.014 - liveStrengthDifference * 0.07, 0.15, 5.2);
-    return { homeChance: homeExpectedGoals / 180, awayChance: awayExpectedGoals / 180 };
+    return { homeChance: homeExpectedGoals / regularSeconds, awayChance: awayExpectedGoals / regularSeconds };
   };
   let { homeChance, awayChance } = getScoringChances(currentStarRating);
   for (let second = 0; second < seconds; second += 1) {
     let redCardOccurred = false;
     const goalAt = from + (second + 1) * 1000;
     processedUntil = goalAt;
-    const minute = Math.min(120, Math.max(1, Math.floor((goalAt - cup.matchStartedAt) / 2000) + 1));
-    if (activeHomePlayers.length && !sentOffPlayerIds.length && random() < RED_CARD_CHANCE_PER_SECOND) {
+    const minute = getCupMatchMinute(cup, goalAt);
+    if (activeHomePlayers.length && !sentOffPlayerIds.length && random() < RED_CARD_CHANCE_PER_SECOND * 180 / regularSeconds) {
       const redCardedPlayer = selectRedCardedPlayer(activeHomePlayers, formationPositions, random);
       if (redCardedPlayer) {
         const redCardedPlayerIndex = homePlayers.findIndex((player) => player.id === redCardedPlayer.id);
@@ -2426,7 +2445,7 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
       }
     }
     const injuryRoll = random();
-    if (!redCardOccurred && activeHomePlayers.length && cup.substitutionsUsed < STAR_XI_MAX_SUBSTITUTIONS && injuryRoll > 0 && injuryRoll < CUP_INJURY_CHANCE_PER_SECOND) {
+    if (!redCardOccurred && activeHomePlayers.length && cup.substitutionsUsed < STAR_XI_MAX_SUBSTITUTIONS && injuryRoll > 0 && injuryRoll < CUP_INJURY_CHANCE_PER_SECOND * 180 / regularSeconds) {
       const injuredPlayer = selectInjuredPlayer(activeHomePlayers, formationPositions, random);
       if (injuredPlayer) {
         const injuredIndex = homePlayers.findIndex((player) => player.id === injuredPlayer.id);
@@ -2484,7 +2503,7 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
       cup: {
         ...nextCup,
         phase: "extra-time" as const,
-        matchEndsAt: cup.matchEndsAt + CUP_EXTRA_TIME_DURATION_MS,
+        matchEndsAt: cup.matchEndsAt + getCupRegularDurationMs(cup) / 3,
         lastResult: "90 Minuten vorbei. Es geht bis 120′ in die Verlängerung.",
       },
       ...liveBaseResult,
