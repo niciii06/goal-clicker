@@ -1424,3 +1424,14 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 .gc-viewer-stat-grid b{font-size:22px}
 @media(max-width:650px){.gc-match-viewer{padding:8px;margin:11px 0}.gc-viewer-scoreboard{gap:5px}.gc-viewer-pitch-head{font-size:8px}.gc-viewer-legend span:last-child{width:100%;margin-left:0;justify-content:center}.gc-viewer-player-list{grid-template-columns:1fr}.gc-viewer-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.gc-viewer-tabs button{font-size:8px;padding:7px 9px}}
 @media(prefers-reduced-motion:reduce){.gc-live-dot{box-shadow:none}}
+
+/* Keep authoritative match notifications visible without hiding the live pitch. */
+.cup-goal-takeover{inset:auto 14px 14px auto;width:min(340px,calc(100vw - 28px));padding:0;display:block;background:transparent!important;backdrop-filter:none;pointer-events:none}
+.cup-goal-takeover .cup-goal-card{width:100%;padding:15px 18px;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.33);pointer-events:auto}
+.cup-goal-takeover .cup-goal-confetti{display:none}
+.cup-goal-takeover .cup-goal-card>strong{margin-top:7px;font-size:16px;white-space:normal}
+.cup-goal-takeover .cup-goal-card h2{margin:2px 0;font-size:32px;line-height:1.1}
+.cup-goal-takeover .cup-goal-detail{font-size:11px;line-height:1.3}
+.cup-goal-takeover .cup-goal-minute{font-size:9px}
+.cup-goal-takeover .event-takeover-dismiss{margin-top:8px;padding:8px 15px}
+@media(max-width:650px){.cup-goal-takeover{width:min(270px,calc(100vw - 24px));inset:auto 12px 12px auto}.cup-goal-takeover .cup-goal-card{padding:12px}}
