@@ -2,7 +2,7 @@ import { and, desc, eq, or, sql } from "drizzle-orm";
 import { env } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/d1";
 import * as schema from "./schema";
-import { coopRooms } from "./schema";
+import { coopRooms, soloTravel } from "./schema";
 
 export type RoomRow = typeof coopRooms.$inferSelect;
 export type RoomUpdate = Partial<Omit<RoomRow, "code">>;
@@ -38,7 +38,18 @@ function roleClickUpdate(role: string, amount: number, clickCount: number) {
 export class GoalClickerDatabase {
   constructor(private readonly client: Database) {}
 
-  async getRoom(code: string) {
+  async getSoloJourney(owner: string, fixtureId: string) {
+    const [row] = await this.client.select().from(soloTravel).where(and(eq(soloTravel.owner,owner),eq(soloTravel.fixtureId,fixtureId))).limit(1);
+    return row ? JSON.parse(row.journeyJson) : null;
+  }
+  async putSoloJourney(owner: string, fixtureId: string, journey: unknown) {
+    await this.client.insert(soloTravel).values({owner,fixtureId,journeyJson:JSON.stringify(journey)}).onConflictDoNothing();
+    return this.getSoloJourney(owner,fixtureId);
+  }
+  async consumeSoloJourney(owner: string, fixtureId: string, journey: unknown) {
+    await this.client.update(soloTravel).set({journeyJson:JSON.stringify(journey)}).where(and(eq(soloTravel.owner,owner),eq(soloTravel.fixtureId,fixtureId)));
+  }
+  async getRoom(code: string): Promise<RoomRow | null> {
     const [room] = await this.client.select().from(coopRooms).where(eq(coopRooms.code, code)).limit(1);
     return room ?? null;
   }
@@ -57,13 +68,13 @@ export class GoalClickerDatabase {
       .limit(12);
   }
 
-  async insertRoom(values: Partial<typeof coopRooms.$inferInsert>) {
+  async insertRoom(values: typeof coopRooms.$inferInsert) {
     const [room] = await this.client.insert(coopRooms).values(values).returning();
     if (!room) throw new Error("Die Welt konnte nicht gespeichert werden.");
     return room;
   }
 
-  async updateRoom(code: string, values: RoomUpdate, conditions: RoomConditions = {}) {
+  async updateRoom(code: string, values: RoomUpdate, conditions: RoomConditions = {}): Promise<RoomRow | null> {
     const predicates = [eq(coopRooms.code, code)];
     if (conditions.sharedStateVersion !== undefined) predicates.push(eq(coopRooms.sharedStateVersion, conditions.sharedStateVersion));
     if (conditions.lastPassiveAt !== undefined) predicates.push(eq(coopRooms.lastPassiveAt, conditions.lastPassiveAt));

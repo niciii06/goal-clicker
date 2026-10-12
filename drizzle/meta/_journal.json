@@ -43,6 +43,13 @@
       "when": 1786348760316,
       "tag": "0005_sharp_albert_cleary",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791793005958,
+      "tag": "0006_away_journeys",
+      "breakpoints": true
     }
   ]
 }

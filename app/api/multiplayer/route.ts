@@ -1,3 +1,5 @@
+import { fixtureFor, travelGate, consumeTravel, eligibilityError, settleTravel } from '../../travel-data';
+import { claimAllAlbumRewards, claimAlbumReward, prepareCareerMatch, recordCareerMatch } from "../../career-data";
 import { getDb } from "../../../db";
 import type { RoomRow, RoomUpdate } from "../../../db";
 import { activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, CUP_STRATEGIES, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupStrategy, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentGoalBoostMultiplier, getTransferBonuses, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, startTournamentGoalBoost, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE } from "../../feature-data";
@@ -263,6 +265,7 @@ function getBulkPurchase(id: string, game: CoopGameState, requestedCount: number
 function startSeasonCupMatch(game: CoopGameState, now: number) {
   if (game.features.seasonMode.hallOfFame) return "Die Hall of Fame ist erreicht. Starte zuerst Prestige.";
   if (game.features.cup.active) return "Es läuft bereits ein Saisonspiel.";
+  if (game.features.cup.pendingNextRound) return "Schliesse zuerst die aktuelle Turnierrunde ab.";
   const openTransferVacancies = getOpenTransferSquadVacancies(game.features);
   if (openTransferVacancies.length > 0) {
     const location = game.features.starXI.lineupIds.filter(Boolean).length < STAR_XI_SQUAD_SIZE ? "in der Startelf" : "auf der Bank";
@@ -271,15 +274,21 @@ function startSeasonCupMatch(game: CoopGameState, now: number) {
   if (getStarXISelection(game.features.starXI.ownedIds, game.features.starXI.lineupIds).length < STAR_XI_SQUAD_SIZE) return "Für das Saisonspiel brauchst du 11 passende Spieler in der Startelf.";
   const suspendedOnSquad = game.features.cup.suspendedPlayerIds.some((playerId) => game.features.starXI.lineupIds.includes(playerId) || game.features.starXI.benchIds.includes(playerId));
   if (suspendedOnSquad) return "Ein Spieler mit Roter Karte muss vor dem Anpfiff ersetzt werden und darf nicht auf der Bank sitzen.";
+  const fixture = fixtureFor(game.features, "season");
+  const travelError = travelGate(game.features, fixture, now);
+  if (travelError) return travelError;
   game.features = activatePendingTransferLoans(game.features, "stadium");
   const homePlayers = getStarXISelection(game.features.starXI.ownedIds, game.features.starXI.lineupIds).filter((player) => !game.features.cup.sentOffPlayerIds.includes(player.id));
   game.features.cup = beginSeasonCupMatch(game.features.cup, game.features.seasonMode, now, homePlayers, game.features.starXI.formationPositions, game.features.starXI.lineupIds, game.features.starXI.benchIds);
+  consumeTravel(game.features, fixture);
+  prepareCareerMatch(game.features);
   return null;
 }
 
 function recordMultiplayerSeasonMatch(game: CoopGameState, now: number) {
   const result = recordSeasonModeMatch(game.features.seasonMode, game.features.cup.homeScore, game.features.cup.awayScore, game.features.club.name, now, Math.random, game.features.cup.opponentIds[0]);
   if (!result.played || !result.entry) return;
+  recordCareerMatch(game.features, now, result.entry);
   game.features.seasonMode = result.state;
   game.features.seasonMode.table = game.features.seasonMode.table.map((team) => team.id === "club" ? { ...team, name: game.features.club.name } : team);
   game.features = finishActiveTransferLoans(game.features, now).features;
@@ -326,19 +335,20 @@ async function persistGameResponse(
   extraColumns: CoopRoomUpdate = {},
   responseExtras: Record<string, unknown> = {},
 ) {
+  game.features.travel = settleTravel(game.features.travel, Date.now());
   const updated = await db.updateRoom(
     room.code,
     { ...gameColumns(game, timestamp, room.sharedStateVersion), ...extraColumns },
     { sharedStateVersion: room.sharedStateVersion },
   );
-  if (updated) return Response.json({ room: shapeRoom(updated, playerId), role, ...responseExtras });
+  if (updated) return Response.json({ serverNow: Date.now(), room: shapeRoom(updated, playerId), role, ...responseExtras });
 
   const latest = await db.getRoom(room.code);
   if (!latest) return jsonError("Dieser Raum wurde gelöscht.", 404);
   return Response.json({
     error: "Der gemeinsame Spielstand wurde gleichzeitig geändert. Die Aktion wird automatisch nochmals ausgeführt.",
     errorCode: "STALE_STATE",
-    room: shapeRoom(latest, playerId),
+    serverNow: Date.now(), room: shapeRoom(latest, playerId),
     role,
   }, { status: 409 });
 }
@@ -357,6 +367,7 @@ function getSimulationLeaderRole(room: RoomRow, now = Date.now()) {
 
 function shapeRoom(row: RoomRow, viewerId?: string) {
   const game = readGame(row);
+  game.features.travel = settleTravel(game.features.travel, Date.now());
   const redeemedCodes = parseJson<string[]>(row.redeemedBonusCodesJson, []);
   const roomPlayers = getRoomPlayers(row);
   const occupiedPlayers = roomPlayers.filter((player) => Boolean(player.playerId));
@@ -474,7 +485,7 @@ export async function GET(request: Request) {
     if (!role) return jsonError("Du bist nicht in diesem Raum.", 403);
     const refreshed = await refreshPassive(db, room);
     const touched = await db.updateRoom(code, rolePresenceUpdate(role, new Date().toISOString()));
-    return Response.json({ room: shapeRoom(touched ?? refreshed, playerId), role });
+    return Response.json({ serverNow: Date.now(), room: shapeRoom(touched ?? refreshed, playerId), role });
   } catch (error) {
     return Response.json({ error: errorMessage(error) }, { status: 500 });
   }
@@ -484,6 +495,8 @@ export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as {
       action?: unknown;
+      mode?: unknown;
+      groupId?: unknown;
       code?: unknown;
       playerId?: unknown;
       nickname?: unknown;
@@ -530,7 +543,7 @@ export async function POST(request: Request) {
       const now = new Date().toISOString();
       const roomName = cleanRoomName(payload.roomName, `${nickname}s Welt`);
       const room = await db.insertRoom({ code, roomName, hostPlayerId: playerId, hostName: nickname, hostLastSeenAt: now, lastPassiveAt: now, updatedAt: now });
-      return Response.json({ room: shapeRoom(room, playerId), role: "host" }, { status: 201 });
+      return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role: "host" }, { status: 201 });
     }
 
     const code = cleanCode(payload.code);
@@ -558,10 +571,11 @@ export async function POST(request: Request) {
       if (reconnectRole) {
         room = await refreshPassive(db, room);
         const reconnected = await db.updateRoom(code, { ...roleIdentityUpdate(reconnectRole, playerId, nickname, now), updatedAt: now });
-        return Response.json({ room: shapeRoom(reconnected ?? room, playerId), role: reconnectRole });
+        return Response.json({ serverNow: Date.now(), room: shapeRoom(reconnected ?? room, playerId), role: reconnectRole });
       }
 
-      const openRole = (["guest", "player3", "player4"] as const).find((role) => !getRoomPlayer(room, role).playerId);
+      const joinRoom = room;
+      const openRole = (["guest", "player3", "player4"] as const).find((role) => !getRoomPlayer(joinRoom, role).playerId);
       if (!openRole) return jsonError("Dieser Raum ist bereits voll. Maximal vier Spieler können gemeinsam spielen.", 409);
       const wasWaiting = getOccupiedRoomPlayers(room).length < 2;
       const joined = await db.updateRoom(code, {
@@ -569,7 +583,7 @@ export async function POST(request: Request) {
         ...(wasWaiting ? { lastPassiveAt: now } : {}),
         updatedAt: now,
       });
-      return Response.json({ room: shapeRoom(joined ?? room, playerId), role: openRole });
+      return Response.json({ serverNow: Date.now(), room: shapeRoom(joined ?? room, playerId), role: openRole });
     }
 
     const role = roomRole(room, playerId);
@@ -583,22 +597,22 @@ export async function POST(request: Request) {
       if (role !== "host") return jsonError("Nur der Host kann den Namen dieser Welt ändern.", 403);
       const roomName = cleanRoomName(payload.roomName, room.roomName);
       const renamed = await db.updateRoom(code, { roomName, updatedAt: new Date().toISOString() });
-      return Response.json({ room: shapeRoom(renamed ?? room, playerId), role });
+      return Response.json({ serverNow: Date.now(), room: shapeRoom(renamed ?? room, playerId), role });
     }
     if (action === "presence-offline") {
       room = await refreshPassive(db, room);
       const offlineAt = "1970-01-01T00:00:00.000Z";
       const offlineRoom = await db.updateRoom(code, rolePresenceUpdate(role, offlineAt));
-      return Response.json({ room: shapeRoom(offlineRoom ?? room, playerId), role });
+      return Response.json({ serverNow: Date.now(), room: shapeRoom(offlineRoom ?? room, playerId), role });
     }
     const isBackgroundAction = action === "tick" || action === "cup-tick";
     if (isBackgroundAction) {
       const presenceTimestamp = new Date().toISOString();
       const presenceUpdated = await db.updateRoom(code, rolePresenceUpdate(role, presenceTimestamp));
       room = presenceUpdated ?? room;
-      if (getSimulationLeaderRole(room, Date.parse(presenceTimestamp)) !== role) return Response.json({ room: shapeRoom(room, playerId), role });
+      if (getSimulationLeaderRole(room, Date.parse(presenceTimestamp)) !== role) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
       room = await refreshPassive(db, room);
-      if (action === "tick") return Response.json({ room: shapeRoom(room, playerId), role });
+      if (action === "tick") return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
     } else {
       room = await refreshPassive(db, room);
       const presenceUpdated = await db.updateRoom(code, rolePresenceUpdate(role, new Date().toISOString()));
@@ -649,13 +663,13 @@ export async function POST(request: Request) {
       const amount = Math.max(clickCount, Math.min(maxAmount, Math.floor(finite(payload.amount, clickPower * clickCount))));
       const updated = await db.applyClick(code, role, amount, clickCount, timestamp);
       if (!updated) return jsonError("Dieser Raum wurde gelöscht.", 404);
-      return Response.json({ room: shapeRoom(updated, playerId), role });
+      return Response.json({ serverNow: Date.now(), room: shapeRoom(updated, playerId), role });
     }
 
     if (action === "transfer-insider-event") {
       const transferNow = Date.now();
-      if (game.features.transferSaga.nextAt > transferNow) return Response.json({ room: shapeRoom(room, playerId), role });
-      if (game.features.cup.active) return Response.json({ room: shapeRoom(room, playerId), role });
+      if (game.features.transferSaga.nextAt > transferNow) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
+      if (game.features.cup.active) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
       const result = resolveTransferInsiderEvent(game.features, Math.random, transferNow);
       game.features = result.features;
       game.goals += result.goalDelta;
@@ -665,7 +679,7 @@ export async function POST(request: Request) {
     }
 
     if (action === "event") {
-      if (game.features.nextEventAt > Date.now()) return Response.json({ room: shapeRoom(room, playerId), role });
+      if (game.features.nextEventAt > Date.now()) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
       const event = resolveRandomEvent(game.goals);
       game.goals = Math.max(0, game.goals + event.amount);
       game.seasonGoals = Math.max(0, game.seasonGoals + event.amount);
@@ -677,7 +691,7 @@ export async function POST(request: Request) {
     }
 
     if (action === "var-event") {
-      if (game.features.nextVarAt > Date.now()) return Response.json({ room: shapeRoom(room, playerId), role });
+      if (game.features.nextVarAt > Date.now()) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
       const event = resolveVarEvent(game.goals);
       game.goals = Math.max(0, game.goals + event.amount);
       game.seasonGoals = Math.max(0, game.seasonGoals + event.amount);
@@ -710,7 +724,7 @@ export async function POST(request: Request) {
           gameColumns(purchaseGame, purchaseTimestamp, purchaseRoom.sharedStateVersion),
           { sharedStateVersion: purchaseRoom.sharedStateVersion },
         );
-        if (updated) return Response.json({ room: shapeRoom(updated, playerId), role });
+        if (updated) return Response.json({ serverNow: Date.now(), room: shapeRoom(updated, playerId), role });
         const latest = await db.getRoom(purchaseRoom.code);
         if (!latest) return jsonError("Dieser Raum wurde gelöscht.", 404);
         purchaseRoom = latest;
@@ -718,7 +732,7 @@ export async function POST(request: Request) {
       return Response.json({
         error: "Der gemeinsame Spielstand wurde gleichzeitig geändert. Der Kauf wird automatisch nochmals ausgeführt.",
         errorCode: "STALE_STATE",
-        room: shapeRoom(purchaseRoom, playerId),
+        serverNow: Date.now(), room: shapeRoom(purchaseRoom, playerId),
         role,
       }, { status: 409 });
     }
@@ -841,6 +855,21 @@ export async function POST(request: Request) {
       return persistGameResponse(db, room, game, timestamp, playerId, role, {}, { packReveal: reveal });
     }
 
+    if (action === "travel-start") {
+      const mode = payload.mode === "season" ? "season" : "tournament";
+      const t = getTournament(typeof payload.tournamentId === "string" ? payload.tournamentId : "stadium");
+      if (!t) return jsonError("Unbekanntes Turnier.", 409);
+      const now = Date.now();
+      const error = eligibilityError(game.features, mode, t.id, now);
+      if (error) return jsonError(error, 409);
+      if (mode === "tournament" && !isSeasonContentUnlocked(getTournamentUnlockSeason(t.id), game.seasons, testMode)) return jsonError("Das Turnier ist noch gesperrt.", 409);
+      const fixture = fixtureFor(game.features, mode, t.id);
+      if (!fixture.away) return jsonError("Für Heimspiele ist keine Reise nötig.", 409);
+      const gate = travelGate(game.features, fixture, now, true);
+      if (gate && !["Reise gestartet.", "Die Mannschaft ist noch unterwegs."].includes(gate)) return jsonError(gate,409);
+      return persistGameResponse(db,room,game,timestamp,playerId,role);
+    }
+
     if (action === "cup-start") {
       if (payload.mode === "season" || typeof payload.tournamentId !== "string") {
         const seasonStartError = startSeasonCupMatch(game, Date.now());
@@ -869,10 +898,15 @@ export async function POST(request: Request) {
       if (!isSeasonContentUnlocked(tournamentUnlockSeason, game.seasons, testMode)) return jsonError(`${tournament.label} wird in Saison ${tournamentUnlockSeason} freigeschaltet.`, 409);
       const starRating = getStarXIRating(game.features.starXI.ownedIds, game.features.starXI.lineupIds);
       if (starRating < tournament.minimumRating) return jsonError(`${tournament.label} braucht mindestens ${tournament.minimumRating} OVR.`, 409);
+      const fixture = fixtureFor(game.features, "tournament", tournament.id);
+      const travelError = travelGate(game.features, fixture, cupNow);
+      if (travelError) return jsonError(travelError,409);
       if (!game.features.cup.active) {
         if (!game.features.cup.pendingNextRound) game.features = activatePendingTransferLoans(game.features, tournament.id);
         const homePlayers = getStarXISelection(game.features.starXI.ownedIds, game.features.starXI.lineupIds).filter((player) => !game.features.cup.sentOffPlayerIds.includes(player.id));
-        game.features.cup = beginCupMatch(game.features.cup, cupNow, tournament.id, homePlayers, game.features.starXI.formationPositions, game.features.starXI.lineupIds, game.features.starXI.benchIds);
+        game.features.cup = beginCupMatch(game.features.cup, cupNow, tournament.id, homePlayers, game.features.starXI.formationPositions, game.features.starXI.lineupIds, game.features.starXI.benchIds, Math.random, fixture.schedule);
+        consumeTravel(game.features, fixture);
+        prepareCareerMatch(game.features);
       }
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
@@ -899,7 +933,7 @@ export async function POST(request: Request) {
       const expectedPenaltyStep = Number(payload.expectedPenaltyStep);
       const currentPenaltyStep = game.features.cup.penaltyHomeTaken + game.features.cup.penaltyAwayTaken;
       if (!Number.isInteger(expectedPenaltyStep) || expectedPenaltyStep < 0) return jsonError("Der Elfmeterstand ist ungültig.", 409);
-      if (expectedPenaltyStep !== currentPenaltyStep) return Response.json({ room: shapeRoom(room, playerId), role });
+      if (expectedPenaltyStep !== currentPenaltyStep) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
       const homePlayers = getStarXISelection(game.features.starXI.ownedIds, game.features.starXI.lineupIds).filter((player) => !game.features.cup.sentOffPlayerIds.includes(player.id));
       const effectiveRating = getStarXIEffectiveMatchRating(game.features.starXI.ownedIds, game.features.starXI.lineupIds, game.features.cup, 120);
       const cupNow = Date.now();
@@ -910,6 +944,7 @@ export async function POST(request: Request) {
         if (game.features.cup.mode === "season") {
           recordMultiplayerSeasonMatch(game, cupNow);
         } else {
+          recordCareerMatch(game.features, cupNow);
           if (result.tournamentWon) game.features.goalBoost = startTournamentGoalBoost(game.features.cup.tournamentId, cupNow);
           const tournament = getTournament(game.features.cup.tournamentId);
           const tournamentBoost = getTournamentGoalBoostMultiplier(game.features.cup.tournamentId);
@@ -925,8 +960,8 @@ export async function POST(request: Request) {
     }
 
     if (action === "cup-tick") {
-      if (!game.features.cup.active) return Response.json({ room: shapeRoom(room, playerId), role });
-      if (game.features.cup.phase === "penalties") return Response.json({ room: shapeRoom(room, playerId), role });
+      if (!game.features.cup.active) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
+      if (game.features.cup.phase === "penalties") return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
       const homePlayers = getStarXISelection(game.features.starXI.ownedIds, game.features.starXI.lineupIds).filter((player) => !game.features.cup.sentOffPlayerIds.includes(player.id));
       const cupNow = Date.now();
       const matchMinute = Math.min(120, Math.max(1, Math.floor((cupNow - game.features.cup.matchStartedAt) / 2000) + 1));
@@ -938,6 +973,7 @@ export async function POST(request: Request) {
         if (game.features.cup.mode === "season") {
           recordMultiplayerSeasonMatch(game, cupNow);
         } else {
+          recordCareerMatch(game.features, cupNow);
           if (result.tournamentWon) game.features.goalBoost = startTournamentGoalBoost(game.features.cup.tournamentId, cupNow);
           const tournament = getTournament(game.features.cup.tournamentId);
           const tournamentBoost = getTournamentGoalBoostMultiplier(game.features.cup.tournamentId);
@@ -949,6 +985,12 @@ export async function POST(request: Request) {
           if (result.runEnded) game.features = completeTournamentRun(game.features, { tournamentId: result.cup.tournamentId, tournamentWon: result.tournamentWon, completedRound: result.completedRound, opponent: result.opponent, homeScore: result.cup.homeScore, awayScore: result.cup.awayScore, tieBreak: result.tieBreak }, cupNow);
         }
       }
+      return persistGameResponse(db, room, game, timestamp, playerId, role);
+    }
+
+    if (action === "album-claim") {
+      const groupId = typeof payload.groupId === "string" ? payload.groupId : "";
+      if (!(groupId === "all" ? claimAllAlbumRewards(game.features) > 0 : claimAlbumReward(game.features, groupId))) return jsonError("Diese Sammlung ist noch nicht vollständig oder ihre Prämie wurde bereits abgeholt.", 409);
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 
@@ -974,6 +1016,7 @@ export async function POST(request: Request) {
     }
 
     if (action === "season-prestige") {
+      if (game.features.travel.journey && !game.features.travel.journey.consumed) return jsonError("Schliesse zuerst die Auswärtsreise ab.",409);
       if (!game.features.seasonMode.hallOfFame) return jsonError("Prestige wird erst nach der Hall of Fame freigeschaltet.", 409);
       game.features.seasonMode = startSeasonPrestige(game.features.seasonMode, game.features.club.name, Date.now());
       game.seasons = Math.max(game.seasons, MAX_CAREER_SEASON - 1);

@@ -150,14 +150,14 @@ test("Silvuz is a fixed Swiss 100-rated pack player with the SILVAN lobby code",
   assert.match(pageSource, /Silvan Code eingelöst: Silvuz ist für euren gemeinsamen Club freigeschaltet/);
 });
 
-test("Benxli is a Swiss 67-rated legendary goalkeeper with a fixed walkout", async () => {
+test("Mikeboy Jr. is a Swiss 67-rated legendary centre-back with a fixed walkout", async () => {
   const [featureSource, walkoutSource, pageSource] = await Promise.all([
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/walkout-data.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
   ]);
 
-  assert.match(featureSource, /id: "star-benxli",[\s\S]*?countryCode: "CH",[\s\S]*?name: "Benxli",[\s\S]*?position: "TW",[\s\S]*?positions: \["TW"\],[\s\S]*?rating: 67,[\s\S]*?cardType: "legendary",[\s\S]*?packWeight: 0\.04/);
+  assert.match(featureSource, /id: "star-benxli",[\s\S]*?countryCode: "CH",[\s\S]*?name: "Mikeboy Jr\.",[\s\S]*?position: "IV",[\s\S]*?positions: \["IV"\],[\s\S]*?rating: 67,[\s\S]*?cardType: "legendary",[\s\S]*?packWeight: 0\.04/);
   assert.match(walkoutSource, /"star-benxli": \{ \.\.\.GOAT_PROFILE/);
   assert.match(pageSource, /function formatStableInteger\(value: number\)/);
   assert.match(pageSource, /formatStableInteger\(STAR_XI_TOTAL_CARD_COUNT\)/);

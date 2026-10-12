@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { primaryKey, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const coopRooms = sqliteTable("coop_rooms", {
   code: text("code").primaryKey(),
@@ -46,3 +46,10 @@ export const coopRooms = sqliteTable("coop_rooms", {
   pendingUpgradeCount: integer("pending_upgrade_count"),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+
+// Solo journey receipts use the existing player capability, like shared worlds.
+export const soloTravel = sqliteTable('solo_travel', {
+  owner: text('owner').notNull(),
+  fixtureId: text('fixture_id').notNull(),
+  journeyJson: text('journey_json').notNull(),
+}, (t) => [primaryKey({ columns: [t.owner, t.fixtureId] })]);

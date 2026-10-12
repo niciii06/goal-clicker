@@ -15,9 +15,6 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Goal Clicker | Football Idle Club",
   description: "Klick den Ball, sammle Tore und baue dein eigenes Fussball Imperium.",
-  other: {
-    "codex-preview": "development",
-  },
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

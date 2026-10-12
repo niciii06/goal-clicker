@@ -1,3 +1,8 @@
+import { normalizeTravel, emptyTravel } from './travel-data';
+import type { TravelState } from './travel-data';
+import { seasonGeography } from './travel-geography';
+import { initialCareerState, normalizeCareerState } from "./career-data";
+import type { CareerState } from "./career-data";
 import { FC26_STAR_PROFILES, type StarPosition } from "./fc26-player-pool";
 import { getFC27Positions } from "./fc27-positions";
 import { getFC27Rating } from "./fc27-ratings";
@@ -42,6 +47,9 @@ export type GoalBoostState = {
 };
 
 export type CupState = {
+  careerMatchId?: string;
+  careerRatingSeed?: number;
+  careerBonuses?: Record<string, number>;
   active: boolean;
   mode: CupMatchMode;
   phase: CupMatchPhase;
@@ -377,6 +385,8 @@ export type SeasonModeState = {
 
 export type GameFeatures = {
   schemaVersion: number;
+  travel: TravelState;
+  career: CareerState;
   transferMarket: TransferMarketState;
   starXI: StarXIState;
   club: ClubProfile;
@@ -423,7 +433,7 @@ export const STAR_PACK_ROLL_DURATION_MS = 8000;
 export const STAR_XI_SQUAD_SIZE = 11;
 export const STAR_XI_BENCH_SIZE = 12;
 export const STAR_XI_MAX_SUBSTITUTIONS = 5;
-export const GAME_FEATURES_SCHEMA_VERSION = 3;
+export const GAME_FEATURES_SCHEMA_VERSION = 4;
 export const SEASON_MODE_DIVISION_COUNT = 15;
 export const SEASON_MODE_MATCHES_PER_SEASON = 10;
 export const SEASON_MODE_TABLE_SIZE = 6;
@@ -1036,7 +1046,7 @@ function getSeasonOpponentRating(division: number, index: number) {
 function createSeasonTable(division: number, clubName: string): SeasonTableRow[] {
   return [
     { id: "club", name: clubName || "FC Goal", rating: 0 },
-    ...SEASON_OPPONENT_NAMES.map((name, index) => ({ id: `season-opponent-${index + 1}`, name, rating: getSeasonOpponentRating(division, index + 1) })),
+    ...SEASON_OPPONENT_NAMES.map((_, index) => ({ id: `season-opponent-${index + 1}`, name: seasonGeography(division, index).name, rating: getSeasonOpponentRating(division, index + 1) })),
   ].map((team) => ({ ...team, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 }));
 }
 
@@ -1487,7 +1497,7 @@ export function getBestStarXISelection(ownedIds: string[], formationPositions: r
   const blocked = new Set(blockedPlayerIds);
   const players = [...new Set(ownedIds)]
     .map((id) => getStarXIPlayer(id))
-    .filter((player): player is StarXIPlayer => Boolean(player) && !blocked.has(player.id));
+    .filter((player): player is StarXIPlayer => player !== undefined && !blocked.has(player.id));
   const candidateIds = new Set<string>();
 
   for (const position of positions) {
@@ -1697,7 +1707,7 @@ export function getCupPlayerMatchRating(cup: CupState, playerId: string, minute:
   const cleanSheetBoost = concededWhilePlaying === 0
     ? playedProgress * (position === "TW" ? 0.42 : position === "IV" || position === "LV" || position === "LAV" || position === "RV" || position === "RAV" ? 0.3 : position === "ZDM" ? 0.14 : 0)
     : 0;
-  return getStarXIPlayerMatchRating(playerId, cup.matchStartedAt, effectiveMinute, 0, enteredAtMinute, eventImpact + cleanSheetBoost, position);
+  return getStarXIPlayerMatchRating(playerId, cup.careerRatingSeed ?? cup.matchStartedAt, effectiveMinute, 0, enteredAtMinute, eventImpact + cleanSheetBoost, position);
 }
 
 export type CupSubstitutionImpact = {
@@ -1744,7 +1754,7 @@ export function getStarXIEffectiveMatchRating(ownedIds: string[], lineupIds: str
   const missing = STAR_XI_SQUAD_SIZE - starters.length;
   const effectiveTotal = starters.reduce((total, player) => {
     const liveForm = getCupPlayerMatchRating(cup, player.id, minute) ?? 6.4;
-    return total + player.rating + (liveForm - 6.5) * 2.8;
+    return total + Math.min(100, player.rating + (cup.careerBonuses?.[player.id] ?? 0)) + (liveForm - 6.5) * 2.8;
   }, missing * 55);
   const squadRating = Math.round((effectiveTotal / STAR_XI_SQUAD_SIZE) * 10) / 10;
   const momentumRating = (Number(cup.matchMomentum) || 0) * CUP_MOMENTUM_RATING_WEIGHT;
@@ -1933,6 +1943,9 @@ function startTournamentRound(cup: CupState, tournament: TournamentDefinition, r
   });
   return {
     ...cup,
+    careerRatingSeed: now,
+    careerMatchId: `career-${now}-tournament-${opponent.name}`,
+    careerBonuses: undefined,
     mode: "tournament",
     tournamentId: tournament.id,
     round,
@@ -1972,7 +1985,7 @@ function startTournamentRound(cup: CupState, tournament: TournamentDefinition, r
   };
 }
 
-export function beginCupMatch(cup: CupState, now = Date.now(), tournamentId = cup.tournamentId, homePlayers: readonly StarXIPlayer[] = [], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS, originalLineupIds: readonly string[] = homePlayers.map((player) => player.id), originalBenchIds: readonly string[] = [], random = Math.random): CupState {
+export function beginCupMatch(cup: CupState, now = Date.now(), tournamentId = cup.tournamentId, homePlayers: readonly StarXIPlayer[] = [], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS, originalLineupIds: readonly string[] = homePlayers.map((player) => player.id), originalBenchIds: readonly string[] = [], random = Math.random, plannedOpponentIds?: readonly string[]): CupState {
   const tournament = getTournament(tournamentId) ?? TOURNAMENTS[0];
   if (!cup.pendingNextRound && cup.nextTournamentAt > now) return cup;
   if (cup.pendingNextRound && cup.tournamentId === tournament.id && cup.round < tournament.rounds) {
@@ -1987,7 +2000,7 @@ export function beginCupMatch(cup: CupState, now = Date.now(), tournamentId = cu
       originalBenchIds: [...originalBenchIds],
     }, tournament, cup.round, now, false, homePlayers, formationPositions, false);
   }
-  const opponentIds = getTournamentOpponentSchedule(tournament, random);
+  const opponentIds = plannedOpponentIds?.length === tournament.rounds ? [...plannedOpponentIds] : getTournamentOpponentSchedule(tournament, random);
   return startTournamentRound({ ...cup, round: 0, opponentIds, pendingNextRound: false, nextTournamentAt: 0, suspendedPlayerIds: [], originalLineupIds: [...originalLineupIds], originalBenchIds: [...originalBenchIds] }, tournament, 0, now, true, homePlayers, formationPositions);
 }
 
@@ -2002,6 +2015,9 @@ export function beginSeasonCupMatch(cup: CupState, seasonValue: unknown, now = D
   });
   return {
     ...cup,
+    careerRatingSeed: now,
+    careerMatchId: `career-${now}-season-${opponent.name}`,
+    careerBonuses: undefined,
     mode: "season",
     tournamentId: "stadium",
     round: 0,
@@ -2112,7 +2128,7 @@ function selectWeightedPlayer(candidates: { player: StarXIPlayer; weight: number
 
 function selectHomeScorer(homePlayers: readonly StarXIPlayer[], cup: CupState, minute: number, random: () => number, formationPositions: readonly StarPosition[], matchEvents: readonly CupGoalEvent[]) {
   if (!homePlayers.length) return undefined;
-  const liveCup = { ...cup, matchEvents };
+  const liveCup = { ...cup, matchEvents: [...matchEvents] };
   const candidates = homePlayers.map((player, index) => {
     const position = formationPositions[index] ?? STAR_XI_FORMATION_POSITIONS[index] ?? player.position;
     const skill = 0.4 + ((clamp(player.rating, 67, 100) - 67) / 33) ** 1.7 * 1.6;
@@ -2186,7 +2202,7 @@ function getInjuryReason(position: StarPosition, random: () => number) {
 }
 
 function decrementCupInjuries(injuredPlayerIds: Record<string, number>) {
-  return Object.fromEntries(Object.entries(injuredPlayerIds).map(([playerId, matches]) => [playerId, Math.max(0, Math.floor(Number(matches) || 0) - 1)]).filter(([, matches]) => matches > 0));
+  return Object.fromEntries(Object.entries(injuredPlayerIds).map(([playerId, matches]) => [playerId, Math.max(0, Math.floor(Number(matches) || 0) - 1)]).filter(([, matches]) => Number(matches) > 0));
 }
 
 function getCupBaseResult(cup: CupState, starRating: number) {
@@ -2516,11 +2532,13 @@ export function initialMissions() {
 export function initialGameFeatures(now = Date.now()): GameFeatures {
   return {
     schemaVersion: GAME_FEATURES_SCHEMA_VERSION,
+    travel: emptyTravel(),
+    career: initialCareerState(),
     transferMarket: { offerIds: ["turbo", "wall", "maestro"], ownedIds: [] },
     starXI: { ownedIds: [], fragments: 0, lineupIds: Array.from({ length: STAR_XI_SQUAD_SIZE }, () => ""), benchIds: Array.from({ length: STAR_XI_BENCH_SIZE }, () => ""), formationId: "433", formationPositions: [...STAR_XI_FORMATION_POSITIONS] },
-    club: { name: "FC Goal", badge: "⚽", color: "#0071e3" },
+    club: { name: "FC Arbeitszeitbetrug", badge: "⚽", color: "#0071e3" },
     cup: { active: false, mode: "season", phase: "regular", tournamentId: "stadium", round: 0, wins: 0, best: 0, trophies: { stadium: 0, champions: 0, world: 0 }, lastResult: "Noch kein Saisonspiel.", matchStartedAt: 0, matchEndsAt: 0, lastTickAt: 0, homeScore: 0, awayScore: 0, opponent: "", opponentRating: 58, opponentStrategyId: "ballbesitz", opponentIds: [], strategyId: "konter", substitutionsUsed: 0, matchMomentum: 0, originalLineupIds: [], originalBenchIds: [], playerEnteredAt: {}, playerExitedAt: {}, playerMatchPositions: {}, lastGoal: null, lastInjury: null, matchEvents: [], cardEvents: [], injuryEvents: [], sentOffPlayerIds: [], suspendedPlayerIds: [], injuredPlayerIds: {}, matchPaused: false, pendingNextRound: false, nextTournamentAt: 0, penaltyHomeScore: 0, penaltyAwayScore: 0, penaltyHomeTaken: 0, penaltyAwayTaken: 0, penaltyTurn: "home", penaltyEvents: [], penaltyMessage: "", allTimeScorers: {}, allTimeAppearances: {} },
-    seasonMode: initialSeasonMode("FC Goal"),
+    seasonMode: initialSeasonMode("FC Arbeitszeitbetrug"),
     goalBoost: { tournamentId: null, multiplier: 1, startedAt: 0, endsAt: 0 },
     missions: initialMissions(),
     history: [],
@@ -2653,7 +2671,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     const saved = asRecord(rawMissions.find((item) => asRecord(item).id === mission.id));
     return { ...mission, claimed: saved.claimed === true };
   });
-  const history = Array.isArray(source.history) ? source.history.map((item) => asRecord(item)).filter((item) => typeof item.title === "string").slice(-30).map((item, index) => ({
+  const history: MatchHistoryEntry[] = Array.isArray(source.history) ? source.history.map((item) => asRecord(item)).filter((item) => typeof item.title === "string").slice(-30).map((item, index) => ({
     id: safeString(item.id, `history-${index}`),
     title: safeString(item.title, "Spielereignis"),
     detail: safeString(item.detail, ""),
@@ -2661,7 +2679,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     timestamp: Number(item.timestamp) || Date.now(),
   })) : [];
   const randomEventSource = asRecord(source.randomEvent);
-  const randomEvent = typeof randomEventSource.title === "string" ? {
+  const randomEvent: RandomEvent | null = typeof randomEventSource.title === "string" ? {
     id: randomEventSource.id === "var" || randomEventSource.id === "elefantino" || randomEventSource.id === "sponsor" || randomEventSource.id === "fans" || randomEventSource.id === "injury" || randomEventSource.id === "weather" ? randomEventSource.id : "fans",
     title: safeString(randomEventSource.title, "Stadionereignis"),
     message: safeString(randomEventSource.message, "Die Fans sorgen für Stimmung."),
@@ -2691,7 +2709,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
   const archiveIds = new Set<string>();
   const transferArchive = (Array.isArray(transferSagaSource.archive) ? transferSagaSource.archive : [])
     .map(normalizeTransferInsiderEvent)
-    .filter((event): event is TransferInsiderEvent => Boolean(event) && event.outcome !== "failed")
+    .filter((event): event is TransferInsiderEvent => event !== null && event.outcome !== "failed")
     .filter((event) => {
       if (archiveIds.has(event.id)) return false;
       archiveIds.add(event.id);
@@ -2837,10 +2855,12 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
   });
   return {
     schemaVersion: GAME_FEATURES_SCHEMA_VERSION,
+    travel: normalizeTravel(source.travel),
+    career: normalizeCareerState(source.career, [...normalizedStarXI.ownedIds, ...loans.map(loan => loan.playerId)], { ...defaults.cup, ...cup, allTimeScorers, allTimeAppearances, playerEnteredAt, matchEvents, active } as CupState),
     transferMarket: { offerIds: offerIds.length ? offerIds : defaults.transferMarket.offerIds, ownedIds: [...new Set(ownedIds)] },
     starXI: normalizedStarXI,
     club: { name: clubName, badge: CLUB_BADGES.includes(String(club.badge)) ? String(club.badge) : defaults.club.badge, color: CLUB_COLORS.includes(String(club.color)) ? String(club.color) : defaults.club.color },
-    cup: { active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && Boolean(lastInjury), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
+    cup: { careerRatingSeed: Number.isFinite(Number(cup.careerRatingSeed)) && Number(cup.careerRatingSeed) > 0 ? Number(cup.careerRatingSeed) : matchStartedAt, careerMatchId: typeof cup.careerMatchId === "string" ? cup.careerMatchId.slice(0, 200) : undefined, careerBonuses: Object.fromEntries(Object.entries(asRecord(cup.careerBonuses)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Number(value), -2, 5)])), active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && Boolean(lastInjury), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
     seasonMode: normalizedSeasonMode,
     goalBoost,
     missions,

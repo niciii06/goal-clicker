@@ -491,7 +491,7 @@ test("a red card removes the player and blocks the next round until replacement"
   assert.equal(restored.lineupIds.filter(Boolean).length, 10);
 
   const emptySlot = restored.lineupIds.findIndex((playerId) => !playerId);
-  const replacement = STAR_XI_PLAYERS.find((player) => !restored.lineupIds.includes(player.id) && !restored.benchIds.includes(player.id) && canStarXIPlayerFillSlot(player.id, emptySlot, restored.formationPositions));
+  const replacement = STAR_XI_PLAYERS.find((player) => !result.cup.suspendedPlayerIds.includes(player.id) && !restored.lineupIds.includes(player.id) && !restored.benchIds.includes(player.id) && canStarXIPlayerFillSlot(player.id, emptySlot, restored.formationPositions));
   assert.ok(replacement);
   const replaced = setStarXIStarter(restored, emptySlot, replacement!.id, result.cup.suspendedPlayerIds);
   assert.equal(replaced.lineupIds.filter(Boolean).length, STAR_XI_SQUAD_SIZE);
@@ -625,6 +625,7 @@ test("drag-style squad moves swap starters, bench and reserve without losing pla
   const benchIds = [benchStarter.id, ...remainingPlayers.slice(0, STAR_XI_BENCH_SIZE - 1).map((player) => player.id)];
   const reservePlayer = remainingPlayers[STAR_XI_BENCH_SIZE - 1];
   const state = {
+    fragments: 0,
     ownedIds: [...lineupIds, ...benchIds, reservePlayer.id],
     lineupIds,
     benchIds,

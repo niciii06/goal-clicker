@@ -107,7 +107,7 @@ test("progress surfaces show full targets instead of remaining amounts", async (
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(pageSource, /Saisonspiel starten/);
+  assert.match(pageSource, /travelLabel\(fixtureFor\(displayGame.features,"season"\)\)/);
   assert.match(pageSource, /`\$\{formatNumber\(nextRank\.minimum\)\} Tore für \$\{nextRank\.name\}`/);
   assert.match(pageSource, /`\$\{seasonNextOpponent\.rating\} OVR/);
   assert.match(pageSource, /`\$\{STAR_XI_SQUAD_SIZE\} passende Startplätze erforderlich`/);

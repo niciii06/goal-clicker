@@ -65,7 +65,7 @@ test("tournament cooldown stays server-safe while season matches share the game 
   assert.match(featureSource, /TOURNAMENT_COOLDOWN_MS = 5 \* 60 \* 1000/);
   assert.match(featureSource, /nextCup\.nextTournamentAt = now \+ TOURNAMENT_COOLDOWN_MS/);
   assert.match(apiSource, /!game\.features\.cup\.pendingNextRound && game\.features\.cup\.nextTournamentAt > cupNow/);
-  assert.match(pageSource, /Saisonspiel starten/);
+  assert.match(pageSource, /travelLabel\(fixtureFor\(displayGame.features,"season"\)\)/);
   assert.match(pageSource, /tournamentCooldownActive/);
   assert.match(pageSource, /season-competition-card/);
   assert.match(pageSource, /startCup\(selectedTournament\.id\)/);
@@ -92,5 +92,5 @@ test("multiplayer rooms preserve old slots and accept four players", async () =>
   assert.match(apiSource, /getOccupiedRoomPlayers\(room\)\.length >= 2/);
   assert.match(pageSource, /BIS ZU VIER SPIELER/);
   assert.match(pageSource, /room\.players\.map/);
-  assert.match(protocolSource, /MULTIPLAYER_PROTOCOL_VERSION = 2/);
+  assert.match(protocolSource, /MULTIPLAYER_PROTOCOL_VERSION = 4/);
 });
