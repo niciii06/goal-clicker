@@ -47,7 +47,8 @@ export class GoalClickerDatabase {
     return this.getSoloJourney(owner,fixtureId);
   }
   async consumeSoloJourney(owner: string, fixtureId: string, journey: unknown) {
-    await this.client.update(soloTravel).set({journeyJson:JSON.stringify(journey)}).where(and(eq(soloTravel.owner,owner),eq(soloTravel.fixtureId,fixtureId)));
+    const rows=await this.client.update(soloTravel).set({journeyJson:JSON.stringify(journey)}).where(and(eq(soloTravel.owner,owner),eq(soloTravel.fixtureId,fixtureId),sql`COALESCE(json_extract(${soloTravel.journeyJson}, '$.consumed'),0) = 0`)).returning();
+    return rows.length===1;
   }
   async getRoom(code: string): Promise<RoomRow | null> {
     const [room] = await this.client.select().from(coopRooms).where(eq(coopRooms.code, code)).limit(1);

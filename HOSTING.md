@@ -1,7 +1,7 @@
 # Goal Clicker selbst bearbeiten und hosten
 
-Dieser Stand übernimmt den Spielcode der Sites Version 113, Commit
-`0b96e6007467246726af8e5ff5192c4153b308d5`, und ergänzt externes Hosting.
+Dieser Stand übernimmt den Spielcode der Sites Version 125, Commit
+`30ecda8bbb57146fc6a7b0a683ac0b582f668d1a`, und ergänzt externes Hosting.
 
 ## Voraussetzungen
 

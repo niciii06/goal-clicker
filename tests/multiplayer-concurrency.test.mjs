@@ -51,8 +51,8 @@ test("singleplayer and multiplayer tournaments never add direct goal rewards", a
   assert.doesNotMatch(featureSource, /baseReward|rewardMultiplier/);
   assert.doesNotMatch(apiSource, /result\.reward/);
   assert.doesNotMatch(pageSource, /result\.reward/);
-  assert.match(apiSource, /if \(result\.tournamentWon\) game\.features\.goalBoost = startTournamentGoalBoost/);
-  assert.match(pageSource, /if \(result\.tournamentWon\) features\.goalBoost = startTournamentGoalBoost/);
+  assert.doesNotMatch(apiSource, /if \(result\.tournamentWon\) game\.features\.goalBoost = startTournamentGoalBoost/);
+  assert.doesNotMatch(pageSource, /if \(result\.tournamentWon\) features\.goalBoost = startTournamentGoalBoost/);
 });
 
 test("tournament cooldown stays server-safe while season matches share the game picker", async () => {
@@ -92,5 +92,5 @@ test("multiplayer rooms preserve old slots and accept four players", async () =>
   assert.match(apiSource, /getOccupiedRoomPlayers\(room\)\.length >= 2/);
   assert.match(pageSource, /BIS ZU VIER SPIELER/);
   assert.match(pageSource, /room\.players\.map/);
-  assert.match(protocolSource, /MULTIPLAYER_PROTOCOL_VERSION = 5/);
+  assert.match(protocolSource, /MULTIPLAYER_PROTOCOL_VERSION = 7/);
 });

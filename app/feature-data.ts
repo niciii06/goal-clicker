@@ -1,11 +1,13 @@
+import type { Venue } from './travel-geography';
 import { normalizeTravel, emptyTravel } from './travel-data';
 import type { TravelState } from './travel-data';
-import { seasonGeography } from './travel-geography';
-import { initialCareerState, normalizeCareerState } from "./career-data";
+import { seasonGeography, LEAGUE_LABELS, HOME_VENUE, venueForClubName } from './travel-geography';
+import { initialCareerState, normalizeCareerState, getPlayerForm, getCareerCard } from "./career-data";
 import type { CareerState } from "./career-data";
 import { FC26_STAR_PROFILES, type StarPosition } from "./fc26-player-pool";
 import { getFC27Positions } from "./fc27-positions";
 import { getFC27Rating } from "./fc27-ratings";
+import { FC27_INDIA_PROFILES, SCRAP_RATING_GROUPS, drawScrapPlayer } from "./scrap-pack";
 import { getFunnyPlayerName } from "./funny-player-names";
 
 export type { StarPosition } from "./fc26-player-pool";
@@ -47,6 +49,7 @@ export type GoalBoostState = {
 };
 
 export type CupState = {
+  fixture?: {id:string;away:boolean;venue:Venue;opponentId:string};
   careerMatchId?: string;
   careerRatingSeed?: number;
   careerBonuses?: Record<string, number>;
@@ -163,6 +166,7 @@ export type StarXIPlayer = {
   isCustom?: boolean;
   cardType?: "base" | "icon" | "legendary";
   packWeight?: number;
+  originalAttributes?: (typeof FC27_INDIA_PROFILES)[number]["attributes"];
 };
 
 export type StarFormationId =
@@ -194,7 +198,9 @@ export type StarXIState = {
   formationPositions: StarPosition[];
 };
 
-export type StarPackId = "scrap" | "scout" | "elite" | "legend";
+export type RewardPackId = `reward-${1|2|3|4|5|6}`;
+export type StarPackId = "scrap" | "scout" | "elite" | "legend" | RewardPackId;
+export type EarnedPack = { id:string; packId:RewardPackId; earnedAt:number; opening?:StarPackOpening };
 
 export type StarPackOdds = {
   label: string;
@@ -344,6 +350,8 @@ export type TournamentCompletionSummary = {
 };
 
 export type SeasonTableRow = {
+  clubId?: string;
+  venue?: Venue;
   id: string;
   name: string;
   rating: number;
@@ -370,7 +378,9 @@ export type SeasonMatchHistoryEntry = {
   createdAt: number;
 };
 
+export type SeasonFixture = { opponentId:string; away:boolean; venue:Venue; clubId:string };
 export type SeasonModeState = {
+  fixtures?: SeasonFixture[];
   division: number;
   highestDivision: number;
   matchday: number;
@@ -385,6 +395,8 @@ export type SeasonModeState = {
 
 export type GameFeatures = {
   schemaVersion: number;
+  earnedPacks: EarnedPack[];
+  completedTournamentRuns: string[];
   travel: TravelState;
   career: CareerState;
   transferMarket: TransferMarketState;
@@ -433,7 +445,7 @@ export const STAR_PACK_ROLL_DURATION_MS = 8000;
 export const STAR_XI_SQUAD_SIZE = 11;
 export const STAR_XI_BENCH_SIZE = 12;
 export const STAR_XI_MAX_SUBSTITUTIONS = 5;
-export const GAME_FEATURES_SCHEMA_VERSION = 4;
+export const GAME_FEATURES_SCHEMA_VERSION = 5;
 export const SEASON_MODE_DIVISION_COUNT = 15;
 export const SEASON_MODE_MATCHES_PER_SEASON = 10;
 export const SEASON_MODE_TABLE_SIZE = 6;
@@ -943,14 +955,7 @@ const FC26_ICON_PLAYERS: StarXIPlayer[] = FC26_ICON_DATA.map(([id, name, rating,
   packWeight: 0.015,
 }));
 
-// Stable normal cards: IDs and ratings survive reloads through the existing catalogue.
-export const SCRAP_PLAYERS: StarXIPlayer[] = STAR_POSITIONS.flatMap((position, index) => Array.from({ length: 4 }, (_, variant) => ({
-  id: `scrap-${position.toLowerCase()}-${variant+1}`, name: `${['Reto Rost','Kevin Kreisliga','Ueli Umweg','Dario Dosenfuss'][variant]} (${position})`,
-  position, positions: [position], rating: 40 + (index * 7 + variant * 5) % 25,
-  price: 100, accent: '#8b8177', cardType: 'base' as const,
-})));
-
-export const STAR_XI_PLAYERS: StarXIPlayer[] = [
+const EXISTING_STAR_XI_PLAYERS: StarXIPlayer[] = [
   ...SPECIAL_STAR_XI_PLAYERS,
   ...FC26_ICON_PLAYERS,
   ...YB_FC26_PLAYERS,
@@ -964,10 +969,17 @@ export const STAR_XI_PLAYERS: StarXIPlayer[] = [
     price: Math.round(Math.min(1500000000, 5000 * 1.28 ** (profile.rating - 70))),
     accent: profile.accent,
   })),
-  ...SCRAP_PLAYERS,
 ];
 
-export const STAR_XI_BASE_CARD_COUNT = FC26_STAR_PROFILES.length + YB_FC26_PLAYERS.length + SCRAP_PLAYERS.length;
+// Reuse existing source IDs; retired fictional cards are removed by save normalization.
+export const SCRAP_PLAYERS: StarXIPlayer[] = FC27_INDIA_PROFILES.map(profile => {
+  const existing = EXISTING_STAR_XI_PLAYERS.find(p => p.sourceId === profile.sourceId);
+  return { ...existing, id:existing?.id ?? `scrap-ea-${profile.sourceId}`, sourceId:profile.sourceId, countryCode:'IN', name:profile.name, position:profile.positions[0], positions:[...profile.positions], rating:profile.rating, price:existing?.price ?? Math.round(5000 * 1.28 ** (profile.rating - 70)), accent:existing?.accent ?? '#8b8177', cardType:'base', originalAttributes:profile.attributes };
+});
+const SCRAP_PLAYER_IDS = new Set(SCRAP_PLAYERS.map(p => p.id));
+export const STAR_XI_PLAYERS: StarXIPlayer[] = [...EXISTING_STAR_XI_PLAYERS.filter(p => !SCRAP_PLAYER_IDS.has(p.id)), ...SCRAP_PLAYERS];
+
+export const STAR_XI_BASE_CARD_COUNT = FC26_STAR_PROFILES.length + YB_FC26_PLAYERS.length + SCRAP_PLAYERS.filter(p => !EXISTING_STAR_XI_PLAYERS.some(old => old.id === p.id)).length;
 export const STAR_XI_ICON_CARD_COUNT = FC26_ICON_PLAYERS.length;
 export const STAR_XI_SPECIAL_CARD_COUNT = SPECIAL_STAR_XI_PLAYERS.length;
 export const STAR_XI_TOTAL_CARD_COUNT = STAR_XI_PLAYERS.length;
@@ -986,11 +998,42 @@ export function getStarXIFragmentCompensation(player: StarXIPlayer) {
 }
 
 export const STAR_PACKS: readonly StarPackDefinition[] = [
-  { id: "scrap", label: "Schrott-Pack", price: 7500, description: "Füsse aus Blei, aber elf müssen wir sein. Eine Basiskarte, freie Positionen zuerst, keine Duplikate solange verfügbar.", odds: [{ label: "Schrott 40–64", minRating: 40, maxRating: 64, chance: 1 }] },
+  { id: "scrap", label: "Schrott-Pack", price: 7500, description: "Günstig einsteigen und dein Team ergänzen. Enthält eine Basiskarte.", odds: SCRAP_RATING_GROUPS.map(group => ({ ...group, label: group.minRating === 0 ? "Rating bis 54" : `Rating ${group.minRating}–${group.maxRating}` })) },
   { id: "scout", label: "Scout Pack", price: 25000, description: "Früh verfügbar und ideal zum Aufbau, starke Karten bleiben extrem selten", odds: [{ label: "Standard 65–79", minRating: 65, maxRating: 79, chance: 0.9 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.09 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.009 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.00099 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.00001 }] },
   { id: "elite", label: "Elite Pack", price: 250000000, description: "Midgame Pack mit besseren Chancen, aber ohne geschenkte Topelf", odds: [{ label: "Standard 65–79", minRating: 65, maxRating: 79, chance: 0.55 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.38 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.06 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.0099 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.0001 }] },
   { id: "legend", label: "Legenden Pack", price: 5000000000, description: "Teures Endgame Risiko mit klar besseren, aber weiterhin seltenen Topkarten", odds: [{ label: "Standard 65–79", minRating: 65, maxRating: 79, chance: 0.18 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.42 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.34 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.05 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.01 }] },
 ];
+
+const REWARD_BRACKETS = [[0,59],[60,69],[70,79],[80,85],[86,89],[90,99]] as const;
+const REWARD_PERCENTAGES = [[60,30,9,1,0,0],[25,45,25,4.5,.5,0],[5,20,55,18,1.9,.1],[0,5,40,48,6.5,.5],[0,0,20,55,23,2],[0,0,5,50,40,5]] as const;
+export const REWARD_PACKS:readonly StarPackDefinition[] = ['Kleines Prämienpack','Basis-Prämienpack','Solides Prämienpack','Hochwertiges Prämienpack','Premium-Prämienpack','Top-Prämienpack'].map((label,i)=>({id:`reward-${i+1}` as RewardPackId,label,price:0,description:'Eine originale Basiskarte als Turnierprämie. Doppelte Karten geben Fragmente.',odds:REWARD_BRACKETS.map(([minRating,maxRating],b)=>({label:minRating===0?'Rating bis 59':`Rating ${minRating}–${maxRating}`,minRating,maxRating,chance:REWARD_PERCENTAGES[i][b]/100}))}));
+export function getTournamentRewardPack(id:TournamentId) {return REWARD_PACKS[id==='stadium'?1:id==='champions'?3:5];}
+export function isRewardPack(id:string):id is RewardPackId {return REWARD_PACKS.some(p=>p.id===id);}
+const rewardPoolCache=new Map<RewardPackId,ReturnType<typeof calculateRewardPackOdds>>();
+export function getRewardPackOdds(id:RewardPackId,players:readonly StarXIPlayer[]=STAR_XI_PLAYERS) {
+ if(players===STAR_XI_PLAYERS){const cached=rewardPoolCache.get(id);if(cached)return cached;const groups=calculateRewardPackOdds(id,players);rewardPoolCache.set(id,groups);return groups;}return calculateRewardPackOdds(id,players);
+}
+function calculateRewardPackOdds(id:RewardPackId,players:readonly StarXIPlayer[]=STAR_XI_PLAYERS) {
+ const pack=REWARD_PACKS.find(p=>p.id===id)!;
+ const base=players.filter(p=>!p.isCustom&&p.cardType!=='icon'&&p.cardType!=='legendary');
+ const groups=pack.odds.map(o=>({...o,players:base.filter(p=>p.rating>=o.minRating&&p.rating<=o.maxRating)})).filter(o=>o.players.length&&o.chance>0);
+ const total=groups.reduce((sum,o)=>sum+o.chance,0);if(!total)throw new Error('Keine gültigen Prämienkarten verfügbar.');
+ return groups.map(o=>({...o,chance:o.chance/total}));
+}
+export function openEarnedPack(features:GameFeatures,id:string,now=Date.now(),random=Math.random,canonical?:StarPackOpening) {
+ const earned=features.earnedPacks.find(p=>p.id===id);
+ if(!earned||earned.opening||features.cup.active)return null;
+ const opening=canonical??openStarPack(earned.packId,features.starXI.ownedIds,random);
+ if(opening.packId!==earned.packId||!getStarXIPlayer(opening.player.id))return null;
+ // Duplicate compensation is decided against the collection at application time.
+ const player=getStarXIPlayer(opening.player.id)!,duplicate=features.starXI.ownedIds.includes(player.id);
+ const result={...opening,player,duplicate,fragmentCompensation:duplicate?getStarXIFragmentCompensation(player):0};
+ earned.opening=result;
+ if(duplicate)features.starXI.fragments+=result.fragmentCompensation;else features.starXI=addStarXIPlayer(features.starXI,player.id);
+ features.starPackReveal={...result,openedAt:now,openedBy:'Du',troll:shouldTriggerPackTroll(player)};
+ addHistory(features,{title:`${earned.packId}: ${player.name}`,detail:duplicate?`+${result.fragmentCompensation} Fragmente`:`${player.positions.join(' / ')} · Rating ${player.rating}`,tone:'positive'},now);
+ return features.starPackReveal;
+}
 
 const PACK_POSITION_GROUPS = [
   { id: "goalkeeper", chance: 1 / 11, positions: ["TW"] },
@@ -1003,7 +1046,7 @@ const STAR_RATING_POOLS = new Map<string, StarXIPlayer[]>();
 for (const pack of STAR_PACKS) {
   for (const odds of pack.odds) {
     const key = `${odds.minRating}-${odds.maxRating}`;
-    if (!STAR_RATING_POOLS.has(key)) STAR_RATING_POOLS.set(key, STAR_XI_PLAYERS.filter((player) => player.rating >= odds.minRating && player.rating <= odds.maxRating));
+    if (!STAR_RATING_POOLS.has(key)) STAR_RATING_POOLS.set(key, EXISTING_STAR_XI_PLAYERS.filter((player) => player.rating >= odds.minRating && player.rating <= odds.maxRating));
   }
 }
 
@@ -1017,23 +1060,7 @@ function clamp(value: number, minimum: number, maximum: number) {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
-const SEASON_DIVISION_LABELS = [
-  "Kreisliga",
-  "2. Liga",
-  "1. Liga",
-  "Regionalliga",
-  "Challenge League",
-  "Super League",
-  "Conference League",
-  "Europa League",
-  "Europa League Elite",
-  "Champions League",
-  "Champions League Elite",
-  "Weltliga",
-  "Weltliga Elite",
-  "Global League",
-  "Hall of Fame",
-] as const;
+const SEASON_DIVISION_LABELS = LEAGUE_LABELS;
 
 const SEASON_OPPONENT_NAMES = [
   "FC Tabellenkeller",
@@ -1045,17 +1072,18 @@ const SEASON_OPPONENT_NAMES = [
 
 export function getSeasonModeDivisionLabel(division: number) {
   const index = Math.max(1, Math.min(SEASON_MODE_DIVISION_COUNT, Math.floor(Number(division) || 1))) - 1;
-  return SEASON_DIVISION_LABELS[index] ?? SEASON_DIVISION_LABELS[0];
+  return `Liga ${15-index} · ${SEASON_DIVISION_LABELS[index] ?? SEASON_DIVISION_LABELS[0]}`;
 }
 
 function getSeasonOpponentRating(division: number, index: number) {
-  return Math.round(clamp(54 + (Math.max(1, division) - 1) * 3 + index * 2, 54, 99));
+  if(division===15)return [98,92,91,96,94][Math.max(0,Math.min(4,index-1))];
+  return Math.round(clamp(40 + (Math.max(1, division) - 1) * 3.4 + index * 1.5, 40, 99));
 }
 
 function createSeasonTable(division: number, clubName: string): SeasonTableRow[] {
   return [
     { id: "club", name: clubName || "FC Goal", rating: 0 },
-    ...SEASON_OPPONENT_NAMES.map((_, index) => ({ id: `season-opponent-${index + 1}`, name: seasonGeography(division, index).name, rating: getSeasonOpponentRating(division, index + 1) })),
+    ...SEASON_OPPONENT_NAMES.map((_, index) => ({ id: `season-opponent-${index + 1}`, name: seasonGeography(division, index).name, clubId: seasonGeography(division,index).id, venue: seasonGeography(division,index).venue, rating: getSeasonOpponentRating(division, index + 1) })),
   ].map((team) => ({ ...team, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 }));
 }
 
@@ -1065,6 +1093,8 @@ function normalizeSeasonTable(raw: unknown, division: number, clubName: string) 
     const source = saved.find((candidate) => candidate.id === fallback.id) ?? {};
     return {
       id: fallback.id,
+      clubId: typeof source.clubId==='string' ? source.clubId : fallback.clubId,
+      venue: fallback.id==='club' ? HOME_VENUE : source.venue && typeof source.venue==='object' && Number.isFinite(Number(asRecord(source.venue).lat)) && Number.isFinite(Number(asRecord(source.venue).lon)) ? source.venue as Venue : venueForClubName(safeString(source.name,fallback.name),division,Number(fallback.id.split('-').at(-1))-1),
       name: fallback.id === "club" ? clubName || fallback.name : safeString(source.name, fallback.name).slice(0, 42),
       rating: fallback.id === "club" ? 0 : Math.max(1, Math.min(99, Math.floor(Number(source.rating) || fallback.rating))),
       played: Math.max(0, Math.floor(Number(source.played) || 0)),
@@ -1085,9 +1115,19 @@ function sortSeasonTable(table: readonly SeasonTableRow[]) {
     || (first.id === "club" ? -1 : second.id === "club" ? 1 : first.name.localeCompare(second.name)));
 }
 
+export function seasonBackgroundPairings(day:number) {
+ const teams=['club','season-opponent-5','season-opponent-4','season-opponent-3','season-opponent-2','season-opponent-1'];
+ for(let n=0;n<day%5;n++)teams.splice(1,0,teams.pop()!);
+ return [[teams[1],teams[4]],[teams[2],teams[3]]];
+}
+export function createSeasonFixtures(table:SeasonTableRow[]):SeasonFixture[] {
+ return Array.from({length:10},(_,day)=>{const o=table.find(t=>t.id===`season-opponent-${day%5+1}`)!;return {opponentId:o.id,clubId:o.clubId??o.id,away:day%2===1,venue:day%2===1?o.venue!:HOME_VENUE};});
+}
+
 export function initialSeasonMode(clubName = "FC Goal"): SeasonModeState {
   const table = createSeasonTable(1, clubName);
   return {
+    fixtures: createSeasonFixtures(table),
     division: 1,
     highestDivision: 1,
     matchday: 0,
@@ -1128,7 +1168,10 @@ export function normalizeSeasonModeState(value: unknown, clubName = "FC Goal", l
   }).filter((item): item is SeasonMatchHistoryEntry => Boolean(item)).slice(-30);
   const table = normalizeSeasonTable(source.table, division, clubName);
   const lastTable = normalizeSeasonTable(source.lastTable, division, clubName);
+  const generated=createSeasonFixtures(table);
+  const fixtures=generated.map((fallback,index)=>{const raw=asRecord((Array.isArray(source.fixtures)?source.fixtures:[])[index]);return raw.opponentId===fallback.opponentId&&typeof raw.away==='boolean'?{...fallback,away:raw.away,venue:raw.away?(table.find(t=>t.id===raw.opponentId)?.venue??fallback.venue):HOME_VENUE}:fallback;});
   return {
+    fixtures,
     division,
     highestDivision,
     matchday: Math.max(0, Math.min(SEASON_MODE_MATCHES_PER_SEASON - 1, Math.floor(Number(source.matchday) || 0))),
@@ -1191,13 +1234,10 @@ export function recordSeasonModeMatch(value: unknown, clubScore: number, opponen
   const opponentRating = opponent?.rating ?? nextOpponent.rating;
   const outcome: SeasonMatchHistoryEntry["outcome"] = safeClubScore > safeOpponentScore ? "win" : safeClubScore === safeOpponentScore ? "draw" : "loss";
   let table = state.table.map((team) => team.id === "club" ? updateSeasonTableRow({ ...team, name: clubName || team.name }, safeClubScore, safeOpponentScore) : team.id === opponent?.id ? updateSeasonTableRow(team, safeOpponentScore, safeClubScore) : team);
-  const backgroundTeams = table.filter((team) => team.id !== "club" && team.id !== opponent?.id);
-  for (let index = 0; index + 1 < backgroundTeams.length; index += 2) {
-    const first = backgroundTeams[index];
-    const second = backgroundTeams[index + 1];
-    const firstScore = rollSeasonScore(first.rating - second.rating + 1, random);
-    const secondScore = rollSeasonScore(second.rating - first.rating - 1, random);
-    table = table.map((team) => team.id === first.id ? updateSeasonTableRow(team, firstScore, secondScore) : team.id === second.id ? updateSeasonTableRow(team, secondScore, firstScore) : team);
+  for(const [firstId,secondId] of seasonBackgroundPairings(state.matchday)) {
+    const first=table.find(t=>t.id===firstId)!,second=table.find(t=>t.id===secondId)!;
+    const firstScore=rollSeasonScore(first.rating-second.rating+1,random),secondScore=rollSeasonScore(second.rating-first.rating-1,random);
+    table=table.map(team=>team.id===first.id?updateSeasonTableRow(team,firstScore,secondScore):team.id===second.id?updateSeasonTableRow(team,secondScore,firstScore):team);
   }
   const lastTable = sortSeasonTable(table);
   const completedSeason = matchday >= SEASON_MODE_MATCHES_PER_SEASON;
@@ -1216,11 +1256,11 @@ export function recordSeasonModeMatch(value: unknown, clubScore: number, opponen
     } else if (position <= 2 && state.division < SEASON_MODE_DIVISION_COUNT) {
       seasonOutcome = "promoted";
       nextDivision = state.division + 1;
-      lastResult = `Saison beendet: Platz ${position} und Aufstieg in Saison ${nextDivision}.`;
+      lastResult = `Saison beendet: Platz ${position} und Aufstieg in Liga ${16-nextDivision}.`;
     } else if (position >= SEASON_MODE_TABLE_SIZE - 1 && state.division > 1) {
       seasonOutcome = "relegated";
       nextDivision = state.division - 1;
-      lastResult = `Saison beendet: Platz ${position} und Abstieg in Saison ${nextDivision}.`;
+      lastResult = `Saison beendet: Platz ${position} und Abstieg in Liga ${16-nextDivision}.`;
     } else {
       seasonOutcome = "stayed";
       lastResult = `Saison beendet: Platz ${position}. Dein Club bleibt in ${getSeasonModeDivisionLabel(state.division)}.`;
@@ -1246,6 +1286,7 @@ export function recordSeasonModeMatch(value: unknown, clubScore: number, opponen
     highestDivision: nextHighestDivision,
     matchday: completedSeason ? 0 : matchday,
     table: completedSeason && !hallOfFame ? createSeasonTable(nextDivision, clubName) : lastTable,
+    fixtures: completedSeason && !hallOfFame ? createSeasonFixtures(createSeasonTable(nextDivision,clubName)) : state.fixtures,
     lastTable,
     lastResult,
     lastMatchAt: now,
@@ -1274,6 +1315,7 @@ export function startSeasonPrestige(value: unknown, clubName = "FC Goal", now = 
     division: 1,
     matchday: 0,
     table: freshTable,
+    fixtures: createSeasonFixtures(freshTable),
     lastTable: freshTable,
     lastResult: `Prestige ${state.prestigeCount + 1} gestartet. Die Jagd auf die Hall of Fame beginnt von vorn.`,
     lastMatchAt: now,
@@ -1494,6 +1536,21 @@ function countBits(value: number) {
   return count;
 }
 
+export type StarXIEvaluationContext = { career?: CareerState; cup?: CupState; minute?: number };
+
+/** Matches the existing performance scale; live match notes never survive their match. */
+export function getStarXISelectionRating(player: StarXIPlayer, context: StarXIEvaluationContext = {}) {
+  const form = context.career ? getPlayerForm(context.career, player.id).bonus : 0;
+  const card = context.career ? getCareerCard(context.career, player).bonus : 0;
+  const cup = context.cup;
+  const currentMatch = cup?.active && cup.matchStartedAt > 0;
+  const prepared = currentMatch && cup.careerRatingSeed === cup.matchStartedAt
+    ? cup.careerBonuses?.[player.id] : undefined;
+  const base = Math.min(100, player.rating + (prepared ?? (form + card)));
+  const live = currentMatch ? getCupPlayerMatchRating(cup, player.id, context.minute ?? 1) : null;
+  return base + (live !== null && Number.isFinite(live) ? (live - 6.5) * 2.8 : 0);
+}
+
 /**
  * Finds the highest-rated valid assignment for the current formation.
  *
@@ -1502,23 +1559,26 @@ function countBits(value: number) {
  * use at most ten other players to block those candidates, so a lower-ranked
  * twelfth candidate can always be replaced by a free higher-ranked one.
  */
-export function getBestStarXISelection(ownedIds: string[], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS, blockedPlayerIds: readonly string[] = []) {
+export function getBestStarXISelection(ownedIds: string[], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS, blockedPlayerIds: readonly string[] = [], context: StarXIEvaluationContext = {}) {
   const positions = Array.from({ length: STAR_XI_SQUAD_SIZE }, (_, index) => formationPositions[index] ?? STAR_XI_FORMATION_POSITIONS[index]);
   const blocked = new Set(blockedPlayerIds);
   const players = [...new Set(ownedIds)]
     .map((id) => getStarXIPlayer(id))
     .filter((player): player is StarXIPlayer => player !== undefined && !blocked.has(player.id));
+  const ratings = new Map(players.map(player => [player.id, getStarXISelectionRating(player, context)]));
+  const rating = (player: StarXIPlayer) => ratings.get(player.id)!;
+  const compare = (a: StarXIPlayer, b: StarXIPlayer) => rating(b) - rating(a) || a.id.localeCompare(b.id);
   const candidateIds = new Set<string>();
 
   for (const position of positions) {
     players
       .filter((player) => canStarXIPlayerPlayPosition(player, position))
-      .sort(compareStarXIPlayers)
+      .sort(compare)
       .slice(0, STAR_XI_SQUAD_SIZE)
       .forEach((player) => candidateIds.add(player.id));
   }
 
-  const candidates = players.filter((player) => candidateIds.has(player.id)).sort(compareStarXIPlayers);
+  const candidates = players.filter((player) => candidateIds.has(player.id)).sort(compare);
   const stateCount = 1 << STAR_XI_SQUAD_SIZE;
   let scores = new Float64Array(stateCount);
   scores.fill(Number.NEGATIVE_INFINITY);
@@ -1534,7 +1594,7 @@ export function getBestStarXISelection(ownedIds: string[], formationPositions: r
       while (openSlots) {
         const slotBit = openSlots & -openSlots;
         const nextMask = mask | slotBit;
-        const nextScore = scores[mask] + player.rating;
+        const nextScore = scores[mask] + rating(player);
         if (nextScore > nextScores[nextMask]) nextScores[nextMask] = nextScore;
         openSlots ^= slotBit;
       }
@@ -1569,7 +1629,7 @@ export function getBestStarXISelection(ownedIds: string[], formationPositions: r
       if (!canStarXIPlayerPlayPosition(player, positions[slotIndex])) continue;
       const previousMask = mask ^ slotBit;
       const previousScore = scoreLayers[playerIndex - 1][previousMask];
-      if (!Number.isFinite(previousScore) || previousScore + player.rating !== currentScore) continue;
+      if (!Number.isFinite(previousScore) || previousScore + rating(player) !== currentScore) continue;
       lineupIds[slotIndex] = player.id;
       mask = previousMask;
       break;
@@ -1578,10 +1638,14 @@ export function getBestStarXISelection(ownedIds: string[], formationPositions: r
   return lineupIds;
 }
 
-export function setBestStarXI(state: StarXIState, blockedPlayerIds: readonly string[] = []) {
+export function setBestStarXI(state: StarXIState, blockedPlayerIds: readonly string[] = [], context: StarXIEvaluationContext = {}) {
+  if (context.cup?.active) return state;
   const next = removeStarXIPlayersFromSquad(normalizeStarXIState(state), blockedPlayerIds);
-  const lineupIds = getBestStarXISelection(next.ownedIds, next.formationPositions, blockedPlayerIds);
-  const benchIds = getBestStarXIBenchSelection(next.ownedIds, lineupIds, next.formationPositions, blockedPlayerIds);
+  const lineupIds = getBestStarXISelection(next.ownedIds, next.formationPositions, blockedPlayerIds, context);
+  const currentScore = next.lineupIds.reduce((sum, id) => sum + (getStarXIPlayer(id) ? getStarXISelectionRating(getStarXIPlayer(id)!, context) : 0), 0);
+  const selectedScore = lineupIds.reduce((sum, id) => sum + (getStarXIPlayer(id) ? getStarXISelectionRating(getStarXIPlayer(id)!, context) : 0), 0);
+  if (next.lineupIds.filter(Boolean).length === lineupIds.filter(Boolean).length && Math.abs(currentScore - selectedScore) < 1e-9) lineupIds.splice(0, lineupIds.length, ...next.lineupIds);
+  const benchIds = getBestStarXIBenchSelection(next.ownedIds, lineupIds, next.formationPositions, blockedPlayerIds, context);
   return { ...next, lineupIds, benchIds };
 }
 
@@ -1595,6 +1659,7 @@ export function getBestStarXIBenchSelection(
   lineupIds: readonly string[],
   formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS,
   blockedPlayerIds: readonly string[] = [],
+  context: StarXIEvaluationContext = {},
 ) {
   const blocked = new Set(blockedPlayerIds);
   const used = new Set(lineupIds.filter(Boolean));
@@ -1608,7 +1673,7 @@ export function getBestStarXIBenchSelection(
     .filter((playerId) => !used.has(playerId) && !blocked.has(playerId))
     .map((playerId) => getStarXIPlayer(playerId))
     .filter((player): player is StarXIPlayer => Boolean(player) && requiredPositions.some((position) => canStarXIPlayerPlayPosition(player, position)))
-    .sort(compareStarXIPlayers);
+    .sort((a, b) => getStarXISelectionRating(b, context) - getStarXISelectionRating(a, context) || a.id.localeCompare(b.id));
 
   if (!requiredPositions.length || !benchCandidates.length) return Array.from({ length: STAR_XI_BENCH_SIZE }, () => "");
   const selectedBenchPlayers: StarXIPlayer[] = [];
@@ -1620,11 +1685,11 @@ export function getBestStarXIBenchSelection(
       || benchCandidates.filter((player) => canStarXIPlayerPlayPosition(player, first.position)).length - benchCandidates.filter((player) => canStarXIPlayerPlayPosition(player, second.position)).length
       || first.index - second.index);
   const candidateScore = (player: StarXIPlayer, assignmentPosition?: StarPosition) => {
-    let score = player.rating * 10 + (assignmentPosition && player.position === assignmentPosition ? 30 : 0);
+    let score = getStarXISelectionRating(player, context) * 10;
     for (const position of activePositions) {
       if (!canStarXIPlayerPlayPosition(player, position)) continue;
       const demand = Math.max(1, positionDemand[position] ?? 1);
-      if (position !== assignmentPosition) score -= 35 / demand;
+      if (position !== assignmentPosition && coverage[position] < demand) score += 35 / demand;
       const excess = coverage[position] + 1 - demand;
       if (excess > 0) score -= excess * 140;
     }
@@ -1638,7 +1703,7 @@ export function getBestStarXIBenchSelection(
 
   for (const { position } of demandOrder) {
     const player = benchCandidates
-      .filter((candidate) => !selectedIds.has(candidate.id) && canStarXIPlayerPlayPosition(candidate, position))
+      .filter((candidate) => !selectedIds.has(candidate.id) && !(isDedicatedStarXIGoalkeeper(candidate) && selectedBenchPlayers.some(isDedicatedStarXIGoalkeeper)) && canStarXIPlayerPlayPosition(candidate, position))
       .sort((first, second) => candidateScore(second, position) - candidateScore(first, position) || compareStarXIPlayers(first, second))[0];
     if (player) selectPlayer(player);
   }
@@ -1772,7 +1837,7 @@ export function getStarXIEffectiveMatchRating(ownedIds: string[], lineupIds: str
 }
 
 export function getStarPack(id: string) {
-  return STAR_PACKS.find((pack) => pack.id === id);
+  return [...STAR_PACKS,...REWARD_PACKS].find((pack) => pack.id === id);
 }
 
 export function getTournament(id: string) {
@@ -1913,30 +1978,16 @@ export function getCupMatchStrength(cup: CupState, starRating: number) {
 
 export function openStarPack(packId: StarPackId, ownedIds: string[], random = Math.random, formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS): StarPackOpening {
   const pack = getStarPack(packId) ?? getStarPack("scout")!;
+  if(isRewardPack(pack.id)) {
+    const groups=getRewardPackOdds(pack.id);let cursor=0;const roll=boundedRandom(random);
+    const group=groups.find(o=>(cursor+=o.chance)>roll)??groups.at(-1)!;
+    const player=group.players[Math.min(group.players.length-1,Math.floor(boundedRandom(random)*group.players.length))];
+    const duplicate=ownedIds.includes(player.id);
+    return {packId:pack.id,packName:pack.label,player,duplicate,fragmentCompensation:duplicate?getStarXIFragmentCompensation(player):0};
+  }
   if (pack.id === 'scrap') {
     const owned = new Set(ownedIds);
-    const unowned = SCRAP_PLAYERS.filter(p => !owned.has(p.id));
-    let pool = unowned.length ? unowned : SCRAP_PLAYERS;
-    const before = getBestStarXISelection(ownedIds, formationPositions).filter(Boolean).length;
-    if (before < STAR_XI_SQUAD_SIZE) {
-      // Augmenting-path matching measures usable slots, including multi-position players.
-      const countSlots = (players: StarXIPlayer[]) => {
-        const slots: (StarXIPlayer | undefined)[] = Array.from({ length: STAR_XI_SQUAD_SIZE });
-        const place = (player: StarXIPlayer, seen: Set<number>): boolean => {
-          for (let slot = 0; slot < slots.length; slot++) {
-            if (seen.has(slot) || !canStarXIPlayerPlayPosition(player, formationPositions[slot] ?? STAR_XI_FORMATION_POSITIONS[slot])) continue;
-            seen.add(slot);
-            if (!slots[slot] || place(slots[slot]!, seen)) { slots[slot] = player; return true; }
-          }
-          return false;
-        };
-        return players.reduce((count, player) => count + Number(place(player, new Set())), 0);
-      };
-      const players = [...owned].map(getStarXIPlayer).filter((p): p is StarXIPlayer => Boolean(p));
-      const useful = pool.filter(p => !owned.has(p.id) && countSlots([...players, p]) > before);
-      if (useful.length) pool = useful;
-    }
-    const player = pool[Math.floor(boundedRandom(random) * pool.length)];
+    const player = drawScrapPlayer(SCRAP_PLAYERS, random);
     const duplicate = owned.has(player.id);
     return { packId: pack.id, packName: pack.label, player, duplicate, fragmentCompensation: duplicate ? getStarXIFragmentCompensation(player) : 0 };
   }
@@ -2569,6 +2620,8 @@ export function initialMissions() {
 export function initialGameFeatures(now = Date.now()): GameFeatures {
   return {
     schemaVersion: GAME_FEATURES_SCHEMA_VERSION,
+    earnedPacks: [],
+    completedTournamentRuns: [],
     travel: emptyTravel(),
     career: initialCareerState(),
     transferMarket: { offerIds: ["turbo", "wall", "maestro"], ownedIds: [] },
@@ -2892,12 +2945,14 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
   });
   return {
     schemaVersion: GAME_FEATURES_SCHEMA_VERSION,
+    completedTournamentRuns: Array.isArray(source.completedTournamentRuns)?[...new Set(source.completedTournamentRuns.filter((id):id is string=>typeof id==='string'))]:[],
+    earnedPacks: (Array.isArray(source.earnedPacks)?source.earnedPacks:[]).map(asRecord).filter(p=>typeof p.id==='string'&&isRewardPack(String(p.packId))).filter((p,i,a)=>a.findIndex(x=>x.id===p.id)===i).map(p=>{const saved=asRecord(p.opening),player=getStarXIPlayer(String(asRecord(saved.player).id));return {id:String(p.id),packId:p.packId as RewardPackId,earnedAt:Number(p.earnedAt)||0,...(player?{opening:{packId:p.packId as RewardPackId,packName:getStarPack(String(p.packId))!.label,player,duplicate:saved.duplicate===true,fragmentCompensation:Math.max(0,Number(saved.fragmentCompensation)||0)}}:{})};}),
     travel: normalizeTravel(source.travel),
     career: normalizeCareerState(source.career, [...normalizedStarXI.ownedIds, ...loans.map(loan => loan.playerId)], { ...defaults.cup, ...cup, allTimeScorers, allTimeAppearances, playerEnteredAt, matchEvents, active } as CupState),
     transferMarket: { offerIds: offerIds.length ? offerIds : defaults.transferMarket.offerIds, ownedIds: [...new Set(ownedIds)] },
     starXI: normalizedStarXI,
     club: { name: clubName, badge: CLUB_BADGES.includes(String(club.badge)) ? String(club.badge) : defaults.club.badge, color: CLUB_COLORS.includes(String(club.color)) ? String(club.color) : defaults.club.color },
-    cup: { careerRatingSeed: Number.isFinite(Number(cup.careerRatingSeed)) && Number(cup.careerRatingSeed) > 0 ? Number(cup.careerRatingSeed) : matchStartedAt, careerMatchId: typeof cup.careerMatchId === "string" ? cup.careerMatchId.slice(0, 200) : undefined, careerBonuses: Object.fromEntries(Object.entries(asRecord(cup.careerBonuses)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Number(value), -2, 5)])), active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && Boolean(lastInjury), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
+    cup: { fixture: cup.fixture && typeof cup.fixture==='object' ? cup.fixture as CupState['fixture'] : undefined, careerRatingSeed: Number.isFinite(Number(cup.careerRatingSeed)) && Number(cup.careerRatingSeed) > 0 ? Number(cup.careerRatingSeed) : matchStartedAt, careerMatchId: typeof cup.careerMatchId === "string" ? cup.careerMatchId.slice(0, 200) : undefined, careerBonuses: Object.fromEntries(Object.entries(asRecord(cup.careerBonuses)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Number(value), -2, 5)])), active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && Boolean(lastInjury), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
     seasonMode: normalizedSeasonMode,
     goalBoost,
     missions,
@@ -3073,8 +3128,21 @@ export function publishTournamentGazette(value: GameFeatures, summary: Tournamen
 
 export function completeTournamentRun(value: GameFeatures, summary: TournamentCompletionSummary, now = Date.now(), random: () => number = Math.random) {
   let features = finishActiveTransferLoans(value, now).features;
+  const runId=`${summary.tournamentId}:${features.cup.matchStartedAt}`;
+  if(features.completedTournamentRuns.includes(runId))return features;
+  features.completedTournamentRuns.push(runId);
+  if(summary.tournamentWon){
+    const pack=getTournamentRewardPack(summary.tournamentId);
+    features.earnedPacks.push({id:runId,packId:pack.id as RewardPackId,earnedAt:now});
+    addHistory(features,{title:`${pack.label} gewonnen`,detail:'Deine Prämie wartet im Packbereich.',tone:'positive'},now);
+  }
   features = startTransferDeadlineDay(features, now, random);
   return publishTournamentGazette(features, summary, now, random).features;
+}
+
+export function getEligibleEventPlayers(features:GameFeatures,position?:StarPosition) {
+ const unavailable=new Set([...getUnavailableStarXIPlayerIds(features),...features.cup.sentOffPlayerIds]);
+ return [...new Set([...features.starXI.lineupIds,...features.starXI.benchIds])].filter(id=>features.starXI.ownedIds.includes(id)&&!unavailable.has(id)).map(getStarXIPlayer).filter((p):p is StarXIPlayer=>Boolean(p)&&(!position||p!.positions.includes(position)));
 }
 
 export function getLoanedStarXIPlayerIds(features: GameFeatures) {

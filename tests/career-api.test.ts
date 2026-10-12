@@ -45,7 +45,7 @@ test('API album reward is persisted once and visible to both room members',async
 });
 test('API kickoff snapshots form and special bonuses, tick finishes with awards and derby reward only once',async()=>{
  let f=initialGameFeatures();f.starXI=setBestStarXI({...f.starXI,ownedIds:STAR_XI_PLAYERS.map(p=>p.id)});f=normalizeGameFeatures(f);
- const player=f.starXI.lineupIds[1];f.career.players[player]={...emptyPlayerStats(),recent:[8,8,8,8,8],appearances:25};f.career.milestoneCards[player]=['loyal'];f.seasonMode.matchday=9;f.career.seasonMatches=9;f.travel.journey=createJourney(fixtureFor(f,'season'),Date.now()-180000,()=>.9);setup(f);
+ const player=f.starXI.lineupIds[1];f.career.players[player]={...emptyPlayerStats(),recent:[8,8,8,8,8],appearances:25};f.career.milestoneCards[player]=['loyal'];f.seasonMode.matchday=9;f.career.seasonMatches=9;if(fixtureFor(f,'season').away)f.travel.journey=createJourney(fixtureFor(f,'season'),Date.now()-180000,()=>.9);setup(f);
  const started=await action('cup-start',{mode:'season'});assert.equal(started.status,200,JSON.stringify(started.data));
  let current=started.data.room.game.features;assert.ok(current.cup.careerMatchId);assert.ok((current.cup.careerBonuses?.[player] ?? 0)>0);
  current.cup.homeScore=2;current.cup.awayScore=0;current.cup.lastTickAt=current.cup.matchEndsAt;current.cup.matchStartedAt=Date.now()-180001;current.cup.matchEndsAt=Date.now()-1;
@@ -76,15 +76,22 @@ test('API scrap purchases charge exactly once under concurrent requests, persist
  const old=await action('star-pack',{packId:'scrap',protocol:4});assert.equal(old.status,426);assert.equal(row.sharedCoins,7500);
  const results=await Promise.all([action('star-pack',{packId:'scrap'}),action('star-pack',{packId:'scrap'},'guest-player-123')]);
  assert.equal(results.filter(r=>r.status===200).length,1);assert.equal(row.sharedCoins,0);
- const saved=JSON.parse(row.sharedFeaturesJson);assert.equal(saved.starXI.ownedIds.length,1);assert.equal(saved.starPackReveal.packId,'scrap');assert.ok(saved.starPackReveal.player.rating<=64);
+ const saved=JSON.parse(row.sharedFeaturesJson);assert.equal(saved.starXI.ownedIds.length,1);assert.equal(saved.starPackReveal.packId,'scrap');assert.ok(saved.starPackReveal.player.rating<=69);assert.equal(saved.starPackReveal.player.countryCode,'IN');
  const fail=await action('star-pack',{packId:'scrap'});assert.notEqual(fail.status,200);assert.equal(row.sharedCoins,0);assert.equal(JSON.parse(row.sharedFeaturesJson).starXI.ownedIds.length,1);
 });
-test('API fresh weak eleven can actually start and finish a season game after eleven saved purchases',async()=>{
- setup();row.sharedCoins=82500;
- for(let i=0;i<11;i++) {const result=await action('star-pack',{packId:'scrap'});assert.equal(result.status,200,JSON.stringify(result.data));assert.equal(row.sharedCoins,82500-(i+1)*7500);assert.equal(result.data.room.game.features.starXI.ownedIds.length,i+1);}
+test('API random scrap purchases allow duplicates and persist a playable team for a season game',async()=>{
+ setup();row.sharedCoins=7500*500;
+ let purchases=0;
+ while(purchases<500){
+  const result=await action('star-pack',{packId:'scrap'});assert.equal(result.status,200,JSON.stringify(result.data));purchases++;
+  assert.equal(row.sharedCoins,7500*(500-purchases));
+  const saved=result.data.room.game.features;
+  assert.ok(saved.starXI.ownedIds.length<=purchases);
+  if(saved.starXI.lineupIds.filter(Boolean).length===11)break;
+ }
  let f=normalizeGameFeatures(JSON.parse(row.sharedFeaturesJson));assert.equal(f.starXI.lineupIds.filter(Boolean).length,11);
  // Existing away-travel requirement is preserved; complete that same journey.
- f.travel.journey=createJourney(fixtureFor(f,'season'),Date.now()-180000,()=>.9);row.sharedFeaturesJson=JSON.stringify(f);
+ if(fixtureFor(f,'season').away)f.travel.journey=createJourney(fixtureFor(f,'season'),Date.now()-180000,()=>.9);row.sharedFeaturesJson=JSON.stringify(f);
  const started=await action('cup-start',{mode:'season'});assert.equal(started.status,200,JSON.stringify(started.data));assert.equal(started.data.room.game.features.cup.active,true);
  f=started.data.room.game.features;f.cup.homeScore=1;f.cup.awayScore=0;f.cup.lastTickAt=f.cup.matchEndsAt;f.cup.matchStartedAt=Date.now()-180001;f.cup.matchEndsAt=Date.now()-1;row.sharedFeaturesJson=JSON.stringify(f);
  const finished=await action('cup-tick');assert.equal(finished.status,200);assert.equal(finished.data.room.game.features.cup.active,false);assert.equal(finished.data.room.game.features.career.reports.length,1);

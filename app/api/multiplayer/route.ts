@@ -2,7 +2,7 @@ import { fixtureFor, travelGate, consumeTravel, eligibilityError, settleTravel }
 import { claimAllAlbumRewards, claimAlbumReward, prepareCareerMatch, recordCareerMatch } from "../../career-data";
 import { getDb } from "../../../db";
 import type { RoomRow, RoomUpdate } from "../../../db";
-import { activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, CUP_STRATEGIES, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupStrategy, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentGoalBoostMultiplier, getTransferBonuses, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, startTournamentGoalBoost, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE } from "../../feature-data";
+import { activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, CUP_STRATEGIES, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupStrategy, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentGoalBoostMultiplier, getTournamentRewardPack, isRewardPack, openEarnedPack, getRewardPackOdds, getTransferBonuses, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, startTournamentGoalBoost, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE } from "../../feature-data";
 import type { GameFeatures, PenaltyDirection, StarFormationId, StarPackReveal } from "../../feature-data";
 import { isSupportedMultiplayerProtocol, MULTIPLAYER_UPDATE_MESSAGE } from "../../multiplayer-protocol";
 import { getFormationUnlockSeason, getPackUnlockSeason, getTournamentUnlockSeason, getUpgradeUnlockSeason, isSeasonContentUnlocked, MAX_CAREER_SEASON } from "../../season-progression";
@@ -796,7 +796,7 @@ export async function POST(request: Request) {
 
     if (action === "star-best-lineup") {
       if (game.features.cup.active) return jsonError("Während eines Pokalspiels kann die Startelf nicht automatisch geändert werden.", 409);
-      game.features.starXI = setBestStarXI(game.features.starXI, getUnavailableStarXIPlayerIds(game.features));
+      game.features.starXI = setBestStarXI(game.features.starXI, getUnavailableStarXIPlayerIds(game.features), { career: game.features.career, cup: game.features.cup });
       const selectedCount = game.features.starXI.lineupIds.filter(Boolean).length;
       if (!selectedCount) return jsonError("Du hast noch keine passenden Spieler im Kader.", 409);
       addHistory(game.features, { title: "Beste Startelf aufgestellt", detail: `${selectedCount} von ${STAR_XI_SQUAD_SIZE} Positionen mit den stärksten passenden Spielern besetzt.`, tone: "positive" });
@@ -817,10 +817,17 @@ export async function POST(request: Request) {
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 
+    if(action==='reward-pack') {
+      const id=typeof (payload as unknown as {rewardId?:string}).rewardId==='string'?(payload as unknown as {rewardId:string}).rewardId:'';
+      const reveal=openEarnedPack(game.features,id,Date.now());
+      if(!reveal)return jsonError('Diese Prämie wurde bereits geöffnet oder ist nicht verfügbar.',409);
+      return persistGameResponse(db,room,game,timestamp,playerId,role,{}, {packReveal:reveal});
+    }
+
     if (action === "star-pack") {
       const packId = typeof payload.packId === "string" ? payload.packId : "";
       const pack = getStarPack(packId);
-      if (!pack) return jsonError("Dieses Pack gibt es nicht.");
+      if (!pack || isRewardPack(pack.id)) return jsonError("Dieses Pack gibt es nicht im Shop.");
       const packUnlockSeason = getPackUnlockSeason(pack.id);
       if (!isSeasonContentUnlocked(packUnlockSeason, game.seasons, testMode)) return jsonError(`Dieses Pack wird in Saison ${packUnlockSeason} freigeschaltet.`, 409);
       if (game.features.cup.active) return jsonError("Während eines Pokalspiels keine Packs öffnen.", 409);
@@ -945,12 +952,12 @@ export async function POST(request: Request) {
           recordMultiplayerSeasonMatch(game, cupNow);
         } else {
           recordCareerMatch(game.features, cupNow);
-          if (result.tournamentWon) game.features.goalBoost = startTournamentGoalBoost(game.features.cup.tournamentId, cupNow);
+
           const tournament = getTournament(game.features.cup.tournamentId);
-          const tournamentBoost = getTournamentGoalBoostMultiplier(game.features.cup.tournamentId);
+
           addHistory(game.features, {
             title: result.tournamentWon ? `${tournament?.trophyName ?? "Pokal"} gewonnen` : result.won ? `Runde ${result.completedRound} gewonnen` : `Turnieraus gegen ${result.opponent}`,
-            detail: result.tournamentWon ? `Elfmeterschiessen gewonnen · Trophäe erhalten · ${String(tournamentBoost).replace(".", ",")}× Goalboost für 03:00` : result.cup.pendingNextRound ? result.cup.suspendedPlayerIds.length ? "Elfmeterschiessen gewonnen · Gesperrten Spieler ersetzen und nächste Partie manuell starten" : "Elfmeterschiessen gewonnen · Aufstellung anpassen und nächste Partie manuell starten" : result.nextRoundStarted ? `Elfmeterschiessen gewonnen · Runde ${result.completedRound + 1} läuft bereits` : "Im Elfmeterschiessen ausgeschieden.",
+            detail: result.tournamentWon ? `Elfmeterschiessen gewonnen · Trophäe erhalten · ${getTournamentRewardPack(result.cup.tournamentId).label}` : result.cup.pendingNextRound ? result.cup.suspendedPlayerIds.length ? "Elfmeterschiessen gewonnen · Gesperrten Spieler ersetzen und nächste Partie manuell starten" : "Elfmeterschiessen gewonnen · Aufstellung anpassen und nächste Partie manuell starten" : result.nextRoundStarted ? `Elfmeterschiessen gewonnen · Runde ${result.completedRound + 1} läuft bereits` : "Im Elfmeterschiessen ausgeschieden.",
             tone: result.won ? "positive" : "negative",
           });
           if (result.runEnded) game.features = completeTournamentRun(game.features, { tournamentId: result.cup.tournamentId, tournamentWon: result.tournamentWon, completedRound: result.completedRound, opponent: result.opponent, homeScore: result.cup.homeScore, awayScore: result.cup.awayScore, tieBreak: result.tieBreak }, cupNow);
@@ -974,12 +981,12 @@ export async function POST(request: Request) {
           recordMultiplayerSeasonMatch(game, cupNow);
         } else {
           recordCareerMatch(game.features, cupNow);
-          if (result.tournamentWon) game.features.goalBoost = startTournamentGoalBoost(game.features.cup.tournamentId, cupNow);
+
           const tournament = getTournament(game.features.cup.tournamentId);
-          const tournamentBoost = getTournamentGoalBoostMultiplier(game.features.cup.tournamentId);
+
           addHistory(game.features, {
             title: result.tournamentWon ? `${tournament?.trophyName ?? "Pokal"} gewonnen` : result.won ? `Runde ${result.completedRound} gewonnen` : `Turnieraus gegen ${result.opponent}`,
-            detail: result.tournamentWon ? `Trophäe erhalten · ${String(tournamentBoost).replace(".", ",")}× Goalboost für 03:00` : result.cup.pendingNextRound ? result.cup.suspendedPlayerIds.length ? "Rote Karte · Gesperrten Spieler ersetzen und nächste Partie manuell starten" : "Aufstellung anpassen und nächste Partie manuell starten" : result.nextRoundStarted ? `Runde ${result.completedRound + 1} läuft bereits` : "Der nächste Turnierlauf kommt bestimmt.",
+            detail: result.tournamentWon ? `Trophäe erhalten · ${getTournamentRewardPack(result.cup.tournamentId).label}` : result.cup.pendingNextRound ? result.cup.suspendedPlayerIds.length ? "Rote Karte · Gesperrten Spieler ersetzen und nächste Partie manuell starten" : "Aufstellung anpassen und nächste Partie manuell starten" : result.nextRoundStarted ? `Runde ${result.completedRound + 1} läuft bereits` : "Der nächste Turnierlauf kommt bestimmt.",
             tone: result.won ? "positive" : "negative",
           });
           if (result.runEnded) game.features = completeTournamentRun(game.features, { tournamentId: result.cup.tournamentId, tournamentWon: result.tournamentWon, completedRound: result.completedRound, opponent: result.opponent, homeScore: result.cup.homeScore, awayScore: result.cup.awayScore, tieBreak: result.tieBreak }, cupNow);

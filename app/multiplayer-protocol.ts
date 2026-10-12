@@ -1,4 +1,4 @@
-export const MULTIPLAYER_PROTOCOL_VERSION = 5;
+export const MULTIPLAYER_PROTOCOL_VERSION = 7;
 
 export const MULTIPLAYER_UPDATE_MESSAGE = "Eine neue Goal Clicker Version ist verfügbar. Lade die Seite einmal neu. Dein Raum und Spielstand bleiben vollständig erhalten.";
 
