@@ -179,7 +179,7 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
   if (c.active || !c.matchStartedAt) return features;
   const id = c.careerMatchId || `career-${c.matchStartedAt}-${c.mode}-${c.opponent}`;
   if (career.processedMatchIds.includes(id)) return features;
-  const minute = c.penaltyEvents.length || c.matchEndsAt-c.matchStartedAt > 180000 ? 120 : 90;
+  const minute = c.phase === "extra-time" || c.phase === "penalties" ? 120 : 90;
   const players = Object.keys(c.playerEnteredAt).map(playerId => getMatchRatingBreakdown(c,playerId,minute)).filter((p): p is PlayerMatchReport => Boolean(p));
   const ranked = [...players].filter(p => p.minutes >= 15).sort((a,b) => b.rating-a.rating || b.goals-a.goals || b.assists-a.assists || a.playerId.localeCompare(b.playerId));
   const motmId = ranked[0]?.playerId ?? null;

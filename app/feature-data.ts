@@ -440,11 +440,12 @@ export function getCupRegularDurationMs(cup: Pick<CupState, "matchStartedAt" | "
   return total > 300000 ? CUP_MATCH_DURATION_MS : 180000;
 }
 
-export function getCupMatchMinute(cup: Pick<CupState, "matchStartedAt" | "matchEndsAt" | "phase">, now: number) {
+export function getCupMatchMinute(cup: Pick<CupState, "matchStartedAt" | "matchEndsAt" | "phase"> & Partial<Pick<CupState, "matchPaused" | "lastTickAt" | "active">>, now: number) {
   if (!cup.matchStartedAt) return 1;
   if (cup.phase === "penalties") return 120;
   const regular = getCupRegularDurationMs(cup);
-  const elapsed = Math.max(0, now - cup.matchStartedAt);
+  const at = (cup.matchPaused || cup.active === false) && cup.lastTickAt ? cup.lastTickAt : now;
+  const elapsed = Math.max(0, Math.min(at, cup.matchEndsAt) - cup.matchStartedAt);
   if (cup.phase === "regular" || elapsed <= regular)
     return Math.max(1, Math.min(90, Math.floor(elapsed / (regular / 90)) + 1));
   return Math.max(91, Math.min(120, 90 + Math.floor((elapsed - regular) / ((regular / 3) / 30)) + 1));
@@ -2412,7 +2413,7 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
   let currentStarRating = starRating;
   let matchMomentum = clamp(Number(cup.matchMomentum) || 0, -CUP_MAX_MOMENTUM, CUP_MAX_MOMENTUM);
   let matchPaused = false;
-  let processedUntil = endAt;
+  let processedUntil = from;
   const getScoringChances = (liveStarRating: number) => {
     const liveStrength = getCupMatchStrength(cup, liveStarRating);
     const liveStrengthDifference = liveStrength.teamStrength - liveStrength.opponentStrength;
@@ -2492,7 +2493,7 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
       matchEvents = [...matchEvents, lastGoal].slice(-40);
     }
   }
-  const nextCup = { ...cup, homeScore, awayScore, lastTickAt: matchPaused ? processedUntil : endAt, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, playerExitedAt, allTimeScorers, lastResult, matchMomentum: Math.round(matchMomentum * 10) / 10, matchPaused };
+  const nextCup = { ...cup, homeScore, awayScore, lastTickAt: processedUntil, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, playerExitedAt, allTimeScorers, lastResult, matchMomentum: Math.round(matchMomentum * 10) / 10, matchPaused };
   const liveBaseResult = getCupBaseResult(cup, currentStarRating);
   if (matchPaused) return { cup: nextCup, ...liveBaseResult };
   if (now < cup.matchEndsAt) return { cup: nextCup, ...liveBaseResult };
