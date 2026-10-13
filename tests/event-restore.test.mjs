@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("restored VAR and special events are presented as a full takeover", async () => {
+test("restored VAR and special events are presented without applying rewards again", async () => {
   const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const restoreBlock = pageSource.slice(
     pageSource.indexOf("const next: GameState"),

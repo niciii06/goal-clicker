@@ -1817,11 +1817,12 @@ export type CupSubstitutionImpact = {
   momentumDelta: number;
 };
 
-export function applyCupSubstitution(cup: CupState, outgoingPlayerId: string | undefined, incomingPlayerId: string, minute: number): CupSubstitutionImpact {
+export function applyCupSubstitution(cup: CupState, outgoingPlayerId: string | undefined, incomingPlayerId: string, minute: number, now = Date.now()): CupSubstitutionImpact {
   const incoming = getStarXIPlayer(incomingPlayerId);
   const outgoing = outgoingPlayerId ? getStarXIPlayer(outgoingPlayerId) : undefined;
   if (!incoming || !outgoing) return { cup, incomingRating: incoming?.rating ?? 0, outgoingRating: outgoing?.rating ?? 0, ratingDelta: 0, outgoingMatchRating: 6.5, momentumDelta: 0 };
 
+  cup = resumeCupMatch(cup, now);
   const substitutionMinute = Math.max(1, Math.min(120, Math.floor(Number(minute) || 1)));
   const outgoingMatchRating = getCupPlayerMatchRating(cup, outgoing.id, substitutionMinute) ?? 6.5;
   const ratingDelta = incoming.rating - outgoing.rating;
@@ -2537,9 +2538,19 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
   };
 }
 
-export function resumeCupMatch(value: CupState) {
+// Shift the timeline when resuming, so an injury pause never catches up unseen play.
+export function shiftCupTimeline(value: CupState, duration: number): CupState {
+  if (duration <= 0) return value;
+  return {...value, matchStartedAt:value.matchStartedAt+duration, matchEndsAt:value.matchEndsAt+duration, lastTickAt:value.lastTickAt+duration,
+    careerRatingSeed:value.careerRatingSeed ?? value.matchStartedAt,
+    lastGoal:value.lastGoal ? {...value.lastGoal,createdAt:value.lastGoal.createdAt+duration}:null,
+    lastInjury:value.lastInjury ? {...value.lastInjury,createdAt:value.lastInjury.createdAt+duration}:null,
+    matchEvents:value.matchEvents.map(e=>({...e,createdAt:e.createdAt+duration})),cardEvents:value.cardEvents.map(e=>({...e,createdAt:e.createdAt+duration})),injuryEvents:value.injuryEvents.map(e=>({...e,createdAt:e.createdAt+duration})),penaltyEvents:value.penaltyEvents.map(e=>({...e,createdAt:e.createdAt+duration})),
+    broadcast:value.broadcast ? {...value.broadcast,events:value.broadcast.events.map(e=>({...e,at:e.at+duration}))} : value.broadcast};
+}
+export function resumeCupMatch(value: CupState, now = Date.now()) {
   if (!value.active || !value.matchPaused) return value;
-  return { ...value, matchPaused: false, lastResult: "Die Partie läuft weiter. Die medizinische Abteilung beobachtet den Rest von der Seitenlinie." };
+  return { ...shiftCupTimeline(value,Math.max(0,now-value.lastTickAt)), matchPaused: false, lastResult: "Die Partie läuft weiter. Die medizinische Abteilung beobachtet den Rest von der Seitenlinie." };
 }
 
 const PENALTY_DIRECTIONS: readonly PenaltyDirection[] = ["left", "center", "right"];
@@ -3005,9 +3016,7 @@ export function pauseGameFeatureTimers(value: unknown, pausedMs: number, now = D
   features.nextVarAt += duration;
   features.transferSaga.nextAt += duration;
   if (features.cup.active) {
-    features.cup.matchStartedAt += duration;
-    features.cup.matchEndsAt += duration;
-    features.cup.lastTickAt += duration;
+    features.cup = shiftCupTimeline(features.cup, duration);
   }
   const pausedAt = now - duration;
   if (features.goalBoost.endsAt > pausedAt) {

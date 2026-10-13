@@ -74,13 +74,14 @@ test("season mode uses the live match flow and table results instead of goal tar
   assert.doesNotMatch(apiSource, /seasonTarget|seasonPath/);
 });
 
-test("season match results open a large standings takeover", async () => {
+test("season match results use an inline expandable standings panel", async () => {
   const [pageSource, featureSource] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(pageSource, /season-standings-takeover/);
+  assert.match(pageSource, /inline-standings/);
+  assert.doesNotMatch(pageSource, /season-standings-takeover/);
   assert.match(pageSource, /displayGame\.features\.seasonMode\.lastTable/);
   assert.match(pageSource, /TOR-DIFF\./);
   assert.match(pageSource, /formatGoalDifference\(team\)/);

@@ -163,3 +163,16 @@ test('viewer renders accessible pitch and correct home scoreboard after normaliz
   const html=renderToStaticMarkup(createElement(LiveMatchViewer,{features:f,now:1_080_000,clubName:"Club",clubColor:"#0071e3"}));
   assert.ok(html.includes('1 : 2'));assert.ok(html.includes('role="img"'));assert.ok(html.includes('viewBox="-3 -3 111 74"'));
 });
+
+test('injury resume retains match minute, remaining duration, fitness and recorded scenes without catching up paused time', async()=>{
+ const {resumeCupMatch,applyCupSubstitution,pauseGameFeatureTimers}=await import('../app/feature-data.ts');
+ const f=completeFixture();f.cup.lastTickAt=1080000;f.cup.matchPaused=true;
+ const beforeMinute=getCupMatchMinute(f.cup,1080000),remaining=f.cup.matchEndsAt-f.cup.lastTickAt;
+ const resumed=resumeCupMatch(f.cup,1280000);
+ assert.equal(getCupMatchMinute(resumed,1280000),beforeMinute);assert.equal(resumed.matchEndsAt-1280000,remaining);assert.equal(resumed.matchPaused,false);
+ assert.equal(resumed.careerMatchId,f.cup.careerMatchId);assert.equal(resumed.careerRatingSeed,f.cup.careerRatingSeed);
+ const sub=applyCupSubstitution(f.cup,f.starXI.lineupIds[3],f.starXI.benchIds.find(Boolean)!,beforeMinute,1280000).cup;
+ assert.equal(getCupMatchMinute(sub,1280000),beforeMinute);assert.equal(sub.matchPaused,false);
+ f.cup.matchEvents=[{id:'paused-goal',side:'home',scorerId:f.starXI.lineupIds[10],scorer:'Player',minute:19,createdAt:1076000,homeScore:1,awayScore:0,ratingImpacts:{}}];
+ const restored=pauseGameFeatureTimers(f,20000,1100000);assert.equal(restored.cup.matchEvents[0].createdAt,1096000);assert.equal(restored.cup.matchEvents[0].minute,19);
+});

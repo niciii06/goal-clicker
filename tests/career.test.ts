@@ -134,3 +134,21 @@ test('penalty shootouts settle rivalry wins but never count shootout goals as ca
  f.cup.penaltyEvents=[{id:'pen',side:'home',playerId:f.starXI.lineupIds[0],player:'P',direction:'left',keeperDirection:'right',outcome:'goal',createdAt:1,homeScore:5,awayScore:4,homeTaken:5,awayTaken:5}];
  recordCareerMatch(f);const rival=f.career.rivals[rivalryKey(f.cup.opponent)];assert.equal(rival.wins,1);assert.equal(rival.draws,0);assert.equal(Object.values(f.career.players).reduce((n,s)=>n+s.goals,0),1);
 });
+
+test('archive evicts only the oldest detail after eleven completions and keeps cumulative stats across save restoration',()=>{
+ const f=fixture();finishFixture(f);
+ for(let i=1;i<=11;i++){f.cup.careerMatchId=`archive-${i}`;recordCareerMatch(f,1200000+i*1000);}
+ assert.equal(f.career.reports.length,10);assert.equal(f.career.reports[0].id,'archive-2');assert.equal(f.career.reports.at(-1)?.id,'archive-11');
+ const player=f.cup.originalLineupIds[0];assert.equal(f.career.players[player].appearances,11);
+ const restored=normalizeGameFeatures(JSON.parse(JSON.stringify(f)));
+ assert.deepEqual(restored.career.reports,f.career.reports);assert.equal(restored.career.players[player].appearances,11);
+ recordCareerMatch(restored,1400000);assert.equal(restored.career.reports.length,10);assert.equal(restored.career.players[player].appearances,11);
+});
+
+test('eight-report legacy saves retain available data and the historical panel vanishes during live play',()=>{
+ const f=fixture();finishFixture(f);
+ for(let i=0;i<8;i++){f.cup.careerMatchId=`legacy-${i}`;recordCareerMatch(f,1200000+i*1000);}
+ const old=JSON.parse(JSON.stringify(f));for(const r of old.career.reports){delete r.events;delete r.startingIds;delete r.benchIds;delete r.competition;}
+ const restored=normalizeGameFeatures(old);assert.equal(restored.career.reports.length,8);assert.equal(restored.career.reports[0].events,undefined);
+ restored.cup.active=true;assert.equal(renderToStaticMarkup(React.createElement(MatchRatingsPanel,{features:restored,minute:30})), '');
+});

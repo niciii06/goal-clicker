@@ -104,10 +104,10 @@ test('motion has bounded acceleration and speeds, removes departed actors and ne
  motion.step(frame.actors.slice(1),1/60,f.cup,6,'normal');assert.ok(!motion.bodies.has(frame.actors[0].id));assert.equal(JSON.stringify(f),before);
 });
 
-test('complete viewer exposes both lineups, canvas, cameras and direct controls with accessible labels',()=>{
+test('compact viewer exposes three tabs, canvas, cameras and one substitution entry point',()=>{
  const f=fixture();f.cup.broadcast=createMatchBroadcast(f.cup);
  const html=renderToStaticMarkup(createElement(LiveMatchViewer,{features:f,now:1030000,clubName:'Testclub',clubColor:'#0071e3',onTactic:()=>{},onSubstitute:()=>{}}));
- assert.ok(html.includes('<canvas'));assert.ok(html.includes('Grosse Spielansicht'));assert.ok(html.includes('Ball verfolgen'));assert.ok(html.includes('Highlight-Kamera'));assert.equal((html.match(/gc-team-list/g)??[]).length,2);assert.ok(html.includes(f.cup.broadcast.opponentXI[0].name));
+ assert.ok(html.includes('<canvas'));assert.ok(html.includes('Grosse Spielansicht'));assert.ok(html.includes('Ball verfolgen'));assert.ok(html.includes('Highlight-Kamera'));assert.equal((html.match(/role="tab"/g)??[]).length,3);assert.ok(html.includes('MATCH'));assert.ok(html.includes('TEAM'));assert.ok(html.includes('STATISTIK'));assert.ok(html.includes('Auswechslungen'));assert.equal((html.match(/gc-team-list/g)??[]).length,0);
 });
 
 test('pitch geometry draws both goals, penalty areas and centre circle through a canvas context',()=>{

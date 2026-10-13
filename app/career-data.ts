@@ -1,10 +1,11 @@
-import { addHistory, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, STAR_XI_PLAYERS, SCRAP_PLAYERS } from './feature-data';
+import { addHistory, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, STAR_XI_PLAYERS, SCRAP_PLAYERS } from './feature-data';
 import type { CupState, GameFeatures, SeasonMatchHistoryEntry, StarXIPlayer } from './feature-data';
 
 export type PlayerCareerStats = { appearances: number; minutes: number; goals: number; assists: number; ratingTotal: number; ratedMatches: number; motm: number; subAppearances: number; subRatingTotal: number; subMinutes: number; recent: number[] };
 export type RatingReason = { label: string; value: number };
 export type PlayerMatchReport = { playerId: string; rating: number; minutes: number; goals: number; assists: number; substitute: boolean; reasons: RatingReason[] };
-export type CareerMatchReport = { id: string; opponent: string; homeScore: number; awayScore: number; mode: 'season' | 'tournament'; createdAt: number; motmId: string | null; derby: boolean; derbyReward: number; players: PlayerMatchReport[] };
+export type ArchivedMatchEvent = { id: string; minute: number; label: string };
+export type CareerMatchReport = { away?: boolean; competition?: string; events?: ArchivedMatchEvent[]; penaltyScore?: string; startingIds?: string[]; benchIds?: string[]; id: string; opponent: string; homeScore: number; awayScore: number; mode: 'season' | 'tournament'; createdAt: number; motmId: string | null; derby: boolean; derbyReward: number; players: PlayerMatchReport[] };
 export type AwardWinner = { playerId: string; value: string } | null;
 export type SeasonAwards = { id: string; division: number; seasonNumber: number; matchesTracked: number; createdAt: number; best: AwardWinner; scorer: AwardWinner; joker: AwardWinner; disappointment: AwardWinner };
 export type Rivalry = { opponent: string; played: number; wins: number; draws: number; losses: number; goalsFor: number; goalsAgainst: number; closeGames: number; active: boolean; lastResults: string[]; lastPlayedAt: number };
@@ -112,13 +113,13 @@ export function normalizeCareerState(value: unknown, knownIds: readonly string[]
   }
   function winner(raw: unknown): AwardWinner { const w = object(raw); return typeof w.playerId === 'string' && getStarXIPlayer(w.playerId) ? { playerId: w.playerId, value: text(w.value, 100) } : null; }
   next.awards = (Array.isArray(source.awards) ? source.awards : []).slice(-20).map(raw => { const a = object(raw); return { id: text(a.id, 200), division: Math.max(1, integer(a.division, 20)), seasonNumber: Math.max(1, integer(a.seasonNumber)), matchesTracked: integer(a.matchesTracked, 10), createdAt: number(a.createdAt, 1e15), best: winner(a.best), scorer: winner(a.scorer), joker: winner(a.joker), disappointment: winner(a.disappointment) }; }).filter(a => a.id);
-  next.reports = (Array.isArray(source.reports) ? source.reports : []).slice(-8).map(raw => {
+  next.reports = (Array.isArray(source.reports) ? source.reports : []).slice(-10).map(raw => {
     const r = object(raw);
     const players: PlayerMatchReport[] = (Array.isArray(r.players) ? r.players : []).slice(0, 16).map(rawPlayer => {
       const p = object(rawPlayer), playerId = text(p.playerId);
       return { playerId, rating: Math.max(4.5, number(p.rating, 10)), minutes: integer(p.minutes, 120), goals: integer(p.goals, 40), assists: integer(p.assists, 40), substitute: p.substitute === true, reasons: (Array.isArray(p.reasons) ? p.reasons : []).slice(0, 12).map(rawReason => { const reason = object(rawReason), n = Number(reason.value); return { label: text(reason.label, 100), value: Number.isFinite(n) ? Math.max(-10, Math.min(10, n)) : 0 }; }) };
     }).filter(p => getStarXIPlayer(p.playerId));
-    return { id: text(r.id, 200), opponent: text(r.opponent, 80), homeScore: integer(r.homeScore, 40), awayScore: integer(r.awayScore, 40), mode: r.mode === 'season' ? 'season' as const : 'tournament' as const, createdAt: number(r.createdAt, 1e15), motmId: typeof r.motmId === 'string' && players.some(p => p.playerId === r.motmId) ? r.motmId : null, derby: r.derby === true, derbyReward: integer(r.derbyReward, 400), players };
+    return { away: typeof r.away === 'boolean' ? r.away : undefined, competition: text(r.competition, 120) || undefined, penaltyScore: text(r.penaltyScore, 30) || undefined, startingIds: Array.isArray(r.startingIds) ? validIds(r.startingIds) : undefined, benchIds: Array.isArray(r.benchIds) ? validIds(r.benchIds) : undefined, events: Array.isArray(r.events) ? r.events.slice(-200).map(raw => { const e = object(raw); return { id: text(e.id,200), minute: integer(e.minute,120), label: text(e.label,240) }; }).filter(e => e.id) : undefined, id: text(r.id, 200), opponent: text(r.opponent, 80), homeScore: integer(r.homeScore, 40), awayScore: integer(r.awayScore, 40), mode: r.mode === 'season' ? 'season' as const : 'tournament' as const, createdAt: number(r.createdAt, 1e15), motmId: typeof r.motmId === 'string' && players.some(p => p.playerId === r.motmId) ? r.motmId : null, derby: r.derby === true, derbyReward: integer(r.derbyReward, 400), players };
   }).filter(r => r.id);
   return next;
 }
@@ -205,7 +206,13 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
       addHistory(features, { title: `${m.label}-Karte freigeschaltet`, detail: `${getStarXIPlayer(p.playerId)?.name} · ${m.target} ${MILESTONE_METRIC_LABELS[m.metric]}. Die stärkste Version ist automatisch aktiv.`, tone: 'positive' });
     }
   }
-  career.reports = [...career.reports,{ id, opponent: c.opponent, homeScore: c.homeScore, awayScore: c.awayScore, mode: c.mode, createdAt: now, motmId, derby: old.active, derbyReward, players }].slice(-8);
+  const events: ArchivedMatchEvent[] = [
+    ...c.matchEvents.map(e => ({ id:e.id, minute:e.minute, label:`⚽ ${e.scorer}` })),
+    ...c.cardEvents.map(e => ({ id:e.id, minute:e.minute, label:`🟥 ${e.player} · ${e.reason}` })),
+    ...c.injuryEvents.map(e => ({ id:e.id, minute:e.minute, label:`🩹 ${e.player} · ${e.reason}` })),
+    ...(c.broadcast?.events ?? []).filter(e => ['substitution','yellow','var'].includes(e.kind)).map(e => ({id:e.id, minute:e.minute, label:`${e.kind} · ${e.player}`})),
+  ].sort((a,b)=>a.minute-b.minute);
+  career.reports = [...career.reports,{ away:c.fixture?.away, competition:c.mode === 'season' ? `Saison ${career.seasonNumber}` : getTournament(c.tournamentId)?.label, penaltyScore:c.penaltyEvents.length ? `${c.penaltyHomeScore}:${c.penaltyAwayScore}` : undefined, startingIds:[...c.originalLineupIds], benchIds:[...c.originalBenchIds], events, id, opponent: c.opponent, homeScore: c.homeScore, awayScore: c.awayScore, mode: c.mode, createdAt: now, motmId, derby: old.active, derbyReward, players }].slice(-10);
   career.processedMatchIds = [...career.processedMatchIds,id].slice(-100);
   if (c.mode === 'season') {
     career.seasonMatches += 1;
