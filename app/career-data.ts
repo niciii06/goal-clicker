@@ -1,3 +1,5 @@
+import { goalLabel } from './match-goals';
+import { recordedActionRating } from './match-broadcast';
 import { addHistory, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, STAR_XI_PLAYERS, SCRAP_PLAYERS } from './feature-data';
 import type { CupState, GameFeatures, SeasonMatchHistoryEntry, StarXIPlayer } from './feature-data';
 
@@ -165,7 +167,9 @@ export function getMatchRatingBreakdown(cup: CupState, playerId: string, minute:
   if (assists) reasons.push({ label: `${assists} ${assists === 1 ? 'Vorlage' : 'Vorlagen'}`, value: assistValue });
   if (faultValue) reasons.push({ label: 'Beteiligung an Gegentoren', value: faultValue });
   if (cleanValue) reasons.push({ label: 'Ohne Gegentor auf dem Platz', value: cleanValue });
-  const rounding = rating - base - goalValue - assistValue - faultValue - cleanValue;
+  const actions=recordedActionRating(cup,playerId,end);
+  if(actions)reasons.push({label:'Erfasste Aktionen: Zuspiele, Schüsse, Paraden und Karten',value:actions});
+  const rounding = rating - base - goalValue - assistValue - faultValue - cleanValue - actions;
   if (Math.abs(rounding) > .00001) reasons.push({ label: 'Rundung und Notengrenzen (4.5 bis 10)', value: rounding });
   if (cup.cardEvents.some(e => e.playerId === playerId)) reasons.push({ label: 'Rote Karte: Team geschwächt, Einsatz beendet', value: 0 });
   if (cup.injuryEvents.some(e => e.playerId === playerId)) reasons.push({ label: 'Verletzungsbedingtes Einsatzende', value: 0 });
@@ -207,7 +211,7 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
     }
   }
   const events: ArchivedMatchEvent[] = [
-    ...c.matchEvents.map(e => ({ id:e.id, minute:e.minute, label:`⚽ ${e.scorer}` })),
+    ...c.matchEvents.map(e => ({ id:e.id, minute:e.minute, label:`⚽ ${goalLabel(e,false)}` })),
     ...c.cardEvents.map(e => ({ id:e.id, minute:e.minute, label:`🟥 ${e.player} · ${e.reason}` })),
     ...c.injuryEvents.map(e => ({ id:e.id, minute:e.minute, label:`🩹 ${e.player} · ${e.reason}` })),
     ...(c.broadcast?.events ?? []).filter(e => ['substitution','yellow','var'].includes(e.kind)).map(e => ({id:e.id, minute:e.minute, label:`${e.kind} · ${e.player}`})),

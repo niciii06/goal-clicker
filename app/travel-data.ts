@@ -7,7 +7,7 @@ import type { JourneyPlan } from './journey-routing';
 export type TravelFixture = { id: string; mode: 'season'|'tournament'; tournamentId: TournamentId; opponentId: string; opponent: string; away: boolean; region: number; venue: Venue; schedule: string[] };
 export type TravelEvent = { id: string; text: string; template?: string; playerId?:string; at: number; delta: number };
 export type Journey = { plan?: JourneyPlan; origin?: Venue; id: string; fixture: TravelFixture; startedAt: number; baseMs: number; endsAt: number; transport: 'walk'|'bike'|'car'|'bus'|'train'|'plane'; km: number; events: TravelEvent[]; consumed: boolean; counted?: boolean };
-export type TravelStats = { trips: number; km: number; countries: string[]; furthest: { opponent: string; km: number } | null; opponents: Record<string,{name:string;trips:number}> };
+export type TravelStats = { recentEvents?: string[]; trips: number; km: number; countries: string[]; furthest: { opponent: string; km: number } | null; opponents: Record<string,{name:string;trips:number}> };
 export type TravelState = { journey: Journey|null; stats: TravelStats };
 export const emptyTravel = (): TravelState => ({journey:null,stats:{trips:0,km:0,countries:[],furthest:null,opponents:{}}});
 export function normalizeTravel(value: unknown): TravelState {
@@ -16,7 +16,7 @@ export function normalizeTravel(value: unknown): TravelState {
  const valid=Boolean(j && typeof j.id==='string' && j.fixture && typeof j.fixture.id==='string' && j.fixture.venue && Number.isFinite(j.fixture.venue.lat) && Math.abs(j.fixture.venue.lat)<=85 && Number.isFinite(j.fixture.venue.lon) && Math.abs(j.fixture.venue.lon)<=180 && typeof j.fixture.opponent==='string' && typeof j.fixture.venue.city==='string' && ['walk','bike','car','bus','train','plane'].includes(j.transport) && Number.isFinite(j.startedAt) && Number.isFinite(j.baseMs) && j.baseMs>0 && Number.isFinite(j.endsAt) && j.endsAt>j.startedAt && Array.isArray(j.events) && j.events.length<=2 && j.events.every(e=>Number.isFinite(e.at)&&e.at>=0&&Number.isFinite(e.delta)&&Math.abs(e.delta)<=15000));
  const planValid=!j?.plan || validPlan(j.plan,j.baseMs)&&Math.abs(j.endsAt-j.startedAt-j.baseMs)<2;
  const s=src.stats, n=(v:unknown)=>Math.max(0,Number.isFinite(Number(v))?Number(v):0);
- return {journey: valid && planValid ? structuredClone(j) : null, stats: s ? {trips:Math.floor(n(s.trips)),km:n(s.km),countries:Array.isArray(s.countries)?[...new Set(s.countries.filter(c=>typeof c==='string').slice(0,80))]:[],furthest:s.furthest&&typeof s.furthest.opponent==='string'?{opponent:s.furthest.opponent.slice(0,100),km:n(s.furthest.km)}:null,opponents:Object.fromEntries(Object.entries(s.opponents||{}).slice(0,200).filter(([,v])=>v&&typeof v.name==='string').map(([k,v])=>[k,{name:v.name.slice(0,100),trips:Math.floor(n(v.trips))}]))} : emptyTravel().stats};
+ return {journey: valid && planValid ? structuredClone(j) : null, stats: s ? {recentEvents:Array.isArray(s.recentEvents)?s.recentEvents.filter(e=>typeof e==='string').slice(-8):[],trips:Math.floor(n(s.trips)),km:n(s.km),countries:Array.isArray(s.countries)?[...new Set(s.countries.filter(c=>typeof c==='string').slice(0,80))]:[],furthest:s.furthest&&typeof s.furthest.opponent==='string'?{opponent:s.furthest.opponent.slice(0,100),km:n(s.furthest.km)}:null,opponents:Object.fromEntries(Object.entries(s.opponents||{}).slice(0,200).filter(([,v])=>v&&typeof v.name==='string').map(([k,v])=>[k,{name:v.name.slice(0,100),trips:Math.floor(n(v.trips))}]))} : emptyTravel().stats};
 }
 export function fixtureFor(features: GameFeatures, mode: 'season'|'tournament', tournamentId: TournamentId='stadium'): TravelFixture {
  if (mode==='season') {
@@ -48,32 +48,49 @@ export function travelTiming(fixture:TravelFixture) {
  const transport:Journey['transport']=plan.segments.some(s=>s.mode==='plane')?'plane':plan.segments.some(s=>s.mode==='train')?'train':'bus';
  return {km,transport,baseMs:Math.round(gameSeconds(plan.realSeconds,plan.acceleration)*1000),category,plan};
 }
-const EVENTS: readonly {id:string;text:string;delta:number;modes:readonly Journey['transport'][]}[] = [
+const EVENTS: readonly {id:string;text:string;delta:number;modes:readonly Journey['transport'][];phase?:'airport'|'station'|'arrival'}[] = [
  {id:'shoelace',text:'Die Mannschaft bindet synchron die Schuhe.',delta:0,modes:['walk','bike','car']},
  {id:'route',text:'Der Trainer erklärt den kürzesten Weg zur taktischen Meisterleistung.',delta:0,modes:['walk','bike','car']},
  {id:'bundesrat',text:'Der Bundesrat hat den Teambus zugeparkt.',delta:8,modes:['bus']},
- {id:'pass',text:'{player} hat den Reisepass vergessen.',delta:12,modes:['plane']},
+ {id:'pass',phase:'airport',text:'{player} hat den Reisepass vergessen.',delta:12,modes:['plane']},
  {id:'shortcut',text:'Der Busfahrer kennt eine Abkürzung.',delta:-10,modes:['bus']},
- {id:'fabrizio',text:'Fabrizio Romario sitzt plötzlich im Gepäckraum.',delta:0,modes:['bus','train','plane']},
  {id:'mikeboy',text:'{player} schläft im Gepäckfach.',delta:0,modes:['bus','train','plane']},
  {id:'olten',text:'Die Mannschaft nimmt versehentlich den Zug nach Olten.',delta:15,modes:['train']},
  {id:'pilot',text:'Der Pilot ist YB-Fan und gibt Vollgas.',delta:-10,modes:['plane']},
- {id:'kebab',text:'Die Mannschaft bestellt 47 Döner am Flughafen.',delta:5,modes:['plane']},
+ {id:'kebab',phase:'airport',text:'Die Mannschaft bestellt 47 Döner am Flughafen.',delta:5,modes:['plane']},
  {id:'walking',text:'Der Trainer hat Google Maps auf Fussweg gestellt.',delta:8,modes:['bus','train']},
- {id:'var',text:'Das Flughafenpersonal verlangt einen VAR-Check beim Boarding.',delta:0,modes:['plane']},
+ {id:'var',phase:'airport',text:'Das Flughafenpersonal verlangt einen VAR-Check beim Boarding.',delta:0,modes:['plane']},
  {id:'ticket',text:'{player} diskutiert mit dem Kontrolleur über die Taktik.',delta:5,modes:['train']},
  {id:'green',text:'Alle Ampeln sind grün. Der Chauffeur fühlt sich wie ein Rennfahrer.',delta:-5,modes:['bus']},
  {id:'snacks',text:'{player} hat sämtliche Snacks schon vor der Abfahrt gegessen.',delta:0,modes:['bus','train','plane']},
  {id:'express',text:'Der Lokführer erklärt den Zug spontan zum AZB-Express.',delta:-8,modes:['train']},
+ {id:'roadworks',text:'Eine Baustelle zwingt den Teambus auf eine kleine Umleitung.',delta:0,modes:['bus','car']},
+ {id:'exit',text:'Der Chauffeur nimmt fast die falsche Ausfahrt. Der Trainer rettet die Route.',delta:0,modes:['bus','car']},
+ {id:'playlist',text:'{player} verteidigt seine Playlist gegen den Rest der Mannschaft.',delta:0,modes:['bus','train','plane']},
+ {id:'headphones',text:'{player} merkt, dass die Kopfhörer noch zuhause liegen.',delta:0,modes:['bus','train','plane']},
+ {id:'crowded',text:'Der Zug ist voll. Die Mannschaft verteilt sich auf zwei Wagen.',delta:0,modes:['train']},
+ {id:'platform',text:'Gleisänderung: Die Mannschaft wechselt rechtzeitig das Perron.',delta:0,modes:['train'],phase:'station'},
+ {id:'connection',text:'Der Anschlusszug wartet bereits. Alle finden ihren Wagen.',delta:0,modes:['train'],phase:'station'},
+ {id:'security',text:'Bei der Sicherheitskontrolle bildet sich eine kurze Schlange.',delta:0,modes:['plane'],phase:'airport'},
+ {id:'gate',text:'Gateänderung: Die Mannschaft folgt der neuen Anzeige.',delta:0,modes:['plane'],phase:'airport'},
+ {id:'baggage',text:'{player} verwechselt kurz seine Tasche mit dem Materialkoffer.',delta:0,modes:['plane'],phase:'airport'},
+ {id:'parking',text:'Der Ordner zeigt dem Teambus den richtigen Stadionparkplatz.',delta:0,modes:['bus','car','train','plane'],phase:'arrival'},
+ {id:'fans',text:'Ein paar Fans begrüssen die Mannschaft vor dem Stadion.',delta:0,modes:['bus','car','train','plane'],phase:'arrival'},
+ {id:'entrance',text:'Der Trainer findet nach kurzer Suche den Spielereingang.',delta:0,modes:['bus','car','train','plane'],phase:'arrival'},
 ];
 export function createJourney(fixture:TravelFixture,now:number,random=Math.random,features?:GameFeatures):Journey {
  if(!fixture.away)throw new Error('Für Heimspiele ist keine Reise nötig.');
  const timing=travelTiming(fixture),events:TravelEvent[]=[],players=features?getEligibleEventPlayers(features):[];
- const pool=EVENTS.filter(e=>e.modes.includes(timing.transport)&&(!e.text.includes('{player}')||players.length));
- if(random()<.5&&pool.length){const count=random()<.15?2:1;for(let i=0;i<count&&pool.length;i++){
-  const e=pool.splice(Math.min(pool.length-1,Math.floor(random()*pool.length)),1)[0];
+ const recent=features?.travel.stats.recentEvents??[];
+ if(random()<.5){const count=timing.baseMs>30000&&random()<.15?2:1;for(let i=0;i<count;i++){
+  const at=Math.round(timing.baseMs*(i===0?.3:.9)),stage=timing.plan?segmentAt(timing.plan,at/1000):null;
+  const mode=stage?.segment.mode==='wait'?timing.transport:stage?.segment.mode??timing.transport;
+  const phase=stage?.segment.mode==='wait'?(timing.transport==='plane'?'airport':'station'):stage&&stage.index===(timing.plan?.segments.length??0)-1&&stage.fraction>.6?'arrival':undefined;
+  const candidates=EVENTS.filter(e=>e.modes.includes(mode as Journey['transport'])&&(!e.phase||e.phase===phase)&&(!e.text.includes('{player}')||players.length)&&!events.some(v=>v.id===e.id));
+  const fresh=candidates.filter(e=>!recent.includes(e.id)),pool=fresh.length?fresh:candidates;if(!pool.length)continue;
+  const e=pool[Math.min(pool.length-1,Math.floor(random()*pool.length))];
   const player=players.length?players[Math.min(players.length-1,Math.floor(random()*players.length))]:null;
-  events.push({id:e.id,template:e.text,playerId:player?.id,text:e.text.replace('{player}',player?.name??'Die Mannschaft'),at:Math.round(timing.baseMs*(i===0?.3:.6)),delta:0});
+  events.push({id:e.id,template:e.text,playerId:player?.id,text:e.text.replace('{player}',player?.name??'Die Mannschaft'),at,delta:0});
  }}
  return {plan:timing.plan,id:fixture.id,origin:HOME_VENUE,fixture:{...fixture,region:timing.category},startedAt:now,baseMs:timing.baseMs,endsAt:now+timing.baseMs,transport:timing.transport,km:timing.km,events,consumed:false};
 }
@@ -94,7 +111,7 @@ export function settleTravel(state: TravelState, now:number): TravelState {
  const j=state.journey;if(!j||j.consumed||now<j.endsAt)return state;
  // counted marker is stored on the journey independently of match consumption.
  const marked=j as Journey & {counted?:boolean};if(marked.counted)return state;
- const stats=structuredClone(state.stats);stats.trips++;stats.km+=j.km;
+ const stats=structuredClone(state.stats);stats.recentEvents=[...(stats.recentEvents??[]),...j.events.map(e=>e.id)].slice(-8);stats.trips++;stats.km+=j.km;
  if(!stats.countries.includes(j.fixture.venue.country))stats.countries.push(j.fixture.venue.country);
  if(!stats.furthest||j.km>stats.furthest.km)stats.furthest={opponent:j.fixture.opponent,km:j.km};
  const o=stats.opponents[`${j.fixture.venue.id}:${j.fixture.opponent}`]||{name:j.fixture.opponent,trips:0};stats.opponents[`${j.fixture.venue.id}:${j.fixture.opponent}`]={name:o.name,trips:o.trips+1};

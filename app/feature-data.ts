@@ -1,4 +1,4 @@
-import { advanceMatchBroadcast, addBroadcastSubstitution, normalizeMatchBroadcast, chooseGoalPattern, createMatchBroadcast } from './match-broadcast';
+import { recordedActionRating, advanceMatchBroadcast, addBroadcastSubstitution, normalizeMatchBroadcast, chooseGoalPattern, createMatchBroadcast } from './match-broadcast';
 import type { MatchBroadcast, GoalPattern } from './match-broadcast';
 import type { Venue } from './travel-geography';
 import { normalizeTravel, emptyTravel } from './travel-data';
@@ -105,6 +105,8 @@ export type CupState = {
 };
 
 export type CupGoalEvent = {
+  assistId?: string | null;
+  assistName?: string;
   pattern?: GoalPattern;
   id: string;
   side: "home" | "away";
@@ -1571,7 +1573,8 @@ export function getStarXISelectionRating(player: StarXIPlayer, context: StarXIEv
     ? cup.careerBonuses?.[player.id] : undefined;
   const base = Math.min(100, player.rating + (prepared ?? (form + card)));
   const live = currentMatch ? getCupPlayerMatchRating(cup, player.id, context.minute ?? 1) : null;
-  return base + (live !== null && Number.isFinite(live) ? (live - 6.5) * 2.8 : 0);
+  const fitness=currentMatch?cup.broadcast?.fitness[player.id]??100:100;
+  return base-Math.max(0,100-fitness)*.045+(live !== null && Number.isFinite(live) ? (live - 6.5) * 2.8 : 0);
 }
 
 /**
@@ -1805,7 +1808,7 @@ export function getCupPlayerMatchRating(cup: CupState, playerId: string, minute:
   const cleanSheetBoost = concededWhilePlaying === 0
     ? playedProgress * (position === "TW" ? 0.42 : position === "IV" || position === "LV" || position === "LAV" || position === "RV" || position === "RAV" ? 0.3 : position === "ZDM" ? 0.14 : 0)
     : 0;
-  return getStarXIPlayerMatchRating(playerId, cup.careerRatingSeed ?? cup.matchStartedAt, effectiveMinute, 0, enteredAtMinute, eventImpact + cleanSheetBoost, position);
+  return getStarXIPlayerMatchRating(playerId, cup.careerRatingSeed ?? cup.matchStartedAt, effectiveMinute, 0, enteredAtMinute, eventImpact + cleanSheetBoost + recordedActionRating(cup,playerId,effectiveMinute), position);
 }
 
 export type CupSubstitutionImpact = {
@@ -2240,23 +2243,27 @@ function selectWeightedPlayer(candidates: { player: StarXIPlayer; weight: number
   return candidates[candidates.length - 1]?.player;
 }
 
+function matchAttribute(player:StarXIPlayer,key:string){
+ const stats=player.originalAttributes?.stats as Record<string,{value:number}>|undefined;
+ return Number.isFinite(stats?.[key]?.value)?stats![key].value:player.rating;
+}
 function selectHomeScorer(homePlayers: readonly StarXIPlayer[], cup: CupState, minute: number, random: () => number, formationPositions: readonly StarPosition[], matchEvents: readonly CupGoalEvent[]) {
   if (!homePlayers.length) return undefined;
   const liveCup = { ...cup, matchEvents: [...matchEvents] };
   const candidates = homePlayers.map((player, index) => {
-    const position = formationPositions[index] ?? STAR_XI_FORMATION_POSITIONS[index] ?? player.position;
+    const position = cup.playerMatchPositions[player.id] ?? formationPositions[index] ?? player.position;
     const skill = 0.4 + ((clamp(player.rating, 67, 100) - 67) / 33) ** 1.7 * 1.6;
     const form = clamp(0.55 + ((getCupPlayerMatchRating(liveCup, player.id, minute) ?? 6.4) - 5) * 0.25, 0.55, 1.7);
-    return { player, weight: GOAL_POSITION_WEIGHTS[position] * skill * form };
+    return { player, weight: GOAL_POSITION_WEIGHTS[position] * skill * form * clamp(1+(matchAttribute(player,'finishing')-player.rating)/100,.7,1.3) };
   });
   return selectWeightedPlayer(candidates, random);
 }
 
-function selectHomeAssist(homePlayers: readonly StarXIPlayer[], scorerId: string | undefined, formationPositions: readonly StarPosition[], random: () => number) {
+function selectHomeAssist(homePlayers: readonly StarXIPlayer[], scorerId: string | undefined, formationPositions: readonly StarPosition[], random: () => number,cup:CupState) {
   const candidates = homePlayers.filter((player) => player.id !== scorerId).map((player) => {
     const index = homePlayers.findIndex((candidate) => candidate.id === player.id);
-    const position = formationPositions[index] ?? player.position;
-    return { player, weight: ASSIST_POSITION_WEIGHTS[position] * (0.7 + player.rating / 100) };
+    const position = cup.playerMatchPositions[player.id] ?? formationPositions[index] ?? player.position;
+    return { player, weight: ASSIST_POSITION_WEIGHTS[position] * (0.7 + matchAttribute(player,'shortPassing') / 100) };
   });
   return selectWeightedPlayer(candidates, random);
 }
@@ -2424,8 +2431,11 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
   const getScoringChances = (liveStarRating: number) => {
     const liveStrength = getCupMatchStrength(cup, liveStarRating);
     const liveStrengthDifference = liveStrength.teamStrength - liveStrength.opponentStrength;
-    const homeExpectedGoals = clamp(0.55 + liveStrength.teamStrength * 0.014 + liveStrengthDifference * 0.07, 0.15, 5.2);
-    const awayExpectedGoals = clamp(0.55 + liveStrength.opponentStrength * 0.014 - liveStrengthDifference * 0.07, 0.15, 5.2);
+    const technical=activeHomePlayers.reduce((n,p)=>n+(matchAttribute(p,'finishing')+matchAttribute(p,'shortPassing')+matchAttribute(p,'dribbling')-p.rating*3)/3,0)/Math.max(1,activeHomePlayers.length);
+    const backline=activeHomePlayers.filter(p=>['TW','IV','LV','RV','ZDM'].includes(cup.playerMatchPositions[p.id]??p.position));
+    const defence=backline.reduce((n,p)=>n+matchAttribute(p,p.position==='TW'?'gkReflexes':'standingTackle')-p.rating,0)/Math.max(1,backline.length);
+    const homeExpectedGoals = clamp(0.55 + liveStrength.teamStrength * 0.014 + liveStrengthDifference * 0.07 + clamp(technical*.008,-.15,.15), 0.15, 5.2);
+    const awayExpectedGoals = clamp(0.55 + liveStrength.opponentStrength * 0.014 - liveStrengthDifference * 0.07 - clamp(defence*.008,-.15,.15), 0.15, 5.2);
     return { homeChance: homeExpectedGoals / regularSeconds, awayChance: awayExpectedGoals / regularSeconds };
   };
   let { homeChance, awayChance } = getScoringChances(currentStarRating);
@@ -2484,18 +2494,19 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
     if (roll < homeChance) {
       homeScore += 1;
       const scorer = selectHomeScorer(activeHomePlayers, cup, minute, random, formationPositions, matchEvents);
-      const assist = selectHomeAssist(activeHomePlayers, scorer?.id, formationPositions, random);
+      const assist = selectHomeAssist(activeHomePlayers, scorer?.id, formationPositions, random,cup);
       const ratingImpacts: Record<string, number> = {};
       if (scorer) ratingImpacts[scorer.id] = 0.7;
       if (assist) ratingImpacts[assist.id] = (ratingImpacts[assist.id] ?? 0) + 0.25;
-      lastGoal = { id: `${goalAt}-${homeScore}-${awayScore}-home`, side: "home", scorerId: scorer?.id ?? null, scorer: scorer?.name ?? "Dein Club", minute, createdAt: goalAt, homeScore, awayScore, ratingImpacts };
+      lastGoal = { id: `${goalAt}-${homeScore}-${awayScore}-home`, side: "home", scorerId: scorer?.id ?? null, scorer: scorer?.name ?? "Dein Club", minute, createdAt: goalAt, homeScore, awayScore, ratingImpacts, assistId: assist?.id??null, assistName: assist?.name };
       lastGoal.pattern = chooseGoalPattern(lastGoal.id, scorer ? cup.playerMatchPositions[scorer.id] ?? scorer.position : "ST");
+      if(lastGoal.pattern==='penalty'||lastGoal.pattern==='rebound'){if(assist)delete lastGoal.ratingImpacts[assist.id];lastGoal.assistId=null;lastGoal.assistName=undefined;}
       matchEvents = [...matchEvents, lastGoal].slice(-40);
       if (scorer) allTimeScorers[scorer.id] = (allTimeScorers[scorer.id] ?? 0) + 1;
     } else if (roll < homeChance + awayChance) {
       awayScore += 1;
       const opponentRoster = cup.broadcast?.opponentXI ?? createMatchBroadcast(cup).opponentXI;
-      const opponentScorers = opponent.scorers.length ? opponent.scorers : opponentRoster.filter(p=>["ST","LF","RF","ZOM","MS"].includes(p.position)).map(p=>p.name);
+      const opponentScorers = opponentRoster.filter(p=>["ST","LF","RF","ZOM","MS"].includes(p.position)).map(p=>p.name);
       const scorer = opponentScorers[Math.floor(Math.max(0, Math.min(0.999999, random())) * opponentScorers.length)] ?? cup.opponent;
       const ratingImpacts = getConcededGoalRatingImpacts(activeHomePlayers, formationPositions, random);
       lastGoal = { pattern: chooseGoalPattern(`${goalAt}-${awayScore}-away`, "ST"), id: `${goalAt}-${homeScore}-${awayScore}-away`, side: "away", scorerId: opponentRoster.find(p=>p.name===scorer)?.id ?? null, scorer, minute, createdAt: goalAt, homeScore, awayScore, ratingImpacts };
@@ -2613,7 +2624,7 @@ export function resolveCupPenalty(cup: CupState, starRating: number, direction: 
     const goalkeeperIndex = formationPositions.findIndex((position) => position === "TW");
     const goalkeeper = homePlayers[goalkeeperIndex] ?? homePlayers.find((player) => player.positions.includes("TW"));
     const opponentRoster = cup.broadcast?.opponentXI ?? createMatchBroadcast(cup).opponentXI;
-      const opponentScorers = opponent.scorers.length ? opponent.scorers : opponentRoster.filter(p=>["ST","LF","RF","ZOM","MS"].includes(p.position)).map(p=>p.name);
+      const opponentScorers = opponentRoster.filter(p=>["ST","LF","RF","ZOM","MS"].includes(p.position)).map(p=>p.name);
     const playerName = opponentScorers[penaltyAwayTaken % opponentScorers.length] ?? cup.opponent;
     const sameDirection = shotDirection === direction;
     const opponentSkill = clamp((cup.opponentRating - 55) / 44, 0, 1);
@@ -2727,6 +2738,8 @@ function normalizeCupGoalEvent(value: unknown): CupGoalEvent | null {
     homeScore: Math.max(0, Math.floor(Number(source.homeScore) || 0)),
     awayScore: Math.max(0, Math.floor(Number(source.awayScore) || 0)),
     ratingImpacts,
+    assistId:source.assistId===null?null:typeof source.assistId==='string'&&getStarXIPlayer(source.assistId)?source.assistId:undefined,
+    assistName:typeof source.assistName==='string'?source.assistName.slice(0,120):undefined,
   };
 }
 

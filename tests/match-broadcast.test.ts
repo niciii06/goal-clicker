@@ -99,7 +99,7 @@ test('motion has bounded acceleration and speeds, removes departed actors and ne
  let previous=motion.step(frame.actors,1/60,f.cup,6,'normal');
  for(let i=0;i<180;i++){
   const target=frame.actors.map(p=>({...p,x:Math.min(102,p.x+40)}));const next=motion.step(target,1/60,f.cup,6,'normal');
-  next.forEach((p,j)=>assert.ok(Math.hypot(p.x-previous[j].x,p.y-previous[j].y)<=8/60));previous=next;
+  next.forEach((p,j)=>assert.ok(Math.hypot(p.x-previous[j].x,p.y-previous[j].y)<=12/60));previous=next;
  }
  motion.step(frame.actors.slice(1),1/60,f.cup,6,'normal');assert.ok(!motion.bodies.has(frame.actors[0].id));assert.equal(JSON.stringify(f),before);
 });
@@ -107,7 +107,7 @@ test('motion has bounded acceleration and speeds, removes departed actors and ne
 test('compact viewer exposes three tabs, canvas, cameras and one substitution entry point',()=>{
  const f=fixture();f.cup.broadcast=createMatchBroadcast(f.cup);
  const html=renderToStaticMarkup(createElement(LiveMatchViewer,{features:f,now:1030000,clubName:'Testclub',clubColor:'#0071e3',onTactic:()=>{},onSubstitute:()=>{}}));
- assert.ok(html.includes('<canvas'));assert.ok(html.includes('Grosse Spielansicht'));assert.ok(html.includes('Ball verfolgen'));assert.ok(html.includes('Highlight-Kamera'));assert.equal((html.match(/role="tab"/g)??[]).length,3);assert.ok(html.includes('MATCH'));assert.ok(html.includes('TEAM'));assert.ok(html.includes('STATISTIK'));assert.ok(html.includes('Auswechslungen'));assert.equal((html.match(/gc-team-list/g)??[]).length,0);
+ assert.ok(html.includes('<canvas'));assert.ok(html.includes('Grosse Spielansicht'));assert.ok(html.includes('Ball verfolgen'));assert.ok(html.includes('Highlight-Kamera'));assert.equal((html.match(/role="tab"/g)??[]).length,3);assert.ok(html.includes('MATCH'));assert.ok(html.includes('TEAM'));assert.ok(html.includes('STATISTIK'));assert.ok(html.includes('Wechseln'));assert.equal((html.match(/gc-team-list/g)??[]).length,0);
 });
 
 test('pitch geometry draws both goals, penalty areas and centre circle through a canvas context',()=>{

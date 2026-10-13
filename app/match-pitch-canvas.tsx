@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { getVisualFrame } from './match-viewer';
 import type { Actor, Replay } from './match-viewer';
 import type { GameFeatures } from './feature-data';
-import { getStarXIPlayer } from './feature-data';
+import { getCupRegularDurationMs, getStarXIPlayer } from './feature-data';
 import { matchFitness } from './match-broadcast';
 export type CameraMode='full'|'follow'|'highlights';
 type Body={x:number;y:number;vx:number;vy:number};
@@ -14,18 +14,19 @@ const clamp=(x:number,a:number,b:number)=>Math.min(b,Math.max(a,x));
 export class MatchMotion {
  bodies=new Map<string,Body>();scene='';
  step(actors:Actor[],dt:number,cup:GameFeatures['cup'],minute:number,scene:string) {
-  const cut=scene!==this.scene;this.scene=scene;
+  const cut=this.scene!==''&&scene.startsWith('period:')&&this.scene.startsWith('period:')&&scene!==this.scene;this.scene=scene;
   const ids=new Set(actors.map(p=>p.id));for(const id of this.bodies.keys())if(!ids.has(id))this.bodies.delete(id);
   return actors.map(p=>{
    let b=this.bodies.get(p.id);if(!b||cut){b={x:p.x,y:p.y,vx:0,vy:0};this.bodies.set(p.id,b);return {...p};}
    const card=getStarXIPlayer(p.id)??getStarXIPlayer(cup.broadcast?.opponentXI.find(q=>q.id===p.id)?.sourceId??'');
    const pace=card?.originalAttributes?.stats?.sprintSpeed?.value??card?.rating??70;
-   const speed=(p.goalkeeper?4:4.9+pace*.025)*(.65+.35*matchFitness(cup,p.id,minute)/100);
+   const timeScale=360000/getCupRegularDurationMs(cup);
+   const speed=(p.goalkeeper?5:8+pace*.035)*timeScale*(.65+.35*matchFitness(cup,p.id,minute)/100);
    const dx=p.x-b.x,dy=p.y-b.y,d=Math.hypot(dx,dy),desired=Math.min(speed,d*3);
    let vx=d>0?dx/d*desired:0,vy=d>0?dy/d*desired:0;
    for(const [id,q] of this.bodies){if(id===p.id)continue;const sx=b.x-q.x,sy=b.y-q.y,n=Math.hypot(sx,sy);if(n>.05&&n<2.9){vx+=sx/n*(2.9-n)*.8;vy+=sy/n*(2.9-n)*.8;}}
    const vl=Math.hypot(vx,vy);if(vl>speed){vx*=speed/vl;vy*=speed/vl;}
-   const ax=vx-b.vx,ay=vy-b.vy,al=Math.hypot(ax,ay),max=8*dt;
+   const ax=vx-b.vx,ay=vy-b.vy,al=Math.hypot(ax,ay),max=24*timeScale*dt;
    b.vx+=al>max?ax/al*max:ax;b.vy+=al>max?ay/al*max:ay;
    b.x=clamp(b.x+b.vx*dt,1.5,103.5);b.y=clamp(b.y+b.vy*dt,1.5,66.5);
    return {...p,x:b.x,y:b.y};
@@ -56,7 +57,9 @@ export function drawMatchFrame(ctx:CanvasRenderingContext2D,frame:ReturnType<typ
     if(cup.broadcast?.events.some(e=>e.kind==='yellow'&&e.playerId===p.id&&e.minute<=frame.minute)){ctx.fillStyle='#ffe449';ctx.fillRect(p.x+1.2,p.y-2.8,.9,1.4);}
    }
    let ball={...frame.ball};
-   if(frame.ballOwnerId&&(!frame.recent||frame.recent.action)){const owner=actors.find(p=>p.id===frame.ballOwnerId),ideal=frame.actors.find(p=>p.id===frame.ballOwnerId);if(owner&&ideal){ball.x+=owner.x-ideal.x;ball.y+=owner.y-ideal.y;}}
+   if(frame.ballOwnerId&&!frame.pass&&!frame.shotFlight){const owner=actors.find(p=>p.id===frame.ballOwnerId),ideal=frame.actors.find(p=>p.id===frame.ballOwnerId);if(owner&&ideal){ball.x+=owner.x-ideal.x;ball.y+=owner.y-ideal.y;}}
+   if(frame.pass){const a=actors.find(p=>p.id===frame.pass!.fromId),b=actors.find(p=>p.id===frame.pass!.toId);if(a&&b)ball={x:a.x+(b.x-a.x)*frame.pass.progress,y:a.y+(b.y-a.y)*frame.pass.progress};}
+   if(frame.shotFlight){const a=actors.find(p=>p.id===frame.shotFlight!.fromId),ideal=frame.actors.find(p=>p.id===frame.shotFlight!.fromId);if(a&&ideal){ball.x+=(a.x-ideal.x)*(1-frame.shotFlight.progress);ball.y+=(a.y-ideal.y)*(1-frame.shotFlight.progress);}}
    ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(ball.x,ball.y+.8,1.1,.5,0,0,Math.PI*2);ctx.fill();
    ctx.fillStyle='#fff';ctx.strokeStyle='#132319';ctx.lineWidth=.23;ctx.beginPath();ctx.arc(ball.x,ball.y-frame.height*.7,.75+frame.height*.06,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#132319';ctx.beginPath();ctx.arc(ball.x-.15,ball.y-frame.height*.7-.12,.19,0,Math.PI*2);ctx.fill();
 
@@ -76,7 +79,7 @@ export function MatchPitchCanvas({features,now,replay,colours,camera,reducedMoti
    const wall=Date.now()+offset.current;
    const frame=getVisualFrame(data.features,wall,data.replay),dt=clamp((timestamp-previous)/1000,.001,.06);previous=timestamp;lastDraw=timestamp;
    const key=frame.recent&&frame.age<10?frame.recent.id:`period:${frame.minute<=45?0:frame.minute<=90?1:frame.minute<=105?2:3}`;
-   const actors=data.reducedMotion?frame.actors:motion.current.step(frame.actors,dt,data.features.cup,frame.minute,key);
+   const actors=data.reducedMotion?frame.actors:motion.current.step(frame.actors,data.features.cup.matchPaused?0:dt,data.features.cup,frame.minute,key);
    displayed.current=actors;
    const bounds=el.getBoundingClientRect(),dpi=Math.min(window.devicePixelRatio||1,2),width=Math.max(1,Math.round(bounds.width*dpi)),height=Math.max(1,Math.round(bounds.height*dpi));
    if(el.width!==width||el.height!==height){el.width=width;el.height=height;}

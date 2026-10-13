@@ -14,7 +14,7 @@ export type BroadcastEvent = { id:string; kind:BroadcastKind; side:BroadcastSide
 export type BroadcastStatistics = { shots:number; onTarget:number; saves:number; corners:number; freeKicks:number; throwIns:number; yellowCards:number; possessionSeconds:number };
 export type MatchBroadcast = { version:1; clubFormation:string; opponentFormation:string; opponentXI:MatchRosterPlayer[]; slots:Record<string,number>; shirtNumbers:Record<string,number>; fitness:Record<string,number>; fitnessMinute:number; events:BroadcastEvent[]; processedScene:number; possessionSecond:number; clubStats:BroadcastStatistics; opponentStats:BroadcastStatistics };
 export const emptyMatchStats = ():BroadcastStatistics=>({shots:0,onTarget:0,saves:0,corners:0,freeKicks:0,throwIns:0,yellowCards:0,possessionSeconds:0});
-export const broadcastSeed=(s:string)=>{let h=2166136261;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619);return (h>>>0)/4294967296;};
+export const broadcastSeed=(s:string)=>{let h=2166136261;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619);h=Math.imul(h^(h>>>16),0x85ebca6b);h=Math.imul(h^(h>>>13),0xc2b2ae35);return ((h^(h>>>16))>>>0)/4294967296;};
 const clamp=(n:number,a:number,b:number)=>Math.max(a,Math.min(b,n));
 
 const rosterCache=new Map<string,{formation:string;players:MatchRosterPlayer[]}>();
@@ -79,7 +79,7 @@ export function advanceMatchBroadcast(cup:CupState,clubPlayers:readonly StarXIPl
   const historyPlayers=Object.keys(cup.playerEnteredAt).map(id=>getStarXIPlayer(id)).filter((p):p is StarXIPlayer=>Boolean(p)).map(p=>({...p,position:cup.playerMatchPositions[p.id]??p.position}));
   const participants=side==='club'?(historyPlayers.length?historyPlayers:clubPlayers).filter(p=>(cup.playerEnteredAt[p.id]??1)<=m&&(cup.playerExitedAt[p.id]??121)>m&&!cup.cardEvents.some(e=>e.playerId===p.id&&e.minute<=m)):b.opponentXI.map(p=>({id:p.id,name:p.name,position:p.position}));
   if(!participants.length)continue;
-  const primary:BroadcastKind=roll<.13?'corner':roll<.25?'free-kick':roll<.34?'throw-in':roll<.41?'yellow':roll<.65?'shot':roll<.76?'counter':roll<.85?'wide':roll<.93?'combination':'build-up';
+  const primary:BroadcastKind=roll<.04?'corner':roll<.07?'free-kick':roll<.10?'throw-in':roll<.13?'yellow':roll<.4?'shot':roll<.60?'counter':roll<.72?'wide':roll<.86?'combination':'build-up';
   const attackers=participants.filter(p=>p.position!=='TW');
   const preferred=attackers.filter(p=>(primary==='corner'||primary==='wide'||primary==='throw-in')?['LF','RF','LM','RM','LV','RV','LAV','RAV'].includes(p.position):(primary==='shot'||primary==='counter')?['ST','MS','ZOM','ZM','LF','RF'].includes(p.position):primary==='free-kick'?['ZM','ZOM','LF','RF'].includes(p.position):true);
   const selection=preferred.length?preferred:attackers;
@@ -100,9 +100,9 @@ export function advanceMatchBroadcast(cup:CupState,clubPlayers:readonly StarXIPl
  const seconds=Math.floor(elapsed/1000);
  for(let second=b.possessionSecond??0;second<seconds;second++){
   const time=cup.matchStartedAt+second*1000;
-  const action=b.events.filter(e=>e.at<=time&&time-e.at<10000&&e.kind!=='yellow'&&e.kind!=='substitution').at(-1);
-  let side=action?.side??(Math.floor(second/48)%2===0?'club':'opponent');
-  if(action?.outcome&&action.outcome!=='wide'&&time-action.at>5000)side=side==='club'?'opponent':'club';
+  const action=b.events.filter(e=>e.at<=time&&time-e.at<regular/240&&e.kind!=='yellow'&&e.kind!=='substitution').at(-1);
+  let side=action?.side??(Math.floor(second/(regular/30000))%2===0?'club':'opponent');
+  if(action?.outcome&&action.outcome!=='wide'&&time-action.at>regular/360)side=side==='club'?'opponent':'club';
   (side==='club'?b.clubStats:b.opponentStats).possessionSeconds++;
  }
  b.possessionSecond=Math.max(b.possessionSecond??0,seconds);
@@ -120,4 +120,16 @@ export function normalizeMatchBroadcast(value:unknown):MatchBroadcast|undefined 
  const kinds:BroadcastKind[]=['build-up','counter','wide','combination','shot','corner','free-kick','throw-in','yellow','substitution'];
  const events=(Array.isArray(v.events)?v.events:[]).filter(e=>e&&typeof e.id==='string'&&kinds.includes(e.kind)&&['club','opponent'].includes(e.side)&&Number.isFinite(e.at)&&e.at>0&&Number.isFinite(e.minute)&&e.minute>=1&&e.minute<=120&&Number.isFinite(e.lane)&&Number.isFinite(e.seed)&&typeof e.playerId==='string'&&typeof e.player==='string'&&(!e.outcome||['save','wide','blocked'].includes(e.outcome))).slice(-180).map(e=>({...e,id:e.id.slice(0,220),player:e.player.slice(0,100),lane:clamp(e.lane,1,67)}));
  return {version:1,clubFormation:STAR_FORMATIONS.some(f=>f.id===v.clubFormation)?v.clubFormation:'433',opponentFormation:v.opponentFormation,opponentXI:v.opponentXI.map(p=>({...p,name:p.name.slice(0,100)})),slots:record(v.slots,0,10),shirtNumbers:record(v.shirtNumbers,1,99),fitness:record(v.fitness,0,100),fitnessMinute:clamp(Number(v.fitnessMinute)||1,1,120),events:[...new Map(events.map(e=>[e.id,e])).values()],processedScene:clamp(Number(v.processedScene)||0,0,40),possessionSecond:clamp(Number(v.possessionSecond)||0,0,480),clubStats:stats(v.clubStats),opponentStats:stats(v.opponentStats)};
+}
+
+export function recordedActionRating(cup:CupState,id:string,minute:number){
+ const entered=cup.playerEnteredAt[id]??1,end=Math.min(minute,cup.playerExitedAt[id]??minute);let value=0;
+ for(const e of cup.broadcast?.events??[]){if(e.minute<entered||e.minute>end)continue;
+  if(e.keeperId===id&&e.outcome==='save')value+=.07;
+  if(e.playerId!==id)continue;
+  if(e.kind==='yellow')value-=.08;
+  else if(e.outcome==='wide'||e.outcome==='blocked')value-=.05;
+  else if(['counter','combination','build-up','wide'].includes(e.kind))value+=.025;
+ }
+ return clamp(value,-.4,.4);
 }
