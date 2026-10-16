@@ -8,6 +8,10 @@ import { fixtureFor, journeyView, settleTravel, consumeTravel, eligibilityError,
 import type { Journey, TravelFixture } from './travel-data';
 import { TravelPanel, TravelStatsPanel, durationLabel } from './travel-panel';
 import { LiveMatchViewer } from "./match-viewer";
+import { claimDailyReward } from "./daily-reward";
+import { DailyRewardCard } from "./daily-reward-panel";
+import { answerPressConference, getPressReward } from "./press-conference";
+import { PressConferencePanel } from "./press-conference-panel";
 import { claimAllAlbumRewards, claimAlbumReward, prepareCareerMatch, recordCareerMatch, getCareerCard, rivalryKey } from "./career-data";
 import { CareerPanel, AlbumPanel, MatchRatingsPanel, CareerPlayerBadge, PostMatchSummary } from "./career-panels";
 
@@ -112,7 +116,7 @@ type CoopRoom = {
   game: GameState;
 };
 type CoopSession = { code: string; role: CoopRole; playerId: string; room: CoopRoom };
-type CoopApiResponse = { room?: CoopRoom; rooms?: CoopRoom[]; role?: CoopRole; deleted?: boolean; error?: string; errorCode?: string; packReveal?: StarPackReveal };
+type CoopApiResponse = { room?: CoopRoom; rooms?: CoopRoom[]; role?: CoopRole; deleted?: boolean; error?: string; errorCode?: string; packReveal?: StarPackReveal; dailyReward?: { amount: number; dayIndex: number; streak: number; pack: boolean }; press?: { reward: number; mood: number; fanMood: number } };
 
 type UpgradeDefinition = {
   id: string;
@@ -142,7 +146,7 @@ type GameState = {
 };
 
 type FeedEntry = { id: number; icon: IconName; text: string };
-type ClickEffect = { id: number; x: number; y: number; amount: number; critical: boolean };
+type ClickEffect = { id: number; x: number; y: number; amount: number; critical: boolean; combo: number };
 type PenaltyGame = { shots: number; goals: number; message: string; finished: boolean; reward: number };
 type DribbleGame = { sequence: PenaltyDirection[]; step: number; attempts: number; misses: number; message: string; finished: boolean; reward: number };
 type CrossbarGame = { shots: number; hits: number; message: string; finished: boolean; reward: number };
@@ -581,6 +585,37 @@ function getRank(totalGoals: number) {
   return current;
 }
 
+// Fast consecutive clicks build a combo. The multiplier never exceeds x3.
+const COMBO_WINDOW_MS = 450;
+const COMBO_LEVELS = [{ clicks: 0, multiplier: 1 }, { clicks: 15, multiplier: 2 }, { clicks: 40, multiplier: 3 }] as const;
+const VIBRATION_STORAGE_KEY = "goalClickerVibrationV1";
+
+function getComboLevel(count: number) {
+  let level: (typeof COMBO_LEVELS)[number] = COMBO_LEVELS[0];
+  for (const item of COMBO_LEVELS) if (count >= item.clicks) level = item;
+  return level;
+}
+
+function getComboProgress(count: number) {
+  const level = getComboLevel(count), next = COMBO_LEVELS.find((item) => item.clicks > count);
+  return next ? (count - level.clicks) / (next.clicks - level.clicks) : 1;
+}
+
+function canVibrate() {
+  return typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
+}
+
+function readVibrationSetting() {
+  try { return typeof window === "undefined" || localStorage.getItem(VIBRATION_STORAGE_KEY) !== "off"; } catch { return true; }
+}
+
+let vibrationOn = readVibrationSetting();
+
+function vibrate(pattern: number | number[]) {
+  if (!vibrationOn || !canVibrate()) return;
+  try { navigator.vibrate(pattern); } catch { /* Some browsers block vibration without a user gesture. */ }
+}
+
 function createClickResult(clickPower: number, lastClick: number, currentStreak: number) {
   const now = Date.now();
   const streak = now - lastClick < 1200 ? currentStreak + 1 : 1;
@@ -647,6 +682,14 @@ function App() {
   const stageRef = useRef<HTMLDivElement>(null);
   const lastClickRef = useRef(0);
   const streakRef = useRef(0);
+  const comboRef = useRef({ count: 0, last: 0 });
+  const comboTimerRef = useRef<number | null>(null);
+  const [combo, setCombo] = useState({ count: 0, multiplier: 1 });
+  const [comboBurst, setComboBurst] = useState<{ id: number; text: string } | null>(null);
+  const [vibrationEnabled, setVibrationEnabled] = useState(readVibrationSetting);
+  const [dailyBusy, setDailyBusy] = useState(false);
+  const [pressBusy, setPressBusy] = useState(false);
+  const clubGoalRef = useRef<string | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const starRevealTimerRef = useRef<number | null>(null);
@@ -1222,6 +1265,8 @@ function App() {
     const revealDuration = getStarRevealReadyDelay(reveal);
     setStarReveal(reveal);
     if (elapsed < revealDuration) {
+      const tier = getStarCardTier(reveal.player);
+      if (tier === "walkout" || tier === "icon" || tier === "legendary") vibrate([90, 50, 90, 50, 260]);
       setStarWalkoutReady(false);
       starRevealTimerRef.current = window.setTimeout(() => {
         setStarWalkoutReady(true);
@@ -1446,6 +1491,16 @@ function App() {
     }
   }
 
+  const vibrationSupported = hydrated && canVibrate();
+  useEffect(() => () => { if (comboTimerRef.current) window.clearTimeout(comboTimerRef.current); }, []);
+  const latestClubGoalId = displayGame.features.cup.matchEvents.filter((event) => event.side === "home").at(-1)?.id ?? null;
+  const liveMatch = displayGame.features.cup.active;
+  useEffect(() => {
+    // Vibrate once for every new goal of our club while the match is live; ignore goals restored from a save.
+    if (clubGoalRef.current === null) { clubGoalRef.current = latestClubGoalId ?? ""; return; }
+    if (latestClubGoalId && latestClubGoalId !== clubGoalRef.current && liveMatch) vibrate([70, 40, 140]);
+    clubGoalRef.current = latestClubGoalId ?? "";
+  }, [latestClubGoalId, liveMatch]);
   async function sendCoopAction(action: string, extra: Record<string, unknown> = {}) {
     if (!coopSession) return null;
     const run = async () => {
@@ -2346,8 +2401,41 @@ function App() {
     oscillator.stop(start + duration + 0.02);
   }
 
+  function toggleVibration() {
+    const next = !vibrationOn;
+    vibrationOn = next;
+    setVibrationEnabled(next);
+    try { localStorage.setItem(VIBRATION_STORAGE_KEY, next ? "on" : "off"); } catch { /* Storage can be unavailable. */ }
+    if (next) vibrate(40);
+    showToast(next ? "Vibration an" : "Vibration aus");
+  }
+
+  function registerCombo(now: number) {
+    const state = comboRef.current;
+    const previous = getComboLevel(state.count);
+    state.count = now - state.last <= COMBO_WINDOW_MS ? state.count + 1 : 1;
+    state.last = now;
+    const level = getComboLevel(state.count);
+    setCombo({ count: state.count, multiplier: level.multiplier });
+    if (level.multiplier > previous.multiplier) {
+      setComboBurst({ id: now, text: `COMBO x${level.multiplier}` });
+      window.setTimeout(() => setComboBurst((current) => current?.id === now ? null : current), 900);
+      playTone(level.multiplier === 3 ? 988 : 784, 0.12, "triangle", 0.045);
+      vibrate(level.multiplier === 3 ? [30, 25, 45] : 30);
+    }
+    if (comboTimerRef.current) window.clearTimeout(comboTimerRef.current);
+    comboTimerRef.current = window.setTimeout(() => {
+      const ended = getComboLevel(comboRef.current.count).multiplier;
+      comboRef.current = { count: 0, last: 0 };
+      setCombo({ count: 0, multiplier: 1 });
+      if (ended > 1) setComboBurst({ id: Date.now(), text: "Combo vorbei" });
+    }, COMBO_WINDOW_MS + 50);
+    return level.multiplier;
+  }
+
   function handleBallClick(event: MouseEvent<HTMLButtonElement>) {
-    const liveClickPower = getClickPower(displayGame.upgrades, displayGame.stars, displayGame.features, getCurrentTime());
+    const comboMultiplier = registerCombo(Date.now());
+    const liveClickPower = getClickPower(displayGame.upgrades, displayGame.stars, displayGame.features, getCurrentTime()) * comboMultiplier;
     const result = createClickResult(liveClickPower, lastClickRef.current, streakRef.current);
     lastClickRef.current = result.now;
     streakRef.current = result.streak;
@@ -2356,7 +2444,7 @@ function App() {
     const rect = stageRef.current?.getBoundingClientRect();
     const x = rect ? event.clientX - rect.left : 50;
     const y = rect ? event.clientY - rect.top : 50;
-    const effect = { id: result.effectId, x, y, amount: result.amount, critical: result.critical };
+    const effect = { id: result.effectId, x, y, amount: result.amount, critical: result.critical, combo: comboMultiplier };
     setEffects((current) => [...current, effect]);
     setTimeout(() => setEffects((current) => current.filter((item) => item.id !== effect.id)), 850);
     setPulse((value) => !value);
@@ -2494,6 +2582,7 @@ function App() {
       return;
     }
     const purchase = getBulkPurchase(upgrade, displayGame.upgrades, spendableGoals, purchaseMode, hasInfiniteMoney);
+    const isBigPurchase = purchase.count >= 10 || (!hasInfiniteMoney && purchase.totalCost >= displayGame.goals * 0.5);
     if (purchase.count === 0) {
       const nextCost = getCost(upgrade, displayGame.upgrades);
       showToast(nextCost === Infinity ? "Dieses Upgrade ist auf dem Maximum." : `${upgrade.name} kostet ${formatNumber(nextCost)} Tore.`);
@@ -2504,6 +2593,7 @@ function App() {
       try {
         const data = await sendCoopAction("buy", { upgradeId: upgrade.id, count: purchase.count });
         if (data) setCoopMessage(`${upgrade.name} wurde gemeinsam gekauft.`);
+        if (data && isBigPurchase) vibrate([35, 30, 60]);
       } finally {
         setCoopBusy(false);
       }
@@ -2515,6 +2605,69 @@ function App() {
     showToast(purchase.count === 1 ? `${upgrade.name} auf Level ${level}` : `${upgrade.name}: ${purchase.count} Level gekauft`);
     playTone(440, 0.08, "triangle", 0.03);
     playTone(660, 0.13, "triangle", 0.04, 0.08);
+    if (isBigPurchase) vibrate([35, 30, 60]);
+  }
+
+  async function claimDaily() {
+    if (dailyBusy) return;
+    if (isCoopLive) {
+      setDailyBusy(true);
+      try {
+        const data = await sendCoopAction("daily-claim");
+        if (data?.dailyReward) {
+          showToast(`Tag ${data.dailyReward.dayIndex}: +${formatNumber(data.dailyReward.amount)} Tore${data.dailyReward.pack ? " und ein Prämienpack" : ""}`);
+          vibrate([40, 30, 90]);
+        }
+      } finally {
+        setDailyBusy(false);
+      }
+      return;
+    }
+    const now = getCurrentTime();
+    const preview = claimDailyReward(game.features.dailyRewards, "solo", getBasePassivePower(game.upgrades, game.stars, game.features), getBaseClickPower(game.upgrades, game.stars, game.features), now);
+    if (!preview) { showToast("Die Prämie für heute ist schon abgeholt."); return; }
+    setGame((current) => {
+      const claim = claimDailyReward(current.features.dailyRewards, "solo", getBasePassivePower(current.upgrades, current.stars, current.features), getBaseClickPower(current.upgrades, current.stars, current.features), now);
+      if (!claim) return current;
+      const features = normalizeGameFeatures(current.features);
+      features.dailyRewards = claim.state;
+      if (claim.pack && !features.earnedPacks.some((pack) => pack.id === claim.pack!.id)) features.earnedPacks.push(claim.pack);
+      addHistory(features, { title: `Tägliche Prämie · Tag ${claim.dayIndex}`, detail: `+${formatNumber(claim.amount)} Tore${claim.pack ? " und ein Prämienpack" : ""}. Serie: ${claim.streak} ${claim.streak === 1 ? "Tag" : "Tage"}.`, tone: "positive" }, now);
+      return { ...current, goals: current.goals + claim.amount, seasonGoals: current.seasonGoals + claim.amount, totalGoals: current.totalGoals + claim.amount, features };
+    });
+    addFeed(`Tägliche Prämie Tag ${preview.dayIndex}: +${formatNumber(preview.amount)} Tore.`, "star");
+    showToast(`Tag ${preview.dayIndex}: +${formatNumber(preview.amount)} Tore${preview.pack ? " und ein Prämienpack unter Packs & Album" : ""}`);
+    playTone(659, 0.1, "triangle", 0.04);
+    playTone(988, 0.18, "triangle", 0.045, 0.1);
+    vibrate([40, 30, 90]);
+  }
+
+  async function answerPress(matchId: string, questionId: string, answerIndex: number) {
+    if (pressBusy) return;
+    if (isCoopLive) {
+      setPressBusy(true);
+      try {
+        const data = await sendCoopAction("press-answer", { matchId, questionId, answerIndex });
+        if (data?.press) showToast(`Medienprämie +${formatNumber(data.press.reward)} Tore · Fanstimmung ${data.press.mood >= 0 ? "+" : ""}${data.press.mood}`);
+      } finally {
+        setPressBusy(false);
+      }
+      return;
+    }
+    const now = getCurrentTime();
+    const preview = answerPressConference(game.features.press, game.features.cup, game.features.club.name, matchId, questionId, answerIndex, now);
+    if (!preview) return;
+    const reward = getPressReward(getBasePassivePower(game.upgrades, game.stars, game.features), getBaseClickPower(game.upgrades, game.stars, game.features));
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      const result = answerPressConference(features.press, features.cup, features.club.name, matchId, questionId, answerIndex, now);
+      if (!result) return current;
+      features.press = result.press;
+      addHistory(features, { title: "Pressekonferenz", detail: `«${result.answer}» · Fanstimmung ${result.mood >= 0 ? "+" : ""}${result.mood}`, tone: result.mood >= 0 ? "positive" : "neutral" }, now);
+      return { ...current, goals: current.goals + reward, seasonGoals: current.seasonGoals + reward, totalGoals: current.totalGoals + reward, features };
+    });
+    showToast(`Medienprämie +${formatNumber(reward)} Tore · Fanstimmung ${preview.mood >= 0 ? "+" : ""}${preview.mood}`);
+    playTone(523, 0.08, "triangle", 0.03);
   }
 
   async function beginSeasonPrestige() {
@@ -2721,7 +2874,7 @@ function App() {
       <header className="topbar">
         <div className="brand-lockup"><div className="brand-ball"><FootballGraphic /></div><div className="brand-copy"><p className="eyebrow">FOOTBALL IDLE CLUB / UPDATE 1.34</p><h1>GOAL <span>CLICKER</span></h1></div></div>
         <div className={`header-goals${goalBoostActive ? " goal-boost-active" : ""}`} aria-live="polite" aria-label={`Aktueller Kontostand: ${hasInfiniteMoney ? "unbegrenzt" : formatNumber(displayGame.goals)} Tore${goalBoostActive ? `; ${goalBoostLabel}-facher Goalboost noch ${goalBoostCountdown}` : ""}`}><span>{hasInfiniteMoney ? "AZB TESTMODUS" : "AKTUELLER STAND"}</span><strong>{displayBalance}</strong><small>TORE</small>{goalBoostActive && <em className="header-goal-boost">⚡ {goalBoostLabel}× · {goalBoostCountdown}</em>}</div>
-        <div className="top-actions"><button className="icon-button" aria-label="Benachrichtigungsverlauf" onClick={()=>setFeatureTab("history")}>🔔</button><span className="save-status"><i /> auch minimiert aktiv · update sicher gespeichert</span><button className="icon-button" onClick={toggleSound} aria-label={game.sound ? "Sound ausschalten" : "Sound einschalten"}><Icon name={game.sound ? "sound" : "mute"} size={17} /></button><button className="reset-button" onClick={resetGame}>Reset</button></div>
+        <div className="top-actions"><button className="icon-button" aria-label="Benachrichtigungsverlauf" onClick={()=>setFeatureTab("history")}>🔔</button><span className="save-status"><i /> auch minimiert aktiv · update sicher gespeichert</span><button className="icon-button" onClick={toggleSound} aria-label={game.sound ? "Sound ausschalten" : "Sound einschalten"}><Icon name={game.sound ? "sound" : "mute"} size={17} /></button>{vibrationSupported && <button className={`icon-button vibration-toggle${vibrationEnabled ? "" : " off"}`} onClick={toggleVibration} aria-pressed={vibrationEnabled} aria-label={vibrationEnabled ? "Vibration ausschalten" : "Vibration einschalten"}>📳</button>}<button className="reset-button" onClick={resetGame}>Reset</button></div>
       </header>
 
       <nav className="mode-switch" aria-label="Spielmodus">
@@ -2742,11 +2895,14 @@ function App() {
           <div className="score-display"><span className="score-label">{hasInfiniteMoney ? "UNBEGRENZTES TESTGUTHABEN" : isCoopLive ? "GEMEINSAME TORE" : "DEINE TORE"}</span><strong>{displayBalance}</strong><span className="per-click-label">+{formatNumber(clickPower)} {isCoopLive ? "pro Team-Klick" : "pro Klick"}</span></div>
           <div className="ball-stage" ref={stageRef}>
             <div className="stadium-glow" /><div className="stadium-lights"><span /><span /><span /><span /><span /></div><div className="field-circle" /><div className="field-line field-line-one" /><div className="field-line field-line-two" /><div className="field-label">{isCoopLive ? "CO-OP CLICKER ARENA" : "GOAL CLICKER ARENA"}</div>
-            <button type="button" className={`ball-button${pulse ? " hit" : ""}`} onClick={handleBallClick} onKeyDown={handleBallKeyDown} aria-label={isCoopLive ? "Team-Ball anklicken" : "Fussball anklicken"}><span className="ball-aura" /><FootballGraphic /></button>
+            <button type="button" className={`ball-button${pulse ? " hit" : ""}${combo.multiplier > 1 ? ` combo-${combo.multiplier}` : ""}`} onClick={handleBallClick} onKeyDown={handleBallKeyDown} aria-label={isCoopLive ? "Team-Ball anklicken" : "Fussball anklicken"}><span className="ball-aura" /><FootballGraphic /></button>
             <p className="click-label"><span>CLICK</span> den Ball {isCoopLive ? "fürs Team" : "für Tore"}</p>
-            <div className="floating-layer">{effects.map((effect) => <span className={`floating-number${effect.critical ? " critical" : ""}`} key={effect.id} style={{ left: effect.x, top: effect.y }}>{effect.critical ? `CRIT! +${formatNumber(effect.amount)}` : `+${formatNumber(effect.amount)}`}</span>)}</div>
+            <div className="floating-layer">{effects.map((effect) => <span className={`floating-number${effect.critical ? " critical" : ""}${effect.combo > 1 ? ` combo-${effect.combo}` : ""}`} key={effect.id} style={{ left: effect.x, top: effect.y }}>{effect.critical ? `CRIT! +${formatNumber(effect.amount)}` : `+${formatNumber(effect.amount)}`}</span>)}</div>
+            <div className={`combo-meter level-${combo.multiplier}${combo.count > 1 ? " active" : ""}`} aria-live="polite"><span className="combo-label">{combo.multiplier > 1 ? `COMBO x${combo.multiplier}` : combo.count > 1 ? `${combo.count} Klicks` : "Schnell klicken für Combo"}</span><span className="combo-track"><i style={{ width: `${Math.round(getComboProgress(combo.count) * 100)}%` }} /></span><small>{combo.multiplier === 3 ? "Maximum erreicht" : `Nächste Stufe: x${combo.multiplier + 1}`}</small></div>
+            {comboBurst && <div className={`combo-burst${comboBurst.text === "Combo vorbei" ? " ended" : ""}`} key={comboBurst.id} aria-hidden="true">{comboBurst.text}</div>}
           </div>
           <div className="production-strip"><div className="production-item"><span className="production-icon">/s</span><div><small>PRO SEKUNDE</small><strong>{formatNumber(passivePower)}</strong></div></div><div className="production-divider" /><div className="production-item"><span className="production-icon">+1</span><div><small>PRO KLICK</small><strong>{formatNumber(clickPower)}</strong></div></div><div className="production-divider" /><div className="production-item"><span className="production-icon">#</span><div><small>KLICKS</small><strong>{formatNumber(displayGame.clicks)}</strong></div></div></div>
+          {hydrated && (!isCoopLive || coopSession) && <DailyRewardCard state={displayGame.features.dailyRewards} claimKey={isCoopLive ? coopSession!.role : "solo"} now={countdownNow} passivePerSecond={getBasePassivePower(displayGame.upgrades, displayGame.stars, displayGame.features)} clickPower={getBaseClickPower(displayGame.upgrades, displayGame.stars, displayGame.features)} busy={dailyBusy || coopBusy} coop={isCoopLive} onClaim={() => { void claimDaily(); }} format={formatNumber} />}
           {!activeMiniGame && <div className="mini-game-hub">
             <div className="mini-game-hub-heading"><div><p className="eyebrow">STADION / ARCADE</p><h3>Matchday Minigames</h3></div><span>ROTIEREND</span></div>
             <div className="mini-game-grid">
@@ -2802,6 +2958,7 @@ function App() {
       {gazetteAnnouncement && <div className={`inline-gazette ${gazetteAnnouncement.tone}`}  aria-label={`Goal Gazette: ${gazetteAnnouncement.headline}`}><article className="gazette-front-page"><header><span>GOAL GAZETTE</span><b>SONDERAUSGABE</b></header><div className="gazette-dateline"><span>{getTournament(gazetteAnnouncement.tournamentId)?.label ?? "TURNIER"}</span><strong>{displayClubName} {gazetteAnnouncement.homeScore}:{gazetteAnnouncement.awayScore} {gazetteAnnouncement.opponent}</strong></div><h2>{gazetteAnnouncement.headline}</h2><h3>{gazetteAnnouncement.strapline}</h3><p>{gazetteAnnouncement.body}</p><footer><span>{gazetteAnnouncement.tieBreak ? "ENTSCHEIDUNG IM ELFMETERSCHIESSEN" : `RUNDE ${gazetteAnnouncement.completedRound} BEENDET`}</span><button className="event-takeover-dismiss" onClick={dismissGazetteAnnouncement}>Zeitung zuklappen</button></footer></article></div>}
             </div>}
             {!displayGame.features.cup.active && displayGame.features.cup.matchStartedAt > 0 && <PostMatchSummary features={displayGame.features} onCareer={()=>setFeatureTab("career")} onContinue={()=>setFeatureTab("squad")} />}
+            {!displayGame.features.cup.active && displayGame.features.cup.matchStartedAt > 0 && <PressConferencePanel features={displayGame.features} busy={pressBusy || coopBusy} reward={getPressReward(getBasePassivePower(displayGame.upgrades, displayGame.stars, displayGame.features), getBaseClickPower(displayGame.upgrades, displayGame.stars, displayGame.features))} onAnswer={(matchId, questionId, index) => { void answerPress(matchId, questionId, index); }} format={formatNumber} />}
 
             {(() => { const opponent = displayGame.features.cup.active ? displayGame.features.cup.opponent : getSeasonModeNextOpponent(displayGame.features.seasonMode, displayClubName).name; const rival = displayGame.features.career.rivals[rivalryKey(opponent)]; return rival?.active ? <div className="career-derby-banner"><strong>🔥 Derby gegen {rival.opponent}</strong>{rival.wins} Siege · {rival.draws} Remis · {rival.losses} Niederlagen. Die Kurve zählt auf dich. Sieg: 400 Fragmente, Remis: 150.</div> : null; })()}
             <div className="feature-panel-heading"><div><p className="eyebrow">SAISONMODUS / STAR XI</p><h3>Jede Partie zählt.</h3></div><span className="feature-stat">{starXIRating} OVR</span></div>

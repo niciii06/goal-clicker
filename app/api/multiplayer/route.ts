@@ -13,6 +13,8 @@ import { isSupportedMultiplayerProtocol, MULTIPLAYER_UPDATE_MESSAGE } from "../.
 import { getFormationUnlockSeason, getPackUnlockSeason, getTournamentUnlockSeason, getUpgradeUnlockSeason, isSeasonContentUnlocked, MAX_CAREER_SEASON } from "../../season-progression";
 import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../../upgrade-purchase";
 import { MAX_MULTIPLAYER_BODY_BYTES, readJsonBody, RequestBodyTooLargeError } from "../request-body";
+import { claimDailyReward } from "../../daily-reward";
+import { answerPressConference, getPressReward } from "../../press-conference";
 
 const MAX_NAME_LENGTH = 18;
 const MAX_ROOM_NAME_LENGTH = 28;
@@ -542,6 +544,9 @@ export async function POST(request: Request) {
       roomName?: unknown;
       bonusCode?: unknown;
       preferredRole?: unknown;
+      matchId?: unknown;
+      questionId?: unknown;
+      answerIndex?: unknown;
       protocol?: unknown;
     }>(request, MAX_MULTIPLAYER_BODY_BYTES);
     if (!isSupportedMultiplayerProtocol(payload.protocol)) return jsonError(MULTIPLAYER_UPDATE_MESSAGE, 426);
@@ -694,11 +699,39 @@ export async function POST(request: Request) {
     if (action === "click") {
       const clickPower = getClickPower(game.upgrades, game.stars, game.features, Date.parse(timestamp));
       const clickCount = Math.max(1, Math.min(50, Math.floor(finite(payload.clickCount, 1))));
-      const maxAmount = Math.max(clickCount, Math.floor(clickPower * clickCount * 2.2));
+      // Highest legitimate click: combo x3, streak bonus x1.1 and a critical hit x2.
+      const maxAmount = Math.max(clickCount, Math.floor(clickPower * clickCount * 6.6));
       const amount = Math.max(clickCount, Math.min(maxAmount, Math.floor(finite(payload.amount, clickPower * clickCount))));
       const updated = await db.applyClick(code, role, amount, clickCount, timestamp);
       if (!updated) return jsonError("Dieser Raum wurde gelöscht.", 404);
       return Response.json({ serverNow: Date.now(), room: shapeRoom(updated, playerId), role });
+    }
+
+    if (action === "daily-claim") {
+      const claim = claimDailyReward(game.features.dailyRewards, role, getBasePassivePower(game.upgrades, game.stars, game.features), getBaseClickPower(game.upgrades, game.stars, game.features), Date.now());
+      if (!claim) return jsonError("Die tägliche Prämie für heute ist schon abgeholt.", 409);
+      game.features.dailyRewards = claim.state;
+      game.goals += claim.amount;
+      game.seasonGoals += claim.amount;
+      game.totalGoals += claim.amount;
+      if (claim.pack && !game.features.earnedPacks.some((pack) => pack.id === claim.pack!.id)) game.features.earnedPacks.push(claim.pack);
+      addHistory(game.features, { title: `Tägliche Prämie · Tag ${claim.dayIndex}`, detail: `${getRoomPlayer(room, role).name ?? "Ein Spieler"} holt ${Math.floor(claim.amount).toLocaleString("de-CH")} Tore${claim.pack ? " und ein Prämienpack" : ""}. Serie: ${claim.streak} Tage.`, tone: "positive" });
+      return persistGameResponse(db, room, game, timestamp, playerId, role, {}, { dailyReward: { amount: claim.amount, dayIndex: claim.dayIndex, streak: claim.streak, pack: Boolean(claim.pack) } });
+    }
+
+    if (action === "press-answer") {
+      const matchId = typeof payload.matchId === "string" ? payload.matchId.slice(0, 200) : "";
+      const questionId = typeof payload.questionId === "string" ? payload.questionId.slice(0, 40) : "";
+      const answerIndex = Math.floor(finite(payload.answerIndex, -1));
+      const result = answerPressConference(game.features.press, game.features.cup, game.features.club.name, matchId, questionId, answerIndex, Date.now());
+      if (!result) return jsonError("Diese Pressekonferenz ist schon vorbei.", 409);
+      const reward = getPressReward(getBasePassivePower(game.upgrades, game.stars, game.features), getBaseClickPower(game.upgrades, game.stars, game.features));
+      game.features.press = result.press;
+      game.goals += reward;
+      game.seasonGoals += reward;
+      game.totalGoals += reward;
+      addHistory(game.features, { title: "Pressekonferenz", detail: `«${result.answer}» · Fanstimmung ${result.mood >= 0 ? "+" : ""}${result.mood}`, tone: result.mood >= 0 ? "positive" : "neutral" });
+      return persistGameResponse(db, room, game, timestamp, playerId, role, {}, { press: { reward, mood: result.mood, fanMood: result.fanMood } });
     }
 
     if (action === "transfer-insider-event") {

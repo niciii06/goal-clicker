@@ -4,6 +4,10 @@ import { recordedActionRating, advanceMatchBroadcast, addBroadcastSubstitution, 
 import type { MatchBroadcast, GoalPattern } from './match-broadcast';
 import type { Venue } from './travel-geography';
 import { normalizeTravel, emptyTravel } from './travel-data';
+import { normalizeDailyRewards } from './daily-reward';
+import type { DailyRewardState } from './daily-reward';
+import { normalizePress } from './press-conference';
+import type { PressState } from './press-conference';
 import type { TravelState } from './travel-data';
 import { seasonGeography, LEAGUE_LABELS, HOME_VENUE, venueForClubName } from './travel-geography';
 import { initialCareerState, normalizeCareerState, getPlayerForm, getCareerCard } from "./career-data";
@@ -431,6 +435,8 @@ export type GameFeatures = {
   starPackReveal: StarPackReveal | null;
   transferSaga: TransferSagaState;
   gazetteIssues: TournamentGazetteIssue[];
+  dailyRewards: DailyRewardState;
+  press: PressState;
   nextEventAt: number;
   nextVarAt: number;
 };
@@ -2786,6 +2792,8 @@ export function initialGameFeatures(now = Date.now()): GameFeatures {
     starPackReveal: null,
     transferSaga: { loans: [], vacancies: [], archive: [], latestEvent: null, lastFailedReason: "", nextAt: now + getTransferEventDelay(), deadlineDayStartedAt: 0, deadlineDayEndsAt: 0 },
     gazetteIssues: [],
+    dailyRewards: {},
+    press: normalizePress(undefined),
     nextEventAt: now + getRandomEventDelay(),
     nextVarAt: now + getRandomEventDelay(),
   };
@@ -3116,6 +3124,8 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     starPackReveal,
     transferSaga,
     gazetteIssues,
+    dailyRewards: normalizeDailyRewards(source.dailyRewards),
+    press: normalizePress(source.press),
     nextEventAt: Number(source.nextEventAt) > 0 ? Number(source.nextEventAt) : defaults.nextEventAt,
     nextVarAt: Number(source.nextVarAt) > 0 ? Number(source.nextVarAt) : defaults.nextVarAt,
   };

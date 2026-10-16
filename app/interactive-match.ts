@@ -11,6 +11,8 @@ export type InteractiveMatch = { version:2; id:string; seed:number; time:number;
 const clamp=(v:number,a:number,b:number)=>Math.max(a,Math.min(b,v));
 const dist=(a:SimPoint,b:SimPoint)=>Math.hypot(a.x-b.x,a.y-b.y);
 const point=(p:SimPoint):SimPoint=>({x:p.x,y:p.y});
+/** Game seconds between a goal and the following kickoff (about three real seconds in a league match). */
+export const GOAL_CELEBRATION_SECONDS=90;
 function seedHash(s:string){let n=2166136261;for(const c of s)n=Math.imul(n^c.charCodeAt(0),16777619);return n>>>0||1;}
 function random(c:SimCheckpoint){let n=c.rng;n^=n<<13;n^=n>>>17;n^=n<<5;c.rng=n>>>0||1;return c.rng/4294967296;}
 function attribute(p:StarXIPlayer|undefined,key:string,fallback:number){const stats=p?.originalAttributes?.stats as Record<string,{value:number}>|undefined;const n=stats?.[key]?.value;return clamp(typeof n==='number'&&Number.isFinite(n)?n:fallback,1,99);}
@@ -55,12 +57,13 @@ function prepare(sim:InteractiveMatch,start:SimCheckpoint):SimAction {
  const tactic=actor.side==='club'?sim.strategy:sim.opponentStrategy;
  const rivals=active.filter(p=>p.side!==actor.side),mates=active.filter(p=>p.side===actor.side&&p.id!==actor.id);
  const pressure=rivals.reduce((n,p)=>n+Math.max(0,1-dist(p,actor)/14),0);
- let kind:SimAction['kind']='pass',outcome:SimAction['outcome']='success',target:SimPlayer|undefined,to=point(actor),assist:string|undefined;
+ let kind:SimAction['kind']='pass',outcome:SimAction['outcome']='success',target:SimPlayer|undefined,to=point(actor),assist:string|undefined,celebration=false;
  let duration=18+Math.floor(random(c)*18);
  const roll=random(c);
  if(c.restart){
   kind='restart';duration=18;
-  if(dist(c.ball,{x:52.5,y:34})>35){kickoff(c,c.possession);actor=c.players.find(p=>p.id===c.owner)!;to={x:52.5,y:34};}
+  // After a goal the ball lies in the net: allow a realistic celebration before the kickoff.
+  if(dist(c.ball,{x:52.5,y:34})>35){duration=GOAL_CELEBRATION_SECONDS;celebration=true;kickoff(c,c.possession);actor=c.players.find(p=>p.id===c.owner)!;to={x:52.5,y:34};}
   else {target=mates.filter(p=>p.role!=='TW').sort((a,b)=>dist(a,actor)-dist(b,actor))[0];to=target?point(target):point(actor);}
   c.restart=false;
  }
@@ -90,7 +93,8 @@ function prepare(sim:InteractiveMatch,start:SimCheckpoint):SimAction {
 
  const boundary=c.time<2700?2700:c.time<5400?5400:7200;duration=Math.max(1,Math.min(duration,boundary-c.time));
  const id=`${sim.id}:a${c.sequence++}`,end=c.time+duration;
- movePlayers(c,duration,sim.strategy,sim.opponentStrategy,actor,target);
+ // The celebration only adds clock time: movement and fitness stay those of a normal 18 second restart.
+ movePlayers(c,celebration?Math.min(duration,18):duration,sim.strategy,sim.opponentStrategy,actor,target);
  const liveActor=c.players.find(p=>p.id===actor.id)!;
  if(kind==='carry'){liveActor.x=to.x;liveActor.y=to.y;}
  c.ball=to;c.time=end;c.chain++;
@@ -117,7 +121,7 @@ export function advanceInteractive(cup:CupState,now:number):CupState {
   sim.buffer.shift();sim.committed=a.after;sim.time=a.end;sim.recent.push(a);sim.recent=sim.recent.slice(-12);
   const at=next.matchStartedAt+a.end/secondsPerMs,minute=Math.max(1,Math.min(120,Math.ceil(a.end/60))),actor=a.before.players.find(p=>p.id===a.actor)!;
   const stats=a.side==='club'?next.broadcast.clubStats:next.broadcast.opponentStats,other=a.side==='club'?next.broadcast.opponentStats:next.broadcast.clubStats;
-  stats.possessionSeconds+=(a.end-a.start)/15;
+  stats.possessionSeconds+=(a.kind==='restart'?Math.min(a.end-a.start,18):a.end-a.start)/15;
   if(a.kind==='shot'){
    stats.shots++;if(a.outcome==='goal'||a.outcome==='save')stats.onTarget++;if(a.outcome==='save')other.saves++;
    if(a.outcome==='goal'){

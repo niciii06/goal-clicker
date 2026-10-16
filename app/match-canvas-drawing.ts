@@ -1,6 +1,11 @@
 import type { Actor } from './match-viewer';
 import type { GameFeatures } from './feature-data';
 import type { getVisualFrame } from './match-viewer';
+import { drawAtmosphere, drawCelebration, drawStands, drawWeather } from './stadium-ambience';
+import type { Ambience } from './stadium-ambience';
+import type { FrameCelebration } from './interactive-frame-data';
+
+export type StadiumExtras={ambience?:Ambience;now?:number;celebration?:FrameCelebration;animate?:boolean};
 
 export function drawFootballPitch(ctx:CanvasRenderingContext2D) {
  ctx.fillStyle='#16432e';ctx.fillRect(-4,-4,113,76);
@@ -17,8 +22,11 @@ export function drawFootballPitch(ctx:CanvasRenderingContext2D) {
  for(const [x,y,start] of [[0,0,0],[105,0,Math.PI/2],[105,68,Math.PI],[0,68,Math.PI*1.5]]){ctx.beginPath();ctx.arc(x,y,1,start,start+Math.PI/2);ctx.stroke();}
  ctx.fillStyle='#d5eddb';ctx.beginPath();ctx.arc(52.5,34,.38,0,Math.PI*2);ctx.fill();
 }
-export function drawMatchFrame(ctx:CanvasRenderingContext2D,frame:ReturnType<typeof getVisualFrame>,actors:Actor[],colours:{club:string;opponent:string},cup:GameFeatures['cup']) {
+export function drawMatchFrame(ctx:CanvasRenderingContext2D,frame:ReturnType<typeof getVisualFrame>,actors:Actor[],colours:{club:string;opponent:string},cup:GameFeatures['cup'],extras:StadiumExtras={}) {
+ const now=extras.now??0,animate=extras.animate!==false;
+ if(extras.ambience)drawStands(ctx,extras.ambience,colours,now,extras.celebration,animate);
  drawFootballPitch(ctx);
+ if(extras.ambience)drawAtmosphere(ctx,extras.ambience);
    for(const p of actors){
     const keeper=p.goalkeeper;ctx.fillStyle=keeper?p.team==='club'?'#c684f4':'#74d0ed':colours[p.team];ctx.strokeStyle='#effff3';ctx.lineWidth=.35;
     ctx.beginPath();ctx.ellipse(p.x,p.y,frame.keeperDive===p.id?2.65:1.65,frame.keeperDive===p.id?.9:1.65,0,0,Math.PI*2);ctx.fill();ctx.stroke();
@@ -32,5 +40,6 @@ export function drawMatchFrame(ctx:CanvasRenderingContext2D,frame:ReturnType<typ
    if(frame.shotFlight){const a=actors.find(p=>p.id===frame.shotFlight!.fromId),ideal=frame.actors.find(p=>p.id===frame.shotFlight!.fromId);if(a&&ideal){ball.x+=(a.x-ideal.x)*(1-frame.shotFlight.progress);ball.y+=(a.y-ideal.y)*(1-frame.shotFlight.progress);}}
    ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(ball.x,ball.y+.8,1.1,.5,0,0,Math.PI*2);ctx.fill();
    ctx.fillStyle='#fff';ctx.strokeStyle='#132319';ctx.lineWidth=.23;ctx.beginPath();ctx.arc(ball.x,ball.y-frame.height*.7,.75+frame.height*.06,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#132319';ctx.beginPath();ctx.arc(ball.x-.15,ball.y-frame.height*.7-.12,.19,0,Math.PI*2);ctx.fill();
-
+ if(extras.ambience)drawWeather(ctx,extras.ambience,now,animate);
+ if(extras.celebration)drawCelebration(ctx,extras.celebration,actors.find(p=>p.id===extras.celebration!.scorerId)?.label??'',colours,now,animate);
 }

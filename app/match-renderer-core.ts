@@ -2,7 +2,8 @@ import type { InteractiveMatch } from './interactive-match';
 import type { Actor } from './match-viewer';
 import { readInteractiveFrame } from './interactive-frame-data';
 import { MatchPlaybackClock } from './match-playback-clock';
-export type RenderSnapshot={simulation:InteractiveMatch;startedAt:number;regularDuration:number;paused:boolean;active:boolean;wallNow:number;monotonicAt:number;colours:{club:string;opponent:string};yellowCards:{playerId:string;minute:number}[];width:number;height:number;reducedMotion:boolean};
+import type { Ambience } from './stadium-ambience';
+export type RenderSnapshot={ambience?:Ambience;simulation:InteractiveMatch;startedAt:number;regularDuration:number;paused:boolean;active:boolean;wallNow:number;monotonicAt:number;colours:{club:string;opponent:string};yellowCards:{playerId:string;minute:number}[];width:number;height:number;reducedMotion:boolean};
 /** No React, catalog lookups, scoring, storage or network work lives in this renderer. */
 export class IndependentMatchRenderer {
  snapshot?:RenderSnapshot;private clock=new MatchPlaybackClock();
@@ -16,6 +17,6 @@ export class IndependentMatchRenderer {
   const time=Math.min(latest,this.clock.step(monotonicNow,target,earliest,latest,scale*1000)),f=readInteractiveFrame(s,time);
   const a=f.action,travelling=a&&['pass','cross','shot','interception','restart'].includes(a.kind);
   const actors:Actor[]=f.players.map(p=>({id:p.id,label:p.name,shirt:String(p.number),team:p.side,role:p.role,x:p.x,y:p.y,goalkeeper:p.role==='TW',rating:null}));
-  return {actors,ball:f.ball,height:a?.kind==='cross'?Math.sin(f.progress*Math.PI)*2:0,minute:Math.max(1,Math.min(120,Math.ceil(time/60))),wallTime:p.startedAt+time/scale,status:'Live',recent:undefined,age:Infinity,keeperDive:undefined,ballOwnerId:travelling?undefined:a?.actor,pass:undefined,shotFlight:undefined};
+  return {actors,ball:f.ball,height:a?.kind==='cross'?Math.sin(f.progress*Math.PI)*2:0,minute:Math.max(1,Math.min(120,Math.ceil(time/60))),wallTime:p.startedAt+time/scale,status:'Live',recent:undefined,age:Infinity,keeperDive:undefined,ballOwnerId:travelling?undefined:a?.actor,pass:undefined,shotFlight:undefined,celebration:f.celebration};
  }
 }

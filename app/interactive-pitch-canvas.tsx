@@ -10,6 +10,15 @@ import { MatchPlaybackClock } from './match-playback-clock';
 import type { RenderSnapshot } from './match-renderer-core';
 import { matchFitness } from './match-broadcast';
 import type { CameraMode } from './match-pitch-canvas';
+import { computeAmbience, STADIUM_VIEW } from './stadium-ambience';
+import type { Ambience } from './stadium-ambience';
+
+const ambienceCache=new Map<string,Ambience>();
+function ambienceFor(features:GameFeatures){
+ const c=features.cup,key=`${c.careerMatchId}:${c.matchStartedAt}:${features.press.fanMood}:${c.fixture?.id??''}`;
+ let value=ambienceCache.get(key);if(!value){value=computeAmbience(c,features.press.fanMood,c.simulation?.seed);ambienceCache.clear();ambienceCache.set(key,value);}
+ return value;
+}
 type Body={x:number;y:number;vx:number;vy:number};
 const clamp=(x:number,a:number,b:number)=>Math.min(b,Math.max(a,x));
 
@@ -47,7 +56,7 @@ export function InteractivePitchCanvas({features,now,replay,colours,camera,reduc
  const postSnapshot=useCallback((instance:Worker)=>{
   const data=latest.current,c=data.features.cup;if(!c.simulation||!canvas.current)return;
   const bounds=canvas.current.getBoundingClientRect(),dpi=Math.min(window.devicePixelRatio||1,2);
-  const snapshot:RenderSnapshot={simulation:c.simulation,startedAt:c.matchStartedAt,regularDuration:getCupRegularDurationMs(c),paused:c.matchPaused,active:c.active,
+  const snapshot:RenderSnapshot={ambience:ambienceFor(data.features),simulation:c.simulation,startedAt:c.matchStartedAt,regularDuration:getCupRegularDurationMs(c),paused:c.matchPaused,active:c.active,
    wallNow:clockAnchor.current.wall+performance.now()-clockAnchor.current.monotonic,monotonicAt:performance.timeOrigin+performance.now(),colours:data.colours,
    yellowCards:(c.broadcast?.events??[]).filter(e=>e.kind==='yellow').map(e=>({playerId:e.playerId,minute:e.minute})),width:Math.max(1,Math.round(bounds.width*dpi)),height:Math.max(1,Math.round(bounds.height*dpi)),reducedMotion:data.reducedMotion};
   instance.postMessage({kind:'sync',snapshot});return snapshot;
@@ -100,10 +109,10 @@ export function InteractivePitchCanvas({features,now,replay,colours,camera,reduc
    const zoom=data.camera==='full'?1:data.camera==='follow'?1.35:frame.recent?1.35:1;
    view.current.zoom+=(zoom-view.current.zoom)*Math.min(1,dt*3);
    view.current.x+=(clamp(frame.ball.x,38,67)-view.current.x)*Math.min(1,dt*2);view.current.y+=(clamp(frame.ball.y,24,44)-view.current.y)*Math.min(1,dt*2);
-   const scale=Math.min(width/113,height/76)*view.current.zoom;
+   const scale=Math.min(width/STADIUM_VIEW.width,height/STADIUM_VIEW.height)*view.current.zoom;
    const center=data.camera==='full'?{x:52.5,y:34}:view.current;
    ctx.setTransform(scale,0,0,scale,width/2-center.x*scale,height/2-center.y*scale);
-   drawMatchFrame(ctx,frame,actors,data.colours,data.features.cup);
+   drawMatchFrame(ctx,frame,actors,data.colours,data.features.cup,{ambience:ambienceFor(data.features),now:timestamp,celebration:'celebration' in frame?frame.celebration:undefined,animate:!data.reducedMotion});
    ctx.setTransform(1,0,0,1,0,0);
    frames++;if(timestamp-sampleAt>=1000){data.onFps(Math.round(frames*1000/(timestamp-sampleAt)));frames=0;sampleAt=timestamp;}
    request=requestAnimationFrame(render);
@@ -114,7 +123,7 @@ export function InteractivePitchCanvas({features,now,replay,colours,camera,reduc
  },[workerDisabled,postSnapshot]);
 
  const select=(event:React.PointerEvent<HTMLCanvasElement>)=>{
-  const el=canvas.current;if(!el)return;const b=el.getBoundingClientRect(),z=view.current.zoom,scale=Math.min(b.width/113,b.height/76)*z,center=camera==='full'?{x:52.5,y:34}:view.current;
+  const el=canvas.current;if(!el)return;const b=el.getBoundingClientRect(),z=view.current.zoom,scale=Math.min(b.width/STADIUM_VIEW.width,b.height/STADIUM_VIEW.height)*z,center=camera==='full'?{x:52.5,y:34}:view.current;
   const x=(event.clientX-b.left-b.width/2)/scale+center.x,y=(event.clientY-b.top-b.height/2)/scale+center.y;
   if(worker.current){worker.current.postMessage({kind:'select',x,y});return;}
   const p=displayed.current.find(p=>Math.hypot(p.x-x,p.y-y)<3.2);if(p)onSelect(p.id);
