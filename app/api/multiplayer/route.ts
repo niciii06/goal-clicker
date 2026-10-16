@@ -944,7 +944,7 @@ export async function POST(request: Request) {
     if (action === "cup-resume") {
       if (!game.features.cup.active || !game.features.cup.matchPaused) return jsonError(`${game.features.cup.mode === "season" ? "Das Saisonspiel" : "Das Pokalspiel"} ist gerade nicht pausiert.`, 409);
       game.features.cup = resumeCupMatch(game.features.cup);
-      addHistory(game.features, { title: "Verletzungspause beendet", detail: "Der verletzte Spieler bleibt draußen; die Partie läuft ohne Wechsel weiter.", tone: "neutral" });
+      addHistory(game.features, { title: "Verletzungspause beendet", detail: "Der verletzte Spieler bleibt draussen; die Partie läuft ohne Wechsel weiter.", tone: "neutral" });
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 

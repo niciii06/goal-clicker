@@ -21,8 +21,12 @@ jobs:
           node-version: '22'
           cache: npm
       - name: Install exact dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm ci --no-fund
       - name: Check TypeScript
         run: npm run typecheck
+      - name: Check lint
+        run: npm run lint
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
       - name: Run tests
         run: npm test

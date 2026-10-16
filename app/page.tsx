@@ -2522,7 +2522,7 @@ function App() {
       const features = normalizeGameFeatures(current.features);
       if (!features.cup.active || !features.cup.matchPaused) return current;
       features.cup = resumeCupMatch(features.cup, getCurrentTime());
-      addHistory(features, { title: "Verletzungspause beendet", detail: "Der verletzte Spieler bleibt draußen; die Partie läuft ohne Wechsel weiter.", tone: "neutral" });
+      addHistory(features, { title: "Verletzungspause beendet", detail: "Der verletzte Spieler bleibt draussen; die Partie läuft ohne Wechsel weiter.", tone: "neutral" });
       return { ...current, features };
     });
     setSelectedLineupSlot(null);

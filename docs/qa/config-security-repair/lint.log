@@ -1,0 +1,3 @@
+
+> goal-clicker@0.1.0 lint
+> bash scripts/sites-env.sh -- eslint .
