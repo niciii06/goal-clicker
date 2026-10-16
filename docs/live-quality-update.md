@@ -1,7 +1,5 @@
 # Simplified live matches and gameplay quality
 
-> Historischer Stand. Aktuelle Regeln und Freigabe: [Release verification](release-match-realism.md) und [Sites project knowledge](chatgpt-sites-knowledge.md).
-
 Regular play still takes six minutes. Possessions now use a clock-derived twelve-second cycle with 1.5-second actions, including scaled legacy saves. Player bodies no longer reset when an event changes. Passes connect actual rendered player positions; shots originate at the shooter and goals are revealed on ball arrival. Kickoff keeps each formation in its own half, the conceding side restarts, and halftime switches longitudinal and lateral orientation. Minor stoppages no longer build defensive player blocks.
 
 One Wechseln button opens squad-style formation and bench cards. Drag/drop, touch dragging, tap selection and keyboard activation stage a replacement; confirmation checks current position, eligibility, remaining substitutions and no re-entry. Cancellation has no effects. The panel retains the existing continue-play policy. Fitness remains in mechanics and Best XI but is not shown in the live interface.

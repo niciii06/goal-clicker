@@ -92,5 +92,5 @@ test("multiplayer rooms preserve old slots and accept four players", async () =>
   assert.match(apiSource, /getOccupiedRoomPlayers\(room\)\.length >= 2/);
   assert.match(pageSource, /BIS ZU VIER SPIELER/);
   assert.match(pageSource, /room\.players\.map/);
-  assert.match(protocolSource, /MULTIPLAYER_PROTOCOL_VERSION = 9/);
+  assert.match(protocolSource, /MULTIPLAYER_PROTOCOL_VERSION = 11/);
 });

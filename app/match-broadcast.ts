@@ -1,6 +1,4 @@
-import { evaluateOffside, goalkeeperSaveProbability } from './football-rules';
-import type { OffsideSnapshot } from './football-rules';
-import { getCupMatchMinute, getCupRegularDurationMs, getStarXIPlayer, STAR_XI_PLAYERS, STAR_FORMATIONS } from './feature-data';
+import { getCupMatchMinute, getCupRegularDurationMs, getStarFormation, getStarXIPlayer, STAR_XI_PLAYERS, STAR_FORMATIONS } from './feature-data';
 import type { CupState, StarPosition, StarXIPlayer } from './feature-data';
 
 export type GoalPattern = 'one-on-one'|'low-shot'|'long-range'|'header'|'cross'|'rebound'|'corner'|'free-kick'|'penalty';
@@ -9,13 +7,13 @@ export function chooseGoalPattern(id:string,role:StarPosition):GoalPattern {
  return patterns[Math.floor(broadcastSeed(id)*patterns.length)];
 }
 export type BroadcastSide = 'club' | 'opponent';
-export type BroadcastKind = 'build-up' | 'counter' | 'wide' | 'combination' | 'shot' | 'corner' | 'free-kick' | 'throw-in' | 'yellow' | 'substitution' | 'offside';
+export type BroadcastKind = 'build-up' | 'counter' | 'wide' | 'combination' | 'shot' | 'corner' | 'free-kick' | 'throw-in' | 'yellow' | 'substitution';
 export type ShotOutcome = 'save' | 'wide' | 'blocked';
 export type MatchRosterPlayer = { id:string; sourceId:string; name:string; position:StarPosition; number:number; rating:number; slot:number };
-export type BroadcastEvent = { passSnapshot?: OffsideSnapshot; id:string; kind:BroadcastKind; side:BroadcastSide; minute:number; at:number; playerId:string; player:string; secondaryId?:string; keeperId?:string; outcome?:ShotOutcome; style:'ground'|'lofted'|'through'|'cross'|'header'|'long-range'|'one-touch'|'penalty'|'clearance'; lane:number; seed:number };
-export type BroadcastStatistics = { shots:number; onTarget:number; saves:number; corners:number; freeKicks:number; throwIns:number; yellowCards:number; possessionSeconds:number; offsides?:number };
+export type BroadcastEvent = { id:string; kind:BroadcastKind; side:BroadcastSide; minute:number; at:number; playerId:string; player:string; secondaryId?:string; keeperId?:string; outcome?:ShotOutcome; style:'ground'|'lofted'|'through'|'cross'|'header'|'long-range'|'one-touch'|'penalty'|'clearance'; lane:number; seed:number };
+export type BroadcastStatistics = { shots:number; onTarget:number; saves:number; corners:number; freeKicks:number; throwIns:number; yellowCards:number; possessionSeconds:number };
 export type MatchBroadcast = { version:1; clubFormation:string; opponentFormation:string; opponentXI:MatchRosterPlayer[]; slots:Record<string,number>; shirtNumbers:Record<string,number>; fitness:Record<string,number>; fitnessMinute:number; events:BroadcastEvent[]; processedScene:number; possessionSecond:number; clubStats:BroadcastStatistics; opponentStats:BroadcastStatistics };
-export const emptyMatchStats = ():BroadcastStatistics=>({shots:0,onTarget:0,saves:0,corners:0,freeKicks:0,throwIns:0,yellowCards:0,possessionSeconds:0,offsides:0});
+export const emptyMatchStats = ():BroadcastStatistics=>({shots:0,onTarget:0,saves:0,corners:0,freeKicks:0,throwIns:0,yellowCards:0,possessionSeconds:0});
 export const broadcastSeed=(s:string)=>{let h=2166136261;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619);h=Math.imul(h^(h>>>16),0x85ebca6b);h=Math.imul(h^(h>>>13),0xc2b2ae35);return ((h^(h>>>16))>>>0)/4294967296;};
 const clamp=(n:number,a:number,b:number)=>Math.max(a,Math.min(b,n));
 
@@ -65,9 +63,10 @@ export function advanceMatchBroadcast(cup:CupState,clubPlayers:readonly StarXIPl
   if((cup.playerExitedAt[p.id]??121)<=b.fitnessMinute||cup.sentOffPlayerIds.includes(p.id))continue;
   const entered=cup.playerEnteredAt[p.id]??1,end=cup.playerExitedAt[p.id]??minute;
   const playedDelta=Math.max(0,Math.min(minute,end)-Math.max(b.fitnessMinute,entered));
+  const strategy=p.id.startsWith('opponent-')?cup.opponentStrategyId:cup.strategyId;
   const raw=p.source?.originalAttributes?.stats?.stamina?.value;
   const stamina=typeof raw==='number'?raw:p.source?.rating??70;
-  const workload=(p.role==='TW'?.13:['LV','RV','LAV','RAV','LF','RF','LM','RM'].includes(p.role)?.49:.4)*(1+(70-stamina)/200);
+  const workload=(p.role==='TW'?.13:['LV','RV','LAV','RAV','LF','RF','LM','RM'].includes(p.role)?.49:.4)*(strategy==='angriff'?1.28:strategy==='konter'?1.12:1)*(1+(70-stamina)/200);
   b.fitness[p.id]=clamp((b.fitness[p.id]??100)-playedDelta*workload,15,100);
  }
  b.fitnessMinute=Math.max(b.fitnessMinute,minute);
@@ -78,37 +77,22 @@ export function advanceMatchBroadcast(cup:CupState,clubPlayers:readonly StarXIPl
   const id=`action:${seed}:${index}`,roll=broadcastSeed(id),at=cup.matchStartedAt+index*(regular/30),m=getCupMatchMinute({...cup,matchPaused:false,active:true},at);
   const side:BroadcastSide=broadcastSeed(id+':team')<.5?'club':'opponent';
   const historyPlayers=Object.keys(cup.playerEnteredAt).map(id=>getStarXIPlayer(id)).filter((p):p is StarXIPlayer=>Boolean(p)).map(p=>({...p,position:cup.playerMatchPositions[p.id]??p.position}));
-  const participants=side==='club'?(historyPlayers.length?historyPlayers:clubPlayers).filter(p=>(cup.playerEnteredAt[p.id]??1)<=m&&(cup.playerExitedAt[p.id]??121)>m&&!cup.cardEvents.some(e=>e.playerId===p.id&&e.minute<=m)):b.opponentXI.filter(p=>!cup.cardEvents.some(e=>e.side==='away'&&e.playerId===p.id&&e.minute<=m)).map(p=>({id:p.id,name:p.name,position:p.position}));
+  const participants=side==='club'?(historyPlayers.length?historyPlayers:clubPlayers).filter(p=>(cup.playerEnteredAt[p.id]??1)<=m&&(cup.playerExitedAt[p.id]??121)>m&&!cup.cardEvents.some(e=>e.playerId===p.id&&e.minute<=m)):b.opponentXI.map(p=>({id:p.id,name:p.name,position:p.position}));
   if(!participants.length)continue;
-  let primary:BroadcastKind=roll<.04?'corner':roll<.07?'free-kick':roll<.10?'throw-in':roll<.13?'yellow':roll<.4?'shot':roll<.60?'counter':roll<.72?'wide':roll<.86?'combination':'build-up';
+  const primary:BroadcastKind=roll<.04?'corner':roll<.07?'free-kick':roll<.10?'throw-in':roll<.13?'yellow':roll<.4?'shot':roll<.60?'counter':roll<.72?'wide':roll<.86?'combination':'build-up';
   const attackers=participants.filter(p=>p.position!=='TW');
-  const preferred=attackers.filter(p=>(primary==='corner'||primary==='wide'||primary==='throw-in')?['LF','RF','LM','RM','LV','RV','LAV','RAV'].includes(p.position ?? ''):(primary==='shot'||primary==='counter')?['ST','MS','ZOM','ZM','LF','RF'].includes(p.position ?? ''):primary==='free-kick'?['ZM','ZOM','LF','RF'].includes(p.position ?? ''):true);
+  const preferred=attackers.filter(p=>(primary==='corner'||primary==='wide'||primary==='throw-in')?['LF','RF','LM','RM','LV','RV','LAV','RAV'].includes(p.position):(primary==='shot'||primary==='counter')?['ST','MS','ZOM','ZM','LF','RF'].includes(p.position):primary==='free-kick'?['ZM','ZOM','LF','RF'].includes(p.position):true);
   const selection=preferred.length?preferred:attackers;
   const player=selection[Math.floor(broadcastSeed(id+':player')*selection.length)]??participants[0];
   const stats=side==='club'?b.clubStats:b.opponentStats;
-  if(primary==='yellow'&&b.events.filter(e=>e.kind==='yellow'&&e.playerId===player.id).length>=2)continue;
+  if(primary==='yellow'&&b.events.some(e=>e.kind==='yellow'&&e.playerId===player.id))continue;
   let outcome:ShotOutcome=broadcastSeed(id+':shot')<.6?'save':broadcastSeed(id+':shot')<.88?'wide':'blocked';
   const shooting=primary==='shot'||primary==='corner'||primary==='free-kick';
   const keeper=side==='club'?b.opponentXI.find(p=>p.position==='TW'):historyPlayers.find(p=>p.position==='TW'&&(cup.playerEnteredAt[p.id]??1)<=m&&(cup.playerExitedAt[p.id]??121)>m);
-  if(shooting&&keeper){
-    const source=getStarXIPlayer('sourceId' in keeper?String(keeper.sourceId):keeper.id),a=source?.originalAttributes?.stats;
-    const shooter=getStarXIPlayer(player.id),distance=primary==='free-kick'?25:primary==='corner'?9:15+broadcastSeed(id+':distance')*18;
-    const probability=goalkeeperSaveProbability({rating:source?.rating??cup.opponentRating,reflexes:a?.gkReflexes?.value,positioning:a?.gkPositioning?.value,handling:a?.gkHandling?.value,reactions:a?.reactions?.value},distance,.2,shooter?.rating??cup.opponentRating);
-    const shotRoll=broadcastSeed(id+':shot');outcome=shotRoll<probability?'save':shotRoll<probability+(1-probability)*.7?'wide':'blocked';
-  }
   if(outcome==='save'&&!keeper)outcome='blocked';
-  let passSnapshot:OffsideSnapshot|undefined;
-  if(primary==='counter'){
-    const right=(m<=45||m>90&&m<=105)!==Boolean(cup.fixture?.away)!==(side==='opponent');
-    const x=(n:number)=>right?n:105-n;
-    const defending=side==='club'?b.opponentXI.filter(p=>!cup.cardEvents.some(e=>e.playerId===p.id)):historyPlayers;
-    const receiverX=70+broadcastSeed(id+':receiver')*25;
-    passSnapshot={releasedAt:at,right,ball:{x:x(65),y:34},receiver:{x:x(receiverX),y:28},opponents:defending.map((p,i)=>({x:x(p.position==='TW'?102:['IV','LV','RV','ZDM'].includes(p.position??'')?78+i*.4:60),y:8+i*5})),activelyInvolved:true,restart:'open-play'};
-    if(evaluateOffside(passSnapshot))primary='offside';
-  }
-  const event:BroadcastEvent={...(passSnapshot?{passSnapshot}:{}),id,kind:primary,side,minute:m,at,playerId:player.id,player:player.name,style:primary==='corner'?'header':primary==='wide'?'cross':primary==='counter'?'through':primary==='free-kick'?'lofted':primary==='shot'?'long-range':primary==='combination'?'one-touch':'ground',lane:24+broadcastSeed(id+':lane')*20,seed:roll,...(shooting?{outcome,keeperId:keeper?.id}:{})};
+  const event:BroadcastEvent={id,kind:primary,side,minute:m,at,playerId:player.id,player:player.name,style:primary==='corner'?'header':primary==='wide'?'cross':primary==='counter'?'through':primary==='free-kick'?'lofted':primary==='shot'?'long-range':primary==='combination'?'one-touch':'ground',lane:24+broadcastSeed(id+':lane')*20,seed:roll,...(shooting?{outcome,keeperId:keeper?.id}:{})};
   b.events.push(event);
-  if(primary==='offside')stats.offsides=(stats.offsides??0)+1;if(primary==='corner')stats.corners++;if(primary==='free-kick')stats.freeKicks++;if(primary==='throw-in')stats.throwIns++;if(primary==='yellow')stats.yellowCards++;
+  if(primary==='corner')stats.corners++;if(primary==='free-kick')stats.freeKicks++;if(primary==='throw-in')stats.throwIns++;if(primary==='yellow')stats.yellowCards++;
   if(shooting){stats.shots++;if(outcome==='save'){stats.onTarget++;(side==='club'?b.opponentStats:b.clubStats).saves++;}}
  }
  b.processedScene=Math.max(b.processedScene,Math.min(sceneCount,40));
@@ -133,7 +117,7 @@ export function normalizeMatchBroadcast(value:unknown):MatchBroadcast|undefined 
  if(!v.opponentXI.every((p,i)=>p&&typeof p.name==='string'&&p.id===`opponent-${i}`&&getStarXIPlayer(p.sourceId)&&Number.isFinite(p.number)&&Number.isFinite(p.rating)&&Number.isInteger(p.slot)&&p.slot===i))return undefined;
  const record=(x:unknown,min:number,max:number)=>Object.fromEntries(Object.entries(x&&typeof x==='object'?x:{}).filter(([id,n])=>(getStarXIPlayer(id)||/^opponent-([0-9]|10)$/.test(id))&&Number.isFinite(n)).map(([id,n])=>[id,clamp(Number(n),min,max)]));
  const stats=(x:BroadcastStatistics)=>Object.fromEntries(Object.keys(emptyMatchStats()).map(k=>[k,clamp(Number(x?.[k as keyof BroadcastStatistics])||0,0,10000)])) as BroadcastStatistics;
- const kinds:BroadcastKind[]=['build-up','counter','wide','combination','shot','corner','free-kick','throw-in','yellow','substitution','offside'];
+ const kinds:BroadcastKind[]=['build-up','counter','wide','combination','shot','corner','free-kick','throw-in','yellow','substitution'];
  const events=(Array.isArray(v.events)?v.events:[]).filter(e=>e&&typeof e.id==='string'&&kinds.includes(e.kind)&&['club','opponent'].includes(e.side)&&Number.isFinite(e.at)&&e.at>0&&Number.isFinite(e.minute)&&e.minute>=1&&e.minute<=120&&Number.isFinite(e.lane)&&Number.isFinite(e.seed)&&typeof e.playerId==='string'&&typeof e.player==='string'&&(!e.outcome||['save','wide','blocked'].includes(e.outcome))).slice(-180).map(e=>({...e,id:e.id.slice(0,220),player:e.player.slice(0,100),lane:clamp(e.lane,1,67)}));
  return {version:1,clubFormation:STAR_FORMATIONS.some(f=>f.id===v.clubFormation)?v.clubFormation:'433',opponentFormation:v.opponentFormation,opponentXI:v.opponentXI.map(p=>({...p,name:p.name.slice(0,100)})),slots:record(v.slots,0,10),shirtNumbers:record(v.shirtNumbers,1,99),fitness:record(v.fitness,0,100),fitnessMinute:clamp(Number(v.fitnessMinute)||1,1,120),events:[...new Map(events.map(e=>[e.id,e])).values()],processedScene:clamp(Number(v.processedScene)||0,0,40),possessionSecond:clamp(Number(v.possessionSecond)||0,0,480),clubStats:stats(v.clubStats),opponentStats:stats(v.opponentStats)};
 }

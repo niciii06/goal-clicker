@@ -19,7 +19,7 @@ test('Sydney itinerary contains real airport anchors, connecting flight, overhea
  for(let i=1;i<plan.segments.length;i++)assert.ok(distanceKm(plan.segments[i-1].to,plan.segments[i].from)<.0001);
 });
 test('local games use bus only and Barcelona has ground transfers',()=>{
- assert.ok(planJourney(VENUES.bern).segments.every(s=>s.mode==='bus'));
+ assert.deepEqual(planJourney(VENUES.bern).segments.map(s=>s.mode),['bus']);
  const p=planJourney(VENUES.barcelona);assert.equal(p.segments[0].mode,'bus');assert.equal(p.segments.at(-1)!.mode,'bus');assert.ok(p.segments.some(s=>s.mode==='plane'));
 });
 test('timeline waits at transfer hubs, follows segment duration, reloads and settles once',()=>{
@@ -51,6 +51,5 @@ test('unsupported ground geometry stays explicitly approximate with independent 
 });
 test('cached Bern roads have bends and retained endpoint coordinates',()=>{
  const p=planJourney(VENUES.bern),s=p.segments[0];assert.equal(s.geometry,'road');assert.ok(s.points.length>10);
- assert.ok(distanceKm(s.points[0],HOME_VENUE)<.001);assert.ok(distanceKm(p.segments.at(-1)!.points.at(-1)!,VENUES.bern)<.001);
- if(p.segments.length>1)assert.equal(p.segments.at(-1)!.geometry,'approximate');
+ assert.ok(distanceKm(s.points[0],HOME_VENUE)<.001);assert.ok(distanceKm(s.points.at(-1)!,VENUES.bern)<.001);
 });

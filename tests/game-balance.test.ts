@@ -67,7 +67,7 @@ test("pack positions follow a football squad distribution instead of source orde
   const pulls = 12000;
   for (let index = 0; index < pulls; index += 1) {
     const opening = openStarPack("scout", [], random);
-    counts[positionGroup(opening.player.position ?? '') as keyof typeof counts] += 1;
+    counts[positionGroup(opening.player.position) as keyof typeof counts] += 1;
   }
   assert.ok(counts.goalkeeper / pulls > 0.07 && counts.goalkeeper / pulls < 0.12);
   assert.ok(counts.defence / pulls > 0.32 && counts.defence / pulls < 0.41);
@@ -195,14 +195,14 @@ test("late season targets keep growing instead of collapsing into ten second sea
   assert.ok(finalSeason > 10000000000);
 });
 
-test("legacy tactics no longer modify squad or opponent strength", () => {
+test("tournament strength really uses seventy percent squad and thirty percent tactics", () => {
   const cup = beginCupMatch(initialGameFeatures(1000).cup, 1000, "champions");
   cup.strategyId = "angriff";
   cup.opponentStrategyId = "ballbesitz";
   const strength = getCupMatchStrength(cup, 90);
-  assert.equal(strength.tactical.score, 50);
-  assert.equal(strength.teamStrength, 90);
-  assert.equal(strength.opponentStrength, cup.opponentRating);
+  assert.equal(strength.tactical.score, 72);
+  assert.equal(strength.teamStrength, 84.6);
+  assert.equal(strength.opponentStrength, Math.round((0.7 * cup.opponentRating + 0.3 * 28) * 10) / 10);
 });
 
 test("tournaments draw four times as many tier-safe opponents as they have rounds", () => {
@@ -333,7 +333,6 @@ test("tournament rounds and trophies no longer award direct goals", () => {
   cup.homeScore = 1;
   cup.awayScore = 0;
   cup.lastTickAt = cup.matchEndsAt;
-  cup.halftimeTaken = true;
   const result = advanceCupMatch(cup, 100, cup.matchEndsAt, () => 0.5);
   assert.equal(result.tournamentWon, true);
   assert.equal("reward" in result, false);
@@ -346,7 +345,6 @@ test("a won tournament round pauses before the next manual kickoff", () => {
   cup.homeScore = 1;
   cup.awayScore = 0;
   cup.lastTickAt = cup.matchEndsAt;
-  cup.halftimeTaken = true;
 
   const result = advanceCupMatch(cup, 100, cup.matchEndsAt, () => 0.5);
 
@@ -371,7 +369,6 @@ test("a completed tournament blocks a new run for exactly five minutes", () => {
   cup.homeScore = 0;
   cup.awayScore = 1;
   cup.lastTickAt = cup.matchEndsAt;
-  cup.halftimeTaken = true;
 
   const result = advanceCupMatch(cup, 100, cup.matchEndsAt, () => 0.5);
 
@@ -394,7 +391,6 @@ test("manual tournament rounds never reuse the previous opponent after restore",
     cup.homeScore = 1;
     cup.awayScore = 0;
     cup.lastTickAt = cup.matchEndsAt;
-  cup.halftimeTaken = true;
     const result = advanceCupMatch(cup, 100, cup.matchEndsAt, () => 0.5);
     assert.equal(result.won, true);
     if (round < 2) {
@@ -436,7 +432,7 @@ test("season fixtures use the live cup state and record the real final score", (
 
   assert.equal(started.mode, "season");
   assert.equal(started.active, true);
-  assert.equal(started.matchEndsAt, now + 210000);
+  assert.equal(started.matchEndsAt, now + 360000);
   assert.deepEqual(started.originalLineupIds, starXI.lineupIds);
   assert.deepEqual(started.originalBenchIds, starXI.benchIds);
   assert.equal(started.opponentIds.length, 1);
@@ -478,10 +474,7 @@ test("a red card removes the player and blocks the next round until replacement"
   assert.ok(ratingAfterCard < ratingBeforeCard - 5);
   assert.ok(getCupMatchStrength(shortResult.cup, ratingAfterCard).teamStrength < getCupMatchStrength(cup, ratingBeforeCard).teamStrength - 3);
 
-  let rolls = 0;
-  let cardCup=advanceCupMatch({...cup,homeScore:1},100,now+1000,()=>rolls++<3?0:.5,homePlayers,state.formationPositions).cup;
-  cardCup={...cardCup,lastTickAt:cardCup.matchEndsAt,halftimeTaken:true};
-  const result=advanceCupMatch(cardCup,100,cardCup.matchEndsAt,()=>.5,homePlayers,state.formationPositions);
+  const result = advanceCupMatch(cup, 100, cup.matchEndsAt, () => 0, homePlayers, state.formationPositions);
   const card = result.cup.cardEvents[0];
 
   assert.ok(card);
@@ -521,7 +514,7 @@ test("a live injury pauses the match and a replacement resumes it", () => {
   });
   const homePlayers = getStarXISelection(state.ownedIds, state.lineupIds);
   const cup = beginCupMatch(initialGameFeatures(now).cup, now, "stadium", homePlayers, state.formationPositions, state.lineupIds, state.benchIds, () => 0.5);
-  const injuryRolls = sequenceRandom([0.5, 0.5, 0.0001, 0.5, 0.5, 0.5]);
+  const injuryRolls = sequenceRandom([0.5, 0.0001, 0.5, 0.5, 0.5]);
   const result = advanceCupMatch({ ...cup, matchEndsAt: now + 3000 }, 82, now + 1000, injuryRolls, homePlayers, state.formationPositions);
   const injury = result.cup.lastInjury;
   assert.ok(injury);
@@ -663,9 +656,9 @@ test("transfer insider timing and outcome probabilities stay exact", () => {
   const loan = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.299999, 0, 0, 0]), 2000);
   const sale = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.30, 0, 0, 0, 0]), 2000);
   const failed = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.40, 0, 0, 0, 0]), 2000);
-  assert.equal(loan.event!.outcome, "loan");
-  assert.equal(sale.event!.outcome, "sale");
-  assert.equal(failed.event!.outcome, "failed");
+  assert.equal(loan.event.outcome, "loan");
+  assert.equal(sale.event.outcome, "sale");
+  assert.equal(failed.event.outcome, "failed");
 });
 
 test("Romario waits through a live match but can move a player after its final whistle", () => {
@@ -678,7 +671,7 @@ test("Romario waits through a live match but can move a player after its final w
   live.cup.lastTickAt = 1000;
 
   const blocked = resolveTransferInsiderEvent(live, sequenceRandom([0.1, 0, 0, 0, 0]), 2000);
-  assert.equal(blocked.event!.outcome, "failed");
+  assert.equal(blocked.event.outcome, "failed");
   assert.deepEqual(blocked.features.starXI.ownedIds, originalOwnedIds);
   assert.deepEqual(blocked.features.starXI.lineupIds, originalLineupIds);
   assert.equal(blocked.features.transferSaga.archive.length, 0);
@@ -688,11 +681,11 @@ test("Romario waits through a live match but can move a player after its final w
   afterMatch.cup.pendingNextRound = true;
   afterMatch.cup.round = 1;
   const allowed = resolveTransferInsiderEvent(afterMatch, sequenceRandom([0.1, 0, 0, 0]), 2000);
-  assert.equal(allowed.event!.outcome, "loan");
-  assert.equal(allowed.features.starXI.lineupIds.includes(allowed.event!.playerId!), false);
+  assert.equal(allowed.event.outcome, "loan");
+  assert.equal(allowed.features.starXI.lineupIds.includes(allowed.event.playerId!), false);
   assert.equal(allowed.features.transferSaga.loans[0].status, "active");
   assert.equal(finishActiveTransferLoans(allowed.features, 3000).features.transferSaga.loans.length, 0);
-  assert.equal(allowed.features.transferSaga.archive.at(-1)?.id, allowed.event!.id);
+  assert.equal(allowed.features.transferSaga.archive.at(-1)?.id, allowed.event.id);
 });
 
 test("every completed tournament starts a five-minute Deadline Day and publishes a Gazette", () => {
@@ -713,8 +706,8 @@ test("every completed tournament starts a five-minute Deadline Day and publishes
 
   const loan = resolveTransferInsiderEvent(completed, sequenceRandom([0.599999, 0, 0, 0]), now + 10000);
   const sale = resolveTransferInsiderEvent(completed, sequenceRandom([0.60, 0, 0, 0, 0]), now + 10000);
-  assert.equal(loan.event!.outcome, "loan");
-  assert.equal(sale.event!.outcome, "sale");
+  assert.equal(loan.event.outcome, "loan");
+  assert.equal(sale.event.outcome, "sale");
 });
 
 test("pack trolls stay rare and only target real walkout cards", () => {
@@ -728,7 +721,7 @@ test("pack trolls stay rare and only target real walkout cards", () => {
 
 test("a loaned squad player disappears for one whole tournament and then returns", () => {
   const loanResult = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.1, 0, 0, 0]), 2000);
-  const playerId = loanResult.event!.playerId!;
+  const playerId = loanResult.event.playerId!;
   assert.equal(loanResult.features.starXI.ownedIds.includes(playerId), true);
   assert.equal(loanResult.features.starXI.lineupIds.includes(playerId), false);
   assert.equal(loanResult.features.starXI.benchIds.includes(playerId), false);
@@ -776,26 +769,26 @@ test("a transfer from the bench leaves a manual vacancy until a reserve is selec
 
 test("sales pay the card value sixty percent of the time and can be free", () => {
   const paid = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.31, 0, 0, 0.599999, 0]), 2000);
-  const paidPlayer = STAR_XI_PLAYERS.find((player) => player.id === paid.event!.playerId)!;
-  assert.equal(paid.event!.outcome, "sale");
+  const paidPlayer = STAR_XI_PLAYERS.find((player) => player.id === paid.event.playerId)!;
+  assert.equal(paid.event.outcome, "sale");
   assert.equal(paid.goalDelta, paidPlayer.price);
-  assert.equal(paid.event!.fee, paidPlayer.price);
+  assert.equal(paid.event.fee, paidPlayer.price);
   assert.equal(paid.features.starXI.ownedIds.includes(paidPlayer.id), false);
 
   const free = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.31, 0, 0, 0.6, 0]), 2000);
-  assert.equal(free.event!.outcome, "sale");
+  assert.equal(free.event.outcome, "sale");
   assert.equal(free.goalDelta, 0);
-  assert.equal(free.event!.fee, 0);
-  assert.match(free.event!.message, /ablösefrei/i);
+  assert.equal(free.event.fee, 0);
+  assert.match(free.event.message, /ablösefrei/i);
 });
 
 test("failed Fabrizio Romario reports never repeat the previous reason", () => {
   const first = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.5, 0, 0, 0, 0]), 2000);
   const second = resolveTransferInsiderEvent(first.features, sequenceRandom([0.5, 0, 0, 0, 0]), 3000);
-  assert.equal(first.event!.outcome, "failed");
-  assert.equal(second.event!.outcome, "failed");
-  assert.notEqual(first.event!.reason, second.event!.reason);
-  assert.match(second.event!.message, /Fabrizio Romario/);
+  assert.equal(first.event.outcome, "failed");
+  assert.equal(second.event.outcome, "failed");
+  assert.notEqual(first.event.reason, second.event.reason);
+  assert.match(second.event.message, /Fabrizio Romario/);
 });
 
 test("VAR keeps its exact timing, probability and payout rules", () => {

@@ -1,16 +1,14 @@
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
+import { requestMatchEdit, confirmMatchDraft } from '../../match-commands';
+import type { MatchDraft } from '../../match-commands';
 import { fixtureFor, travelGate, consumeTravel, eligibilityError, settleTravel } from '../../travel-data';
 import { claimAllAlbumRewards, claimAlbumReward, prepareCareerMatch, recordCareerMatch } from "../../career-data";
 import { getDb } from "../../../db";
 import type { RoomRow, RoomUpdate } from "../../../db";
-import { queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getTransferBonuses, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE } from "../../feature-data";
+import { activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, CUP_STRATEGIES, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupStrategy, getCupMatchMinute, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentGoalBoostMultiplier, getTournamentRewardPack, isRewardPack, openEarnedPack, getRewardPackOdds, getTransferBonuses, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, startTournamentGoalBoost, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE } from "../../feature-data";
 import type { GameFeatures, PenaltyDirection, StarFormationId, StarPackReveal } from "../../feature-data";
 import { isSupportedMultiplayerProtocol, MULTIPLAYER_UPDATE_MESSAGE } from "../../multiplayer-protocol";
 import { getFormationUnlockSeason, getPackUnlockSeason, getTournamentUnlockSeason, getUpgradeUnlockSeason, isSeasonContentUnlocked, MAX_CAREER_SEASON } from "../../season-progression";
 import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../../upgrade-purchase";
-import { MAX_MULTIPLAYER_BODY_BYTES, readJsonBody, RequestBodyTooLargeError } from "../request-body";
 
 const MAX_NAME_LENGTH = 18;
 const MAX_ROOM_NAME_LENGTH = 28;
@@ -19,10 +17,6 @@ const MAX_MULTIPLIER_LEVEL = 8;
 const MAX_SEASON_STARS = 20;
 const BALANCE_VERSION = 4;
 const MINI_GAME_COOLDOWN_SECONDS: Record<string, number> = { penalty: 60, dribble: 75, crossbar: 90, prediction: 120 };
-// Highest reward each client minigame can legitimately produce (see awardMiniGame callers in app/page.tsx).
-const MINI_GAME_MAX_REWARD: Record<string, number> = { penalty: 1000, dribble: 355, crossbar: 275, prediction: 335 };
-const GET_PASSIVE_REFRESH_MIN_MS = 5000;
-const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const PRESENCE_TIMEOUT_MS = 180000;
 const SIMULATION_LEADER_TIMEOUT_MS = 5000;
 const PASSIVE_BACKGROUND_GRACE_MS = 24 * 60 * 60 * 1000;
@@ -142,10 +136,7 @@ function cleanCode(value: unknown) {
 }
 
 function makeRoomCode() {
-  // 32 symbols divide 256 evenly, so byte % 32 has no modulo bias.
-  const bytes = new Uint8Array(6);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (byte) => ROOM_CODE_ALPHABET[byte % ROOM_CODE_ALPHABET.length]).join("");
+  return crypto.randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase();
 }
 
 function finite(value: unknown, fallback = 0) {
@@ -424,11 +415,9 @@ function jsonError(message: string, status = 400) {
 }
 
 function errorMessage(error: unknown) {
-  const message = error instanceof Error ? error.message : "";
-  console.error("[multiplayer]", error);
+  const message = error instanceof Error ? error.message : "Unbekannter Serverfehler";
   if (message.includes("no such table") || message.includes("no such column") || message.includes("Failed query")) return "Die Koop-Datenbank wird gerade aktualisiert. Bitte lade die Seite in einem Moment nochmals.";
-  if (message === "Die Welt konnte nicht gespeichert werden." || message.startsWith("Cloudflare D1 binding")) return message;
-  return "Unbekannter Serverfehler. Bitte erneut versuchen.";
+  return message;
 }
 
 async function loadRoom(code: string) {
@@ -437,12 +426,10 @@ async function loadRoom(code: string) {
   return { db, room };
 }
 
-async function refreshPassive(db: ReturnType<typeof getDb>, room: RoomRow, minElapsedMs = 0) {
+async function refreshPassive(db: ReturnType<typeof getDb>, room: RoomRow) {
   const now = Date.now();
   const last = Date.parse(room.lastPassiveAt || room.updatedAt) || now;
   const fullElapsed = Math.max(0, now - last);
-  // Passive income and timer shifts are additive over [last, now], so a deferred refresh loses nothing.
-  if (fullElapsed < minElapsedMs) return room;
   const game = readGame(room);
   const latestSeenAt = Math.max(...getOccupiedRoomPlayers(room).map((player) => Date.parse(player.lastSeenAt || "") || 0), 0);
   const activeLeaseEndsAt = latestSeenAt + PASSIVE_BACKGROUND_GRACE_MS;
@@ -498,7 +485,7 @@ export async function GET(request: Request) {
     if (!room) return jsonError("Raum nicht gefunden.", 404);
     const role = roomRole(room, playerId);
     if (!role) return jsonError("Du bist nicht in diesem Raum.", 403);
-    const refreshed = await refreshPassive(db, room, GET_PASSIVE_REFRESH_MIN_MS);
+    const refreshed = await refreshPassive(db, room);
     const touched = await db.updateRoom(code, rolePresenceUpdate(role, new Date().toISOString()));
     return Response.json({ serverNow: Date.now(), room: shapeRoom(touched ?? refreshed, playerId), role });
   } catch (error) {
@@ -508,7 +495,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const payload = await readJsonBody<{
+    const payload = (await request.json()) as {
       action?: unknown;
       mode?: unknown;
       groupId?: unknown;
@@ -524,11 +511,11 @@ export async function POST(request: Request) {
       transferId?: unknown;
       packId?: unknown;
       lineupIndex?: unknown;
-      changes?: unknown;
       benchIndex?: unknown;
       starPlayerId?: unknown;
       formationId?: unknown;
       strategy?: unknown;
+      draft?: unknown;
       direction?: unknown;
       expectedPenaltyStep?: unknown;
       tournamentId?: unknown;
@@ -540,7 +527,7 @@ export async function POST(request: Request) {
       bonusCode?: unknown;
       preferredRole?: unknown;
       protocol?: unknown;
-    }>(request, MAX_MULTIPLAYER_BODY_BYTES);
+    };
     if (!isSupportedMultiplayerProtocol(payload.protocol)) return jsonError(MULTIPLAYER_UPDATE_MESSAGE, 426);
     const action = typeof payload.action === "string" ? payload.action : "";
     const playerId = cleanPlayerId(payload.playerId);
@@ -550,15 +537,12 @@ export async function POST(request: Request) {
     if (action === "create") {
       if (nickname.length < 2) return jsonError("Der Spielername muss mindestens 2 Zeichen haben.");
       const db = getDb();
-      let code = "";
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        const candidate = makeRoomCode();
-        if (!(await db.getRoom(candidate))) {
-          code = candidate;
-          break;
-        }
+      let code = makeRoomCode();
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const existing = await db.getRoom(code);
+        if (!existing) break;
+        code = makeRoomCode();
       }
-      if (!code) return jsonError("Es konnte gerade kein freier Raumcode erzeugt werden. Bitte erneut versuchen.", 503);
       const now = new Date().toISOString();
       const roomName = cleanRoomName(payload.roomName, `${nickname}s Welt`);
       const room = await db.insertRoom({ code, roomName, hostPlayerId: playerId, hostName: nickname, hostLastSeenAt: now, lastPassiveAt: now, updatedAt: now });
@@ -577,14 +561,11 @@ export async function POST(request: Request) {
       const now = new Date().toISOString();
       const requestedRole = typeof payload.preferredRole === "string" && COOP_ROLES.includes(payload.preferredRole as CoopRole) ? payload.preferredRole as CoopRole : null;
       const directRole = roomRole(room, playerId);
-      const hasSameName = (player: ReturnType<typeof getRoomPlayer>) => player.name?.localeCompare(nickname, "de-CH", { sensitivity: "base" }) === 0;
-      // Name based recovery may only reclaim a seat whose owner is offline. An active
-      // player can never be displaced by someone who only knows the code and the name.
-      const isReclaimable = (player: ReturnType<typeof getRoomPlayer>) => Boolean(player.playerId) && !isOnline(player.lastSeenAt);
-      const sameNamePlayers = getOccupiedRoomPlayers(room).filter(hasSameName);
-      const matchingNameRoles = sameNamePlayers.filter(isReclaimable).map((player) => player.role);
+      const matchingNameRoles = getOccupiedRoomPlayers(room)
+        .filter((player) => player.name?.localeCompare(nickname, "de-CH", { sensitivity: "base" }) === 0)
+        .map((player) => player.role);
       const requestedPlayer = requestedRole ? getRoomPlayer(room, requestedRole) : null;
-      const restoredRole = requestedPlayer?.playerId && hasSameName(requestedPlayer) && isReclaimable(requestedPlayer)
+      const restoredRole = requestedPlayer?.playerId && requestedPlayer.name?.localeCompare(nickname, "de-CH", { sensitivity: "base" }) === 0
         ? requestedRole
         : matchingNameRoles.length === 1
           ? matchingNameRoles[0]
@@ -592,30 +573,20 @@ export async function POST(request: Request) {
       const reconnectRole = directRole ?? restoredRole;
       if (reconnectRole) {
         room = await refreshPassive(db, room);
-        const seatOwner = getRoomPlayer(room, reconnectRole).playerId ?? null;
-        const reconnected = await db.updateRoom(code, { ...roleIdentityUpdate(reconnectRole, playerId, nickname, now), updatedAt: now }, { seat: { role: reconnectRole, playerId: seatOwner } });
-        if (!reconnected) return jsonError("Dieser Platz wurde gerade neu vergeben. Bitte erneut versuchen.", 409);
-        return Response.json({ serverNow: Date.now(), room: shapeRoom(reconnected, playerId), role: reconnectRole });
+        const reconnected = await db.updateRoom(code, { ...roleIdentityUpdate(reconnectRole, playerId, nickname, now), updatedAt: now });
+        return Response.json({ serverNow: Date.now(), room: shapeRoom(reconnected ?? room, playerId), role: reconnectRole });
       }
-      if (sameNamePlayers.some((player) => isOnline(player.lastSeenAt))) return jsonError("Dieser Spielername ist in dieser Welt gerade aktiv. Wähle einen anderen Namen oder versuche es in drei Minuten erneut.", 409);
 
-      let joinRoom: RoomRow = room;
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        const candidateRoom = joinRoom;
-        const openRole = (["guest", "player3", "player4"] as const).find((role) => !getRoomPlayer(candidateRoom, role).playerId);
-        if (!openRole) return jsonError("Dieser Raum ist bereits voll. Maximal vier Spieler können gemeinsam spielen.", 409);
-        const wasWaiting = getOccupiedRoomPlayers(candidateRoom).length < 2;
-        const joined = await db.updateRoom(code, {
-          ...roleIdentityUpdate(openRole, playerId, nickname, now),
-          ...(wasWaiting ? { lastPassiveAt: now } : {}),
-          updatedAt: now,
-        }, { seat: { role: openRole, playerId: null } });
-        if (joined) return Response.json({ serverNow: Date.now(), room: shapeRoom(joined, playerId), role: openRole });
-        const latest = await db.getRoom(code);
-        if (!latest) return jsonError("Raum nicht gefunden.", 404);
-        joinRoom = latest;
-      }
-      return jsonError("Der Raum wurde gerade gleichzeitig betreten. Bitte erneut versuchen.", 409);
+      const joinRoom = room;
+      const openRole = (["guest", "player3", "player4"] as const).find((role) => !getRoomPlayer(joinRoom, role).playerId);
+      if (!openRole) return jsonError("Dieser Raum ist bereits voll. Maximal vier Spieler können gemeinsam spielen.", 409);
+      const wasWaiting = getOccupiedRoomPlayers(room).length < 2;
+      const joined = await db.updateRoom(code, {
+        ...roleIdentityUpdate(openRole, playerId, nickname, now),
+        ...(wasWaiting ? { lastPassiveAt: now } : {}),
+        updatedAt: now,
+      });
+      return Response.json({ serverNow: Date.now(), room: shapeRoom(joined ?? room, playerId), role: openRole });
     }
 
     const role = roomRole(room, playerId);
@@ -701,7 +672,7 @@ export async function POST(request: Request) {
     if (action === "transfer-insider-event") {
       const transferNow = Date.now();
       if (game.features.transferSaga.nextAt > transferNow) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
-      if (game.features.squadLock || game.features.cup.active) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
+      if (game.features.cup.active) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
       const result = resolveTransferInsiderEvent(game.features, Math.random, transferNow);
       game.features = result.features;
       game.goals += result.goalDelta;
@@ -711,7 +682,6 @@ export async function POST(request: Request) {
     }
 
     if (action === "event") {
-      if (game.features.squadLock) return Response.json({serverNow:Date.now(),room:shapeRoom(room,playerId),role});
       if (game.features.nextEventAt > Date.now()) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
       const event = resolveRandomEvent(game.goals);
       game.goals = Math.max(0, game.goals + event.amount);
@@ -724,7 +694,6 @@ export async function POST(request: Request) {
     }
 
     if (action === "var-event") {
-      if (game.features.squadLock) return Response.json({serverNow:Date.now(),room:shapeRoom(room,playerId),role});
       if (game.features.nextVarAt > Date.now()) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
       const event = resolveVarEvent(game.goals);
       game.goals = Math.max(0, game.goals + event.amount);
@@ -797,24 +766,11 @@ export async function POST(request: Request) {
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 
-    if(action==='cup-substitutions'){
-      if(!Array.isArray(payload.changes)||payload.changes.length>5)return jsonError('Ungültiges Wechselpaket.',409);
-      const changes=payload.changes.map(x=>({playerId:String(x?.playerId??''),slot:Number(x?.slot)}));
-      const error=queueMatchChanges(game.features,changes,Date.now());
-      if(error)return jsonError(error,409);
-      return persistGameResponse(db,room,game,timestamp,playerId,role);
-    }
-
     if (action === "star-lineup") {
-      if(game.features.squadLock && !game.features.squadLock.playerIds.includes(String(payload.starPlayerId))) return jsonError('Dieser Spieler gehört nicht zum Reisekader.',409);
+      if(game.features.cup.active&&game.features.cup.simulation)return jsonError('Nutze Wechsel / Taktik in der Matchansicht.',409);
       const lineupIndex = Number(payload.lineupIndex);
       const starPlayerId = typeof payload.starPlayerId === "string" ? payload.starPlayerId : "";
       const starPlayer = getStarXIPlayer(starPlayerId);
-      if(game.features.cup.active){
-        const error=queueMatchChanges(game.features,[{playerId:starPlayerId,slot:lineupIndex}],Date.now());
-        if(error)return jsonError(error,409);
-        return persistGameResponse(db,room,game,timestamp,playerId,role);
-      }
       if (!Number.isInteger(lineupIndex) || lineupIndex < 0 || lineupIndex >= STAR_XI_SQUAD_SIZE) return jsonError("Dieser Aufstellungsplatz ist ungültig.", 409);
       if (!starPlayer || !game.features.starXI.ownedIds.includes(starPlayerId)) return jsonError("Dieser Spieler gehört noch nicht zum Kader.", 409);
       if (game.features.transferSaga.loans.some((loan) => loan.playerId === starPlayerId)) return jsonError(`${starPlayer.name} ist ausgeliehen und aktuell nicht im Team.`, 409);
@@ -852,7 +808,6 @@ export async function POST(request: Request) {
     }
 
     if (action === "star-bench") {
-      if(game.features.squadLock && !game.features.squadLock.playerIds.includes(String(payload.starPlayerId))) return jsonError('Dieser Spieler gehört nicht zum Reisekader.',409);
       const benchIndex = Number(payload.benchIndex);
       const starPlayerId = typeof payload.starPlayerId === "string" ? payload.starPlayerId : "";
       const starPlayer = getStarXIPlayer(starPlayerId);
@@ -967,7 +922,24 @@ export async function POST(request: Request) {
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 
-    if (action === "cup-play") return jsonError('Die auswählbaren Taktiken wurden entfernt.',410);
+    if(action==='cup-edit'){
+      game.features=requestMatchEdit(game.features,Date.now());
+      return persistGameResponse(db,room,game,timestamp,playerId,role);
+    }
+    if(action==='cup-batch'){
+      const d=payload.draft as MatchDraft;
+      if(!d||!Array.isArray(d.lineup)||!d.lineup.every(id=>typeof id==='string')||typeof d.formation!=='string'||typeof d.strategy!=='string')return jsonError('Aufstellung ungültig.',409);
+      const result=confirmMatchDraft(game.features,d,Date.now());if(result.error)return jsonError(result.error,409);
+      game.features=result.features;return persistGameResponse(db,room,game,timestamp,playerId,role);
+    }
+    if (action === "cup-play") {
+      if (!game.features.cup.active) return jsonError("Der Pokal ist gerade nicht aktiv.", 409);
+      if (game.features.cup.phase === "penalties") return jsonError("Im Elfmeterschiessen gibt es keine Taktikwechsel.", 409);
+      const strategy = typeof payload.strategy === "string" && CUP_STRATEGIES.some((item) => item.id === payload.strategy) ? payload.strategy : "konter";
+      if(game.features.cup.simulation)return jsonError('Nutze Wechsel / Taktik in der Matchansicht.',409);
+      game.features.cup.strategyId = getCupStrategy(strategy).id;
+      return persistGameResponse(db, room, game, timestamp, playerId, role);
+    }
 
     if (action === "cup-resume") {
       if (!game.features.cup.active || !game.features.cup.matchPaused) return jsonError(`${game.features.cup.mode === "season" ? "Das Saisonspiel" : "Das Pokalspiel"} ist gerade nicht pausiert.`, 409);
@@ -989,8 +961,6 @@ export async function POST(request: Request) {
       const cupNow = Date.now();
       const result = resolveCupPenalty(game.features.cup, effectiveRating, direction, cupNow, Math.random, homePlayers, game.features.starXI.formationPositions);
       game.features.cup = result.cup;
-      applyPendingMatchChanges(game.features, Date.now());
-      if (result.finished) releaseMatchSquad(game.features, Date.now());
       if (result.finished) {
         game.features.starXI = restoreStarXIAfterMatch(game.features.starXI, game.features.cup);
         if (game.features.cup.mode === "season") {
@@ -1020,8 +990,6 @@ export async function POST(request: Request) {
       const effectiveRating = getStarXIEffectiveMatchRating(game.features.starXI.ownedIds, game.features.starXI.lineupIds, game.features.cup, matchMinute);
       const result = advanceCupMatch(game.features.cup, effectiveRating, cupNow, Math.random, homePlayers, game.features.starXI.formationPositions);
       game.features.cup = result.cup;
-      applyPendingMatchChanges(game.features, Date.now());
-      if (result.finished) releaseMatchSquad(game.features, Date.now());
       if (result.finished) {
         game.features.starXI = restoreStarXIAfterMatch(game.features.starXI, game.features.cup);
         if (game.features.cup.mode === "season") {
@@ -1080,7 +1048,6 @@ export async function POST(request: Request) {
     }
 
     if (action === "reset") {
-      if (role !== "host") return jsonError("Nur der Host kann den gemeinsamen Spielstand zurücksetzen.", 403);
       const sound = game.sound;
       Object.assign(game, initialGame(), { sound });
       return persistGameResponse(db, room, game, timestamp, playerId, role, { hostGoals: 0, guestGoals: 0, player3Goals: 0, player4Goals: 0, hostClicks: 0, guestClicks: 0, player3Clicks: 0, player4Clicks: 0 });
@@ -1090,7 +1057,7 @@ export async function POST(request: Request) {
       const minigameId = typeof payload.minigameId === "string" ? payload.minigameId : "";
       if (!MINI_GAME_COOLDOWN_SECONDS[minigameId]) return jsonError("Dieses Minigame gibt es nicht.");
       if (game.miniGameCooldowns[minigameId] > Date.now()) return jsonError("Dieses Minigame ist noch nicht bereit.", 409);
-      const reward = Math.max(0, Math.min(MINI_GAME_MAX_REWARD[minigameId] ?? 0, Math.floor(finite(payload.reward))));
+      const reward = Math.max(0, Math.min(1000000, Math.floor(finite(payload.reward))));
       game.goals += reward;
       game.seasonGoals += reward;
       game.totalGoals += reward;
@@ -1101,8 +1068,6 @@ export async function POST(request: Request) {
 
     return jsonError("Unbekannte Aktion.");
   } catch (error) {
-    if (error instanceof RequestBodyTooLargeError) return jsonError(error.message, 413);
-    if (error instanceof SyntaxError) return jsonError("Die Anfrage ist ungültig.", 400);
     return Response.json({ error: errorMessage(error) }, { status: 500 });
   }
 }

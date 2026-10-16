@@ -12,8 +12,6 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const dynamic = 'force-dynamic';
-
 export const metadata: Metadata = {
   title: "Goal Clicker | Football Idle Club",
   description: "Klick den Ball, sammle Tore und baue dein eigenes Fussball Imperium.",

@@ -3,22 +3,22 @@ import test from "node:test";
 import { beginSeasonCupMatch, getCupMatchMinute, getCupRegularDurationMs, initialGameFeatures, CUP_MATCH_DURATION_MS, CUP_EXTRA_TIME_DURATION_MS } from "../app/feature-data.ts";
 import { getViewerEvents } from "../app/match-viewer.tsx";
 
-test("new regular fixture has three and a half real minutes and a synchronized 90-minute clock", () => {
+test("new regular fixture has six real minutes and a synchronized 90-minute clock", () => {
   const now = 1_000_000;
   const features = initialGameFeatures(now);
   const cup = beginSeasonCupMatch(features.cup, features.seasonMode, now);
-  assert.equal(cup.matchEndsAt - cup.matchStartedAt, 210_000);
-  assert.equal(CUP_MATCH_DURATION_MS, 240_000);
-  assert.equal(CUP_EXTRA_TIME_DURATION_MS, 80_000);
+  assert.equal(cup.matchEndsAt - cup.matchStartedAt, 360_000);
+  assert.equal(CUP_MATCH_DURATION_MS, 360_000);
+  assert.equal(CUP_EXTRA_TIME_DURATION_MS, 120_000);
   assert.equal(getCupMatchMinute(cup, now), 1);
-  assert.equal(getCupMatchMinute(cup, now + 105_000), 46);
-  assert.equal(getCupMatchMinute(cup, now + 209_999), 90);
+  assert.equal(getCupMatchMinute(cup, now + 180_000), 46);
+  assert.equal(getCupMatchMinute(cup, now + 359_999), 90);
 });
 
 test("saved three-minute fixture keeps its old match clock and event calibration", () => {
   const now = 1_000_000;
   const f = initialGameFeatures(now);
-  const cup = { ...beginSeasonCupMatch(f.cup, f.seasonMode, now), regularDurationMs: undefined, matchEndsAt: now + 180_000 };
+  const cup = { ...beginSeasonCupMatch(f.cup, f.seasonMode, now), matchEndsAt: now + 180_000 };
   assert.equal(getCupRegularDurationMs(cup), 180_000);
   assert.equal(getCupMatchMinute(cup, now + 90_000), 46);
   assert.equal(getCupMatchMinute(cup, now + 179_999), 90);
@@ -42,7 +42,7 @@ test("visual match events come exclusively from recorded authoritative goal, car
 });
 
 import { baseActors, clubAttacksRight, getVisualFrame, type Replay } from '../app/match-viewer.tsx';
-import { STAR_FORMATIONS, STAR_XI_PLAYERS, setBestStarXI, getStarXISelection, advanceCupMatch, normalizeGameFeatures } from '../app/feature-data.ts';
+import { STAR_FORMATIONS, STAR_XI_PLAYERS, setBestStarXI, getStarXISelection, advanceCupMatch, getStarXIPlayer, normalizeGameFeatures } from '../app/feature-data.ts';
 import { recordCareerMatch } from '../app/career-data.ts';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
@@ -52,7 +52,6 @@ function completeFixture() {
   const f=initialGameFeatures(1_000_000);
   f.starXI=setBestStarXI({...f.starXI, ownedIds:STAR_XI_PLAYERS.map(p=>p.id)});
   f.cup=beginSeasonCupMatch(f.cup,f.seasonMode,1_000_000,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions,f.starXI.lineupIds,f.starXI.benchIds);
-  f.cup.regularDurationMs=undefined;f.cup.matchEndsAt=f.cup.matchStartedAt+360000;
   return f;
 }
 
@@ -72,7 +71,7 @@ test('all formation slots render one unique actor with valid bounded coordinates
     assert.equal(new Set(frame.actors.map(p=>p.id)).size,22);
     for(const p of frame.actors) {assert.ok(Number.isFinite(p.x)&&Number.isFinite(p.y));assert.ok(p.x>=0&&p.x<=105&&p.y>=0&&p.y<=68);}
     const keeper=frame.actors.find(p=>p.team==='club'&&p.goalkeeper)!;
-    assert.ok(keeper.x>=3&&keeper.x<=11);
+    assert.equal(keeper.x,3);
   }
 });
 

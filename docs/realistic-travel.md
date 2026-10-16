@@ -2,9 +2,8 @@
 
 New journeys store a version 2 itinerary, real duration, acceleration, each segment's
 geometry/provenance, and authoritative start/arrival timestamps. Existing journeys
-without an itinerary retain their exact original timing. New player Cup fixtures are always away; only the highest Cup final is neutral at Wembley and still requires travel. League scheduling, active/historical fixtures and player form remain unchanged.
-
-Current source-release rules and QA: [Release verification](release-match-realism.md) and [Sites project knowledge](chatgpt-sites-knowledge.md).
+without an itinerary retain their exact original timing. Fixture generation,
+league names/unlocks, match simulation and player form are unchanged.
 
 ## Time and transport
 
@@ -103,7 +102,3 @@ road input covers regional main roads plus local urban streets at public transpo
 hubs/stadiums. No private origin is included in an external OSM query. Derived
 routes retain provenance and use a 4-metre simplification tolerance. Cache changes
 require routing tests and a new production build.
-
-## Departure locks and presentation
-
-Departure freezes nominated XI/bench IDs and Fabrizio/event timer remainders. Injured or suspended nominations are rejected; reload preserves the lock and the exact remainder. Completion releases it once. The map loads on demand with a loading fallback and scrolls into view once per journey. All estimated road/rail connections remain dashed and labelled “Routenverlauf geschätzt”. The canonical cache is reconstructed from seven chunkable parts, with exact-equality regression coverage.

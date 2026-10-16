@@ -1488,13 +1488,16 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 .gc-sub-panel button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}.gc-sub-panel button:disabled{opacity:.45}.gc-sub-panel .gc-sub-heading button,.gc-sub-panel .gc-sub-confirm button{background:var(--surface-soft);border-color:var(--line);color:var(--text)}.gc-sub-panel .gc-sub-confirm button:last-child{background:var(--accent);color:white}.gc-sub-panel .gc-sub-bank .starxi-player-card{background:var(--surface-raised);border-color:var(--line)}
 @media(max-width:650px){.gc-sub-panel{padding:8px;scroll-margin-top:195px}.gc-sub-pitch{height:420px}.gc-sub-pitch .starxi-pitch-slot{padding:5px 2px;min-height:58px}.gc-sub-pitch .starxi-pitch-slot strong{font-size:9px}.gc-sub-bank{grid-template-columns:repeat(2,minmax(0,1fr))}.gc-sub-bank .starxi-player-card{padding:8px;gap:5px;grid-template-columns:1fr auto}.gc-sub-bank .starxi-player-card>span{grid-column:1/-1;font-size:9px}.gc-sub-bank strong{font-size:11px}.gc-sub-bank small{font-size:9px}.gc-sub-bank .starxi-player-card strong,.gc-sub-bank .starxi-player-card small{white-space:normal;overflow-wrap:anywhere}.gc-sub-bank .starxi-player-card b{font-size:18px}.gc-score-scorers{font-size:9px}}
 
-.gc-viewer-pitch-shell { position: relative; }
-.gc-timed-overlay { position: absolute; z-index: 8; inset: 50px 12px 65px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 20px; text-align: center; background: rgba(8,20,27,.96); color: #fff; border: 2px solid; border-radius: 18px; pointer-events: none; animation: gc-overlay-enter .2s ease-out; }
-.gc-timed-overlay > span:first-child { font-size: clamp(22px,5vw,46px); font-weight: 900; letter-spacing: .06em; }
-.gc-timed-overlay > strong { font-size: clamp(15px,2.4vw,25px); overflow-wrap: anywhere; }
-.gc-timed-overlay .gc-match-statistics { max-width: 470px; font-size: 11px; }
-.gc-timed-overlay.halftime { gap: 4px; padding: 12px; }
-.gc-timed-overlay.halftime .gc-match-statistics tr:nth-child(n+6) { display: none; }
-@keyframes gc-overlay-enter { from { opacity:0; transform:scale(.98); } to { opacity:1; transform:scale(1); } }
-@media(max-width:600px) { .gc-timed-overlay { inset:40px 5px 50px; padding:8px; gap:4px; } .gc-timed-overlay .gc-match-statistics { font-size:9px; } }
-@media(prefers-reduced-motion:reduce) { .gc-timed-overlay { animation:none; } }
+.gc-interactive-controls { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.gc-interactive-controls button,.gc-interactive-pause button { min-height:44px; padding:10px 15px; border:1px solid #d9dfdf; border-radius:10px; background:#fff; color:#183c32; font-weight:700; }
+.gc-interactive-controls button[aria-pressed="true"] { background:#e2f2e9; border-color:#6da68b; }
+.gc-interactive-controls button:disabled { opacity:.5; }
+.gc-interactive-pause { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; background:#f4f7f4; border-radius:12px; margin-top:10px; }
+.gc-interactive-ticker { max-height:420px; overflow:auto; padding:8px; }
+.gc-interactive-ticker>div { display:flex; gap:12px; padding:10px; border-bottom:1px solid #e7ebe8; }
+.gc-interactive-match .gc-sub-bank button { min-height:60px; white-space:normal; }
+.gc-interactive-match .gc-sub-confirm { flex-wrap:wrap; }
+.gc-interactive-match .gc-sub-confirm>span { flex-basis:100%; }
+.gc-interactive-match .gc-score-scorers { overflow-wrap:anywhere; }
+@media(max-width:600px) { .gc-interactive-controls button { flex:1 1 40%; } .gc-interactive-match .gc-sub-pitch strong { font-size:9px; } .gc-interactive-match .gc-sub-pitch small { font-size:8px; } .gc-interactive-match .gc-viewer-scoreboard { min-width:0; } }
+.summary-match-stats,.summary-goals { display:flex; flex-wrap:wrap; gap:8px 18px; margin:12px 0; font-size:13px; }

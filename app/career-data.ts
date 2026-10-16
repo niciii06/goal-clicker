@@ -1,3 +1,4 @@
+import { createInteractiveMatch } from './interactive-match';
 import { goalLabel } from './match-goals';
 import { recordedActionRating } from './match-broadcast';
 import { addHistory, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, STAR_XI_PLAYERS, SCRAP_PLAYERS } from './feature-data';
@@ -47,9 +48,9 @@ const POSITION_MILESTONES = Object.fromEntries(Object.entries(CATEGORY_TARGETS).
 export const CAREER_MILESTONES: readonly CareerMilestone[] = [...LEGACY_CAREER_MILESTONES, ...Object.values(POSITION_MILESTONES).flat()];
 export function getMilestoneCategory(player: StarXIPlayer): MilestoneCategory {
   if (player.position === 'TW') return 'goalkeeper';
-  if (['IV','LV','RV','LAV','RAV'].includes(player.position ?? '')) return 'defender';
-  if (['ZDM','ZM','ZOM'].includes(player.position ?? '')) return 'midfielder';
-  if (['LM','RM','LF','RF','LW','RW'].includes(player.position ?? '')) return 'winger';
+  if (['IV','LV','RV','LAV','RAV'].includes(player.position)) return 'defender';
+  if (['ZDM','ZM','ZOM'].includes(player.position)) return 'midfielder';
+  if (['LM','RM','LF','RF','LW','RW'].includes(player.position)) return 'winger';
   return 'striker';
 }
 export function getPlayerMilestones(career: CareerState, player: StarXIPlayer): readonly CareerMilestone[] {
@@ -142,6 +143,7 @@ export function prepareCareerMatch(features: GameFeatures) {
   features.cup.careerBonuses = bonuses;
   features.cup.careerRatingSeed = features.cup.matchStartedAt;
   features.cup.careerMatchId = `career-${features.cup.matchStartedAt}-${features.cup.mode}-${features.cup.opponent}`;
+  if (!features.cup.simulation && features.cup.lastTickAt === features.cup.matchStartedAt) features.cup.simulation = createInteractiveMatch(features.cup, features.starXI.lineupIds, features.starXI.formationId);
   const rival = features.career.rivals[rivalryKey(features.cup.opponent)];
   if (rival?.active) addHistory(features, { title: `Derby gegen ${rival.opponent}`, detail: `${rival.wins} Siege · ${rival.draws} Remis · ${rival.losses} Niederlagen. Die Kurve fordert Revanche!`, tone: 'neutral' });
   return features;

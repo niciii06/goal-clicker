@@ -1,7 +1,5 @@
 # Goal Clicker match viewer: Stage 3 extension
 
-> Historischer Stand. Aktuelle Regeln und Freigabe: [Release verification](release-match-realism.md) und [Sites project knowledge](chatgpt-sites-knowledge.md).
-
 Updated 12 October 2026. This supersedes the initial version-126 audit. The project now includes persisted match actions, full game lineups, fitness, standards, saves and direct match controls in addition to the six-minute clock.
 
 ## Completed behavior

@@ -1,7 +1,5 @@
 # Match center and navigation update
 
-> Historischer Stand. Aktuelle Regeln und Freigabe: [Release verification](release-match-realism.md) und [Sites project knowledge](chatgpt-sites-knowledge.md).
-
 The match center now owns one scoreboard, one chronological event feed with replay controls, and one team decision interface. The three tabs are Match, Team and Statistics. Fitness and player ratings are combined in Team; existing tactics, substitutions, cameras and interactive penalty shootouts remain available. Goals use a brief pitch-local celebration; red cards and ordinary random events use automatic, non-blocking notifications. Random-event consequences continue through the original reducers, independently of display or dismissal. Their queue no longer discards older waiting events, and the bell opens the existing persisted history.
 
 The six primary navigation areas are Home, Matches, Squad, Career, Packs & Album, and Club & More. Packs/Album and Club/Fabrizio/Missions/History use secondary navigation. Squad management is separate from match selection; live substitutions stay in the match center. A live game remains reachable from the labelled Matches tab. Main sections change without reloading the page. Existing Home upgrades, layout customization, minigames and records remain available.

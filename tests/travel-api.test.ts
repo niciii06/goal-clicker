@@ -59,7 +59,6 @@ test('solo server timestamps reject fabricated arrival and local clock, reopens 
  const reopened=await soloAction('status',{fixtureId:j.fixture.id});assert.deepEqual(reopened.data.journey,j);assert.equal(reopened.data.serverNow,clock);
  clock=j.endsAt+1;const arrived=await soloAction('status',{fixtureId:j.fixture.id});assert.equal(arrived.data.journey.consumed,false);
  const kickoff=await soloAction('start',{features:f,mode:'season'});assert.equal(kickoff.status,200);assert.equal(kickoff.data.journey.consumed,true);assert.equal(ledger.size,1);
- const retried=await soloAction('start',{features:f,mode:'season'});assert.equal(retried.status,200);assert.deepEqual(retried.data.journey,kickoff.data.journey);
 });
 test('unregistered shared player and incomplete solo lineup cannot depart',async()=>{
  const f=setup();assert.equal((await action('travel-start',{mode:'season'},'stranger-12345')).status,403);f.starXI.ownedIds=[];f.starXI.lineupIds=[];

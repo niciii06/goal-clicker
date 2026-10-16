@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import { env } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/d1";
 import * as schema from "./schema";
@@ -7,21 +7,10 @@ import { coopRooms, soloTravel } from "./schema";
 export type RoomRow = typeof coopRooms.$inferSelect;
 export type RoomUpdate = Partial<Omit<RoomRow, "code">>;
 
-export type RoomSeatRole = "host" | "guest" | "player3" | "player4";
-
 type RoomConditions = {
   sharedStateVersion?: number;
   lastPassiveAt?: string;
-  /** Guards a seat write: null requires a still empty seat, a string requires the seat to still belong to that player. */
-  seat?: { role: RoomSeatRole; playerId: string | null };
 };
-
-function seatPlayerColumn(role: RoomSeatRole) {
-  if (role === "host") return coopRooms.hostPlayerId;
-  if (role === "guest") return coopRooms.guestPlayerId;
-  if (role === "player3") return coopRooms.player3PlayerId;
-  return coopRooms.player4PlayerId;
-}
 
 function createDatabase() {
   if (!env.DB) {
@@ -90,10 +79,6 @@ export class GoalClickerDatabase {
     const predicates = [eq(coopRooms.code, code)];
     if (conditions.sharedStateVersion !== undefined) predicates.push(eq(coopRooms.sharedStateVersion, conditions.sharedStateVersion));
     if (conditions.lastPassiveAt !== undefined) predicates.push(eq(coopRooms.lastPassiveAt, conditions.lastPassiveAt));
-    if (conditions.seat) {
-      const seatColumn = seatPlayerColumn(conditions.seat.role);
-      predicates.push(conditions.seat.playerId === null ? isNull(seatColumn) : eq(seatColumn, conditions.seat.playerId));
-    }
     const [room] = await this.client
       .update(coopRooms)
       .set(values)

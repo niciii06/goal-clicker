@@ -18,11 +18,8 @@ if [[ ! -x "${vinext}" ]]; then
   exit 69
 fi
 
-# Vinext builds multiple environments without emptying dist; discard stale assets once.
-rm -rf -- "${SITES_PROJECT_ROOT}/dist"
 echo "Running bounded vinext build..."
-env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy \
- timeout \
+timeout \
   --signal=TERM \
   --kill-after="${SITES_BUILD_KILL_AFTER:-10s}" \
   "${SITES_BUILD_TIMEOUT:-3m}" \

@@ -1,9 +1,11 @@
 "use client";
 
-export const dynamic = "force-dynamic";
+import { requestMatchEdit, confirmMatchDraft } from './match-commands';
+import type { MatchDraft } from './match-commands';
 
-import { fixtureFor, journeyView, settleTravel, consumeTravel, eligibilityError, travelTiming } from './travel-data';
+import { fixtureFor, journeyView, settleTravel, consumeTravel, eligibilityError, travelTiming, REGION_LABELS } from './travel-data';
 import type { Journey, TravelFixture } from './travel-data';
+import { regionForDivision } from './travel-geography';
 import { TravelPanel, TravelStatsPanel, durationLabel } from './travel-panel';
 import { LiveMatchViewer } from "./match-viewer";
 import { claimAllAlbumRewards, claimAlbumReward, prepareCareerMatch, recordCareerMatch, getCareerCard, rivalryKey } from "./career-data";
@@ -12,7 +14,7 @@ import { CareerPanel, AlbumPanel, MatchRatingsPanel, CareerPlayerBadge, PostMatc
 import { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AnimationEvent, CSSProperties, DragEvent, ErrorInfo, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { AR, BA, BE, BG, BR, CH, CI, CM, CO, CZ, DE, DK, EC, EG, ES, FR, GB_ENG, GB_NIR, GB_SCT, GB_WLS, GE, GH, GN, HR, HU, IE, IT, JP, KR, MA, MX, NG, NL, NO, PL, PT, RO, RS, RU, SE, SI, TR, UA, US, UY } from "country-flag-icons/react/3x2";
-import { queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, CLUB_BADGES, CLUB_COLORS, completeTournamentRun, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentGoalBoostMultiplier, getTournamentRewardPack, isRewardPack, openEarnedPack, getRewardPackOdds, getTransferBonuses, getUnavailableStarXIPlayerIds, initialGameFeatures, isTransferDeadlineDay, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, resumeCupMatch, shouldTriggerPackTroll, startSeasonPrestige, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_CUSTOM_PLAYERS, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_TOTAL_CARD_COUNT, SEASON_MODE_MATCHES_PER_SEASON, TOURNAMENTS } from "./feature-data";
+import { activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, CLUB_BADGES, CLUB_COLORS, completeTournamentRun, CUP_STRATEGIES, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getCupStrategy, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentGoalBoostMultiplier, getTournamentRewardPack, isRewardPack, openEarnedPack, getRewardPackOdds, getTransferBonuses, getUnavailableStarXIPlayerIds, initialGameFeatures, isTransferDeadlineDay, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, resumeCupMatch, shouldTriggerPackTroll, startSeasonPrestige, startTournamentGoalBoost, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_CUSTOM_PLAYERS, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_TOTAL_CARD_COUNT, SEASON_MODE_MATCHES_PER_SEASON, TOURNAMENTS } from "./feature-data";
 import type { CoopMission, CupCardEvent, GameFeatures, PenaltyDirection as CupPenaltyDirection, RandomEvent, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationId, StarPackId, StarPackReveal, TournamentGazetteIssue, TournamentId, TransferInsiderEvent } from "./feature-data";
 import { getStarCardTier, getWalkoutPresentation } from "./walkout-data";
 import { getFormationUnlockSeason, getPackUnlockSeason, getSeasonMilestone, getTournamentUnlockSeason, getUpgradeUnlockSeason, isSeasonContentUnlocked, MAX_CAREER_SEASON, SEASON_MILESTONES } from "./season-progression";
@@ -49,13 +51,12 @@ function WalkoutCountryFlag({ code, country, compact = false }: { code: string; 
 }
 
 function formatStarXIPositions(player: Parameters<typeof getStarXIPositions>[0], compact = false) {
-  return player.benchOnly ? `${player.symbol} Nur Bank` : player.id === "star-goat-nicu" ? "Alle Positionen" : getStarXIPositions(player).join(compact ? "/" : " / ");
+  return player.id === "star-goat-nicu" ? "Alle Positionen" : getStarXIPositions(player).join(compact ? "/" : " / ");
 }
 
 type StarXIPositionBadgeVariant = "reveal" | "walkout" | "rare" | "compact";
 
 function StarXIPositionBadges({ player, variant = "reveal" }: { player: Parameters<typeof getStarXIPositions>[0]; variant?: StarXIPositionBadgeVariant }) {
-  if(player.benchOnly)return <span className="starxi-position-badge">{player.symbol} Nur Bank</span>;
   const positions = player.id === "star-goat-nicu" ? ["Alle Positionen"] : getStarXIPositions(player);
   return <span className={`starxi-position-badges starxi-position-badges-${variant}`} aria-label={`Positionen: ${positions.join(", ")}`}>
     {positions.map((position) => <span key={position}>{position === "Alle Positionen" ? "ALLE POSITIONEN" : position}</span>)}
@@ -294,12 +295,12 @@ function formatPackChance(chance: number) {
 let travelClock: {server:number;monotonic:number}|null=null;
 function syncTravelClock(serverNow:unknown) { if(typeof serverNow==='number'&&Number.isFinite(serverNow)) travelClock={server:serverNow,monotonic:performance.now()}; }
 function getTravelTime() { return travelClock?travelClock.server+performance.now()-travelClock.monotonic:Date.now(); }
+let sessionClock:{wall:number;monotonic:number}|null=null;
 function getCurrentTime() {
-  return Date.now();
+  if(typeof window==='undefined')return Date.now();
+  sessionClock??={wall:Date.now(),monotonic:performance.now()};
+  return sessionClock.wall+performance.now()-sessionClock.monotonic;
 }
-
-// A lost response for these actions may hide a purchase that the server already applied.
-const NETWORK_RETRY_UNSAFE_COOP_ACTIONS = new Set(["buy", "star-pack", "star-custom-draw", "star-custom-buy"]);
 
 function notifyCoopOffline(code: string | undefined, playerId: string | undefined) {
   if (!code || !playerId || typeof navigator === "undefined") return;
@@ -779,16 +780,15 @@ function App() {
     const sync=async()=>{try{
       const response=await fetch('/api/travel',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'status',playerId,fixtureId:soloJourneyId})});
       const data=await response.json() as {journey?:Journey;serverNow?:number};
-      const serverJourney=data.journey, serverNow=data.serverNow;
-      if(stopped||!response.ok||!serverJourney||typeof serverNow!=='number'||!Number.isFinite(serverNow))return;
-      syncTravelClock(serverNow);
+      if(stopped||!response.ok||!data.journey)return;
+      syncTravelClock(data.serverNow);
       setGame(current=>{
         if(current.features.travel.journey?.id!==soloJourneyId)return current;
         const old=current.features.travel;
-        const j={...serverJourney,consumed:old.journey!.consumed};
+        const j={...data.journey,consumed:old.journey!.consumed};
         const counted=(old.journey as Journey & {counted?:boolean}).counted;
-        const travel=settleTravel({...old,journey:{...j,counted} as Journey},serverNow);
-        return {...current,features:{...current.features,travel,squadLock:serverJourney.squadLock,starXI:{...current.features.starXI,lockedPlayerIds:serverJourney.squadLock?.playerIds}}};
+        const travel=settleTravel({...old,journey:{...j,counted} as Journey},data.serverNow!);
+        return {...current,features:{...current.features,travel}};
       });
     }catch{ /* Last authoritative clock continues; kickoff always revalidates. */ }};
     void sync();const timer=window.setInterval(()=>{const j=gameRef.current.features.travel.journey;if(j&&!journeyView(j,getTravelTime()).arrived)void sync();},5000);
@@ -851,16 +851,17 @@ function App() {
   const startingStarXISelection = startingStarXIPlayers.filter((player): player is NonNullable<typeof player> => Boolean(player));
   const benchStarXIPlayers = useMemo(() => Array.from({ length: STAR_XI_BENCH_SIZE }, (_, index) => getStarXIPlayer(benchStarIds[index] ?? "") ?? null), [benchStarIds]);
   const benchStarXIPlayerCount = benchStarXIPlayers.filter(Boolean).length;
-  const loanedStarIds = displayGame.features.transferSaga.loans.map((loan) => loan.playerId);
+  const loanedStarIds = useMemo(() => displayGame.features.transferSaga.loans.map((loan) => loan.playerId), [displayGame.features.transferSaga.loans]);
   const currentTransferLoans = displayGame.features.transferSaga.loans.map((loan) => ({ loan, player: getStarXIPlayer(loan.playerId) })).filter((entry): entry is { loan: typeof entry.loan; player: NonNullable<ReturnType<typeof getStarXIPlayer>> } => Boolean(entry.player));
   const transferArchive = [...displayGame.features.transferSaga.archive].reverse();
-  const reserveStarXIPlayers = useMemo(() => ownedStarXIPlayers.filter((player) => !lineupStarIds.includes(player.id) && !benchStarIds.includes(player.id) && !loanedStarIds.includes(player.id)), [benchStarIds, lineupStarIds, loanedStarIds, ownedStarXIPlayers]);
+  const reserveStarXICount = useMemo(() => {const assigned=new Set([...lineupStarIds,...benchStarIds,...loanedStarIds]);return ownedStarIds.filter(id=>!assigned.has(id)).length;},[ownedStarIds,lineupStarIds,benchStarIds,loanedStarIds]);
+  const reserveStarXIPlayers = useMemo(() => featureTab!=="squad" || displayGame.features.cup.active ? [] : ownedStarXIPlayers.filter((player) => !lineupStarIds.includes(player.id) && !benchStarIds.includes(player.id) && !loanedStarIds.includes(player.id)), [benchStarIds, lineupStarIds, loanedStarIds, ownedStarXIPlayers, featureTab, displayGame.features.cup.active]);
   const suspendedStarIds = displayGame.features.cup.suspendedPlayerIds;
   const unavailableStarIds = getUnavailableStarXIPlayerIds(displayGame.features);
   const injuredStarIds = Object.entries(displayGame.features.cup.injuredPlayerIds ?? {}).filter(([, matches]) => Number(matches) > 0).map(([playerId]) => playerId);
   const suspendedStarPlayers = suspendedStarIds.map((id) => getStarXIPlayer(id)).filter((player): player is NonNullable<ReturnType<typeof getStarXIPlayer>> => Boolean(player));
   const injuredStarPlayers = injuredStarIds.map((id) => ({ player: getStarXIPlayer(id), matches: Math.max(0, Math.floor(Number(displayGame.features.cup.injuredPlayerIds[id]) || 0)) })).filter((entry): entry is { player: NonNullable<ReturnType<typeof getStarXIPlayer>>; matches: number } => Boolean(entry.player) && entry.matches > 0);
-  const activeMatchInjury = displayGame.features.cup.matchPaused ? displayGame.features.cup.lastInjury : null;
+  const activeMatchInjury = displayGame.features.cup.matchPaused && !displayGame.features.cup.simulation ? displayGame.features.cup.lastInjury : null;
   const suspendedPlayerOnSquad = suspendedStarIds.some((id) => lineupStarIds.includes(id) || benchStarIds.includes(id));
   const activeLineupSlot = selectedLineupSlot !== null && selectedLineupSlot < STAR_XI_SQUAD_SIZE ? selectedLineupSlot : null;
   const activeFormation = getStarFormation(starXIState.formationId);
@@ -1466,9 +1467,8 @@ function App() {
           }
           return data;
         } catch {
-          const retryUnsafe = NETWORK_RETRY_UNSAFE_COOP_ACTIONS.has(action);
-          if (action !== "click" && !retryUnsafe && attempt + 1 < Math.min(3, maxAttempts)) continue;
-          setCoopMessage(retryUnsafe ? "Die Verbindung wurde unterbrochen. Prüfe den gemeinsamen Kontostand, bevor du den Kauf wiederholst." : "Die Verbindung zum Koop-Raum ist gerade unterbrochen.");
+          if (action !== "click" && attempt + 1 < Math.min(3, maxAttempts)) continue;
+          setCoopMessage("Die Verbindung zum Koop-Raum ist gerade unterbrochen.");
           return null;
         }
       }
@@ -1574,7 +1574,7 @@ function App() {
   }
 
   function triggerRandomEvent() {
-    if (gameRef.current.features.squadLock || eventLockRef.current || gameRef.current.features.nextEventAt > getCurrentTime()) return;
+    if (eventLockRef.current || gameRef.current.features.nextEventAt > getCurrentTime()) return;
     eventLockRef.current = true;
     const event = resolveRandomEvent(gameRef.current.goals);
     applyLocalEvent(event);
@@ -1582,7 +1582,7 @@ function App() {
   }
 
   function triggerVarEvent() {
-    if (gameRef.current.features.squadLock || eventLockRef.current || gameRef.current.features.nextVarAt > getCurrentTime()) return;
+    if (eventLockRef.current || gameRef.current.features.nextVarAt > getCurrentTime()) return;
     eventLockRef.current = true;
     const event = resolveVarEvent(gameRef.current.goals);
     applyLocalEvent(event);
@@ -1590,7 +1590,7 @@ function App() {
   }
 
   function triggerTransferInsiderEvent() {
-    if (eventLockRef.current || gameRef.current.features.cup.active || gameRef.current.features.squadLock || gameRef.current.features.transferSaga.nextAt > getCurrentTime()) return;
+    if (eventLockRef.current || gameRef.current.features.cup.active || gameRef.current.features.transferSaga.nextAt > getCurrentTime()) return;
     eventLockRef.current = true;
     const result = resolveTransferInsiderEvent(gameRef.current.features);
     setGame((current) => ({
@@ -1607,13 +1607,13 @@ function App() {
     if (!hydrated) return;
     const timer = window.setInterval(() => {
       if (appMode === "coop" && isCoopLive) {
-        if (!displayGame.features.squadLock && !displayGame.features.cup.active && displayGame.features.transferSaga.nextAt <= getCurrentTime()) void sendCoopAction("transfer-insider-event");
-        else if (!displayGame.features.squadLock && displayGame.features.nextVarAt <= getCurrentTime()) void sendCoopAction("var-event");
-        else if (!displayGame.features.squadLock && displayGame.features.nextEventAt <= getCurrentTime()) void sendCoopAction("event");
+        if (!displayGame.features.cup.active && displayGame.features.transferSaga.nextAt <= getCurrentTime()) void sendCoopAction("transfer-insider-event");
+        else if (displayGame.features.nextVarAt <= getCurrentTime()) void sendCoopAction("var-event");
+        else if (displayGame.features.nextEventAt <= getCurrentTime()) void sendCoopAction("event");
       } else if (appMode === "single") {
-        if (!gameRef.current.features.squadLock && !gameRef.current.features.cup.active && gameRef.current.features.transferSaga.nextAt <= getCurrentTime()) triggerTransferInsiderEvent();
-        else if (!gameRef.current.features.squadLock && gameRef.current.features.nextVarAt <= getCurrentTime()) triggerVarEvent();
-        else if (!gameRef.current.features.squadLock && gameRef.current.features.nextEventAt <= getCurrentTime()) triggerRandomEvent();
+        if (!gameRef.current.features.cup.active && gameRef.current.features.transferSaga.nextAt <= getCurrentTime()) triggerTransferInsiderEvent();
+        else if (gameRef.current.features.nextVarAt <= getCurrentTime()) triggerVarEvent();
+        else if (gameRef.current.features.nextEventAt <= getCurrentTime()) triggerRandomEvent();
       }
     }, 5000);
     return () => window.clearInterval(timer);
@@ -1698,13 +1698,7 @@ function App() {
       }
       return;
     }
-    const latestGame = gameRef.current;
-    if (latestGame.goals < pack.price || latestGame.features.cup.active) {
-      packPurchaseRef.current = false;
-      showToast(latestGame.features.cup.active ? "Während eines Pokalspiels keine Packs." : `${pack.label} kostet ${formatNumber(pack.price)} Tore.`);
-      return;
-    }
-    const opening = openStarPack(pack.id, latestGame.features.starXI.ownedIds, Math.random, latestGame.features.starXI.formationPositions);
+      const opening = openStarPack(pack.id, displayGame.features.starXI.ownedIds, Math.random, displayGame.features.starXI.formationPositions);
     const reveal: StarPackReveal = { packId: opening.packId, packName: opening.packName, player: opening.player, duplicate: opening.duplicate, fragmentCompensation: opening.fragmentCompensation, source: opening.source, openedAt: Date.now(), openedBy: "Du", troll: shouldTriggerPackTroll(opening.player) };
     setGame((current) => {
       const features = normalizeGameFeatures(current.features);
@@ -1769,18 +1763,10 @@ function App() {
     showToast(opening.duplicate ? `Doppelt gezogen · +${formatNumber(opening.fragmentCompensation)} Fragmente` : `${opening.player.name} gezogen`);
   }
 
-  async function confirmMatchChanges(changes: {playerId:string;slot:number}[]) {
-    if(isCoopLive){await sendCoopAction('cup-substitutions',{changes});return;}
-    let failure='';
-    setGame(current=>{const features=normalizeGameFeatures(current.features);failure=queueMatchChanges(features,changes,getCurrentTime());return failure?current:{...current,features};});
-    showToast(failure||'Wechsel für den nächsten Unterbruch vorgemerkt.');
-  }
-
   async function moveStarXIPlayerToLineup(playerId: string, lineupIndex: number) {
-    if(displayGame.features.cup.active){await confirmMatchChanges([{playerId,slot:lineupIndex}]);return;}
+    if(displayGame.features.cup.active && displayGame.features.cup.simulation){showToast('Öffne Wechsel / Taktik in der Matchansicht.');return;}
     const player = getStarXIPlayer(playerId);
     if (!player || !Number.isInteger(lineupIndex) || lineupIndex < 0 || lineupIndex >= STAR_XI_SQUAD_SIZE || !displayGame.features.starXI.ownedIds.includes(playerId)) return;
-    if (displayGame.features.squadLock && !displayGame.features.squadLock.playerIds.includes(playerId)) { showToast('Dieser Spieler gehört nicht zum Reisekader.'); return; }
     if (suspendedStarIds.includes(playerId)) {
       showToast(`${player.name} ist nach der Roten Karte für die nächste Partie gesperrt.`);
       return;
@@ -1906,7 +1892,6 @@ function App() {
   async function selectStarXIBenchPlayer(playerId: string, benchIndex: number) {
     const player = getStarXIPlayer(playerId);
     if (!player || displayGame.features.cup.active || !displayGame.features.starXI.ownedIds.includes(playerId) || displayGame.features.starXI.lineupIds.includes(playerId)) return;
-    if (displayGame.features.squadLock && !displayGame.features.squadLock.playerIds.includes(playerId)) { showToast('Dieser Spieler gehört nicht zum Reisekader.'); return; }
     if (suspendedStarIds.includes(playerId)) {
       showToast(`${player.name} darf nach einer Roten Karte nicht auf die Bank.`);
       return;
@@ -2075,7 +2060,7 @@ function App() {
         const old=current.features.travel, counted=old.journey?.id===data.journey!.id?(old.journey as Journey & {counted?:boolean}).counted:false;
         const travel=settleTravel({...old,journey:{...data.journey!,consumed:false,counted} as Journey},data.serverNow!);
         travel.journey!.consumed=false;
-        return {...current,features:{...current.features,travel,squadLock:data.journey!.squadLock,starXI:{...current.features.starXI,lockedPlayerIds:data.journey!.squadLock?.playerIds}}};
+        return {...current,features:{...current.features,travel}};
       });
       setFeatureTab('cup');
       return action==='start'?data.journey.fixture:null;
@@ -2178,6 +2163,26 @@ function App() {
     showToast(`Spieltag ${displayGame.features.seasonMode.matchday + 1} · ${nextOpponent.name} · Anpfiff · 06:00`);
   }
 
+  async function playCup(strategyId: string) {
+    if (!displayGame.features.cup.active) return;
+    if(displayGame.features.cup.simulation){void editInteractiveMatch();return;}
+    if (!CUP_STRATEGIES.some((strategy) => strategy.id === strategyId)) return;
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("cup-play", { strategy: strategyId });
+      if (data) setCoopMessage("Taktik für das Live-Spiel geändert.");
+      setCoopBusy(false);
+      return;
+    }
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      if (!features.cup.active) return current;
+      features.cup.strategyId = getCupStrategy(strategyId).id;
+      return { ...current, features };
+    });
+    const strategy = CUP_STRATEGIES.find((item) => item.id === strategyId);
+    showToast(`${strategy?.label ?? "Taktik"} aktiviert`);
+  }
 
   function recordFinishedSeasonMatch(features: GameFeatures, now: number) {
     const result = recordSeasonModeMatch(features.seasonMode, features.cup.homeScore, features.cup.awayScore, features.club.name, now, Math.random, features.cup.opponentIds[0]);
@@ -2215,8 +2220,6 @@ function App() {
       const cupNow = getCurrentTime();
       const result = resolveCupPenalty(features.cup, effectiveRating, direction, cupNow, Math.random, homePlayers, features.starXI.formationPositions);
       features.cup = result.cup;
-      applyPendingMatchChanges(features, getCurrentTime());
-      if (result.finished) releaseMatchSquad(features, getCurrentTime());
       if (result.finished) {
         features.starXI = restoreStarXIAfterMatch(features.starXI, features.cup);
         if (features.cup.mode === "season") {
@@ -2238,20 +2241,31 @@ function App() {
     });
   }
 
+  async function editInteractiveMatch() {
+    if(isCoopLive){await sendCoopAction('cup-edit');return;}
+    setGame(current=>({...current,features:requestMatchEdit(normalizeGameFeatures(current.features),getCurrentTime())}));
+  }
+  async function batchInteractiveMatch(draft:MatchDraft){
+    if(isCoopLive){await sendCoopAction('cup-batch',{draft});return;}
+    setGame(current=>{const result=confirmMatchDraft(normalizeGameFeatures(current.features),draft,getCurrentTime());return result.error?current:{...current,features:result.features};});
+  }
+  async function resumeInteractiveMatch(){
+    if(isCoopLive){await sendCoopAction('cup-resume');return;}
+    setGame(current=>({...current,features:{...current.features,cup:resumeCupMatch(current.features.cup,getCurrentTime())}}));
+  }
   function advanceLocalCup() {
     if (!gameRef.current.features.cup.active) return;
     const now = getCurrentTime();
     setGame((current) => {
-      let features = normalizeGameFeatures(current.features);
+      let features = { ...current.features };
       const homePlayers = getStarXISelection(features.starXI.ownedIds, features.starXI.lineupIds);
       const matchMinute = getCupMatchMinute(features.cup, now);
       const effectiveRating = getStarXIEffectiveMatchRating(features.starXI.ownedIds, features.starXI.lineupIds, features.cup, matchMinute);
       const result = advanceCupMatch(features.cup, effectiveRating, now, Math.random, homePlayers, features.starXI.formationPositions);
       if (!result.finished && result.cup.lastTickAt === features.cup.lastTickAt) return current;
       features.cup = result.cup;
-      applyPendingMatchChanges(features, getCurrentTime());
-      if (result.finished) releaseMatchSquad(features, getCurrentTime());
       if (result.finished) {
+        features = structuredClone(features);
         features.starXI = restoreStarXIAfterMatch(features.starXI, features.cup);
         if (features.cup.mode === "season") {
           const finished = recordFinishedSeasonMatch(features, now);
@@ -2547,11 +2561,6 @@ function App() {
 
   function resetGame() {
     if (isCoopLive) {
-      if (coopSession?.role !== "host") {
-        setCoopMessage("Nur der Host kann den gemeinsamen Spielstand zurücksetzen.");
-        showToast("Nur der Host kann zurücksetzen");
-        return;
-      }
       if (!window.confirm("Soll der gemeinsame Koop Spielstand neu gestartet werden?")) return;
       setCoopBusy(true);
       void sendCoopAction("reset").then((data) => {
@@ -2562,10 +2571,7 @@ function App() {
     }
     if (!window.confirm("Wirklich den kompletten Spielstand löschen?")) return;
     const sound = game.sound;
-    const freshGame: GameState = { ...initialGame(), sound };
-    // Update the ref synchronously so the autosave interval or pagehide cannot persist the old state again.
-    gameRef.current = freshGame;
-    setGame(freshGame);
+    setGame({ ...initialGame(), sound });
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(BACKUP_STORAGE_KEY);
     localStorage.removeItem(RECOVERY_STORAGE_KEY);
@@ -2785,8 +2791,8 @@ function App() {
 
             {(() => { const opponent = displayGame.features.cup.active ? displayGame.features.cup.opponent : getSeasonModeNextOpponent(displayGame.features.seasonMode, displayClubName).name; const rival = displayGame.features.career.rivals[rivalryKey(opponent)]; return rival?.active ? <div className="career-derby-banner"><strong>🔥 Derby gegen {rival.opponent}</strong>{rival.wins} Siege · {rival.draws} Remis · {rival.losses} Niederlagen. Die Kurve zählt auf dich. Sieg: 400 Fragmente, Remis: 150.</div> : null; })()}
             <div className="feature-panel-heading"><div><p className="eyebrow">SAISONMODUS / STAR XI</p><h3>Jede Partie zählt.</h3></div><span className="feature-stat">{starXIRating} OVR</span></div>
-            <p className="feature-copy">10 Spieltage pro Saison, Aufstieg und Abstieg über die Tabelle. Ligaspiele dauern etwa 3–4 Minuten, Pokalspiele 4–5 Minuten plus Unterbrüche. Formation, Spielerstärke, Form und Fitness bestimmen die Partie.</p>
-            <div className="starxi-summary"><div><span>STAR XI RATING</span><strong>{starXIRating}</strong><small>Bewertung deiner aktuellen Startelf</small></div><div><span>STARTELF</span><strong>{startingStarXISelection.length} / {STAR_XI_SQUAD_SIZE}</strong><small>{starXIComplete ? "Alle 11 Positionen korrekt besetzt" : `${STAR_XI_SQUAD_SIZE} passende Startplätze erforderlich`}</small></div><div><span>BANK</span><strong>{benchStarXIPlayerCount} / {STAR_XI_BENCH_SIZE}</strong><small>{reserveStarXIPlayers.length} weitere Spieler im Speicher</small></div><div><span>{displayGame.features.cup.active ? "LIVE WECHSEL" : "SAISONPARTIEN"}</span><strong>{displayGame.features.cup.active ? `${displayGame.features.cup.substitutionsUsed} / ${STAR_XI_MAX_SUBSTITUTIONS}` : displayGame.features.seasonMode.history.length}</strong><small>{displayGame.features.cup.active ? "Startelf wählen, danach passenden Bankspieler" : "Alle Ergebnisse zählen für die Tabelle"}</small></div><div><span>FRAGMENTE</span><strong>{formatNumber(displayGame.features.starXI.fragments)}</strong><small>Automatisch für Custom-Karten</small></div></div>
+            <p className="feature-copy">10 Spieltage pro Saison, Aufstieg und Abstieg über die Tabelle. Jede Partie dauert 6 Minuten und läuft im selben Live-Match mit Taktik, Verletzungen, manuellen Wechseln, Verlängerung und Elfmeterschiessen. Teamrating zählt 70 Prozent, deine Taktik 30 Prozent.</p>
+            <div className="starxi-summary"><div><span>STAR XI RATING</span><strong>{starXIRating}</strong><small>Bewertung deiner aktuellen Startelf</small></div><div><span>STARTELF</span><strong>{startingStarXISelection.length} / {STAR_XI_SQUAD_SIZE}</strong><small>{starXIComplete ? "Alle 11 Positionen korrekt besetzt" : `${STAR_XI_SQUAD_SIZE} passende Startplätze erforderlich`}</small></div><div><span>BANK</span><strong>{benchStarXIPlayerCount} / {STAR_XI_BENCH_SIZE}</strong><small>{reserveStarXICount} weitere Spieler im Speicher</small></div><div><span>{displayGame.features.cup.active ? "LIVE WECHSEL" : "SAISONPARTIEN"}</span><strong>{displayGame.features.cup.active ? `${displayGame.features.cup.substitutionsUsed} / ${STAR_XI_MAX_SUBSTITUTIONS}` : displayGame.features.seasonMode.history.length}</strong><small>{displayGame.features.cup.active ? "Startelf wählen, danach passenden Bankspieler" : "Alle Ergebnisse zählen für die Tabelle"}</small></div><div><span>FRAGMENTE</span><strong>{formatNumber(displayGame.features.starXI.fragments)}</strong><small>Automatisch für Custom-Karten</small></div></div>
             {suspendedStarPlayers.length > 0 && <div className="red-card-warning" role="alert"><span>🟥</span><div><strong>{suspendedStarPlayers.map((player) => player.name).join(", ")} nach Roter Karte gesperrt</strong><small>Ersetze {suspendedStarPlayers.length === 1 ? "den Spieler" : "die Spieler"} in der Startelf. {suspendedStarPlayers.length === 1 ? "Er darf" : "Sie dürfen"} bis zum nächsten Anpfiff nicht auf die Bank.</small></div></div>}
             {injuredStarPlayers.length > 0 && <div className="injury-warning" role="status"><span>🩹</span><div><strong>{injuredStarPlayers.map(({ player }) => player.name).join(", ")} verletzt</strong><small>{injuredStarPlayers.map(({ player, matches }) => `${player.name}: noch ${matches} ${matches === 1 ? "Spiel" : "Spiele"}`).join(" · ")}. Verletzungen entstehen nur im laufenden Saisonspiel.</small></div></div>}
             {!displayGame.features.cup.active && <section className="tournament-picker competition-picker" aria-label="Saisonspiele und Turniere">
@@ -2824,7 +2830,7 @@ function App() {
             </section>}
             {!displayGame.features.cup.active && <details className="season-overview"><summary>Saisontabelle · {getSeasonModeDivisionLabel(seasonMode.division)}</summary><div className="season-table">{seasonTable.map((team,index)=><div className={`season-table-row${team.id==='club'?' club':''}`} key={team.id}><i>{index+1}</i><strong>{team.name}</strong><small>{team.points} P · {team.played} SP · {team.wins}-{team.draws}-{team.losses} · TD {formatGoalDifference(team)}</small></div>)}</div></details>}
             <details className="tournament-reward-odds"><summary>Turnierprämie: {getTournamentRewardPack(selectedTournament.id).label} · Chancen anzeigen</summary><div className="star-pack-odds">{getRewardPackOdds(getTournamentRewardPack(selectedTournament.id).id as import('./feature-data').RewardPackId).map(o=><span key={o.label}><em>{o.label}</em><b>{formatPackChance(o.chance)}</b></span>)}</div><small>Eine Basiskarte. Keine Custom-, Icon- oder legendären Karten.</small></details>
-            {displayGame.features.cup.active && <LiveMatchViewer key={displayGame.features.cup.careerMatchId ?? displayGame.features.cup.matchStartedAt} features={displayGame.features} now={countdownNow} clubName={displayClubName} clubColor={displayClubColor} disabled={coopBusy} onSubstitute={changes=>{void confirmMatchChanges(changes);}} />}
+            {displayGame.features.cup.active && <LiveMatchViewer key={displayGame.features.cup.careerMatchId ?? displayGame.features.cup.matchStartedAt} features={displayGame.features} now={countdownNow} clubName={displayClubName} clubColor={displayClubColor} disabled={coopBusy} onEdit={()=>{void editInteractiveMatch();}} onBatch={draft=>{void batchInteractiveMatch(draft);}} onResume={()=>{void resumeInteractiveMatch();}} onTactic={id=>{void playCup(id);}} onSubstitute={(id,slot)=>{void moveStarXIPlayerToLineup(id,slot);}} />}
               {activeMatchInjury && <div className="cup-injury-pause" role="alert"><div className="cup-injury-pause-icon">🩹</div><div><span className="eyebrow">MEDIZINISCHE PAUSE / {activeMatchInjury.minute}′</span><h4>{activeMatchInjury.player} muss raus.</h4><p>{activeMatchInjury.reason}. Die Verletzung zählt für dieses Spiel und noch {activeMatchInjury.matches} {activeMatchInjury.matches === 1 ? "weitere Partie" : "weitere Partien"}.</p><small>Wähle den verletzten Platz und danach einen passenden Bankspieler – oder setze die Partie ohne Wechsel fort.</small></div><div className="cup-injury-pause-actions"><button className="mode-primary" onClick={() => { document.querySelector<HTMLButtonElement>(".match-sub-button")?.click(); }} disabled={coopBusy || !lineupStarIds.includes(activeMatchInjury.playerId)}>Auswechslungen</button><button className="mode-secondary" onClick={() => void resumeCupWithoutSubstitution()} disabled={coopBusy}>Ohne Wechsel weiterspielen</button></div></div>}
 
           </div>}
