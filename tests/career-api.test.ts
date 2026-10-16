@@ -5,6 +5,9 @@ import { registerHooks } from 'node:module';
 import { getTableColumns } from 'drizzle-orm';
 import { coopRooms } from '../db/schema.ts';
 import { initialGameFeatures, normalizeGameFeatures, setBestStarXI, STAR_XI_PLAYERS } from '../app/feature-data.ts';
+import { beginSeasonCupMatch, getStarXISelection, getStarXIPlayer } from '../app/feature-data';
+import { draftMatch } from '../app/match-commands';
+import { prepareCareerMatch } from '../app/career-data';
 import { emptyPlayerStats, getAlbumGroups } from '../app/career-data.ts';
 import { MULTIPLAYER_PROTOCOL_VERSION } from '../app/multiplayer-protocol.ts';
 import type { GameFeatures } from '../app/feature-data.ts';
@@ -48,6 +51,7 @@ test('API kickoff snapshots form and special bonuses, tick finishes with awards 
  const player=f.starXI.lineupIds[1];f.career.players[player]={...emptyPlayerStats(),recent:[8,8,8,8,8],appearances:25};f.career.milestoneCards[player]=['loyal'];f.seasonMode.matchday=9;f.career.seasonMatches=9;if(fixtureFor(f,'season').away)f.travel.journey=createJourney(fixtureFor(f,'season'),Date.now()-180000,()=>.9);setup(f);
  const started=await action('cup-start',{mode:'season'});assert.equal(started.status,200,JSON.stringify(started.data));
  let current=started.data.room.game.features;assert.ok(current.cup.careerMatchId);assert.ok((current.cup.careerBonuses?.[player] ?? 0)>0);
+ delete current.cup.simulation; // Legacy save: isolate existing reward/progression checks.
  current.cup.homeScore=2;current.cup.awayScore=0;current.cup.lastTickAt=current.cup.matchEndsAt;current.cup.matchStartedAt=Date.now()-180001;current.cup.matchEndsAt=Date.now()-1;
  current.career.rivals[`rival:${current.cup.opponent.toLocaleLowerCase('de-CH')}`]={opponent:current.cup.opponent,played:3,wins:2,draws:0,losses:1,goalsFor:3,goalsAgainst:2,closeGames:3,active:true,lastResults:['1:0'],lastPlayedAt:1};
  row.sharedFeaturesJson=JSON.stringify(current);
@@ -93,7 +97,28 @@ test('API random scrap purchases allow duplicates and persist a playable team fo
  // Existing away-travel requirement is preserved; complete that same journey.
  if(fixtureFor(f,'season').away)f.travel.journey=createJourney(fixtureFor(f,'season'),Date.now()-180000,()=>.9);row.sharedFeaturesJson=JSON.stringify(f);
  const started=await action('cup-start',{mode:'season'});assert.equal(started.status,200,JSON.stringify(started.data));assert.equal(started.data.room.game.features.cup.active,true);
- f=started.data.room.game.features;f.cup.homeScore=1;f.cup.awayScore=0;f.cup.lastTickAt=f.cup.matchEndsAt;f.cup.matchStartedAt=Date.now()-180001;f.cup.matchEndsAt=Date.now()-1;row.sharedFeaturesJson=JSON.stringify(f);
+ f=started.data.room.game.features;delete f.cup.simulation; // Legacy in-progress save compatibility.
+ f.cup.homeScore=1;f.cup.awayScore=0;f.cup.lastTickAt=f.cup.matchEndsAt;f.cup.matchStartedAt=Date.now()-180001;f.cup.matchEndsAt=Date.now()-1;row.sharedFeaturesJson=JSON.stringify(f);
  const finished=await action('cup-tick');assert.equal(finished.status,200);assert.equal(finished.data.room.game.features.cup.active,false);assert.equal(finished.data.room.game.features.career.reports.length,1);
  const again=await action('cup-tick');assert.equal(again.data.room.game.features.career.reports.length,1);
+});
+
+test('API interactive edits validate atomically and normal completion is persisted once',async()=>{
+ const f=initialGameFeatures();f.starXI=setBestStarXI({...f.starXI,ownedIds:STAR_XI_PLAYERS.map(p=>p.id)});const start=Date.now()-14000;
+ f.cup=beginSeasonCupMatch(f.cup,f.seasonMode,start,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions,f.starXI.lineupIds,f.starXI.benchIds);prepareCareerMatch(f);setup(f);
+ assert.equal((await action('cup-edit')).status,200);let current=JSON.parse(row.sharedFeaturesJson) as GameFeatures;current.cup.matchStartedAt-=4000;current.cup.matchEndsAt-=4000;row.sharedFeaturesJson=JSON.stringify(current);
+ assert.equal((await action('cup-tick')).status,200);current=JSON.parse(row.sharedFeaturesJson);assert.ok(current.cup.matchPaused);
+ const d=draftMatch(current),bad={...d,lineup:[...d.lineup]};bad.lineup[1]=bad.lineup[0];assert.equal((await action('cup-batch',{draft:bad})).status,409);assert.equal(JSON.parse(row.sharedFeaturesJson).cup.substitutionsUsed,0);
+ let count=0;for(let slot=0;slot<11&&count<2;slot++){const id=current.starXI.benchIds.find(id=>id&&!d.lineup.includes(id)&&getStarXIPlayer(id)?.positions.includes(current.starXI.formationPositions[slot]));if(id){d.lineup[slot]=id;count++;}}
+ d.strategy='angriff';assert.equal(count,2);const confirmed=await action('cup-batch',{draft:d});assert.equal(confirmed.status,200,JSON.stringify(confirmed.data));assert.equal(confirmed.data.room.game.features.cup.substitutionsUsed,2);assert.equal(confirmed.data.room.game.features.cup.strategyId,'angriff');
+ assert.equal((await action('star-lineup',{lineupIndex:0,starPlayerId:d.lineup[0]})).status,409);
+ const removed=await action('cup-quick');assert.notEqual(removed.status,200);assert.ok(JSON.parse(row.sharedFeaturesJson).cup.active);
+ let finished=await action('cup-tick');
+ for(let i=0;i<20&&finished.data.room.game.features.cup.active;i++){
+  if(finished.data.room.game.features.cup.matchPaused)assert.equal((await action('cup-resume')).status,200);
+  const saved=JSON.parse(row.sharedFeaturesJson) as GameFeatures;saved.cup.matchStartedAt-=400000;saved.cup.matchEndsAt-=400000;saved.cup.lastTickAt-=400000;row.sharedFeaturesJson=JSON.stringify(saved);
+  finished=await action('cup-tick');assert.equal(finished.status,200,JSON.stringify(finished.data));
+ }
+ assert.equal(finished.data.room.game.features.cup.active,false);assert.equal(finished.data.room.game.features.career.reports.length,1);
+ const again=await action('cup-tick');assert.equal(again.status,200);assert.equal(again.data.room.game.features.career.reports.length,1);assert.equal(again.data.room.game.features.cup.homeScore,finished.data.room.game.features.cup.homeScore);
 });

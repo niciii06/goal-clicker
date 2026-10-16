@@ -1,6 +1,8 @@
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+import { requestMatchEdit, confirmMatchDraft } from '../../match-commands';
+import type { MatchDraft } from '../../match-commands';
 import { fixtureFor, travelGate, consumeTravel, eligibilityError, settleTravel } from '../../travel-data';
 import { claimAllAlbumRewards, claimAlbumReward, prepareCareerMatch, recordCareerMatch } from "../../career-data";
 import { getDb } from "../../../db";
@@ -529,6 +531,7 @@ export async function POST(request: Request) {
       starPlayerId?: unknown;
       formationId?: unknown;
       strategy?: unknown;
+      draft?: unknown;
       direction?: unknown;
       expectedPenaltyStep?: unknown;
       tournamentId?: unknown;
@@ -807,6 +810,7 @@ export async function POST(request: Request) {
 
     if (action === "star-lineup") {
       if(game.features.squadLock && !game.features.squadLock.playerIds.includes(String(payload.starPlayerId))) return jsonError('Dieser Spieler gehört nicht zum Reisekader.',409);
+      if(game.features.cup.active&&game.features.cup.simulation)return jsonError('Nutze Wechsel / Taktik in der Matchansicht.',409);
       const lineupIndex = Number(payload.lineupIndex);
       const starPlayerId = typeof payload.starPlayerId === "string" ? payload.starPlayerId : "";
       const starPlayer = getStarXIPlayer(starPlayerId);
@@ -967,6 +971,16 @@ export async function POST(request: Request) {
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 
+    if(action==='cup-edit'){
+      game.features=requestMatchEdit(game.features,Date.now());
+      return persistGameResponse(db,room,game,timestamp,playerId,role);
+    }
+    if(action==='cup-batch'){
+      const d=payload.draft as MatchDraft;
+      if(!d||!Array.isArray(d.lineup)||!d.lineup.every(id=>typeof id==='string')||typeof d.formation!=='string'||typeof d.strategy!=='string')return jsonError('Aufstellung ungültig.',409);
+      const result=confirmMatchDraft(game.features,d,Date.now());if(result.error)return jsonError(result.error,409);
+      game.features=result.features;return persistGameResponse(db,room,game,timestamp,playerId,role);
+    }
     if (action === "cup-play") return jsonError('Die auswählbaren Taktiken wurden entfernt.',410);
 
     if (action === "cup-resume") {

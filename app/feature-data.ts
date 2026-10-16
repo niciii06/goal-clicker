@@ -1,3 +1,5 @@
+import { advanceInteractive, invalidateInteractive, normalizeInteractive, resumeInteractive } from './interactive-match';
+import type { InteractiveMatch } from './interactive-match';
 import { recordedActionRating, advanceMatchBroadcast, addBroadcastSubstitution, normalizeMatchBroadcast, chooseGoalPattern, createMatchBroadcast } from './match-broadcast';
 import type { MatchBroadcast, GoalPattern } from './match-broadcast';
 import type { Venue } from './travel-geography';
@@ -51,6 +53,7 @@ export type GoalBoostState = {
 };
 
 export type CupState = {
+  simulation?: InteractiveMatch;
   broadcast?: MatchBroadcast;
   fixture?: {id:string;away:boolean;neutral?:boolean;venue:Venue;opponentId:string};
   careerMatchId?: string;
@@ -2089,6 +2092,7 @@ function startTournamentRound(cup: CupState, tournament: TournamentDefinition, r
   });
   return {
     ...cup,
+    simulation: undefined,
     broadcast: undefined,
     careerRatingSeed: now,
     careerMatchId: `career-${now}-tournament-${opponent.name}`,
@@ -2170,6 +2174,7 @@ export function beginSeasonCupMatch(cup: CupState, seasonValue: unknown, now = D
   });
   return {
     ...cup,
+    simulation: undefined,
     broadcast: undefined,
     careerRatingSeed: now,
     careerMatchId: `career-${now}-season-${opponent.name}`,
@@ -2456,6 +2461,17 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
   }
   if (cup.matchPaused) return { cup, ...baseResult };
   if (cup.phase === "penalties") return { cup, ...baseResult };
+  if (cup.simulation) {
+    const next = advanceInteractive(cup, now);
+    if (next.matchPaused || next.simulation!.time < (cup.phase === 'extra-time' ? 7200 : 5400)) return {cup:next,...baseResult};
+    if (cup.mode === 'season' || next.homeScore !== next.awayScore) {
+      next.simulation!.status='completed';
+      return finishCupRound(next, starRating, next.homeScore > next.awayScore, now, false);
+    }
+    if(cup.phase === 'regular') return {cup:{...next,phase:'extra-time' as const,matchEndsAt:cup.matchEndsAt+getCupRegularDurationMs(cup)/3,lastResult:'Verlängerung bis 120′.'},...baseResult};
+    next.simulation!.status='completed';
+    return {cup:{...next,phase:'penalties' as const,penaltyTurn:'home' as const,lastResult:'Elfmeterschiessen. Wähle eine Richtung.'},...baseResult};
+  }
   const halfAt=cup.matchStartedAt+getCupRegularDurationMs(cup)/2;
   if(!cup.halftimeTaken && cup.lastTickAt>halfAt)cup={...cup,halftimeTaken:true};
   const endAt = Math.max(cup.matchStartedAt, Math.min(now, cup.matchEndsAt, !cup.halftimeTaken&&cup.phase==='regular'?halfAt:Infinity));
@@ -2645,7 +2661,7 @@ export function shiftCupTimeline(value: CupState, duration: number): CupState {
 }
 export function resumeCupMatch(value: CupState, now = Date.now()) {
   if (!value.active || !value.matchPaused) return value;
-  return { ...shiftCupTimeline(value,Math.max(0,now-value.lastTickAt)), matchPaused: false, lastResult: "Die Partie läuft weiter. Die medizinische Abteilung beobachtet den Rest von der Seitenlinie." };
+  return { ...resumeInteractive(shiftCupTimeline(value,Math.max(0,now-value.lastTickAt))), matchPaused: false, lastResult: "Die Partie läuft weiter. Die medizinische Abteilung beobachtet den Rest von der Seitenlinie." };
 }
 
 const PENALTY_DIRECTIONS: readonly PenaltyDirection[] = ["left", "center", "right"];
@@ -2820,7 +2836,7 @@ function normalizeCupGoalEvent(value: unknown): CupGoalEvent | null {
     homeScore: Math.max(0, Math.floor(Number(source.homeScore) || 0)),
     awayScore: Math.max(0, Math.floor(Number(source.awayScore) || 0)),
     ratingImpacts,
-    assistId:source.assistId===null?null:typeof source.assistId==='string'&&getStarXIPlayer(source.assistId)?source.assistId:undefined,
+    assistId:source.assistId===null?null:typeof source.assistId==='string'&&(getStarXIPlayer(source.assistId)||source.side==='away'&&/^opponent-([0-9]|10)$/.test(source.assistId))?source.assistId:undefined,
     assistName:typeof source.assistName==='string'?source.assistName.slice(0,120):undefined,
   };
 }
@@ -3091,7 +3107,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     transferMarket: { offerIds: offerIds.length ? offerIds : defaults.transferMarket.offerIds, ownedIds: [...new Set(ownedIds)] },
     starXI: { ...normalizedStarXI, lockedPlayerIds: normalizeSquadLock(source.squadLock ?? asRecord(asRecord(source.travel).journey).squadLock)?.playerIds },
     club: { name: clubName, badge: CLUB_BADGES.includes(String(club.badge)) ? String(club.badge) : defaults.club.badge, color: CLUB_COLORS.includes(String(club.color)) ? String(club.color) : defaults.club.color },
-    cup: { restartAt:Number.isFinite(cup.restartAt)?Number(cup.restartAt):undefined, restartSide:cup.restartSide==='opponent'?'opponent':'club', regularDurationMs: Number(cup.regularDurationMs)>=180000&&Number(cup.regularDurationMs)<=300000?Number(cup.regularDurationMs):undefined, halftimeTaken:cup.halftimeTaken===true, timedPause:normalizeTimedPause(cup.timedPause), subWindowsUsed: Math.min(3,Math.max(0,Math.floor(Number(cup.subWindowsUsed)||0))), pendingSubstitutions: normalizePendingSubstitutions(cup.pendingSubstitutions), broadcast: normalizeMatchBroadcast(cup.broadcast), fixture: cup.fixture && typeof cup.fixture==='object' ? cup.fixture as CupState['fixture'] : undefined, careerRatingSeed: Number.isFinite(Number(cup.careerRatingSeed)) && Number(cup.careerRatingSeed) > 0 ? Number(cup.careerRatingSeed) : matchStartedAt, careerMatchId: typeof cup.careerMatchId === "string" ? cup.careerMatchId.slice(0, 200) : undefined, careerBonuses: Object.fromEntries(Object.entries(asRecord(cup.careerBonuses)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Number(value), -2, 5)])), active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && Boolean(lastInjury), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
+    cup: { simulation: normalizeInteractive(cup.simulation), restartAt:Number.isFinite(cup.restartAt)?Number(cup.restartAt):undefined, restartSide:cup.restartSide==='opponent'?'opponent':'club', regularDurationMs: Number(cup.regularDurationMs)>=180000&&Number(cup.regularDurationMs)<=300000?Number(cup.regularDurationMs):undefined, halftimeTaken:cup.halftimeTaken===true, timedPause:normalizeTimedPause(cup.timedPause), subWindowsUsed: Math.min(3,Math.max(0,Math.floor(Number(cup.subWindowsUsed)||0))), pendingSubstitutions: normalizePendingSubstitutions(cup.pendingSubstitutions), broadcast: normalizeMatchBroadcast(cup.broadcast), fixture: cup.fixture && typeof cup.fixture==='object' ? cup.fixture as CupState['fixture'] : undefined, careerRatingSeed: Number.isFinite(Number(cup.careerRatingSeed)) && Number(cup.careerRatingSeed) > 0 ? Number(cup.careerRatingSeed) : matchStartedAt, careerMatchId: typeof cup.careerMatchId === "string" ? cup.careerMatchId.slice(0, 200) : undefined, careerBonuses: Object.fromEntries(Object.entries(asRecord(cup.careerBonuses)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Number(value), -2, 5)])), active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && (Boolean(lastInjury) || Boolean(cup.simulation)), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
     seasonMode: normalizedSeasonMode,
     goalBoost,
     missions,
@@ -3112,7 +3128,7 @@ export function pauseGameFeatureTimers(value: unknown, pausedMs: number, now = D
   features.nextEventAt += duration;
   features.nextVarAt += duration;
   features.transferSaga.nextAt += duration;
-  if (features.cup.active) {
+  if (features.cup.active && (!features.cup.simulation || features.cup.matchPaused)) {
     features.cup = shiftCupTimeline(features.cup, duration);
   }
   const pausedAt = now - duration;

@@ -6,6 +6,8 @@ import type { GameFeatures } from './feature-data';
 import { matchColours } from './match-colours';
 import { goalLabel, goalAssistId } from './match-goals';
 import { MatchSubstitutions } from './match-substitutions';
+import { InteractiveMatchPanel } from "./interactive-match-panel";
+import type { InteractivePanelProps } from "./interactive-match-panel";
 import { getVisualFrame, getViewerEvents, eventLabel } from './match-visual-frame';
 import type { Replay } from './match-visual-frame';
 export { getVisualFrame, getViewerEvents, eventLabel, clubAttacksRight, baseActors } from './match-visual-frame';
@@ -15,7 +17,7 @@ const MatchPitchCanvas=dynamic(()=>import('./match-pitch-canvas').then(module=>m
  ssr:false,
  loading:()=> <canvas className="gc-viewer-pitch" role="img" aria-label="Live Fussballfeld wird geladen"><svg viewBox="-3 -3 111 74" role="img" aria-label="Fussballfeld wird geladen"><rect width="105" height="68" fill="#237648"/><path d="M52.5 0V68" stroke="white"/></svg></canvas>,
 });
-export function LiveMatchViewer({ features, now, clubName, clubColor, disabled=false, onSubstitute }: { features: GameFeatures; now: number; clubName: string; clubColor: string; disabled?:boolean; onSubstitute?:(changes:{playerId:string;slot:number}[])=>void }) {
+export function LegacyLiveMatchViewer({ features, now, clubName, clubColor, disabled=false, onSubstitute }: { features: GameFeatures; now: number; clubName: string; clubColor: string; disabled?:boolean; onSubstitute?:(changes:{playerId:string;slot:number}[])=>void }) {
   const [tab, setTab] = useState<Phase>("live");
   const [clock, setClock] = useState(now);
   const [replay, setReplay] = useState<Replay>();
@@ -110,10 +112,13 @@ export function LiveMatchViewer({ features, now, clubName, clubColor, disabled=f
   </section>;
 }
 
-function MatchStatistics({features,clubName}:{features:GameFeatures;clubName:string}) {
+export function MatchStatistics({features,clubName}:{features:GameFeatures;clubName:string}) {
  const c=features.cup,b=c.broadcast,a=b?.clubStats,o=b?.opponentStats;
  const goals=c.matchEvents,ownGoals=goals.filter(e=>e.side==='home'),otherGoals=goals.filter(e=>e.side==='away');
  const total=(a?.possessionSeconds??0)+(o?.possessionSeconds??0),own=total?Math.round((a!.possessionSeconds/total)*100):50;
- const rows:[string,string|number,string|number][]=[['Tore',c.homeScore,c.awayScore],['Ballbesitz',`${own}%`,`${100-own}%`],['Schüsse',(a?.shots??0)+ownGoals.length,(o?.shots??0)+otherGoals.length],['Aufs Tor',(a?.onTarget??0)+ownGoals.length,(o?.onTarget??0)+otherGoals.length],['Paraden',a?.saves??0,o?.saves??0],['Ecken',(a?.corners??0)+ownGoals.filter(e=>e.pattern==='corner').length,(o?.corners??0)+otherGoals.filter(e=>e.pattern==='corner').length],['Freistösse',(a?.freeKicks??0)+ownGoals.filter(e=>e.pattern==='free-kick').length,(o?.freeKicks??0)+otherGoals.filter(e=>e.pattern==='free-kick').length],['Abseits',a?.offsides??0,o?.offsides??0],['Gelbe Karten',a?.yellowCards??0,o?.yellowCards??0],['Rote Karten',c.cardEvents.filter(e=>e.side==='home').length,c.cardEvents.filter(e=>e.side==='away').length]];
+ const extra=c.simulation?0:1;
+ const rows:[string,string|number,string|number][]=[['Tore',c.homeScore,c.awayScore],['Ballbesitz',`${own}%`,`${100-own}%`],['Schüsse',(a?.shots??0)+ownGoals.length*extra,(o?.shots??0)+otherGoals.length*extra],['Aufs Tor',(a?.onTarget??0)+ownGoals.length*extra,(o?.onTarget??0)+otherGoals.length*extra],['Paraden',a?.saves??0,o?.saves??0],['Ecken',(a?.corners??0)+ownGoals.filter(e=>e.pattern==='corner').length,(o?.corners??0)+otherGoals.filter(e=>e.pattern==='corner').length],['Freistösse',(a?.freeKicks??0)+ownGoals.filter(e=>e.pattern==='free-kick').length,(o?.freeKicks??0)+otherGoals.filter(e=>e.pattern==='free-kick').length],['Abseits',a?.offsides??0,o?.offsides??0],['Gelbe Karten',a?.yellowCards??0,o?.yellowCards??0],['Rote Karten',c.cardEvents.filter(e=>e.side==='home').length,c.cardEvents.filter(e=>e.side==='away').length]];
  return <table className="gc-match-statistics"><thead><tr><th>{clubName}</th><th>Statistik</th><th>{c.opponent}</th></tr></thead><tbody>{rows.map(([label,club,opponent])=><tr key={label}><td>{club}</td><th>{label}</th><td>{opponent}</td></tr>)}</tbody></table>;
 }
+
+export function LiveMatchViewer(props:InteractivePanelProps & {onSubstitute?:(changes:{playerId:string;slot:number}[])=>void}){return props.features.cup.simulation?<InteractiveMatchPanel {...props}/>:<LegacyLiveMatchViewer {...props}/>;}

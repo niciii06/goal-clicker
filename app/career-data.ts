@@ -1,3 +1,4 @@
+import { createInteractiveMatch } from './interactive-match';
 import { goalLabel } from './match-goals';
 import { recordedActionRating } from './match-broadcast';
 import { addHistory, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, STAR_XI_PLAYERS, SCRAP_PLAYERS } from './feature-data';
@@ -142,6 +143,7 @@ export function prepareCareerMatch(features: GameFeatures) {
   features.cup.careerBonuses = bonuses;
   features.cup.careerRatingSeed = features.cup.matchStartedAt;
   features.cup.careerMatchId = `career-${features.cup.matchStartedAt}-${features.cup.mode}-${features.cup.opponent}`;
+  if (!features.cup.simulation && features.cup.lastTickAt === features.cup.matchStartedAt) features.cup.simulation = createInteractiveMatch(features.cup, features.starXI.lineupIds, features.starXI.formationId);
   const rival = features.career.rivals[rivalryKey(features.cup.opponent)];
   if (rival?.active) addHistory(features, { title: `Derby gegen ${rival.opponent}`, detail: `${rival.wins} Siege · ${rival.draws} Remis · ${rival.losses} Niederlagen. Die Kurve fordert Revanche!`, tone: 'neutral' });
   return features;

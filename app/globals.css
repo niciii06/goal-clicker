@@ -1498,3 +1498,17 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 @keyframes gc-overlay-enter { from { opacity:0; transform:scale(.98); } to { opacity:1; transform:scale(1); } }
 @media(max-width:600px) { .gc-timed-overlay { inset:40px 5px 50px; padding:8px; gap:4px; } .gc-timed-overlay .gc-match-statistics { font-size:9px; } }
 @media(prefers-reduced-motion:reduce) { .gc-timed-overlay { animation:none; } }
+
+.gc-interactive-controls { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.gc-interactive-controls button,.gc-interactive-pause button { min-height:44px; padding:10px 15px; border:1px solid #d9dfdf; border-radius:10px; background:#fff; color:#183c32; font-weight:700; }
+.gc-interactive-controls button[aria-pressed="true"] { background:#e2f2e9; border-color:#6da68b; }
+.gc-interactive-controls button:disabled { opacity:.5; }
+.gc-interactive-pause { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; background:#f4f7f4; border-radius:12px; margin-top:10px; }
+.gc-interactive-ticker { max-height:420px; overflow:auto; padding:8px; }
+.gc-interactive-ticker>div { display:flex; gap:12px; padding:10px; border-bottom:1px solid #e7ebe8; }
+.gc-interactive-match .gc-sub-bank button { min-height:60px; white-space:normal; }
+.gc-interactive-match .gc-sub-confirm { flex-wrap:wrap; }
+.gc-interactive-match .gc-sub-confirm>span { flex-basis:100%; }
+.gc-interactive-match .gc-score-scorers { overflow-wrap:anywhere; }
+@media(max-width:600px) { .gc-interactive-controls button { flex:1 1 40%; } .gc-interactive-match .gc-sub-pitch strong { font-size:9px; } .gc-interactive-match .gc-sub-pitch small { font-size:8px; } .gc-interactive-match .gc-viewer-scoreboard { min-width:0; } }
+.summary-match-stats,.summary-goals { display:flex; flex-wrap:wrap; gap:8px 18px; margin:12px 0; font-size:13px; }

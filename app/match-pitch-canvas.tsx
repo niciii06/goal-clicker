@@ -4,6 +4,7 @@ import { getVisualFrame } from './match-visual-frame';
 import type { Actor, Replay } from './match-visual-frame';
 import type { GameFeatures } from './feature-data';
 import { MatchPresentation, resolvedBall } from './match-motion';
+import { InteractivePitchCanvas } from './interactive-pitch-canvas';
 export { MatchMotion, BallMotion, resolvedBall, MatchPresentation } from './match-motion';
 export type CameraMode='full'|'follow'|'highlights';
 const clamp=(x:number,a:number,b:number)=>Math.min(b,Math.max(a,x));
@@ -35,7 +36,12 @@ export function drawMatchFrame(ctx:CanvasRenderingContext2D,frame:ReturnType<typ
    ctx.fillStyle='#fff';ctx.strokeStyle='#132319';ctx.lineWidth=.23;ctx.beginPath();ctx.arc(ball.x,ball.y-frame.height*.7,.75+frame.height*.06,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#132319';ctx.beginPath();ctx.arc(ball.x-.15,ball.y-frame.height*.7-.12,.19,0,Math.PI*2);ctx.fill();
 
 }
-export function MatchPitchCanvas({features,now,replay,colours,camera,reducedMotion,onSelect,onFps}:{features:GameFeatures;now:number;replay?:Replay;colours:{club:string;opponent:string};camera:CameraMode;reducedMotion:boolean;onSelect:(id:string)=>void;onFps:(fps:number)=>void}) {
+type PitchCanvasProps={features:GameFeatures;now:number;replay?:Replay;colours:{club:string;opponent:string};camera:CameraMode;reducedMotion:boolean;onSelect:(id:string)=>void;onFps:(fps:number)=>void;playbackWall?:{current:number;workerActive?:boolean}};
+// Matches with an Interactive Match 2.0 simulation use the Sites worker renderer; legacy fixtures keep the presentation below.
+export function MatchPitchCanvas(props:PitchCanvasProps) {
+ return props.features.cup.simulation?<InteractivePitchCanvas {...props}/>:<LegacyPitchCanvas {...props}/>;
+}
+export function LegacyPitchCanvas({features,now,replay,colours,camera,reducedMotion,onSelect,onFps}:PitchCanvasProps) {
  const canvas=useRef<HTMLCanvasElement>(null),latest=useRef({features,now,replay,colours,camera,reducedMotion,onSelect,onFps});
  const offset=useRef(0);
  useLayoutEffect(()=>{latest.current={features,now,replay,colours,camera,reducedMotion,onSelect,onFps};offset.current=now-Date.now();},[features,now,replay,colours,camera,reducedMotion,onSelect,onFps]);
