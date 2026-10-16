@@ -77,15 +77,15 @@ export function advanceMatchBroadcast(cup:CupState,clubPlayers:readonly StarXIPl
   const id=`action:${seed}:${index}`,roll=broadcastSeed(id),at=cup.matchStartedAt+index*(regular/30),m=getCupMatchMinute({...cup,matchPaused:false,active:true},at);
   const side:BroadcastSide=broadcastSeed(id+':team')<.5?'club':'opponent';
   const historyPlayers=Object.keys(cup.playerEnteredAt).map(id=>getStarXIPlayer(id)).filter((p):p is StarXIPlayer=>Boolean(p)).map(p=>({...p,position:cup.playerMatchPositions[p.id]??p.position}));
-  const participants=side==='club'?(historyPlayers.length?historyPlayers:clubPlayers).filter(p=>(cup.playerEnteredAt[p.id]??1)<=m&&(cup.playerExitedAt[p.id]??121)>m&&!cup.cardEvents.some(e=>e.playerId===p.id&&e.minute<=m)):b.opponentXI.map(p=>({id:p.id,name:p.name,position:p.position}));
+  const participants=side==='club'?(historyPlayers.length?historyPlayers:clubPlayers).filter(p=>(cup.playerEnteredAt[p.id]??1)<=m&&(cup.playerExitedAt[p.id]??121)>m&&!cup.cardEvents.some(e=>e.playerId===p.id&&e.minute<=m)):b.opponentXI.filter(p=>!cup.cardEvents.some(e=>e.side==='away'&&e.playerId===p.id&&e.minute<=m)).map(p=>({id:p.id,name:p.name,position:p.position}));
   if(!participants.length)continue;
   const primary:BroadcastKind=roll<.04?'corner':roll<.07?'free-kick':roll<.10?'throw-in':roll<.13?'yellow':roll<.4?'shot':roll<.60?'counter':roll<.72?'wide':roll<.86?'combination':'build-up';
   const attackers=participants.filter(p=>p.position!=='TW');
-  const preferred=attackers.filter(p=>(primary==='corner'||primary==='wide'||primary==='throw-in')?['LF','RF','LM','RM','LV','RV','LAV','RAV'].includes(p.position):(primary==='shot'||primary==='counter')?['ST','MS','ZOM','ZM','LF','RF'].includes(p.position):primary==='free-kick'?['ZM','ZOM','LF','RF'].includes(p.position):true);
+  const preferred=attackers.filter(p=>(primary==='corner'||primary==='wide'||primary==='throw-in')?['LF','RF','LM','RM','LV','RV','LAV','RAV'].includes(p.position ?? ''):(primary==='shot'||primary==='counter')?['ST','MS','ZOM','ZM','LF','RF'].includes(p.position ?? ''):primary==='free-kick'?['ZM','ZOM','LF','RF'].includes(p.position ?? ''):true);
   const selection=preferred.length?preferred:attackers;
   const player=selection[Math.floor(broadcastSeed(id+':player')*selection.length)]??participants[0];
   const stats=side==='club'?b.clubStats:b.opponentStats;
-  if(primary==='yellow'&&b.events.some(e=>e.kind==='yellow'&&e.playerId===player.id))continue;
+  if(primary==='yellow'&&b.events.filter(e=>e.kind==='yellow'&&e.playerId===player.id).length>=2)continue;
   let outcome:ShotOutcome=broadcastSeed(id+':shot')<.6?'save':broadcastSeed(id+':shot')<.88?'wide':'blocked';
   const shooting=primary==='shot'||primary==='corner'||primary==='free-kick';
   const keeper=side==='club'?b.opponentXI.find(p=>p.position==='TW'):historyPlayers.find(p=>p.position==='TW'&&(cup.playerEnteredAt[p.id]??1)<=m&&(cup.playerExitedAt[p.id]??121)>m);

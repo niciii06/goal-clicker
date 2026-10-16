@@ -20,6 +20,7 @@ export async function POST(request: Request) {
   const fixture=fixtureFor(f,mode,t.id);
   if(!fixture.away)return Response.json({error:'Das ist ein Heimspiel.'},{status:409});
   let journey=await db.getSoloJourney(p.playerId,fixture.id) as Journey|null;
+  if(journey?.squadLock && [...f.starXI.lineupIds,...f.starXI.benchIds].some(id=>id&&!journey!.squadLock!.playerIds.includes(id)))return Response.json({error:'Dieser Spieler gehört nicht zum Reisekader.'},{status:409});
   if(p.action==='depart') {
    if(!journey)journey=await db.putSoloJourney(p.playerId,fixture.id,createJourney(fixture,now,Math.random,f));
   } else if(p.action==='start') {

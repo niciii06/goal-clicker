@@ -66,6 +66,7 @@ export function baseActors(features: GameFeatures, cup: CupState, minute: number
   const occupied = new Set<number>();
   const active = roster.flatMap((id, i) => {
     const p = getStarXIPlayer(id);
+    if(p?.benchOnly)return [];
     if (!p || !replay && (cup.sentOffPlayerIds.includes(id) || (cup.playerExitedAt[id] ?? 121) <= minute)) return [];
     let slotIndex = replay ? (cup.broadcast?.slots[id] ?? cup.originalLineupIds.indexOf(id)) : i;
     const role = cup.playerMatchPositions[id] ?? features.starXI.formationPositions[i] ?? p.position;

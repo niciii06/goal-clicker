@@ -9,6 +9,7 @@ export const HOME_VENUE = venue('home-buempliz45', 'Heimstadion Bümplizstrasse 
 export const HOME_ADDRESS = 'Bümplizstrasse 45, 3027 Bern';
 export const VENUES: Record<string, Venue> = Object.fromEntries([
   HOME_VENUE,
+  venue('wembley', 'Wembley Stadium', 'London', 'England', 51.5560, -0.2795),
   venue('bern', 'Stadion Wankdorf', 'Bern', 'Schweiz', 46.96278, 7.465),
   venue('thun', 'Arena Thun', 'Thun', 'Schweiz', 46.74472, 7.60556),
   venue('biel', 'Tissot Arena', 'Biel', 'Schweiz', 47.1575, 7.2833),

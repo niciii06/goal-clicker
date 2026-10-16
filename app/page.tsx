@@ -11,7 +11,7 @@ import { CareerPanel, AlbumPanel, MatchRatingsPanel, CareerPlayerBadge, PostMatc
 import { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AnimationEvent, CSSProperties, DragEvent, ErrorInfo, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { AR, BA, BE, BG, BR, CH, CI, CM, CO, CZ, DE, DK, EC, EG, ES, FR, GB_ENG, GB_NIR, GB_SCT, GB_WLS, GE, GH, GN, HR, HU, IE, IT, JP, KR, MA, MX, NG, NL, NO, PL, PT, RO, RS, RU, SE, SI, TR, UA, US, UY } from "country-flag-icons/react/3x2";
-import { activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, CLUB_BADGES, CLUB_COLORS, completeTournamentRun, CUP_STRATEGIES, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getCupStrategy, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentGoalBoostMultiplier, getTournamentRewardPack, isRewardPack, openEarnedPack, getRewardPackOdds, getTransferBonuses, getUnavailableStarXIPlayerIds, initialGameFeatures, isTransferDeadlineDay, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, resumeCupMatch, shouldTriggerPackTroll, startSeasonPrestige, startTournamentGoalBoost, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_CUSTOM_PLAYERS, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_TOTAL_CARD_COUNT, SEASON_MODE_MATCHES_PER_SEASON, TOURNAMENTS } from "./feature-data";
+import { releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, CLUB_BADGES, CLUB_COLORS, completeTournamentRun, CUP_STRATEGIES, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getCupStrategy, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentGoalBoostMultiplier, getTournamentRewardPack, isRewardPack, openEarnedPack, getRewardPackOdds, getTransferBonuses, getUnavailableStarXIPlayerIds, initialGameFeatures, isTransferDeadlineDay, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, resumeCupMatch, shouldTriggerPackTroll, startSeasonPrestige, startTournamentGoalBoost, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_CUSTOM_PLAYERS, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_TOTAL_CARD_COUNT, SEASON_MODE_MATCHES_PER_SEASON, TOURNAMENTS } from "./feature-data";
 import type { CoopMission, CupCardEvent, GameFeatures, PenaltyDirection as CupPenaltyDirection, RandomEvent, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationId, StarPackId, StarPackReveal, TournamentGazetteIssue, TournamentId, TransferInsiderEvent } from "./feature-data";
 import { getStarCardTier, getWalkoutPresentation } from "./walkout-data";
 import { getFormationUnlockSeason, getPackUnlockSeason, getSeasonMilestone, getTournamentUnlockSeason, getUpgradeUnlockSeason, isSeasonContentUnlocked, MAX_CAREER_SEASON, SEASON_MILESTONES } from "./season-progression";
@@ -48,12 +48,13 @@ function WalkoutCountryFlag({ code, country, compact = false }: { code: string; 
 }
 
 function formatStarXIPositions(player: Parameters<typeof getStarXIPositions>[0], compact = false) {
-  return player.id === "star-goat-nicu" ? "Alle Positionen" : getStarXIPositions(player).join(compact ? "/" : " / ");
+  return player.benchOnly ? `${player.symbol} Nur Bank` : player.id === "star-goat-nicu" ? "Alle Positionen" : getStarXIPositions(player).join(compact ? "/" : " / ");
 }
 
 type StarXIPositionBadgeVariant = "reveal" | "walkout" | "rare" | "compact";
 
 function StarXIPositionBadges({ player, variant = "reveal" }: { player: Parameters<typeof getStarXIPositions>[0]; variant?: StarXIPositionBadgeVariant }) {
+  if(player.benchOnly)return <span className="starxi-position-badge">{player.symbol} Nur Bank</span>;
   const positions = player.id === "star-goat-nicu" ? ["Alle Positionen"] : getStarXIPositions(player);
   return <span className={`starxi-position-badges starxi-position-badges-${variant}`} aria-label={`Positionen: ${positions.join(", ")}`}>
     {positions.map((position) => <span key={position}>{position === "Alle Positionen" ? "ALLE POSITIONEN" : position}</span>)}
@@ -782,7 +783,7 @@ function App() {
         const j={...data.journey,consumed:old.journey!.consumed};
         const counted=(old.journey as Journey & {counted?:boolean}).counted;
         const travel=settleTravel({...old,journey:{...j,counted} as Journey},data.serverNow!);
-        return {...current,features:{...current.features,travel}};
+        return {...current,features:{...current.features,travel,squadLock:data.journey!.squadLock,starXI:{...current.features.starXI,lockedPlayerIds:data.journey!.squadLock?.playerIds}}};
       });
     }catch{ /* Last authoritative clock continues; kickoff always revalidates. */ }};
     void sync();const timer=window.setInterval(()=>{const j=gameRef.current.features.travel.journey;if(j&&!journeyView(j,getTravelTime()).arrived)void sync();},5000);
@@ -1567,7 +1568,7 @@ function App() {
   }
 
   function triggerRandomEvent() {
-    if (eventLockRef.current || gameRef.current.features.nextEventAt > getCurrentTime()) return;
+    if (gameRef.current.features.squadLock || eventLockRef.current || gameRef.current.features.nextEventAt > getCurrentTime()) return;
     eventLockRef.current = true;
     const event = resolveRandomEvent(gameRef.current.goals);
     applyLocalEvent(event);
@@ -1575,7 +1576,7 @@ function App() {
   }
 
   function triggerVarEvent() {
-    if (eventLockRef.current || gameRef.current.features.nextVarAt > getCurrentTime()) return;
+    if (gameRef.current.features.squadLock || eventLockRef.current || gameRef.current.features.nextVarAt > getCurrentTime()) return;
     eventLockRef.current = true;
     const event = resolveVarEvent(gameRef.current.goals);
     applyLocalEvent(event);
@@ -1583,7 +1584,7 @@ function App() {
   }
 
   function triggerTransferInsiderEvent() {
-    if (eventLockRef.current || gameRef.current.features.cup.active || gameRef.current.features.transferSaga.nextAt > getCurrentTime()) return;
+    if (eventLockRef.current || gameRef.current.features.cup.active || gameRef.current.features.squadLock || gameRef.current.features.transferSaga.nextAt > getCurrentTime()) return;
     eventLockRef.current = true;
     const result = resolveTransferInsiderEvent(gameRef.current.features);
     setGame((current) => ({
@@ -1600,13 +1601,13 @@ function App() {
     if (!hydrated) return;
     const timer = window.setInterval(() => {
       if (appMode === "coop" && isCoopLive) {
-        if (!displayGame.features.cup.active && displayGame.features.transferSaga.nextAt <= getCurrentTime()) void sendCoopAction("transfer-insider-event");
-        else if (displayGame.features.nextVarAt <= getCurrentTime()) void sendCoopAction("var-event");
-        else if (displayGame.features.nextEventAt <= getCurrentTime()) void sendCoopAction("event");
+        if (!displayGame.features.squadLock && !displayGame.features.cup.active && displayGame.features.transferSaga.nextAt <= getCurrentTime()) void sendCoopAction("transfer-insider-event");
+        else if (!displayGame.features.squadLock && displayGame.features.nextVarAt <= getCurrentTime()) void sendCoopAction("var-event");
+        else if (!displayGame.features.squadLock && displayGame.features.nextEventAt <= getCurrentTime()) void sendCoopAction("event");
       } else if (appMode === "single") {
-        if (!gameRef.current.features.cup.active && gameRef.current.features.transferSaga.nextAt <= getCurrentTime()) triggerTransferInsiderEvent();
-        else if (gameRef.current.features.nextVarAt <= getCurrentTime()) triggerVarEvent();
-        else if (gameRef.current.features.nextEventAt <= getCurrentTime()) triggerRandomEvent();
+        if (!gameRef.current.features.squadLock && !gameRef.current.features.cup.active && gameRef.current.features.transferSaga.nextAt <= getCurrentTime()) triggerTransferInsiderEvent();
+        else if (!gameRef.current.features.squadLock && gameRef.current.features.nextVarAt <= getCurrentTime()) triggerVarEvent();
+        else if (!gameRef.current.features.squadLock && gameRef.current.features.nextEventAt <= getCurrentTime()) triggerRandomEvent();
       }
     }, 5000);
     return () => window.clearInterval(timer);
@@ -1759,6 +1760,7 @@ function App() {
   async function moveStarXIPlayerToLineup(playerId: string, lineupIndex: number) {
     const player = getStarXIPlayer(playerId);
     if (!player || !Number.isInteger(lineupIndex) || lineupIndex < 0 || lineupIndex >= STAR_XI_SQUAD_SIZE || !displayGame.features.starXI.ownedIds.includes(playerId)) return;
+    if (displayGame.features.squadLock && !displayGame.features.squadLock.playerIds.includes(playerId)) { showToast('Dieser Spieler gehört nicht zum Reisekader.'); return; }
     if (suspendedStarIds.includes(playerId)) {
       showToast(`${player.name} ist nach der Roten Karte für die nächste Partie gesperrt.`);
       return;
@@ -1884,6 +1886,7 @@ function App() {
   async function selectStarXIBenchPlayer(playerId: string, benchIndex: number) {
     const player = getStarXIPlayer(playerId);
     if (!player || displayGame.features.cup.active || !displayGame.features.starXI.ownedIds.includes(playerId) || displayGame.features.starXI.lineupIds.includes(playerId)) return;
+    if (displayGame.features.squadLock && !displayGame.features.squadLock.playerIds.includes(playerId)) { showToast('Dieser Spieler gehört nicht zum Reisekader.'); return; }
     if (suspendedStarIds.includes(playerId)) {
       showToast(`${player.name} darf nach einer Roten Karte nicht auf die Bank.`);
       return;
@@ -2052,7 +2055,7 @@ function App() {
         const old=current.features.travel, counted=old.journey?.id===data.journey!.id?(old.journey as Journey & {counted?:boolean}).counted:false;
         const travel=settleTravel({...old,journey:{...data.journey!,consumed:false,counted} as Journey},data.serverNow!);
         travel.journey!.consumed=false;
-        return {...current,features:{...current.features,travel}};
+        return {...current,features:{...current.features,travel,squadLock:data.journey!.squadLock,starXI:{...current.features.starXI,lockedPlayerIds:data.journey!.squadLock?.playerIds}}};
       });
       setFeatureTab('cup');
       return action==='start'?data.journey.fixture:null;
@@ -2211,6 +2214,7 @@ function App() {
       const cupNow = getCurrentTime();
       const result = resolveCupPenalty(features.cup, effectiveRating, direction, cupNow, Math.random, homePlayers, features.starXI.formationPositions);
       features.cup = result.cup;
+      if (result.finished) releaseMatchSquad(features, getCurrentTime());
       if (result.finished) {
         features.starXI = restoreStarXIAfterMatch(features.starXI, features.cup);
         if (features.cup.mode === "season") {
@@ -2243,6 +2247,7 @@ function App() {
       const result = advanceCupMatch(features.cup, effectiveRating, now, Math.random, homePlayers, features.starXI.formationPositions);
       if (!result.finished && result.cup.lastTickAt === features.cup.lastTickAt) return current;
       features.cup = result.cup;
+      if (result.finished) releaseMatchSquad(features, getCurrentTime());
       if (result.finished) {
         features.starXI = restoreStarXIAfterMatch(features.starXI, features.cup);
         if (features.cup.mode === "season") {

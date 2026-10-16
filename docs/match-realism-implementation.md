@@ -56,3 +56,22 @@ behaviour/API tests and 41 JavaScript regression tests passed (199 total).
 `npm run typecheck`: passed with no diagnostics.
 
 No gameplay changes in this phase. Existing legacy fixture/save tests passed.
+
+## Phase 2
+
+Implemented away-only Cup fixtures and configuration-ranked neutral Wembley
+final. Added positionless bench-only Pfuschi and 100 ZM/ZDM Di Certo through
+existing collection/custom draws. Both sides can incur multiple dismissals;
+opponent roster IDs survive normalization and dismissed actors/actions are
+removed. Second cautions produce a dismissal. Added persisted departure
+allowlist and frozen scheduler remainders, enforced in squad setters and
+multiplayer/solo travel handlers. Completion restores the stored remainders
+once. No cancellation UI exists, so no new cancellation action was invented.
+
+Validation: targeted travel/master/viewer tests passed; the updated
+balance/session rerun passed 49/49 tests. Typecheck passed. Production build
+completed and artifact validator reported:
+`Validated Sites artifact: ESM Worker default.fetch and hosting manifest are present.`
+No paid providers or deployment used. Historical journey endpoints are retained.
+Remaining: queued batch substitutions/windows, timed overlays/clock/tactics,
+viewer realism, source-backed venue audit, visual QA.

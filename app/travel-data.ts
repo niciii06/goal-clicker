@@ -1,12 +1,12 @@
-import { getSeasonModeNextOpponent, getTournament, getTournamentOpponentSchedule, getStarXISelection, getOpenTransferSquadVacancies, getStarXIRating, getEligibleEventPlayers } from './feature-data';
+import { getSeasonModeNextOpponent, getTournament, getTournamentOpponentSchedule, getStarXISelection, getOpenTransferSquadVacancies, getStarXIRating, getEligibleEventPlayers, TOURNAMENTS, lockMatchSquad } from './feature-data';
 import type { GameFeatures, TournamentId } from './feature-data';
-import { HOME_VENUE, REGION_LABELS, distanceKm, seasonGeography, tournamentVenue, classifyDestination, HOME_ADDRESS } from './travel-geography';
+import { HOME_VENUE, REGION_LABELS, distanceKm, seasonGeography, tournamentVenue, classifyDestination, HOME_ADDRESS, VENUES } from './travel-geography';
 import type { Venue } from './travel-geography';
 import { planJourney, gameSeconds, segmentAt } from './journey-routing';
 import type { JourneyPlan } from './journey-routing';
-export type TravelFixture = { id: string; mode: 'season'|'tournament'; tournamentId: TournamentId; opponentId: string; opponent: string; away: boolean; region: number; venue: Venue; schedule: string[] };
+export type TravelFixture = { id: string; mode: 'season'|'tournament'; tournamentId: TournamentId; opponentId: string; opponent: string; away: boolean; neutral?: boolean; region: number; venue: Venue; schedule: string[] };
 export type TravelEvent = { id: string; text: string; template?: string; playerId?:string; at: number; delta: number };
-export type Journey = { plan?: JourneyPlan; origin?: Venue; id: string; fixture: TravelFixture; startedAt: number; baseMs: number; endsAt: number; transport: 'walk'|'bike'|'car'|'bus'|'train'|'plane'; km: number; events: TravelEvent[]; consumed: boolean; counted?: boolean };
+export type Journey = { squadLock?: GameFeatures['squadLock']; plan?: JourneyPlan; origin?: Venue; id: string; fixture: TravelFixture; startedAt: number; baseMs: number; endsAt: number; transport: 'walk'|'bike'|'car'|'bus'|'train'|'plane'; km: number; events: TravelEvent[]; consumed: boolean; counted?: boolean };
 export type TravelStats = { recentEvents?: string[]; trips: number; km: number; countries: string[]; furthest: { opponent: string; km: number } | null; opponents: Record<string,{name:string;trips:number}> };
 export type TravelState = { journey: Journey|null; stats: TravelStats };
 export const emptyTravel = (): TravelState => ({journey:null,stats:{trips:0,km:0,countries:[],furthest:null,opponents:{}}});
@@ -28,8 +28,10 @@ export function fixtureFor(features: GameFeatures, mode: 'season'|'tournament', 
  const previous=features.travel.journey?.fixture;
  const schedule=c.pendingNextRound ? c.opponentIds : previous?.id===id ? previous.schedule : getTournamentOpponentSchedule(t,seededRandom(id));
  const round=c.pendingNextRound?c.round:0, o=t.opponents.find(o=>o.id===schedule[round]) ?? t.opponents[0];
- const away=round%2===0,venue=away?tournamentVenue(o.id):HOME_VENUE;
- return {id,mode,tournamentId:t.id,opponentId:o.id,opponent:o.name,away,region:away?classifyDestination(venue):0,venue,schedule:[...schedule]};
+ const highest = [...TOURNAMENTS].sort((a,b)=>b.minimumRating-a.minimumRating)[0];
+ const neutral = t.id===highest.id && round===t.rounds-1;
+ const away=true,venue=neutral?VENUES.wembley:tournamentVenue(o.id);
+ return {id,mode,tournamentId:t.id,opponentId:o.id,opponent:o.name,away,neutral,region:away?classifyDestination(venue):0,venue,schedule:[...schedule]};
 }
 function seededRandom(seed:string) { let n=2166136261;for(const c of seed)n=Math.imul(n^c.charCodeAt(0),16777619);return ()=>{n+=0x6D2B79F5;let t=Math.imul(n^(n>>>15),1|n);t^=t+Math.imul(t^(t>>>7),61|t);return ((t^(t>>>14))>>>0)/4294967296;}; }
 // Retained export for historical consumers; these ranges no longer affect timing.
@@ -92,7 +94,7 @@ export function createJourney(fixture:TravelFixture,now:number,random=Math.rando
   const player=players.length?players[Math.min(players.length-1,Math.floor(random()*players.length))]:null;
   events.push({id:e.id,template:e.text,playerId:player?.id,text:e.text.replace('{player}',player?.name??'Die Mannschaft'),at,delta:0});
  }}
- return {plan:timing.plan,id:fixture.id,origin:HOME_VENUE,fixture:{...fixture,region:timing.category},startedAt:now,baseMs:timing.baseMs,endsAt:now+timing.baseMs,transport:timing.transport,km:timing.km,events,consumed:false};
+ return {squadLock:features?{fixtureId:fixture.id,playerIds:[...new Set([...features.starXI.lineupIds,...features.starXI.benchIds].filter(Boolean))],startedAt:now,transferRemaining:Math.max(0,features.transferSaga.nextAt-now),eventRemaining:Math.max(0,features.nextEventAt-now),varRemaining:Math.max(0,features.nextVarAt-now)}:undefined,plan:timing.plan,id:fixture.id,origin:HOME_VENUE,fixture:{...fixture,region:timing.category},startedAt:now,baseMs:timing.baseMs,endsAt:now+timing.baseMs,transport:timing.transport,km:timing.km,events,consumed:false};
 }
 export function journeyView(j: Journey, now:number,features?:GameFeatures) {
  const elapsed=Math.max(0,now-j.startedAt);let end=j.baseMs,start=0,progress=0;
@@ -125,6 +127,8 @@ export function eligibilityError(features:GameFeatures,mode:'season'|'tournament
  if(getOpenTransferSquadVacancies(features).length)return 'Schliesse zuerst die Kaderlücke.';
  if(getStarXISelection(features.starXI.ownedIds,features.starXI.lineupIds).length<11)return 'Vervollständige zuerst die Startelf.';
  if(features.cup.suspendedPlayerIds.some(id=>features.starXI.lineupIds.includes(id)||features.starXI.benchIds.includes(id)))return 'Ersetze zuerst die gesperrten Spieler.';
+ if([...features.starXI.lineupIds,...features.starXI.benchIds].some(id=>Number(features.cup.injuredPlayerIds[id])>0))return 'Ersetze zuerst die verletzten Spieler.';
+ if(features.squadLock&&[...features.starXI.lineupIds,...features.starXI.benchIds].some(id=>id&&!features.squadLock!.playerIds.includes(id)))return 'Dieser Spieler gehört nicht zum Reisekader.';
  if(mode==='tournament'&&getStarXIRating(features.starXI.ownedIds,features.starXI.lineupIds)<getTournament(tournamentId)!.minimumRating)return 'Die Teamstärke reicht für dieses Turnier noch nicht.';
  return null;
 }
@@ -135,11 +139,11 @@ export function travelGate(features:GameFeatures,fixture:TravelFixture,now:numbe
  if(!fixture.away)return null;
  if(!current||current.fixture.id!==fixture.id) {
   if(!depart)return 'Reise zuerst zum Auswärtsspiel.';
-  features.travel.journey=createJourney(fixture,now,Math.random,features);return 'Reise gestartet.';
+  lockMatchSquad(features,fixture.id,now);features.travel.journey=createJourney(fixture,now,Math.random,features);return 'Reise gestartet.';
  }
  if(current.consumed)return 'Diese Partie wurde bereits gestartet.';
  if(now<current.endsAt)return 'Die Mannschaft ist noch unterwegs.';
  return null;
 }
-export function consumeTravel(features:GameFeatures,fixture:TravelFixture) { features.cup.fixture={id:fixture.id,away:fixture.away,venue:fixture.venue,opponentId:fixture.opponentId}; if(features.travel.journey?.fixture.id===fixture.id)features.travel.journey.consumed=true; }
+export function consumeTravel(features:GameFeatures,fixture:TravelFixture) { features.cup.fixture={id:fixture.id,away:fixture.away,neutral:fixture.neutral,venue:fixture.venue,opponentId:fixture.opponentId}; if(features.travel.journey?.fixture.id===fixture.id)features.travel.journey.consumed=true; }
 export {HOME_VENUE,REGION_LABELS};

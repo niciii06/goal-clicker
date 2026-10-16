@@ -52,7 +52,7 @@ export type GoalBoostState = {
 
 export type CupState = {
   broadcast?: MatchBroadcast;
-  fixture?: {id:string;away:boolean;venue:Venue;opponentId:string};
+  fixture?: {id:string;away:boolean;neutral?:boolean;venue:Venue;opponentId:string};
   careerMatchId?: string;
   careerRatingSeed?: number;
   careerBonuses?: Record<string, number>;
@@ -164,7 +164,9 @@ export type StarXIPlayer = {
   sourceId?: string;
   countryCode?: string;
   name: string;
-  position: StarPosition;
+  position: StarPosition | null;
+  benchOnly?: boolean;
+  symbol?: string;
   positions: StarPosition[];
   rating: number;
   price: number;
@@ -196,6 +198,7 @@ export type StarFormationDefinition = {
 };
 
 export type StarXIState = {
+  lockedPlayerIds?: string[];
   ownedIds: string[];
   fragments: number;
   lineupIds: string[];
@@ -409,6 +412,7 @@ export type GameFeatures = {
   starXI: StarXIState;
   club: ClubProfile;
   cup: CupState;
+  squadLock?: { fixtureId: string; playerIds: string[]; startedAt: number; transferRemaining: number; eventRemaining: number; varRemaining: number };
   seasonMode: SeasonModeState;
   goalBoost: GoalBoostState;
   missions: CoopMission[];
@@ -686,7 +690,19 @@ export const TRANSFER_PLAYERS: TransferPlayer[] = [
   { id: "legend", name: "Die Legende", position: "Ikone", rating: 99, price: 900000, clickBonus: 300, passiveBonus: 4000, incomeBonus: 0.12, accent: "#1d1d1f" },
 ];
 
+function specialAttributes(rating: number) {
+  const template = structuredClone(FC27_INDIA_PROFILES[0].attributes);
+  template.overallRating = rating;
+  for (const stat of Object.values(template.stats)) stat.value = rating;
+  return template;
+}
 const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
+  { id: "star-pfuschi", name: "Pfuschi", isCustom: true, benchOnly: true,
+    position: null, positions: [], rating: 1, price: 1000, accent: "#64748b",
+    cardType: "legendary", symbol: "☠️", packWeight: .04, originalAttributes: specialAttributes(1) },
+  { id: "star-di-certo", name: "Di Certo", isCustom: true, position: "ZM",
+    positions: ["ZM", "ZDM"], rating: 100, price: 5000000000, accent: "#c69214",
+    cardType: "legendary", packWeight: .02, originalAttributes: specialAttributes(100) },
   {
     id: "star-goat-nicu",
     isCustom: true,
@@ -1384,11 +1400,11 @@ function uniqueKnownStarIds(ids: unknown) {
 }
 
 export function getStarXIPositions(player: StarXIPlayer) {
-  return player.positions.length ? player.positions : [player.position];
+  return player.benchOnly ? [] : player.positions.length ? player.positions : player.position ? [player.position] : [];
 }
 
 export function canStarXIPlayerPlayPosition(player: StarXIPlayer | undefined, position: StarPosition) {
-  return Boolean(player && getStarXIPositions(player).includes(position));
+  return Boolean(player && !player.benchOnly && getStarXIPositions(player).includes(position));
 }
 
 export function canStarXIPlayerFillSlot(playerId: string, lineupIndex: number, formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS) {
@@ -1462,6 +1478,8 @@ function normalizeBenchSlots(ownedIds: string[], lineupIds: string[], rawBenchId
 export function normalizeStarXIState(value: unknown, blockedPlayerIds: readonly string[] = []) {
   const source = asRecord(value);
   const ownedIds = uniqueKnownStarIds(source.ownedIds);
+  const lockedPlayerIds = Array.isArray(source.lockedPlayerIds) ? uniqueKnownStarIds(source.lockedPlayerIds) : undefined;
+  blockedPlayerIds = [...new Set([...blockedPlayerIds, ...(lockedPlayerIds ? ownedIds.filter(id => !lockedPlayerIds.includes(id)) : [])])];
   const fragments = Math.max(0, Math.floor(Number(source.fragments) || 0));
   const blockedIds = new Set(blockedPlayerIds);
   const requestedPositions = normalizeFormationPositions(source.formationPositions);
@@ -1471,7 +1489,7 @@ export function normalizeStarXIState(value: unknown, blockedPlayerIds: readonly 
   const formationPositions = formation.slots.map((slot) => slot.position);
   const lineupIds = normalizeLineupSlots(ownedIds, source.lineupIds, formationPositions, blockedIds);
   const benchIds = normalizeBenchSlots(ownedIds, lineupIds, source.benchIds, blockedIds);
-  return { ownedIds, fragments, lineupIds, benchIds, formationId: formation.id, formationPositions };
+  return { ownedIds, lockedPlayerIds, fragments, lineupIds, benchIds, formationId: formation.id, formationPositions };
 }
 
 export function removeStarXIPlayersFromSquad(state: StarXIState, playerIds: readonly string[], removeFromLineup = true) {
@@ -1488,6 +1506,7 @@ export function addStarXIPlayer(state: StarXIState, playerId: string) {
   const next = normalizeStarXIState(state);
   if (!getStarXIPlayer(playerId) || next.ownedIds.includes(playerId)) return next;
   next.ownedIds = [...next.ownedIds, playerId];
+  if(next.lockedPlayerIds && !next.lockedPlayerIds.includes(playerId))return next;
   const openLineupIndex = next.lineupIds.findIndex((id, index) => !id && canStarXIPlayerFillSlot(playerId, index, next.formationPositions));
   if (openLineupIndex >= 0) next.lineupIds[openLineupIndex] = playerId;
   else {
@@ -1500,7 +1519,7 @@ export function addStarXIPlayer(state: StarXIState, playerId: string) {
 
 export function setStarXIStarter(state: StarXIState, lineupIndex: number, playerId: string, blockedPlayerIds: readonly string[] = []) {
   const next = normalizeStarXIState(state);
-  const blocked = new Set(blockedPlayerIds);
+  const blocked = new Set([...blockedPlayerIds,...(next.lockedPlayerIds?next.ownedIds.filter(id=>!next.lockedPlayerIds!.includes(id)):[])]);
   if (!Number.isInteger(lineupIndex) || lineupIndex < 0 || lineupIndex >= STAR_XI_SQUAD_SIZE || blocked.has(playerId) || !next.ownedIds.includes(playerId) || !canStarXIPlayerFillSlot(playerId, lineupIndex, next.formationPositions)) return next;
   const lineupIds = [...next.lineupIds];
   const currentPlayerId = lineupIds[lineupIndex];
@@ -1534,6 +1553,7 @@ export function setStarXIFormation(state: StarXIState, formationId: StarFormatio
 
 export function setStarXIBenchPlayer(state: StarXIState, benchIndex: number, playerId: string, blockedPlayerIds: readonly string[] = []) {
   const next = normalizeStarXIState(state);
+  if(next.lockedPlayerIds && !next.lockedPlayerIds.includes(playerId))return next;
   if (!Number.isInteger(benchIndex) || benchIndex < 0 || benchIndex >= STAR_XI_BENCH_SIZE || blockedPlayerIds.includes(playerId) || !next.ownedIds.includes(playerId) || next.lineupIds.includes(playerId)) return next;
   const currentPlayerId = next.benchIds[benchIndex];
   const otherBenchIndex = next.benchIds.indexOf(playerId);
@@ -1666,6 +1686,7 @@ export function getBestStarXISelection(ownedIds: string[], formationPositions: r
 
 export function setBestStarXI(state: StarXIState, blockedPlayerIds: readonly string[] = [], context: StarXIEvaluationContext = {}) {
   if (context.cup?.active) return state;
+  blockedPlayerIds = [...blockedPlayerIds,...(state.lockedPlayerIds?state.ownedIds.filter(id=>!state.lockedPlayerIds!.includes(id)):[])];
   const next = removeStarXIPlayersFromSquad(normalizeStarXIState(state), blockedPlayerIds);
   const lineupIds = getBestStarXISelection(next.ownedIds, next.formationPositions, blockedPlayerIds, context);
   const currentScore = next.lineupIds.reduce((sum, id) => sum + (getStarXIPlayer(id) ? getStarXISelectionRating(getStarXIPlayer(id)!, context) : 0), 0);
@@ -1761,7 +1782,7 @@ export function restoreStarXIAfterMatch(state: StarXIState, cup: CupState) {
 
 export function getStarXISelection(ownedIds: string[], lineupIds: string[] = []) {
   const selectedIds = lineupIds.some(Boolean) ? lineupIds : ownedIds;
-  const selected = selectedIds.map((id) => getStarXIPlayer(id)).filter((player): player is StarXIPlayer => Boolean(player));
+  const selected = selectedIds.map((id) => getStarXIPlayer(id)).filter((player): player is StarXIPlayer => Boolean(player && !player.benchOnly));
   return lineupIds.some(Boolean) ? selected.slice(0, STAR_XI_SQUAD_SIZE) : selected.sort((first, second) => second.rating - first.rating || first.id.localeCompare(second.id)).slice(0, STAR_XI_SQUAD_SIZE);
 }
 
@@ -1796,7 +1817,7 @@ export function getStarXIPlayerMatchRating(playerId: string, matchStartedAt: num
 
 export function getCupPlayerMatchRating(cup: CupState, playerId: string, minute: number) {
   const enteredAtMinute = cup.playerEnteredAt[playerId];
-  if (!enteredAtMinute || minute < enteredAtMinute) return null;
+  if (getStarXIPlayer(playerId)?.benchOnly || !enteredAtMinute || minute < enteredAtMinute) return null;
   const effectiveMinute = Math.max(enteredAtMinute, Math.min(minute, cup.playerExitedAt[playerId] ?? minute));
   const position = cup.playerMatchPositions[playerId] ?? getStarXIPlayer(playerId)?.position;
   const eventImpact = cup.matchEvents.reduce((total, event) => {
@@ -1823,7 +1844,7 @@ export type CupSubstitutionImpact = {
 export function applyCupSubstitution(cup: CupState, outgoingPlayerId: string | undefined, incomingPlayerId: string, minute: number, now = Date.now()): CupSubstitutionImpact {
   const incoming = getStarXIPlayer(incomingPlayerId);
   const outgoing = outgoingPlayerId ? getStarXIPlayer(outgoingPlayerId) : undefined;
-  if (!incoming || !outgoing) return { cup, incomingRating: incoming?.rating ?? 0, outgoingRating: outgoing?.rating ?? 0, ratingDelta: 0, outgoingMatchRating: 6.5, momentumDelta: 0 };
+  if (!incoming || incoming.benchOnly || !outgoing) return { cup, incomingRating: incoming?.rating ?? 0, outgoingRating: outgoing?.rating ?? 0, ratingDelta: 0, outgoingMatchRating: 6.5, momentumDelta: 0 };
 
   cup = resumeCupMatch(cup, now);
   const substitutionMinute = Math.max(1, Math.min(120, Math.floor(Number(minute) || 1)));
@@ -2050,6 +2071,7 @@ export function openStarPack(packId: StarPackId, ownedIds: string[], random = Ma
 
 function startTournamentRound(cup: CupState, tournament: TournamentDefinition, round: number, now: number, resetStrategy = false, homePlayers: readonly StarXIPlayer[] = [], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS, allowSavedOpponent = true): CupState {
   const opponent = getTournamentOpponentAt(tournament, round, cup.opponentIds, cup.opponent, cup.opponentRating, allowSavedOpponent);
+  homePlayers = homePlayers.filter(p => !p.benchOnly);
   const playerEnteredAt = Object.fromEntries(homePlayers.map((player) => [player.id, 1]));
   const playerMatchPositions = Object.fromEntries(homePlayers.map((player, index) => [player.id, formationPositions[index] ?? player.position])) as Record<string, StarPosition>;
   const allTimeAppearances = { ...(cup.allTimeAppearances ?? {}) };
@@ -2123,6 +2145,7 @@ export function beginCupMatch(cup: CupState, now = Date.now(), tournamentId = cu
 export function beginSeasonCupMatch(cup: CupState, seasonValue: unknown, now = Date.now(), homePlayers: readonly StarXIPlayer[] = [], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS, originalLineupIds: readonly string[] = homePlayers.map((player) => player.id), originalBenchIds: readonly string[] = []): CupState {
   const season = normalizeSeasonModeState(seasonValue);
   const opponent = getSeasonModeNextOpponent(season);
+  homePlayers = homePlayers.filter(p => !p.benchOnly);
   const playerEnteredAt = Object.fromEntries(homePlayers.map((player) => [player.id, 1]));
   const playerMatchPositions = Object.fromEntries(homePlayers.map((player, index) => [player.id, formationPositions[index] ?? player.position])) as Record<string, StarPosition>;
   const allTimeAppearances = { ...(cup.allTimeAppearances ?? {}) };
@@ -2421,7 +2444,7 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
   const suspendedPlayerIds = [...cup.suspendedPlayerIds];
   const injuredPlayerIds = { ...(cup.injuredPlayerIds ?? {}) };
   const playerExitedAt = { ...cup.playerExitedAt };
-  let activeHomePlayers = homePlayers.filter((player) => !sentOffPlayerIds.includes(player.id) && !(Number(injuredPlayerIds[player.id]) > 0));
+  let activeHomePlayers = homePlayers.filter((player) => !player.benchOnly && !sentOffPlayerIds.includes(player.id) && !(Number(injuredPlayerIds[player.id]) > 0));
   const allTimeScorers = { ...cup.allTimeScorers };
   let lastResult = cup.lastResult;
   let currentStarRating = starRating;
@@ -2430,7 +2453,8 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
   let processedUntil = from;
   const getScoringChances = (liveStarRating: number) => {
     const liveStrength = getCupMatchStrength(cup, liveStarRating);
-    const liveStrengthDifference = liveStrength.teamStrength - liveStrength.opponentStrength;
+    const opponentDismissals = new Set(cardEvents.filter(e => e.side === 'away').map(e => e.playerId)).size;
+    const liveStrengthDifference = liveStrength.teamStrength - liveStrength.opponentStrength + opponentDismissals * RED_CARD_MATCH_RATING_DROP;
     const technical=activeHomePlayers.reduce((n,p)=>n+(matchAttribute(p,'finishing')+matchAttribute(p,'shortPassing')+matchAttribute(p,'dribbling')-p.rating*3)/3,0)/Math.max(1,activeHomePlayers.length);
     const backline=activeHomePlayers.filter(p=>['TW','IV','LV','RV','ZDM'].includes(cup.playerMatchPositions[p.id]??p.position));
     const defence=backline.reduce((n,p)=>n+matchAttribute(p,p.position==='TW'?'gkReflexes':'standingTackle')-p.rating,0)/Math.max(1,backline.length);
@@ -2444,7 +2468,7 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
     const goalAt = from + (second + 1) * 1000;
     processedUntil = goalAt;
     const minute = getCupMatchMinute(cup, goalAt);
-    if (activeHomePlayers.length && !sentOffPlayerIds.length && random() < RED_CARD_CHANCE_PER_SECOND * 180 / regularSeconds) {
+    if (activeHomePlayers.length > 7 && random() < RED_CARD_CHANCE_PER_SECOND * 180 / regularSeconds) {
       const redCardedPlayer = selectRedCardedPlayer(activeHomePlayers, formationPositions, random);
       if (redCardedPlayer) {
         const redCardedPlayerIndex = homePlayers.findIndex((player) => player.id === redCardedPlayer.id);
@@ -2461,6 +2485,18 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
         redCardOccurred = true;
         lastResult = `Rote Karte für ${redCardedPlayer.name}. Das Momentum kippt, dein Team ist in Unterzahl. Die nächste Partie darf erst nach einem Ersatz starten.`;
       }
+    }
+    const opponentRoster = cup.broadcast?.opponentXI ?? createMatchBroadcast(cup).opponentXI;
+    const opponents = opponentRoster.filter(p => !cardEvents.some(e => e.side === 'away' && e.playerId === p.id));
+    if (opponents.length > 7 && random() < RED_CARD_CHANCE_PER_SECOND * 180 / regularSeconds) {
+      const defenders = opponents.filter(p => ['IV','LV','RV','ZDM'].includes(p.position));
+      const pool = defenders.length ? defenders : opponents;
+      const p = pool[Math.min(pool.length-1, Math.floor(boundedRandom(random)*pool.length))];
+      const reason = getRedCardReason(p.position, random);
+      cardEvents.push({id:`${goalAt}-${p.id}-red`,side:'away',playerId:p.id,player:p.name,reason,card:'red',minute,createdAt:goalAt,homeScore,awayScore});
+      ({ homeChance, awayChance } = getScoringChances(currentStarRating));
+      lastResult = `Rote Karte für ${p.name}. ${cup.opponent} spielt in Unterzahl.`;
+      redCardOccurred = true;
     }
     const injuryRoll = random();
     if (!redCardOccurred && activeHomePlayers.length && cup.substitutionsUsed < STAR_XI_MAX_SUBSTITUTIONS && injuryRoll > 0 && injuryRoll < CUP_INJURY_CHANCE_PER_SECOND * 180 / regularSeconds) {
@@ -2506,7 +2542,7 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
     } else if (roll < homeChance + awayChance) {
       awayScore += 1;
       const opponentRoster = cup.broadcast?.opponentXI ?? createMatchBroadcast(cup).opponentXI;
-      const opponentScorers = opponentRoster.filter(p=>["ST","LF","RF","ZOM","MS"].includes(p.position)).map(p=>p.name);
+      const opponentScorers = opponentRoster.filter(p=>!cardEvents.some(e=>e.side==='away'&&e.playerId===p.id)&&["ST","LF","RF","ZOM","MS"].includes(p.position)).map(p=>p.name);
       const scorer = opponentScorers[Math.floor(Math.max(0, Math.min(0.999999, random())) * opponentScorers.length)] ?? cup.opponent;
       const ratingImpacts = getConcededGoalRatingImpacts(activeHomePlayers, formationPositions, random);
       lastGoal = { pattern: chooseGoalPattern(`${goalAt}-${awayScore}-away`, "ST"), id: `${goalAt}-${homeScore}-${awayScore}-away`, side: "away", scorerId: opponentRoster.find(p=>p.name===scorer)?.id ?? null, scorer, minute, createdAt: goalAt, homeScore, awayScore, ratingImpacts };
@@ -2515,6 +2551,13 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
   }
   const nextCup = { ...cup, homeScore, awayScore, lastTickAt: processedUntil, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, playerExitedAt, allTimeScorers, lastResult, matchMomentum: Math.round(matchMomentum * 10) / 10, matchPaused };
   nextCup.broadcast = advanceMatchBroadcast(nextCup, homePlayers);
+  for(const e of nextCup.broadcast.events.filter(e=>e.kind==='yellow')) {
+    const yellows=nextCup.broadcast.events.filter(a=>a.kind==='yellow'&&a.side===e.side&&a.playerId===e.playerId&&a.at<=e.at);
+    if(yellows.length<2||nextCup.cardEvents.some(c=>c.playerId===e.playerId))continue;
+    const side=e.side==='club'?'home':'away';
+    nextCup.cardEvents.push({id:`second-yellow:${e.id}`,side,playerId:e.playerId,player:e.player,reason:'zweites verwarnungswürdiges Foul',card:'red',minute:e.minute,createdAt:e.at,homeScore,awayScore});
+    if(side==='home'){nextCup.sentOffPlayerIds.push(e.playerId);nextCup.suspendedPlayerIds.push(e.playerId);nextCup.playerExitedAt[e.playerId]=e.minute;}
+  }
   const liveBaseResult = getCupBaseResult(cup, currentStarRating);
   if (matchPaused) return { cup: nextCup, ...liveBaseResult };
   if (now < cup.matchEndsAt) return { cup: nextCup, ...liveBaseResult };
@@ -2706,7 +2749,7 @@ function normalizeTransferInsiderEvent(value: unknown): TransferInsiderEvent | n
   const outcome: TransferInsiderOutcome | null = source.outcome === "loan" || source.outcome === "sale" || source.outcome === "failed" || source.outcome === "return" ? source.outcome : null;
   const createdAt = Math.floor(Number(source.createdAt) || 0);
   if (!outcome || createdAt <= 0) return null;
-  const playerId = typeof source.playerId === "string" && getStarXIPlayer(source.playerId) ? source.playerId : null;
+  const playerId = typeof source.playerId === "string" && (getStarXIPlayer(source.playerId) || source.side === "away" && /^opponent-([0-9]|10)$/.test(source.playerId)) ? source.playerId : null;
   return {
     id: safeString(source.id, `transfer-${createdAt}`),
     outcome,
@@ -2746,7 +2789,7 @@ function normalizeCupGoalEvent(value: unknown): CupGoalEvent | null {
 function normalizeCupCardEvent(value: unknown): CupCardEvent | null {
   const source = asRecord(value);
   if (typeof source.id !== "string" || (source.side !== "home" && source.side !== "away") || source.card !== "red" || Number(source.createdAt) <= 0) return null;
-  const playerId = typeof source.playerId === "string" && getStarXIPlayer(source.playerId) ? source.playerId : null;
+  const playerId = typeof source.playerId === "string" && (getStarXIPlayer(source.playerId) || source.side === "away" && /^opponent-([0-9]|10)$/.test(source.playerId)) ? source.playerId : null;
   return {
     id: safeString(source.id, "red-card-event"),
     side: source.side,
@@ -2943,7 +2986,8 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
   const pendingNextRound = cup.pendingNextRound === true && !active && (mode === "season" || (Number(cup.round) >= 0 && Number(cup.round) < tournament.rounds));
   const nextTournamentAt = Math.max(0, Math.floor(Number(cup.nextTournamentAt) || 0));
   const loanedPlayerIds = transferSaga.loans.map((loan) => loan.playerId);
-  const normalizedStarXI = removeStarXIPlayersFromSquad(normalizeStarXIState(starXI, loanedPlayerIds), [...new Set([...suspendedPlayerIds, ...Object.keys(injuredPlayerIds)])], !active);
+  const savedLock = normalizeSquadLock(source.squadLock ?? asRecord(asRecord(source.travel).journey).squadLock);
+  const normalizedStarXI = removeStarXIPlayersFromSquad(normalizeStarXIState({...starXI, lockedPlayerIds:savedLock?.playerIds}, loanedPlayerIds), [...new Set([...suspendedPlayerIds, ...Object.keys(injuredPlayerIds)])], !active);
   const normalizeSavedSquadSlots = (value: unknown, size: number) => {
     const slots = Array.isArray(value) ? value : [];
     return Array.from({ length: size }, (_, index) => {
@@ -3003,9 +3047,10 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     completedTournamentRuns: Array.isArray(source.completedTournamentRuns)?[...new Set(source.completedTournamentRuns.filter((id):id is string=>typeof id==='string'))]:[],
     earnedPacks: (Array.isArray(source.earnedPacks)?source.earnedPacks:[]).map(asRecord).filter(p=>typeof p.id==='string'&&isRewardPack(String(p.packId))).filter((p,i,a)=>a.findIndex(x=>x.id===p.id)===i).map(p=>{const saved=asRecord(p.opening),player=getStarXIPlayer(String(asRecord(saved.player).id));return {id:String(p.id),packId:p.packId as RewardPackId,earnedAt:Number(p.earnedAt)||0,...(player?{opening:{packId:p.packId as RewardPackId,packName:getStarPack(String(p.packId))!.label,player,duplicate:saved.duplicate===true,fragmentCompensation:Math.max(0,Number(saved.fragmentCompensation)||0)}}:{})};}),
     travel: normalizeTravel(source.travel),
+    squadLock: normalizeSquadLock(source.squadLock ?? asRecord(asRecord(source.travel).journey).squadLock),
     career: normalizeCareerState(source.career, [...normalizedStarXI.ownedIds, ...loans.map(loan => loan.playerId)], { ...defaults.cup, ...cup, allTimeScorers, allTimeAppearances, playerEnteredAt, matchEvents, active } as CupState),
     transferMarket: { offerIds: offerIds.length ? offerIds : defaults.transferMarket.offerIds, ownedIds: [...new Set(ownedIds)] },
-    starXI: normalizedStarXI,
+    starXI: { ...normalizedStarXI, lockedPlayerIds: normalizeSquadLock(source.squadLock ?? asRecord(asRecord(source.travel).journey).squadLock)?.playerIds },
     club: { name: clubName, badge: CLUB_BADGES.includes(String(club.badge)) ? String(club.badge) : defaults.club.badge, color: CLUB_COLORS.includes(String(club.color)) ? String(club.color) : defaults.club.color },
     cup: { broadcast: normalizeMatchBroadcast(cup.broadcast), fixture: cup.fixture && typeof cup.fixture==='object' ? cup.fixture as CupState['fixture'] : undefined, careerRatingSeed: Number.isFinite(Number(cup.careerRatingSeed)) && Number(cup.careerRatingSeed) > 0 ? Number(cup.careerRatingSeed) : matchStartedAt, careerMatchId: typeof cup.careerMatchId === "string" ? cup.careerMatchId.slice(0, 200) : undefined, careerBonuses: Object.fromEntries(Object.entries(asRecord(cup.careerBonuses)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Number(value), -2, 5)])), active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && Boolean(lastInjury), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
     seasonMode: normalizedSeasonMode,
@@ -3204,7 +3249,7 @@ export function getLoanedStarXIPlayerIds(features: GameFeatures) {
 
 export function getUnavailableStarXIPlayerIds(features: GameFeatures) {
   const injuredIds = Object.entries(features.cup.injuredPlayerIds ?? {}).filter(([, matches]) => Number(matches) > 0).map(([playerId]) => playerId);
-  return [...new Set([...features.cup.suspendedPlayerIds, ...injuredIds, ...getLoanedStarXIPlayerIds(features)])];
+  return [...new Set([...features.cup.suspendedPlayerIds, ...injuredIds, ...getLoanedStarXIPlayerIds(features), ...(features.squadLock?features.starXI.ownedIds.filter(id=>!features.squadLock!.playerIds.includes(id)):[])])];
 }
 
 export function getOpenTransferSquadVacancies(features: GameFeatures) {
@@ -3249,6 +3294,7 @@ export function finishActiveTransferLoans(value: GameFeatures, now = Date.now())
 
 export function resolveTransferInsiderEvent(value: GameFeatures, random: () => number = Math.random, now = Date.now()) {
   const features = normalizeGameFeatures(value);
+  if (features.squadLock) return { features, event: null, goalDelta: 0 };
   const deadlineDay = isTransferDeadlineDay(features, now);
   const loanChance = deadlineDay ? TRANSFER_DEADLINE_LOAN_CHANCE : TRANSFER_LOAN_CHANCE;
   const eventRoll = clamp(random(), 0, 0.999999);
@@ -3440,4 +3486,27 @@ export function resolveVarEvent(goals: number, random = Math.random(), now = Dat
 
 export function addHistory(features: GameFeatures, entry: Omit<MatchHistoryEntry, "id" | "timestamp">, now = Date.now()) {
   features.history = [...features.history, { ...entry, id: `${now}-${Math.random().toString(36).slice(2, 7)}`, timestamp: now }].slice(-30);
+}
+
+
+function normalizeSquadLock(value: unknown): GameFeatures['squadLock'] {
+  const v = asRecord(value);
+  if (typeof v.fixtureId !== 'string' || !Array.isArray(v.playerIds) || !Number.isFinite(v.startedAt)) return undefined;
+  const finite = (n: unknown) => Math.max(0, Number.isFinite(Number(n)) ? Number(n) : 0);
+  return { fixtureId: v.fixtureId, playerIds: uniqueKnownStarIds(v.playerIds), startedAt: Number(v.startedAt), transferRemaining: finite(v.transferRemaining), eventRemaining: finite(v.eventRemaining), varRemaining: finite(v.varRemaining) };
+}
+export function lockMatchSquad(features: GameFeatures, fixtureId: string, now: number) {
+  if (features.squadLock) return;
+  features.squadLock = {fixtureId, playerIds: [...new Set([...features.starXI.lineupIds,...features.starXI.benchIds].filter(Boolean))], startedAt:now, transferRemaining:Math.max(0,features.transferSaga.nextAt-now), eventRemaining:Math.max(0,features.nextEventAt-now), varRemaining:Math.max(0,features.nextVarAt-now)};
+  features.starXI.lockedPlayerIds = [...features.squadLock.playerIds];
+}
+export function releaseMatchSquad(features: GameFeatures, now: number) {
+  const lock = features.squadLock;
+  if (!lock) return;
+  features.transferSaga.nextAt = now + lock.transferRemaining;
+  features.nextEventAt = now + lock.eventRemaining;
+  features.nextVarAt = now + lock.varRemaining;
+  delete features.squadLock;
+  delete features.starXI.lockedPlayerIds;
+  if(features.travel.journey) delete features.travel.journey.squadLock;
 }

@@ -38,7 +38,7 @@ test('whole collection produces valid stable saved assignments and safe match lo
 
 test('form changes a close contested slot and secondary positions score equally',()=>{
  const f=initialGameFeatures();
- const pair=STAR_XI_PLAYERS.flatMap(a=>STAR_XI_PLAYERS.filter(b=>b.id!==a.id&&a.rating>b.rating&&a.rating-b.rating<=3&&getStarXIPositions(b).includes(a.position)).map(b=>[a,b])).find(([a,b])=>a.rating<98&&b.rating<98)!;
+ const pair=STAR_XI_PLAYERS.flatMap(a=>STAR_XI_PLAYERS.filter(b=>b.id!==a.id&&a.rating>b.rating&&a.rating-b.rating<=3&&getStarXIPositions(b).includes(a.position!)).map(b=>[a,b])).find(([a,b])=>a.rating<98&&b.rating<98)!;
  const [a,b]=pair;
  f.career.players[a.id]={...emptyPlayerStats(),recent:[4.5]};
  f.career.players[b.id]={...emptyPlayerStats(),recent:[9]};

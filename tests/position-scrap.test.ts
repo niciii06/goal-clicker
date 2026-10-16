@@ -7,7 +7,7 @@ import { SCRAP_PLAYERS, STAR_FORMATIONS, STAR_PACKS, STAR_XI_PLAYERS, addStarXIP
 import { emptyPlayerStats, getCareerCard, getMilestoneCategory, getPlayerMilestones, normalizeCareerState, claimAllAlbumRewards, getAlbumGroups } from '../app/career-data.ts';
 import { getPackUnlockSeason, getUpgradeUnlockSeason } from '../app/season-progression.ts';
 function random(seed=1) { return () => ((seed = (Math.imul(seed,1664525)+1013904223)>>>0)/4294967296); }
-const player = (position:string) => STAR_XI_PLAYERS.find(p=>p.position===position) ?? {...STAR_XI_PLAYERS[0],position:position as (typeof STAR_XI_PLAYERS)[number]['position'],positions:[position as (typeof STAR_XI_PLAYERS)[number]['position']]};
+const player = (position:string) => STAR_XI_PLAYERS.find(p=>p.position===position) ?? {...STAR_XI_PLAYERS[0],position:position as NonNullable<(typeof STAR_XI_PLAYERS)[number]['position']>,positions:[position as NonNullable<(typeof STAR_XI_PLAYERS)[number]['position']>]};
 test('every primary position receives increasing realistic goals with unchanged nonstacking rewards',()=>{
  for(const [pos,category] of [['TW','goalkeeper'],['IV','defender'],['LV','defender'],['RV','defender'],['ZDM','midfielder'],['ZM','midfielder'],['ZOM','midfielder'],['LM','winger'],['RM','winger'],['LF','winger'],['RF','winger'],['ST','striker'],['MS','striker']]) {
   const p=player(pos);assert.equal(getMilestoneCategory(p),category);

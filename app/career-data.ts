@@ -47,9 +47,9 @@ const POSITION_MILESTONES = Object.fromEntries(Object.entries(CATEGORY_TARGETS).
 export const CAREER_MILESTONES: readonly CareerMilestone[] = [...LEGACY_CAREER_MILESTONES, ...Object.values(POSITION_MILESTONES).flat()];
 export function getMilestoneCategory(player: StarXIPlayer): MilestoneCategory {
   if (player.position === 'TW') return 'goalkeeper';
-  if (['IV','LV','RV','LAV','RAV'].includes(player.position)) return 'defender';
-  if (['ZDM','ZM','ZOM'].includes(player.position)) return 'midfielder';
-  if (['LM','RM','LF','RF','LW','RW'].includes(player.position)) return 'winger';
+  if (['IV','LV','RV','LAV','RAV'].includes(player.position ?? '')) return 'defender';
+  if (['ZDM','ZM','ZOM'].includes(player.position ?? '')) return 'midfielder';
+  if (['LM','RM','LF','RF','LW','RW'].includes(player.position ?? '')) return 'winger';
   return 'striker';
 }
 export function getPlayerMilestones(career: CareerState, player: StarXIPlayer): readonly CareerMilestone[] {

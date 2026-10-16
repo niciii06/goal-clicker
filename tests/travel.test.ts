@@ -63,11 +63,11 @@ test('trip statistics count arrival once and survive refresh',()=>{
  assert.equal(settleTravel(state,now).stats.trips,0);const arrived=settleTravel(state,state.journey.endsAt);assert.equal(arrived.stats.trips,1);
  const restored=normalizeTravel(JSON.parse(JSON.stringify(arrived)));assert.equal(settleTravel(restored,now+180000).stats.trips,1);assert.ok(restored.stats.furthest);assert.equal(restored.stats.countries.length,1);
 });
-test('tournament plan is stable, real opponent matches travelled destination and next rounds alternate',()=>{
+test('tournament plan is stable, real opponent matches travelled destination and all subsequent rounds remain away',()=>{
  const f=ready(),fixture=fixtureFor(f,'tournament','champions');assert.deepEqual(fixtureFor(f,'tournament','champions'),fixture);
  f.travel.journey=createJourney(fixture,now,()=>.9);
  const cup=beginCupMatch(f.cup,now+180000,'champions',getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions,f.starXI.lineupIds,f.starXI.benchIds,()=>.8,fixture.schedule);
- assert.equal(cup.opponent,fixture.opponent);f.cup={...cup,active:false,pendingNextRound:true,round:1};assert.equal(fixtureFor(f,'tournament','champions').away,false);
+ assert.equal(cup.opponent,fixture.opponent);f.cup={...cup,active:false,pendingNextRound:true,round:1};assert.equal(fixtureFor(f,'tournament','champions').away,true);
  f.cup.round=2;assert.equal(fixtureFor(f,'tournament','champions').away,true);
 });
 test('lineup, cooldown, red card and active match validation remain enforced',()=>{
