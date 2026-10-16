@@ -37,7 +37,7 @@ test('authoritative added actions and their statistics survive JSON roundtrip an
 test('broadcast uses no match RNG, rendering and replays cannot fabricate goals or mutate state',()=>{
  const f=fixture();let calls=0;
  const result=advanceCupMatch(f.cup,80,1030000,()=>{calls++;return .5;},players(f),f.starXI.formationPositions);
- assert.equal(calls,90);assert.equal(result.cup.homeScore,0);assert.equal(result.cup.awayScore,0);
+ assert.equal(calls,120);assert.equal(result.cup.homeScore,0);assert.equal(result.cup.awayScore,0);
  f.cup=result.cup;const before=JSON.stringify(f);
  for(let t=1030000;t<1032000;t+=16)getVisualFrame(f,t);
  for(const event of getViewerEvents(f.cup))getVisualFrame(f,1062000,{event,startedAt:1060000});

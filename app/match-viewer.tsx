@@ -223,7 +223,7 @@ export function getVisualFrame(features: GameFeatures, wallNow: number, replay?:
   return {actors,ball,height,minute,status,recent,age,keeperDive,ballOwnerId,pass,shotFlight};
 }
 
-export function LiveMatchViewer({ features, now, clubName, clubColor, disabled=false, onTactic, onSubstitute }: { features: GameFeatures; now: number; clubName: string; clubColor: string; disabled?:boolean; onTactic?:(id:GameFeatures["cup"]["strategyId"])=>void; onSubstitute?:(id:string,slot:number)=>void }) {
+export function LiveMatchViewer({ features, now, clubName, clubColor, disabled=false, onTactic, onSubstitute }: { features: GameFeatures; now: number; clubName: string; clubColor: string; disabled?:boolean; onTactic?:(id:GameFeatures["cup"]["strategyId"])=>void; onSubstitute?:(changes:{playerId:string;slot:number}[])=>void }) {
   const [tab, setTab] = useState<Phase>("live");
   const [clock, setClock] = useState(now);
   const [replay, setReplay] = useState<Replay>();
@@ -297,7 +297,7 @@ export function LiveMatchViewer({ features, now, clubName, clubColor, disabled=f
       </div>
     </div>
     {selectedPlayer && <div className="gc-viewer-player-detail"><strong>{frame.actors.find(p=>p.id===selectedPlayer)?.label??getStarXIPlayer(selectedPlayer)?.name}</strong><span>Note {frame.actors.find(p=>p.id===selectedPlayer)?.rating?.toFixed(1)??'–'}</span><button type="button" onClick={()=>setSelectedPlayer(undefined)}>Schliessen</button></div>}
-    <button type="button" className="mode-secondary match-sub-button" disabled={disabled||!onSubstitute||cup.phase==='penalties'||cup.substitutionsUsed>=STAR_XI_MAX_SUBSTITUTIONS} onClick={()=>setSubOpen(true)}>Wechseln</button>{subOpen&&<MatchSubstitutions features={features} disabled={disabled} onConfirm={(id,slot)=>onSubstitute?.(id,slot)} onClose={()=>setSubOpen(false)}/>} <div className="gc-viewer-tabs" role="tablist" aria-label="Spielansichten">{phases.map((item) => <button type="button" role="tab" aria-selected={tab === item.id} key={item.id} className={tab === item.id ? "selected" : ""} onClick={() => { setTab(item.id); if (item.id !== "live") setReplay(undefined); }}>{item.label}</button>)}</div>
+    <button type="button" className="mode-secondary match-sub-button" disabled={disabled||!onSubstitute||cup.phase==='penalties'||cup.substitutionsUsed>=STAR_XI_MAX_SUBSTITUTIONS} onClick={()=>setSubOpen(true)}>Wechseln</button>{subOpen&&<MatchSubstitutions features={features} disabled={disabled} onConfirm={changes=>onSubstitute?.(changes)} onClose={()=>setSubOpen(false)}/>} <div className="gc-viewer-tabs" role="tablist" aria-label="Spielansichten">{phases.map((item) => <button type="button" role="tab" aria-selected={tab === item.id} key={item.id} className={tab === item.id ? "selected" : ""} onClick={() => { setTab(item.id); if (item.id !== "live") setReplay(undefined); }}>{item.label}</button>)}</div>
     <div className="gc-viewer-tab-panel" role="tabpanel">
       {tab === "live" && <div className="gc-viewer-events">{history.length ? history.slice().reverse().map(event=><button key={event.id} type="button" onClick={()=>setReplay({event,startedAt:clock})}><time>{event.minute}′</time><span>{eventLabel(event)} · {event.player}</span><b>▶</b></button>) : <span>Die Partie läuft. Tore, Karten, Verletzungen und Wechsel erscheinen hier.</span>}</div>}
       {tab === "statistics" && <MatchStatistics features={features} clubName={clubName} />}

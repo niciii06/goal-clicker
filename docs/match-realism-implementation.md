@@ -75,3 +75,16 @@ completed and artifact validator reported:
 No paid providers or deployment used. Historical journey endpoints are retained.
 Remaining: queued batch substitutions/windows, timed overlays/clock/tactics,
 viewer realism, source-backed venue audit, visual QA.
+
+## Phase 3
+
+Added shared batch validation, persisted pending changes and one-window atomic
+execution on authoritative stoppages. The UI supports drag/tap multi-staging,
+review and batch confirmation. Legacy live squad actions use the same queue;
+multiplayer validates each incoming player and slot. Halftime batches are
+exempt from windows while remaining within the five-player total.
+
+Validation: 32/32 match/session/change/viewer tests passed, TypeScript passed,
+production build and Sites artifact validation passed. Tested reload of pending
+batches, duplicate slots, unavailable players, exhausted limits and repeat ticks.
+Remaining: authoritative halftime/goal timing, match pacing and viewer/routing QA.

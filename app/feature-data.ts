@@ -76,6 +76,9 @@ export type CupState = {
   opponentIds: string[];
   strategyId: CupStrategyId;
   substitutionsUsed: number;
+  timedPause?: {kind:'goal'|'halftime';id:string;startsAt:number;endsAt:number;frozenAt:number};
+  subWindowsUsed?: number;
+  pendingSubstitutions?: {id: string; requestedAt: number; changes: {playerId:string;slot:number;outgoingId:string}[]};
   matchMomentum: number;
   originalLineupIds: string[];
   originalBenchIds: string[];
@@ -2100,6 +2103,8 @@ function startTournamentRound(cup: CupState, tournament: TournamentDefinition, r
     opponentIds: [...cup.opponentIds],
     strategyId: resetStrategy ? "konter" : cup.strategyId,
     substitutionsUsed: 0,
+    subWindowsUsed: 0,
+    pendingSubstitutions: undefined,
     matchMomentum: 0,
     playerEnteredAt,
     playerExitedAt: {},
@@ -2174,6 +2179,8 @@ export function beginSeasonCupMatch(cup: CupState, seasonValue: unknown, now = D
     opponentIds: [opponent.id],
     strategyId: cup.strategyId,
     substitutionsUsed: 0,
+    subWindowsUsed: 0,
+    pendingSubstitutions: undefined,
     matchMomentum: 0,
     originalLineupIds: [...originalLineupIds],
     originalBenchIds: [...originalBenchIds],
@@ -3052,7 +3059,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     transferMarket: { offerIds: offerIds.length ? offerIds : defaults.transferMarket.offerIds, ownedIds: [...new Set(ownedIds)] },
     starXI: { ...normalizedStarXI, lockedPlayerIds: normalizeSquadLock(source.squadLock ?? asRecord(asRecord(source.travel).journey).squadLock)?.playerIds },
     club: { name: clubName, badge: CLUB_BADGES.includes(String(club.badge)) ? String(club.badge) : defaults.club.badge, color: CLUB_COLORS.includes(String(club.color)) ? String(club.color) : defaults.club.color },
-    cup: { broadcast: normalizeMatchBroadcast(cup.broadcast), fixture: cup.fixture && typeof cup.fixture==='object' ? cup.fixture as CupState['fixture'] : undefined, careerRatingSeed: Number.isFinite(Number(cup.careerRatingSeed)) && Number(cup.careerRatingSeed) > 0 ? Number(cup.careerRatingSeed) : matchStartedAt, careerMatchId: typeof cup.careerMatchId === "string" ? cup.careerMatchId.slice(0, 200) : undefined, careerBonuses: Object.fromEntries(Object.entries(asRecord(cup.careerBonuses)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Number(value), -2, 5)])), active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && Boolean(lastInjury), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
+    cup: { subWindowsUsed: Math.min(3,Math.max(0,Math.floor(Number(cup.subWindowsUsed)||0))), pendingSubstitutions: normalizePendingSubstitutions(cup.pendingSubstitutions), broadcast: normalizeMatchBroadcast(cup.broadcast), fixture: cup.fixture && typeof cup.fixture==='object' ? cup.fixture as CupState['fixture'] : undefined, careerRatingSeed: Number.isFinite(Number(cup.careerRatingSeed)) && Number(cup.careerRatingSeed) > 0 ? Number(cup.careerRatingSeed) : matchStartedAt, careerMatchId: typeof cup.careerMatchId === "string" ? cup.careerMatchId.slice(0, 200) : undefined, careerBonuses: Object.fromEntries(Object.entries(asRecord(cup.careerBonuses)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Number(value), -2, 5)])), active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && Boolean(lastInjury), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
     seasonMode: normalizedSeasonMode,
     goalBoost,
     missions,
@@ -3509,4 +3516,51 @@ export function releaseMatchSquad(features: GameFeatures, now: number) {
   delete features.squadLock;
   delete features.starXI.lockedPlayerIds;
   if(features.travel.journey) delete features.travel.journey.squadLock;
+}
+
+export type MatchChange = {playerId:string;slot:number};
+function normalizePendingSubstitutions(value: unknown): CupState['pendingSubstitutions'] {
+ const v=asRecord(value);
+ if(typeof v.id!=='string'||!Number.isFinite(v.requestedAt)||!Array.isArray(v.changes)||!v.changes.length||v.changes.length>5)return undefined;
+ const changes=v.changes.map(asRecord).filter(c=>typeof c.playerId==='string'&&typeof c.outgoingId==='string'&&Number.isInteger(c.slot)&&Number(c.slot)>=0&&Number(c.slot)<11).map(c=>({playerId:String(c.playerId),outgoingId:String(c.outgoingId),slot:Number(c.slot)}));
+ return changes.length===v.changes.length?{id:v.id,requestedAt:Number(v.requestedAt),changes}:undefined;
+}
+export function matchChangeError(features:GameFeatures,changes:readonly MatchChange[]) {
+ const c=features.cup;
+ if(!c.active||c.phase==='penalties')return 'Zurzeit ist kein Wechsel möglich.';
+ if(!changes.length||changes.length+c.substitutionsUsed>5)return 'Maximal fünf Spielerwechsel pro Partie.';
+ if(c.timedPause?.kind!=='halftime'&&(c.subWindowsUsed??0)>=3)return 'Alle drei Wechselfenster sind aufgebraucht.';
+ if(new Set(changes.map(x=>x.slot)).size!==changes.length||new Set(changes.map(x=>x.playerId)).size!==changes.length)return 'Jeder Spieler und Feldplatz darf nur einmal vorkommen.';
+ for(const x of changes){
+  const outgoing=features.starXI.lineupIds[x.slot],incoming=getStarXIPlayer(x.playerId);
+  if(!Number.isInteger(x.slot)||x.slot<0||x.slot>=11||!outgoing||c.sentOffPlayerIds.includes(outgoing))return 'Ein des Feldes verwiesener Spieler kann nicht ersetzt werden.';
+  if(!incoming||incoming.benchOnly||!features.starXI.benchIds.includes(x.playerId)||c.playerExitedAt[x.playerId]||c.sentOffPlayerIds.includes(x.playerId)||getUnavailableStarXIPlayerIds(features).includes(x.playerId))return 'Dieser Bankspieler ist nicht spielberechtigt.';
+  if(!canStarXIPlayerFillSlot(x.playerId,x.slot,features.starXI.formationPositions))return 'Die Position passt nicht.';
+ }
+ return '';
+}
+export function queueMatchChanges(features:GameFeatures,changes:readonly MatchChange[],now:number) {
+ if(features.cup.pendingSubstitutions)return 'Es ist bereits ein Wechselpaket vorgemerkt.';
+ const error=matchChangeError(features,changes);if(error)return error;
+ features.cup.pendingSubstitutions={id:`subs:${features.cup.careerMatchId}:${features.cup.substitutionsUsed}`,requestedAt:now,changes:changes.map(x=>({...x,outgoingId:features.starXI.lineupIds[x.slot]}))};
+ applyPendingMatchChanges(features,now);
+ return '';
+}
+export function applyPendingMatchChanges(features:GameFeatures,now:number) {
+ const c=features.cup,p=c.pendingSubstitutions;if(!p||!c.active)return;
+ const halftime=c.timedPause?.kind==='halftime'&&now<c.timedPause.endsAt;
+ const stoppage=halftime||c.matchPaused||[...c.matchEvents,...c.cardEvents].some(e=>e.createdAt>=p.requestedAt)||c.broadcast?.events.some(e=>e.at>=p.requestedAt&&['corner','throw-in','free-kick','yellow'].includes(e.kind));
+ if(!stoppage)return;
+ if(p.changes.some(x=>features.starXI.lineupIds[x.slot]!==x.outgoingId)||matchChangeError(features,p.changes)){delete c.pendingSubstitutions;return;}
+ const minute=getCupMatchMinute(c,now);
+ for(const x of p.changes){
+  features.cup=applyCupSubstitution(features.cup,x.outgoingId,x.playerId,minute,now).cup;
+  features.starXI=setStarXIStarter(features.starXI,x.slot,x.playerId,getUnavailableStarXIPlayerIds(features));
+  features.cup.playerExitedAt[x.outgoingId]=Math.min(features.cup.playerExitedAt[x.outgoingId]??minute,minute);
+  features.cup.playerEnteredAt[x.playerId]=minute;
+  features.cup.playerMatchPositions[x.playerId]=features.starXI.formationPositions[x.slot];
+  features.cup.substitutionsUsed++;
+ }
+ features.cup.subWindowsUsed=(c.subWindowsUsed??0)+(halftime?0:1);
+ delete features.cup.pendingSubstitutions;
 }
