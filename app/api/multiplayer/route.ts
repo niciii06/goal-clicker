@@ -10,6 +10,7 @@ import type { GameFeatures, PenaltyDirection, StarFormationId, StarPackReveal } 
 import { isSupportedMultiplayerProtocol, MULTIPLAYER_UPDATE_MESSAGE } from "../../multiplayer-protocol";
 import { getFormationUnlockSeason, getPackUnlockSeason, getTournamentUnlockSeason, getUpgradeUnlockSeason, isSeasonContentUnlocked, MAX_CAREER_SEASON } from "../../season-progression";
 import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../../upgrade-purchase";
+import { MAX_MULTIPLAYER_BODY_BYTES, readJsonBody, RequestBodyTooLargeError } from "../request-body";
 
 const MAX_NAME_LENGTH = 18;
 const MAX_ROOM_NAME_LENGTH = 28;
@@ -18,6 +19,10 @@ const MAX_MULTIPLIER_LEVEL = 8;
 const MAX_SEASON_STARS = 20;
 const BALANCE_VERSION = 4;
 const MINI_GAME_COOLDOWN_SECONDS: Record<string, number> = { penalty: 60, dribble: 75, crossbar: 90, prediction: 120 };
+// Highest reward each client minigame can legitimately produce (see awardMiniGame callers in app/page.tsx).
+const MINI_GAME_MAX_REWARD: Record<string, number> = { penalty: 1000, dribble: 355, crossbar: 275, prediction: 335 };
+const GET_PASSIVE_REFRESH_MIN_MS = 5000;
+const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const PRESENCE_TIMEOUT_MS = 180000;
 const SIMULATION_LEADER_TIMEOUT_MS = 5000;
 const PASSIVE_BACKGROUND_GRACE_MS = 24 * 60 * 60 * 1000;
@@ -137,7 +142,10 @@ function cleanCode(value: unknown) {
 }
 
 function makeRoomCode() {
-  return crypto.randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase();
+  // 32 symbols divide 256 evenly, so byte % 32 has no modulo bias.
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => ROOM_CODE_ALPHABET[byte % ROOM_CODE_ALPHABET.length]).join("");
 }
 
 function finite(value: unknown, fallback = 0) {
@@ -416,9 +424,11 @@ function jsonError(message: string, status = 400) {
 }
 
 function errorMessage(error: unknown) {
-  const message = error instanceof Error ? error.message : "Unbekannter Serverfehler";
+  const message = error instanceof Error ? error.message : "";
+  console.error("[multiplayer]", error);
   if (message.includes("no such table") || message.includes("no such column") || message.includes("Failed query")) return "Die Koop-Datenbank wird gerade aktualisiert. Bitte lade die Seite in einem Moment nochmals.";
-  return message;
+  if (message === "Die Welt konnte nicht gespeichert werden." || message.startsWith("Cloudflare D1 binding")) return message;
+  return "Unbekannter Serverfehler. Bitte erneut versuchen.";
 }
 
 async function loadRoom(code: string) {
@@ -427,10 +437,12 @@ async function loadRoom(code: string) {
   return { db, room };
 }
 
-async function refreshPassive(db: ReturnType<typeof getDb>, room: RoomRow) {
+async function refreshPassive(db: ReturnType<typeof getDb>, room: RoomRow, minElapsedMs = 0) {
   const now = Date.now();
   const last = Date.parse(room.lastPassiveAt || room.updatedAt) || now;
   const fullElapsed = Math.max(0, now - last);
+  // Passive income and timer shifts are additive over [last, now], so a deferred refresh loses nothing.
+  if (fullElapsed < minElapsedMs) return room;
   const game = readGame(room);
   const latestSeenAt = Math.max(...getOccupiedRoomPlayers(room).map((player) => Date.parse(player.lastSeenAt || "") || 0), 0);
   const activeLeaseEndsAt = latestSeenAt + PASSIVE_BACKGROUND_GRACE_MS;
@@ -486,7 +498,7 @@ export async function GET(request: Request) {
     if (!room) return jsonError("Raum nicht gefunden.", 404);
     const role = roomRole(room, playerId);
     if (!role) return jsonError("Du bist nicht in diesem Raum.", 403);
-    const refreshed = await refreshPassive(db, room);
+    const refreshed = await refreshPassive(db, room, GET_PASSIVE_REFRESH_MIN_MS);
     const touched = await db.updateRoom(code, rolePresenceUpdate(role, new Date().toISOString()));
     return Response.json({ serverNow: Date.now(), room: shapeRoom(touched ?? refreshed, playerId), role });
   } catch (error) {
@@ -496,7 +508,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const payload = (await request.json()) as {
+    const payload = await readJsonBody<{
       action?: unknown;
       mode?: unknown;
       groupId?: unknown;
@@ -528,7 +540,7 @@ export async function POST(request: Request) {
       bonusCode?: unknown;
       preferredRole?: unknown;
       protocol?: unknown;
-    };
+    }>(request, MAX_MULTIPLAYER_BODY_BYTES);
     if (!isSupportedMultiplayerProtocol(payload.protocol)) return jsonError(MULTIPLAYER_UPDATE_MESSAGE, 426);
     const action = typeof payload.action === "string" ? payload.action : "";
     const playerId = cleanPlayerId(payload.playerId);
@@ -538,12 +550,15 @@ export async function POST(request: Request) {
     if (action === "create") {
       if (nickname.length < 2) return jsonError("Der Spielername muss mindestens 2 Zeichen haben.");
       const db = getDb();
-      let code = makeRoomCode();
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        const existing = await db.getRoom(code);
-        if (!existing) break;
-        code = makeRoomCode();
+      let code = "";
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const candidate = makeRoomCode();
+        if (!(await db.getRoom(candidate))) {
+          code = candidate;
+          break;
+        }
       }
+      if (!code) return jsonError("Es konnte gerade kein freier Raumcode erzeugt werden. Bitte erneut versuchen.", 503);
       const now = new Date().toISOString();
       const roomName = cleanRoomName(payload.roomName, `${nickname}s Welt`);
       const room = await db.insertRoom({ code, roomName, hostPlayerId: playerId, hostName: nickname, hostLastSeenAt: now, lastPassiveAt: now, updatedAt: now });
@@ -562,11 +577,14 @@ export async function POST(request: Request) {
       const now = new Date().toISOString();
       const requestedRole = typeof payload.preferredRole === "string" && COOP_ROLES.includes(payload.preferredRole as CoopRole) ? payload.preferredRole as CoopRole : null;
       const directRole = roomRole(room, playerId);
-      const matchingNameRoles = getOccupiedRoomPlayers(room)
-        .filter((player) => player.name?.localeCompare(nickname, "de-CH", { sensitivity: "base" }) === 0)
-        .map((player) => player.role);
+      const hasSameName = (player: ReturnType<typeof getRoomPlayer>) => player.name?.localeCompare(nickname, "de-CH", { sensitivity: "base" }) === 0;
+      // Name based recovery may only reclaim a seat whose owner is offline. An active
+      // player can never be displaced by someone who only knows the code and the name.
+      const isReclaimable = (player: ReturnType<typeof getRoomPlayer>) => Boolean(player.playerId) && !isOnline(player.lastSeenAt);
+      const sameNamePlayers = getOccupiedRoomPlayers(room).filter(hasSameName);
+      const matchingNameRoles = sameNamePlayers.filter(isReclaimable).map((player) => player.role);
       const requestedPlayer = requestedRole ? getRoomPlayer(room, requestedRole) : null;
-      const restoredRole = requestedPlayer?.playerId && requestedPlayer.name?.localeCompare(nickname, "de-CH", { sensitivity: "base" }) === 0
+      const restoredRole = requestedPlayer?.playerId && hasSameName(requestedPlayer) && isReclaimable(requestedPlayer)
         ? requestedRole
         : matchingNameRoles.length === 1
           ? matchingNameRoles[0]
@@ -574,20 +592,30 @@ export async function POST(request: Request) {
       const reconnectRole = directRole ?? restoredRole;
       if (reconnectRole) {
         room = await refreshPassive(db, room);
-        const reconnected = await db.updateRoom(code, { ...roleIdentityUpdate(reconnectRole, playerId, nickname, now), updatedAt: now });
-        return Response.json({ serverNow: Date.now(), room: shapeRoom(reconnected ?? room, playerId), role: reconnectRole });
+        const seatOwner = getRoomPlayer(room, reconnectRole).playerId ?? null;
+        const reconnected = await db.updateRoom(code, { ...roleIdentityUpdate(reconnectRole, playerId, nickname, now), updatedAt: now }, { seat: { role: reconnectRole, playerId: seatOwner } });
+        if (!reconnected) return jsonError("Dieser Platz wurde gerade neu vergeben. Bitte erneut versuchen.", 409);
+        return Response.json({ serverNow: Date.now(), room: shapeRoom(reconnected, playerId), role: reconnectRole });
       }
+      if (sameNamePlayers.some((player) => isOnline(player.lastSeenAt))) return jsonError("Dieser Spielername ist in dieser Welt gerade aktiv. Wähle einen anderen Namen oder versuche es in drei Minuten erneut.", 409);
 
-      const joinRoom = room;
-      const openRole = (["guest", "player3", "player4"] as const).find((role) => !getRoomPlayer(joinRoom, role).playerId);
-      if (!openRole) return jsonError("Dieser Raum ist bereits voll. Maximal vier Spieler können gemeinsam spielen.", 409);
-      const wasWaiting = getOccupiedRoomPlayers(room).length < 2;
-      const joined = await db.updateRoom(code, {
-        ...roleIdentityUpdate(openRole, playerId, nickname, now),
-        ...(wasWaiting ? { lastPassiveAt: now } : {}),
-        updatedAt: now,
-      });
-      return Response.json({ serverNow: Date.now(), room: shapeRoom(joined ?? room, playerId), role: openRole });
+      let joinRoom: RoomRow = room;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const candidateRoom = joinRoom;
+        const openRole = (["guest", "player3", "player4"] as const).find((role) => !getRoomPlayer(candidateRoom, role).playerId);
+        if (!openRole) return jsonError("Dieser Raum ist bereits voll. Maximal vier Spieler können gemeinsam spielen.", 409);
+        const wasWaiting = getOccupiedRoomPlayers(candidateRoom).length < 2;
+        const joined = await db.updateRoom(code, {
+          ...roleIdentityUpdate(openRole, playerId, nickname, now),
+          ...(wasWaiting ? { lastPassiveAt: now } : {}),
+          updatedAt: now,
+        }, { seat: { role: openRole, playerId: null } });
+        if (joined) return Response.json({ serverNow: Date.now(), room: shapeRoom(joined, playerId), role: openRole });
+        const latest = await db.getRoom(code);
+        if (!latest) return jsonError("Raum nicht gefunden.", 404);
+        joinRoom = latest;
+      }
+      return jsonError("Der Raum wurde gerade gleichzeitig betreten. Bitte erneut versuchen.", 409);
     }
 
     const role = roomRole(room, playerId);
@@ -1052,6 +1080,7 @@ export async function POST(request: Request) {
     }
 
     if (action === "reset") {
+      if (role !== "host") return jsonError("Nur der Host kann den gemeinsamen Spielstand zurücksetzen.", 403);
       const sound = game.sound;
       Object.assign(game, initialGame(), { sound });
       return persistGameResponse(db, room, game, timestamp, playerId, role, { hostGoals: 0, guestGoals: 0, player3Goals: 0, player4Goals: 0, hostClicks: 0, guestClicks: 0, player3Clicks: 0, player4Clicks: 0 });
@@ -1061,7 +1090,7 @@ export async function POST(request: Request) {
       const minigameId = typeof payload.minigameId === "string" ? payload.minigameId : "";
       if (!MINI_GAME_COOLDOWN_SECONDS[minigameId]) return jsonError("Dieses Minigame gibt es nicht.");
       if (game.miniGameCooldowns[minigameId] > Date.now()) return jsonError("Dieses Minigame ist noch nicht bereit.", 409);
-      const reward = Math.max(0, Math.min(1000000, Math.floor(finite(payload.reward))));
+      const reward = Math.max(0, Math.min(MINI_GAME_MAX_REWARD[minigameId] ?? 0, Math.floor(finite(payload.reward))));
       game.goals += reward;
       game.seasonGoals += reward;
       game.totalGoals += reward;
@@ -1072,6 +1101,8 @@ export async function POST(request: Request) {
 
     return jsonError("Unbekannte Aktion.");
   } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) return jsonError(error.message, 413);
+    if (error instanceof SyntaxError) return jsonError("Die Anfrage ist ungültig.", 400);
     return Response.json({ error: errorMessage(error) }, { status: 500 });
   }
 }

@@ -5,11 +5,12 @@ import { getDb } from '../../../db';
 import { normalizeGameFeatures, getTournament } from '../../feature-data';
 import { createJourney, eligibilityError, fixtureFor } from '../../travel-data';
 import type { Journey } from '../../travel-data';
+import { MAX_GAME_STATE_BODY_BYTES, readJsonBody, RequestBodyTooLargeError } from '../request-body';
 // Solo saves remain browser-local; this ledger makes elapsed travel server-authoritative.
 // Player IDs are existing opaque capabilities, matching the shared-world API architecture.
 export async function POST(request: Request) {
  try {
-  const p=await request.json() as {playerId?:unknown;action?:unknown;fixtureId?:unknown;features?:unknown;mode?:unknown;tournamentId?:string};
+  const p=await readJsonBody<{playerId?:unknown;action?:unknown;fixtureId?:unknown;features?:unknown;mode?:unknown;tournamentId?:unknown}>(request,MAX_GAME_STATE_BODY_BYTES);
   if(typeof p.playerId!=='string'||p.playerId.length<8||p.playerId.length>80)return Response.json({error:'Spieler-ID fehlt.'},{status:400});
   const db=getDb(), now=Date.now();
   if(p.action==='status') {
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
    const journey=await db.getSoloJourney(p.playerId,p.fixtureId);
    return Response.json({journey,serverNow:now},{headers:{'cache-control':'no-store'}});
   }
-  const f=normalizeGameFeatures(p.features),mode=p.mode==='season'?'season':'tournament',t=getTournament(p.tournamentId||'stadium');
+  const f=normalizeGameFeatures(p.features),mode=p.mode==='season'?'season':'tournament',t=getTournament(typeof p.tournamentId==='string'&&p.tournamentId?p.tournamentId:'stadium');
   if(!t)return Response.json({error:'Unbekanntes Turnier.'},{status:409});
   const error=eligibilityError(f,mode,t.id,now);if(error)return Response.json({error},{status:409});
   const fixture=fixtureFor(f,mode,t.id);
@@ -33,5 +34,5 @@ export async function POST(request: Request) {
    if(!await db.consumeSoloJourney(p.playerId,fixture.id,journey)){const receipt=await db.getSoloJourney(p.playerId,fixture.id);return Response.json({journey:receipt,serverNow:now},{headers:{'cache-control':'no-store'}});}
   } else return Response.json({error:'Unbekannte Reiseaktion.'},{status:400});
   return Response.json({journey,serverNow:now},{headers:{'cache-control':'no-store'}});
- } catch {return Response.json({error:'Die Reise konnte nicht synchronisiert werden. Bitte erneut versuchen.'},{status:503});}
+ } catch (error) {if(error instanceof RequestBodyTooLargeError)return Response.json({error:error.message},{status:413});return Response.json({error:'Die Reise konnte nicht synchronisiert werden. Bitte erneut versuchen.'},{status:503});}
 }
