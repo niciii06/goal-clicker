@@ -88,3 +88,20 @@ Validation: 32/32 match/session/change/viewer tests passed, TypeScript passed,
 production build and Sites artifact validation passed. Tested reload of pending
 batches, duplicate slots, unavailable players, exhausted limits and repeat ticks.
 Remaining: authoritative halftime/goal timing, match pacing and viewer/routing QA.
+
+## Phase 4
+
+New leagues run for 210s (240s for highest divisions); cups run 240/270/300s
+based on configured competition minimum rating. Persisted timed pauses hold
+both engine and canvas: goal-line animation then exactly 4000ms overlay;
+10000ms halftime at minute 45 with accessible substitution panel. Resume shifts
+the active clock, retains original event timestamps and restores conceding-team
+kickoff. Halftime status and deadlines survive normalization. Removed tactic
+selectors/modifiers; legacy IDs are harmless. Added represented-club kit colours
+and home-preserving contrast fallback, plus mobile/reduced-motion overlay CSS.
+
+Validation: 89/89 targeted regression tests, TypeScript and production build
+passed. Tests cover boundary timestamps, reload, frozen RNG, single restart,
+legacy durations, no repeated goal, kit clash and halftime window exemption.
+React review checked effect cleanup, refs and accessibility of modified UI.
+Remaining: football decision/restart fidelity, ground audit/routing and visual QA.

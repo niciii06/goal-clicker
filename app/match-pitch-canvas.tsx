@@ -20,8 +20,8 @@ export class MatchMotion {
    let b=this.bodies.get(p.id);if(!b||cut){b={x:p.x,y:p.y,vx:0,vy:0};this.bodies.set(p.id,b);return {...p};}
    const card=getStarXIPlayer(p.id)??getStarXIPlayer(cup.broadcast?.opponentXI.find(q=>q.id===p.id)?.sourceId??'');
    const pace=card?.originalAttributes?.stats?.sprintSpeed?.value??card?.rating??70;
-   const timeScale=360000/getCupRegularDurationMs(cup);
-   const speed=(p.goalkeeper?5:8+pace*.035)*timeScale*(.65+.35*matchFitness(cup,p.id,minute)/100);
+   const timeScale=Math.min(1.2,360000/getCupRegularDurationMs(cup));
+   const speed=Math.min(12,(p.goalkeeper?5:8+pace*.035)*timeScale*(.65+.35*matchFitness(cup,p.id,minute)/100));
    const dx=p.x-b.x,dy=p.y-b.y,d=Math.hypot(dx,dy),desired=Math.min(speed,d*3);
    let vx=d>0?dx/d*desired:0,vy=d>0?dy/d*desired:0;
    for(const [id,q] of this.bodies){if(id===p.id)continue;const sx=b.x-q.x,sy=b.y-q.y,n=Math.hypot(sx,sy);if(n>.05&&n<2.9){vx+=sx/n*(2.9-n)*.8;vy+=sy/n*(2.9-n)*.8;}}
@@ -79,7 +79,7 @@ export function MatchPitchCanvas({features,now,replay,colours,camera,reducedMoti
    const wall=Date.now()+offset.current;
    const frame=getVisualFrame(data.features,wall,data.replay),dt=clamp((timestamp-previous)/1000,.001,.06);previous=timestamp;lastDraw=timestamp;
    const key=frame.recent&&frame.age<10?frame.recent.id:`period:${frame.minute<=45?0:frame.minute<=90?1:frame.minute<=105?2:3}`;
-   const actors=data.reducedMotion?frame.actors:motion.current.step(frame.actors,data.features.cup.matchPaused?0:dt,data.features.cup,frame.minute,key);
+   const actors=data.reducedMotion?frame.actors:motion.current.step(frame.actors,data.features.cup.matchPaused||data.features.cup.timedPause&&wall>=data.features.cup.timedPause.startsAt?0:dt,data.features.cup,frame.minute,key);
    displayed.current=actors;
    const bounds=el.getBoundingClientRect(),dpi=Math.min(window.devicePixelRatio||1,2),width=Math.max(1,Math.round(bounds.width*dpi)),height=Math.max(1,Math.round(bounds.height*dpi));
    if(el.width!==width||el.height!==height){el.width=width;el.height=height;}

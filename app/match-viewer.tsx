@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { getCupMatchMinute, getCupRegularDurationMs, getCupPlayerMatchRating, getStarFormation, getStarXIPlayer, CUP_STRATEGIES, STAR_XI_MAX_SUBSTITUTIONS } from "./feature-data";
+import { getCupMatchMinute, getCupRegularDurationMs, getCupPlayerMatchRating, getStarFormation, getStarXIPlayer, STAR_XI_MAX_SUBSTITUTIONS } from "./feature-data";
+import { matchColours } from './match-colours';
 import { createMatchBroadcast } from './match-broadcast';
 import type { BroadcastKind, BroadcastEvent } from './match-broadcast';
 import { goalLabel, goalAssistId } from './match-goals';
@@ -139,11 +140,11 @@ function openPlay(features:GameFeatures,at:number,minute:number,clubRight:boolea
   const cycleSeconds=stepSeconds*8;
   const cycle=Math.floor(elapsed/cycleSeconds),local=elapsed%cycleSeconds,nodeIndex=Math.min(7,Math.floor(local/stepSeconds)),t=local%stepSeconds/stepSeconds;
   const possession: Team = cycle%2 === 0 ? "club" : "opponent";
-  const strategy = possession === "club" ? cup.strategyId : cup.opponentStrategyId;
+  const strategy = 'ballbesitz';
   const right = possession === "club" ? clubRight : !clubRight;
   const seed = (cup.careerMatchId ?? String(cup.matchStartedAt)) + ":" + cycle;
   const from = possessionNode(nodeIndex,right,strategy,seed), to = possessionNode(nodeIndex+1,right,strategy,seed);
-  const defendingStrategy=possession==='club'?cup.opponentStrategyId:cup.strategyId;
+  const defendingStrategy='ballbesitz';
   const start = separateTargets(targetsAtNode(base,possession,from,strategy,defendingStrategy)), end = separateTargets(targetsAtNode(base,possession,to,strategy,defendingStrategy));
   const actorAt = (index:number,phase:number) => ({...start[index],x:mix(start[index].x,end[index].x,smooth(phase)),y:mix(start[index].y,end[index].y,smooth(phase))});
   const actors = base.map((_,i) => actorAt(i,t));
@@ -166,7 +167,9 @@ function openPlay(features:GameFeatures,at:number,minute:number,clubRight:boolea
 }
 export function getVisualFrame(features: GameFeatures, wallNow: number, replay?: Replay) {
   const cup = features.cup;
-  const at = cup.matchPaused || !cup.active ? cup.lastTickAt : Math.min(wallNow,cup.matchEndsAt);
+  const frozen=cup.timedPause;
+  const visualAt=frozen?frozen.kind==='goal'?Math.min(wallNow,frozen.startsAt):frozen.frozenAt:wallNow;
+  const at = cup.matchPaused || !cup.active ? cup.lastTickAt : Math.min(visualAt,cup.matchEndsAt);
   const minute = replay ? replay.event.minute : getCupMatchMinute(cup,at);
   const clubRight = clubAttacksRight(minute,Boolean(cup.fixture?.away));
   const open=openPlay(features,replay?replay.event.at:at,minute,clubRight,Boolean(replay)||!cup.active);
@@ -212,8 +215,8 @@ export function getVisualFrame(features: GameFeatures, wallNow: number, replay?:
   else if (recent && recent.kind === "goal" && age >= 2 && age < 3) {ball={x:52.5,y:34};status="Wiederanpfiff";}
   else if (cup.phase === "penalties") {ball={x:clubRight ? 94 : 11,y:34};status="Elfmeterschiessen";}
   const periodTransition=!replay && ((minute===46 || minute===91 || minute===106) && Math.floor(elapsed)%4<2);
-  if(!replay&&(elapsed<1.5||periodTransition||status==='Wiederanpfiff')){
-    const kickoffSide:Team=status==='Wiederanpfiff'&&recent?.kind==='goal'?(recent.side==='club'?'opponent':'club'):'club';
+  if(!replay&&(elapsed<1.5||periodTransition||status==='Wiederanpfiff'||cup.restartAt!==undefined&&wallNow>=cup.restartAt&&wallNow<cup.restartAt+1500)){
+    const kickoffSide:Team=cup.restartAt!==undefined&&wallNow<cup.restartAt+1500?(cup.restartSide??'club'):status==='Wiederanpfiff'&&recent?.kind==='goal'?(recent.side==='club'?'opponent':'club'):'club';
     const anchors=baseActors(features,cup,minute,clubRight);
     const taker=anchors.filter(p=>p.team===kickoffSide&&!p.goalkeeper).sort((a,b)=>Math.abs(a.x-52.5)-Math.abs(b.x-52.5))[0];
     actors.splice(0,actors.length,...anchors.map(p=>{const right=p.team==='club'?clubRight:!clubRight;return {...p,x:p.goalkeeper?p.x:right?Math.min(49,p.x*.61):Math.max(56,105-(105-p.x)*.61),y:p.id===taker?.id?34:p.y};}));
@@ -223,7 +226,7 @@ export function getVisualFrame(features: GameFeatures, wallNow: number, replay?:
   return {actors,ball,height,minute,status,recent,age,keeperDive,ballOwnerId,pass,shotFlight};
 }
 
-export function LiveMatchViewer({ features, now, clubName, clubColor, disabled=false, onTactic, onSubstitute }: { features: GameFeatures; now: number; clubName: string; clubColor: string; disabled?:boolean; onTactic?:(id:GameFeatures["cup"]["strategyId"])=>void; onSubstitute?:(changes:{playerId:string;slot:number}[])=>void }) {
+export function LiveMatchViewer({ features, now, clubName, clubColor, disabled=false, onSubstitute }: { features: GameFeatures; now: number; clubName: string; clubColor: string; disabled?:boolean; onSubstitute?:(changes:{playerId:string;slot:number}[])=>void }) {
   const [tab, setTab] = useState<Phase>("live");
   const [clock, setClock] = useState(now);
   const [replay, setReplay] = useState<Replay>();
@@ -264,23 +267,33 @@ export function LiveMatchViewer({ features, now, clubName, clubColor, disabled=f
     return () => cancelAnimationFrame(animation);
   }, [now, reducedMotion]);
   const cup = features.cup;
+  useEffect(()=>{
+    const pause=features.cup.timedPause;if(!pause)return;
+    const offset=now-Date.now();
+    const timers=[pause.startsAt,pause.endsAt].map(at=>window.setTimeout(()=>setClock(Date.now()+offset),Math.max(0,at-now)));
+    return()=>timers.forEach(clearTimeout);
+  },[features.cup.timedPause?.id,features.cup.timedPause?.startsAt,features.cup.timedPause?.endsAt,now]);
   const activeReplay = replay && clock - replay.startedAt < 10000 ? replay : undefined;
   const frame = getVisualFrame(features, clock, activeReplay);
   const history = getViewerEvents(cup).filter((event) => event.at <= clock);
-  const effectiveClock = cup.matchPaused ? cup.lastTickAt : Math.min(clock,cup.matchEndsAt);
+  const effectiveClock = cup.timedPause?.frozenAt ?? (cup.matchPaused ? cup.lastTickAt : Math.min(clock,cup.matchEndsAt));
   const regular = getCupRegularDurationMs(cup);
   const halfTimeTransition = !activeReplay && cup.active && [regular/2,regular,regular+regular/6].some(boundary => Math.abs(effectiveClock-cup.matchStartedAt-boundary)<1350);
   const visiting = Boolean(cup.fixture?.away);
   const home = visiting ? cup.opponent : clubName;
   const away = visiting ? clubName : cup.opponent;
-  const visibleGoals=cup.matchEvents.filter(e=>e.createdAt+(goalAssistId(e)?1150:750)<=effectiveClock);
-  const waitingGoals=cup.matchEvents.filter(e=>e.createdAt+(goalAssistId(e)?1150:750)>effectiveClock);
+  const scoreClock=cup.timedPause?.kind==='goal'?Math.min(clock,cup.timedPause.startsAt):effectiveClock;
+  const visibleGoals=cup.matchEvents.filter(e=>e.createdAt+(goalAssistId(e)?1150:750)<=scoreClock);
+  const waitingGoals=cup.matchEvents.filter(e=>e.createdAt+(goalAssistId(e)?1150:750)>scoreClock);
   const ownScore=cup.homeScore-waitingGoals.filter(e=>e.side==='home').length;
   const otherScore=cup.awayScore-waitingGoals.filter(e=>e.side==='away').length;
   const homeScore=visiting?otherScore:ownScore,awayScore=visiting?ownScore:otherScore;
   const scorers=(side:'home'|'away')=><div className="gc-score-scorers">{visibleGoals.filter(e=>e.side===side).map(e=><span key={e.id}>{goalLabel(e)}</span>)}</div>;
   const phases: { id: Phase; label: string }[] = [{id:'live',label:'MATCH'},{id:'team',label:'TEAM'},{id:'statistics',label:'STATISTIK'}];
-  const colours = { club: clubColor || "#17875f", opponent: clubColor.toLowerCase() === "#e85d04" ? "#79b8ff" : "#ffc857" };
+  const colours = matchColours(cup.opponent,clubColor,visiting);
+  const pause=cup.timedPause;
+  const timedOverlay=!activeReplay&&pause&&clock>=pause.startsAt&&clock<pause.endsAt;
+  const goal=pause?.kind==='goal'?cup.matchEvents.find(e=>e.id===pause.id):undefined;
   return <section ref={viewerRef} className={`gc-match-viewer ${tab === "team" ? "team-open" : "pitch-focus"}${expanded?" expanded":""}`} role={expanded?"dialog":undefined} aria-modal={expanded?true:undefined} aria-label="Animierte 2D-Live-Spielansicht">
     <div className="gc-viewer-tools"><span>{cup.mode==="season"?"SAISON":"POKAL"} · {cup.fixture?.venue.stadium??cup.opponent}</span><button type="button" onClick={()=>setExpanded(x=>!x)}>{expanded?"Ansicht schliessen":"Grosse Spielansicht"}</button></div>
     <div className="gc-viewer-scoreboard"><div><small>HEIM</small><strong><span className="gc-team-badge">{visiting?home.slice(0,2).toUpperCase():features.club.badge}</span> {home}</strong>{scorers(visiting?'away':'home')}</div><div className="gc-viewer-score"><span>{homeScore} : {awayScore}</span><small>{!cup.active ? "ABPFIFF" : cup.matchPaused ? "PAUSIERT" : cup.phase === "penalties" ? "ELFMETERSCHIESSEN" : cup.phase === "extra-time" ? "VERLÄNGERUNG" : "LIVE"} · {getCupMatchMinute(cup,effectiveClock)}′{activeReplay ? ` · Replay ${frame.minute}′` : ""}</small></div><div><small>AUSWÄRTS</small><strong>{away} <span className="gc-team-badge">{visiting?features.club.badge:away.slice(0,2).toUpperCase()}</span></strong>{scorers(visiting?'home':'away')}</div></div>
@@ -288,8 +301,8 @@ export function LiveMatchViewer({ features, now, clubName, clubColor, disabled=f
     <div className="gc-viewer-main">
       <div className="gc-viewer-pitch-shell">
         <div className="gc-viewer-pitch-head"><span><i className="gc-live-dot" /> {activeReplay ? "WIEDERHOLUNG" : frame.status}</span><span>{getStarFormation(features.starXI.formationId).label} · 2D</span></div>
-        {halfTimeTransition && <div className="gc-viewer-half-time"><strong>{cup.phase === "extra-time" ? "VERLÄNGERUNG" : "HALBZEIT"}</strong><span>Seitenwechsel</span></div>}
-        {frame.recent?.kind === 'goal' && !activeReplay && frame.age >= (frame.recent.assistId?1.15:.75) && frame.age < 2 && <div className="gc-goal-burst" role="status"><strong>⚽ TOR!</strong><span>{frame.recent.player} · {frame.recent.minute}′</span></div>}
+        {!cup.timedPause && halfTimeTransition && <div className="gc-viewer-half-time"><strong>{cup.phase === "extra-time" ? "VERLÄNGERUNG" : "HALBZEIT"}</strong><span>Seitenwechsel</span></div>}
+        {timedOverlay && <div className={`gc-timed-overlay ${pause.kind}`} role="status" style={{borderColor:goal?.side==='away'?colours.opponent:colours.club}}><span>{pause.kind==='halftime'?'HALBZEIT':'⚽ TOR!'}</span><strong>{clubName} {cup.homeScore} : {cup.awayScore} {cup.opponent}</strong>{goal?<><b>{goal.side==='home'?clubName:cup.opponent}</b><span>{goal.scorer} · {goal.minute}′</span>{goal.assistName&&<small>Vorlage: {goal.assistName}</small>}</>:<><MatchStatistics features={features} clubName={clubName}/><small>Zweite Halbzeit in {Math.max(1,Math.ceil((pause.endsAt-clock)/1000))} s</small></>}</div>}
         <MatchPitchCanvas features={features} now={now} replay={activeReplay} colours={colours} camera={camera} reducedMotion={reducedMotion} onSelect={setSelectedPlayer} onFps={setFps} />
         <div className="gc-viewer-cameras" role="group" aria-label="Kamera"><button type="button" aria-pressed={camera==='full'} onClick={()=>setCamera('full')}>Ganzes Feld</button><button type="button" aria-pressed={camera==='follow'} onClick={()=>setCamera('follow')}>Ball verfolgen</button><button type="button" aria-pressed={camera==='highlights'} onClick={()=>setCamera('highlights')}>Highlight-Kamera</button><small>{fps>0?`${fps} FPS`:''}</small></div>
         <div className="gc-viewer-legend"><span><i style={{ background: colours.club }} />{clubName}</span><span><i style={{ background: colours.opponent }} />{cup.opponent}</span><span>Live-Spielansicht</span></div>
@@ -301,7 +314,7 @@ export function LiveMatchViewer({ features, now, clubName, clubColor, disabled=f
     <div className="gc-viewer-tab-panel" role="tabpanel">
       {tab === "live" && <div className="gc-viewer-events">{history.length ? history.slice().reverse().map(event=><button key={event.id} type="button" onClick={()=>setReplay({event,startedAt:clock})}><time>{event.minute}′</time><span>{eventLabel(event)} · {event.player}</span><b>▶</b></button>) : <span>Die Partie läuft. Tore, Karten, Verletzungen und Wechsel erscheinen hier.</span>}</div>}
       {tab === "statistics" && <MatchStatistics features={features} clubName={clubName} />}
-      {tab === "team" && <div className="gc-viewer-tactics"><p>Dein Plan: <strong>{CUP_STRATEGIES.find(s=>s.id===cup.strategyId)?.label}</strong> · Gegner: {CUP_STRATEGIES.find(s=>s.id===cup.opponentStrategyId)?.label}</p>{CUP_STRATEGIES.map(strategy=><button type="button" key={strategy.id} disabled={disabled||!cup.active||cup.phase==='penalties'||!onTactic} aria-pressed={cup.strategyId===strategy.id} onClick={()=>onTactic?.(strategy.id)}><strong>{strategy.label}</strong><small>{strategy.description}</small></button>)}</div>}
+      {tab === "team" && <div className="gc-viewer-tactics"><p>Formation {getStarFormation(features.starXI.formationId).label} · {cup.substitutionsUsed}/5 Wechsel · {cup.subWindowsUsed??0}/3 Fenster</p>{cup.pendingSubstitutions&&<p>Wechselpaket wartet auf den nächsten Unterbruch.</p>}</div>}
 
 
     </div>

@@ -936,13 +936,7 @@ export async function POST(request: Request) {
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 
-    if (action === "cup-play") {
-      if (!game.features.cup.active) return jsonError("Der Pokal ist gerade nicht aktiv.", 409);
-      if (game.features.cup.phase === "penalties") return jsonError("Im Elfmeterschiessen gibt es keine Taktikwechsel.", 409);
-      const strategy = typeof payload.strategy === "string" && CUP_STRATEGIES.some((item) => item.id === payload.strategy) ? payload.strategy : "konter";
-      game.features.cup.strategyId = getCupStrategy(strategy).id;
-      return persistGameResponse(db, room, game, timestamp, playerId, role);
-    }
+    if (action === "cup-play") return jsonError('Die auswählbaren Taktiken wurden entfernt.',410);
 
     if (action === "cup-resume") {
       if (!game.features.cup.active || !game.features.cup.matchPaused) return jsonError(`${game.features.cup.mode === "season" ? "Das Saisonspiel" : "Das Pokalspiel"} ist gerade nicht pausiert.`, 409);

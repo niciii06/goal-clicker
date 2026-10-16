@@ -195,14 +195,14 @@ test("late season targets keep growing instead of collapsing into ten second sea
   assert.ok(finalSeason > 10000000000);
 });
 
-test("tournament strength really uses seventy percent squad and thirty percent tactics", () => {
+test("legacy tactics no longer modify squad or opponent strength", () => {
   const cup = beginCupMatch(initialGameFeatures(1000).cup, 1000, "champions");
   cup.strategyId = "angriff";
   cup.opponentStrategyId = "ballbesitz";
   const strength = getCupMatchStrength(cup, 90);
-  assert.equal(strength.tactical.score, 72);
-  assert.equal(strength.teamStrength, 84.6);
-  assert.equal(strength.opponentStrength, Math.round((0.7 * cup.opponentRating + 0.3 * 28) * 10) / 10);
+  assert.equal(strength.tactical.score, 50);
+  assert.equal(strength.teamStrength, 90);
+  assert.equal(strength.opponentStrength, cup.opponentRating);
 });
 
 test("tournaments draw four times as many tier-safe opponents as they have rounds", () => {
@@ -333,6 +333,7 @@ test("tournament rounds and trophies no longer award direct goals", () => {
   cup.homeScore = 1;
   cup.awayScore = 0;
   cup.lastTickAt = cup.matchEndsAt;
+  cup.halftimeTaken = true;
   const result = advanceCupMatch(cup, 100, cup.matchEndsAt, () => 0.5);
   assert.equal(result.tournamentWon, true);
   assert.equal("reward" in result, false);
@@ -345,6 +346,7 @@ test("a won tournament round pauses before the next manual kickoff", () => {
   cup.homeScore = 1;
   cup.awayScore = 0;
   cup.lastTickAt = cup.matchEndsAt;
+  cup.halftimeTaken = true;
 
   const result = advanceCupMatch(cup, 100, cup.matchEndsAt, () => 0.5);
 
@@ -369,6 +371,7 @@ test("a completed tournament blocks a new run for exactly five minutes", () => {
   cup.homeScore = 0;
   cup.awayScore = 1;
   cup.lastTickAt = cup.matchEndsAt;
+  cup.halftimeTaken = true;
 
   const result = advanceCupMatch(cup, 100, cup.matchEndsAt, () => 0.5);
 
@@ -391,6 +394,7 @@ test("manual tournament rounds never reuse the previous opponent after restore",
     cup.homeScore = 1;
     cup.awayScore = 0;
     cup.lastTickAt = cup.matchEndsAt;
+  cup.halftimeTaken = true;
     const result = advanceCupMatch(cup, 100, cup.matchEndsAt, () => 0.5);
     assert.equal(result.won, true);
     if (round < 2) {
@@ -432,7 +436,7 @@ test("season fixtures use the live cup state and record the real final score", (
 
   assert.equal(started.mode, "season");
   assert.equal(started.active, true);
-  assert.equal(started.matchEndsAt, now + 360000);
+  assert.equal(started.matchEndsAt, now + 210000);
   assert.deepEqual(started.originalLineupIds, starXI.lineupIds);
   assert.deepEqual(started.originalBenchIds, starXI.benchIds);
   assert.equal(started.opponentIds.length, 1);
@@ -475,7 +479,9 @@ test("a red card removes the player and blocks the next round until replacement"
   assert.ok(getCupMatchStrength(shortResult.cup, ratingAfterCard).teamStrength < getCupMatchStrength(cup, ratingBeforeCard).teamStrength - 3);
 
   let rolls = 0;
-  const result = advanceCupMatch({...cup, homeScore:1}, 100, cup.matchEndsAt, () => rolls++ < 3 ? 0 : .5, homePlayers, state.formationPositions);
+  let cardCup=advanceCupMatch({...cup,homeScore:1},100,now+1000,()=>rolls++<3?0:.5,homePlayers,state.formationPositions).cup;
+  cardCup={...cardCup,lastTickAt:cardCup.matchEndsAt,halftimeTaken:true};
+  const result=advanceCupMatch(cardCup,100,cardCup.matchEndsAt,()=>.5,homePlayers,state.formationPositions);
   const card = result.cup.cardEvents[0];
 
   assert.ok(card);

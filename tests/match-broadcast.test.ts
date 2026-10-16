@@ -11,6 +11,7 @@ import {MatchMotion,drawFootballPitch} from '../app/match-pitch-canvas.tsx';
 function fixture() {
  const f=initialGameFeatures(1000000);f.starXI=setBestStarXI({...f.starXI,ownedIds:STAR_XI_PLAYERS.map(p=>p.id)});
  f.cup=beginSeasonCupMatch(f.cup,f.seasonMode,1000000,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions,f.starXI.lineupIds,f.starXI.benchIds);
+ f.cup.regularDurationMs=undefined;f.cup.matchEndsAt=f.cup.matchStartedAt+360000;
  return f;
 }
 const players=(f:ReturnType<typeof fixture>)=>getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds);
@@ -52,7 +53,7 @@ test('fitness is saved, decreases by role and workload, stays frozen when paused
  assert.ok(matchFitness(bulk,id,46)<100);
  const aggressive={...f.cup,strategyId:'angriff' as const,lastTickAt:1180000};aggressive.broadcast=advanceMatchBroadcast(aggressive,p);
  const possession={...f.cup,strategyId:'ballbesitz' as const,lastTickAt:1180000};possession.broadcast=advanceMatchBroadcast(possession,p);
- assert.ok(aggressive.broadcast.fitness[id]<possession.broadcast.fitness[id]);
+ assert.equal(aggressive.broadcast.fitness[id],possession.broadcast.fitness[id]);
  const paused={...bulk,matchPaused:true};assert.deepEqual(advanceCupMatch(paused,80,1400000,()=>.5,p).cup.broadcast,bulk.broadcast);
 });
 
@@ -106,7 +107,7 @@ test('motion has bounded acceleration and speeds, removes departed actors and ne
 
 test('compact viewer exposes three tabs, canvas, cameras and one substitution entry point',()=>{
  const f=fixture();f.cup.broadcast=createMatchBroadcast(f.cup);
- const html=renderToStaticMarkup(createElement(LiveMatchViewer,{features:f,now:1030000,clubName:'Testclub',clubColor:'#0071e3',onTactic:()=>{},onSubstitute:()=>{}}));
+ const html=renderToStaticMarkup(createElement(LiveMatchViewer,{features:f,now:1030000,clubName:'Testclub',clubColor:'#0071e3',onSubstitute:()=>{}}));
  assert.ok(html.includes('<canvas'));assert.ok(html.includes('Grosse Spielansicht'));assert.ok(html.includes('Ball verfolgen'));assert.ok(html.includes('Highlight-Kamera'));assert.equal((html.match(/role="tab"/g)??[]).length,3);assert.ok(html.includes('MATCH'));assert.ok(html.includes('TEAM'));assert.ok(html.includes('STATISTIK'));assert.ok(html.includes('Wechseln'));assert.equal((html.match(/gc-team-list/g)??[]).length,0);
 });
 

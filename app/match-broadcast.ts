@@ -63,10 +63,10 @@ export function advanceMatchBroadcast(cup:CupState,clubPlayers:readonly StarXIPl
   if((cup.playerExitedAt[p.id]??121)<=b.fitnessMinute||cup.sentOffPlayerIds.includes(p.id))continue;
   const entered=cup.playerEnteredAt[p.id]??1,end=cup.playerExitedAt[p.id]??minute;
   const playedDelta=Math.max(0,Math.min(minute,end)-Math.max(b.fitnessMinute,entered));
-  const strategy=p.id.startsWith('opponent-')?cup.opponentStrategyId:cup.strategyId;
+  const strategy='ballbesitz';
   const raw=p.source?.originalAttributes?.stats?.stamina?.value;
   const stamina=typeof raw==='number'?raw:p.source?.rating??70;
-  const workload=(p.role==='TW'?.13:['LV','RV','LAV','RAV','LF','RF','LM','RM'].includes(p.role)?.49:.4)*(strategy==='angriff'?1.28:strategy==='konter'?1.12:1)*(1+(70-stamina)/200);
+  const workload=(p.role==='TW'?.13:['LV','RV','LAV','RAV','LF','RF','LM','RM'].includes(p.role)?.49:.4)*(1+(70-stamina)/200);
   b.fitness[p.id]=clamp((b.fitness[p.id]??100)-playedDelta*workload,15,100);
  }
  b.fitnessMinute=Math.max(b.fitnessMinute,minute);
