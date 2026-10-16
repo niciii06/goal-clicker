@@ -1,0 +1,1012 @@
+{
+  "auditedAt": "2026-10-16",
+  "method": "Official venue metadata plus OpenStreetMap full-size soccer-pitch polygons. Nearest local pitch explicitly marked when official ground cannot be resolved. No unverified point is promoted to verified.",
+  "limitations": "OSM map requests returned HTTP 509 after partial retrieval. Remaining records require verification.",
+  "swiss": [
+    {
+      "club": "FC Bethlehem BE",
+      "venueId": "venue-fc-bethlehem",
+      "oldLat": 46.946583,
+      "oldLon": 7.380235,
+      "lat": 46.9463539,
+      "lon": 7.3805768,
+      "distanceMetres": 36,
+      "osmWay": "540035241",
+      "osmName": "",
+      "registeredStadium": "Sportplatz Brünnen",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/540035241",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 4665
+    },
+    {
+      "club": "SC Holligen 94",
+      "venueId": "venue-sc-holligen-94",
+      "oldLat": 46.947166,
+      "oldLon": 7.414715,
+      "lat": 46.9466136,
+      "lon": 7.4146786,
+      "distanceMetres": 62,
+      "osmWay": "58113135",
+      "osmName": "",
+      "registeredStadium": "Sportplatz Steigerhubel",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/58113135",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 5440
+    },
+    {
+      "club": "FC Galicia de Berna",
+      "venueId": "venue-fc-galicia",
+      "oldLat": 46.967392,
+      "oldLon": 7.453578,
+      "lat": 46.9667791,
+      "lon": 7.4534764,
+      "distanceMetres": 69,
+      "osmWay": "48952180",
+      "osmName": "",
+      "registeredStadium": "Sportpark Wyler",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/48952180",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 7184
+    },
+    {
+      "club": "FC Ticino Bern",
+      "venueId": "venue-fc-ticino-bern",
+      "oldLat": 46.94062,
+      "oldLon": 7.402265,
+      "lat": 46.9409667,
+      "lon": 7.4028753,
+      "distanceMetres": 60,
+      "osmWay": "376144032",
+      "osmName": "",
+      "registeredStadium": "Sportplatz Bodenweid",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/376144032",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 7377
+    },
+    {
+      "club": "FC Länggasse",
+      "venueId": "venue-fc-laenggasse",
+      "oldLat": 46.960228,
+      "oldLon": 7.431205,
+      "lat": 46.9596867,
+      "lon": 7.4313667,
+      "distanceMetres": 61,
+      "osmWay": "24976863",
+      "osmName": "",
+      "registeredStadium": "Stadion Neufeld",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/24976863",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 7669
+    },
+    {
+      "club": "FC Weissenstein Bern",
+      "venueId": "venue-fc-weissenstein",
+      "oldLat": 46.935425,
+      "oldLon": 7.422005,
+      "lat": 46.9372597,
+      "lon": 7.4191178,
+      "distanceMetres": 300,
+      "osmWay": "44528946",
+      "osmName": "",
+      "registeredStadium": "Sportplatz Weissenstein",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/44528946",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 7494
+    },
+    {
+      "club": "FC Wyler Bern",
+      "venueId": "venue-fc-wyler",
+      "oldLat": 46.967392,
+      "oldLon": 7.453578,
+      "lat": 46.9667791,
+      "lon": 7.4534764,
+      "distanceMetres": 69,
+      "osmWay": "48952180",
+      "osmName": "",
+      "registeredStadium": "Sportpark Wyler",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/48952180",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 7184
+    },
+    {
+      "club": "SC Bümpliz 78",
+      "venueId": "venue-sc-buempliz-78",
+      "oldLat": 46.94062,
+      "oldLon": 7.402265,
+      "lat": 46.9409667,
+      "lon": 7.4028753,
+      "distanceMetres": 60,
+      "osmWay": "376144032",
+      "osmName": "",
+      "registeredStadium": "Sportplatz Bodenweid",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/376144032",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 7377
+    },
+    {
+      "club": "FC Bern 1894",
+      "venueId": "venue-fc-bern",
+      "oldLat": 46.960228,
+      "oldLon": 7.431205,
+      "lat": 46.9596867,
+      "lon": 7.4313667,
+      "distanceMetres": 61,
+      "osmWay": "24976863",
+      "osmName": "",
+      "registeredStadium": "Stadion Neufeld",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/24976863",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 7669
+    },
+    {
+      "club": "AS Italiana",
+      "venueId": "venue-as-italiana",
+      "oldLat": 46.935425,
+      "oldLon": 7.422005,
+      "lat": 46.9372597,
+      "lon": 7.4191178,
+      "distanceMetres": 300,
+      "osmWay": "44528946",
+      "osmName": "",
+      "registeredStadium": "Sportplatz Weissenstein",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/44528946",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 7494
+    },
+    {
+      "club": "SC Worb",
+      "venueId": "venue-sc-worb",
+      "oldLat": 46.930367,
+      "oldLon": 7.569691,
+      "lat": 46.9257345,
+      "lon": 7.5678996,
+      "distanceMetres": 533,
+      "osmWay": "54756538",
+      "osmName": "",
+      "registeredStadium": "Sportplatz Worbboden",
+      "status": "local-pitch-fallback",
+      "source": "https://www.openstreetmap.org/way/54756538",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 4009
+    },
+    {
+      "club": "FC Ostermundigen",
+      "venueId": "venue-fc-ostermundigen",
+      "oldLat": 46.955967,
+      "oldLon": 7.495543,
+      "lat": 46.95859,
+      "lon": 7.497761,
+      "distanceMetres": 337,
+      "osmWay": "26160927",
+      "osmName": "Sportplatz Oberfeld",
+      "registeredStadium": "Sportplatz Oberfeld",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/26160927",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 8286
+    },
+    {
+      "club": "FC Wabern",
+      "venueId": "venue-fc-wabern",
+      "oldLat": 46.898464,
+      "oldLon": 7.398941,
+      "lat": 46.8883133,
+      "lon": 7.3919244,
+      "distanceMetres": 1250,
+      "osmWay": "45253543",
+      "osmName": "",
+      "registeredStadium": "Sportplatz Lerbermatt",
+      "status": "local-pitch-fallback",
+      "source": "https://www.openstreetmap.org/way/45253543",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 4658
+    },
+    {
+      "club": "FC Bolligen",
+      "venueId": "venue-fc-bolligen",
+      "oldLat": 46.982468,
+      "oldLon": 7.51057,
+      "lat": 46.9677811,
+      "lon": 7.4956824,
+      "distanceMetres": 1988,
+      "osmWay": "189826962",
+      "osmName": "",
+      "registeredStadium": "Sportplatz Wegmühle",
+      "status": "local-pitch-fallback",
+      "source": "https://www.openstreetmap.org/way/189826962",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 6459
+    },
+    {
+      "club": "FC Zollikofen",
+      "venueId": "venue-fc-zollikofen",
+      "oldLat": 46.995239,
+      "oldLon": 7.453623,
+      "lat": 46.9885463,
+      "lon": 7.4543499,
+      "distanceMetres": 747,
+      "osmWay": "80895073",
+      "osmName": "",
+      "registeredStadium": "Sportplatz Geisshubel",
+      "status": "local-pitch-fallback",
+      "source": "https://www.openstreetmap.org/way/80895073",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 5972
+    },
+    {
+      "club": "FC Rubigen",
+      "venueId": "venue-fc-rubigen",
+      "oldLat": 46.895279,
+      "oldLon": 7.544133,
+      "lat": 46.8941182,
+      "lon": 7.5377194,
+      "distanceMetres": 505,
+      "osmWay": "205831806",
+      "osmName": "",
+      "registeredStadium": "Sportplatz Hunzigenrüti",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/205831806",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 6186
+    },
+    {
+      "club": "FC Belp",
+      "venueId": "venue-fc-belp",
+      "oldLat": 46.888588,
+      "oldLon": 7.51086,
+      "lat": 46.8846889,
+      "lon": 7.5027479,
+      "distanceMetres": 755,
+      "osmWay": "204651516",
+      "osmName": "",
+      "registeredStadium": "Sportplatz Giessenbad",
+      "status": "local-pitch-fallback",
+      "source": "https://www.openstreetmap.org/way/204651516",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 7460
+    },
+    {
+      "club": "FC Konolfingen",
+      "venueId": "venue-fc-konolfingen",
+      "oldLat": 46.88657,
+      "oldLon": 7.609078,
+      "lat": 46.8758997,
+      "lon": 7.6254539,
+      "distanceMetres": 1721,
+      "osmWay": "33816706",
+      "osmName": "",
+      "registeredStadium": "Sportplatz Inseli",
+      "status": "local-pitch-fallback",
+      "source": "https://www.openstreetmap.org/way/33816706",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 7845
+    },
+    {
+      "club": "SC Jegenstorf",
+      "venueId": "venue-sc-jegenstorf",
+      "oldLat": 47.051449,
+      "oldLon": 7.508086,
+      "lat": 47.0506994,
+      "lon": 7.5156819,
+      "distanceMetres": 582,
+      "osmWay": "171957573",
+      "osmName": "",
+      "registeredStadium": "Sportplatz Gyrisberg",
+      "status": "local-pitch-fallback",
+      "source": "https://www.openstreetmap.org/way/171957573",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 8867
+    },
+    {
+      "club": "FC Schönbühl",
+      "venueId": "venue-fc-schoenbuehl",
+      "oldLat": 47.019566,
+      "oldLon": 7.503345,
+      "lat": 47.0233477,
+      "lon": 7.5004282,
+      "distanceMetres": 476,
+      "osmWay": "158768079",
+      "osmName": "",
+      "registeredStadium": "Sportplatz Moos",
+      "status": "local-pitch-fallback",
+      "source": "https://www.openstreetmap.org/way/158768079",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 4361
+    },
+    {
+      "club": "FC Langnau im Emmental",
+      "venueId": "venue-fc-langnau",
+      "oldLat": 46.95475,
+      "oldLon": 7.804457,
+      "lat": 46.93587,
+      "lon": 7.7985733,
+      "distanceMetres": 2149,
+      "osmWay": "220682024",
+      "osmName": "",
+      "registeredStadium": "Sportplatz Moos",
+      "status": "local-pitch-fallback",
+      "source": "https://www.openstreetmap.org/way/220682024",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 6195
+    },
+    {
+      "club": "FC Lerchenfeld",
+      "venueId": "venue-fc-lerchenfeld",
+      "oldLat": 46.760513,
+      "oldLon": 7.596534,
+      "lat": 46.7612992,
+      "lon": 7.5969175,
+      "distanceMetres": 92,
+      "osmWay": "683456580",
+      "osmName": "",
+      "registeredStadium": "Sportanlagen Waldeck",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/683456580",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 7464
+    },
+    {
+      "club": "FC Interlaken",
+      "venueId": "venue-fc-interlaken",
+      "oldLat": 46.684219,
+      "oldLon": 7.878633,
+      "lat": 46.6843773,
+      "lon": 7.8721789,
+      "distanceMetres": 493,
+      "osmWay": "215037008",
+      "osmName": "",
+      "registeredStadium": "Sportplatz Lanzenen",
+      "status": "local-pitch-fallback",
+      "source": "https://www.openstreetmap.org/way/215037008",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 7774
+    },
+    {
+      "club": "FC Spiez",
+      "venueId": "venue-fc-spiez",
+      "oldLat": 46.691071,
+      "oldLon": 7.660812,
+      "lat": 46.6907721,
+      "lon": 7.6669976,
+      "distanceMetres": 473,
+      "osmWay": "342429600",
+      "osmName": "",
+      "registeredStadium": "Sportplatz ABC-Zentrum",
+      "status": "local-pitch-fallback",
+      "source": "https://www.openstreetmap.org/way/342429600",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 5702
+    },
+    {
+      "club": "SC Burgdorf 1898",
+      "venueId": "venue-sc-burgdorf",
+      "oldLat": 47.065617,
+      "oldLon": 7.614275,
+      "lat": 47.0661862,
+      "lon": 7.6143666,
+      "distanceMetres": 64,
+      "osmWay": "582949850",
+      "osmName": "",
+      "registeredStadium": "Stadion Neumatt",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/582949850",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 8506
+    },
+    {
+      "club": "FC Münsingen",
+      "venueId": "venue-fc-muensingen",
+      "oldLat": 46.883224,
+      "oldLon": 7.565205,
+      "lat": 46.8791555,
+      "lon": 7.5556106,
+      "distanceMetres": 859,
+      "osmWay": "150613929",
+      "osmName": "",
+      "registeredStadium": "Sportanlage Sandreutenen",
+      "status": "local-pitch-fallback",
+      "source": "https://www.openstreetmap.org/way/150613929",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 4809
+    },
+    {
+      "club": "FC Köniz",
+      "venueId": "venue-fc-koeniz",
+      "oldLat": 46.898464,
+      "oldLon": 7.398941,
+      "lat": 46.8883133,
+      "lon": 7.3919244,
+      "distanceMetres": 1250,
+      "osmWay": "45253543",
+      "osmName": "",
+      "registeredStadium": "Sportplatz Liebefeld-Hessgut",
+      "status": "local-pitch-fallback",
+      "source": "https://www.openstreetmap.org/way/45253543",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 4658
+    },
+    {
+      "club": "FC Muri-Gümligen",
+      "venueId": "venue-fc-muri-guemligen",
+      "oldLat": 46.933434,
+      "oldLon": 7.499686,
+      "lat": 46.933718,
+      "lon": 7.4993586,
+      "distanceMetres": 40,
+      "osmWay": "1386571639",
+      "osmName": "",
+      "registeredStadium": "Sportzentrum Füllerich",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/1386571639",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 6410
+    },
+    {
+      "club": "FC Dürrenast",
+      "venueId": "venue-fc-duerrenast",
+      "oldLat": 46.740459,
+      "oldLon": 7.607642,
+      "lat": 46.7445792,
+      "lon": 7.6066046,
+      "distanceMetres": 465,
+      "osmWay": "211181856",
+      "osmName": "",
+      "registeredStadium": "Stadion Lachen",
+      "status": "local-pitch-fallback",
+      "source": "https://www.openstreetmap.org/way/211181856",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 8207
+    },
+    {
+      "club": "FC Bosporus",
+      "venueId": "venue-fc-bosporus",
+      "oldLat": 46.967392,
+      "oldLon": 7.453578,
+      "lat": 46.9667791,
+      "lon": 7.4534764,
+      "distanceMetres": 69,
+      "osmWay": "48952180",
+      "osmName": "",
+      "registeredStadium": "Sportpark Wyler",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/48952180",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 7184
+    },
+    {
+      "club": "FC Solothurn",
+      "venueId": "venue-fc-solothurn",
+      "oldLat": 47.208057,
+      "oldLon": 7.529796,
+      "lat": 47.2064154,
+      "lon": 7.5214534,
+      "distanceMetres": 657,
+      "osmWay": "51773470",
+      "osmName": "",
+      "registeredStadium": "Stadion FC Solothurn",
+      "status": "local-pitch-fallback",
+      "source": "https://www.openstreetmap.org/way/51773470",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 9375
+    },
+    {
+      "club": "FC Fribourg",
+      "venueId": "venue-fc-fribourg",
+      "oldLat": 46.803371,
+      "oldLon": 7.161779,
+      "lat": 46.8024419,
+      "lon": 7.1584293,
+      "distanceMetres": 275,
+      "osmWay": "120677508",
+      "osmName": "",
+      "registeredStadium": "Stade Universitaire Saint-Léonard",
+      "status": "local-pitch-fallback",
+      "source": "https://www.openstreetmap.org/way/120677508",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 5672
+    },
+    {
+      "club": "SC Düdingen",
+      "venueId": "venue-sc-duedingen",
+      "oldLat": 46.856926,
+      "oldLon": 7.194113,
+      "lat": 46.8573701,
+      "lon": 7.1940779,
+      "distanceMetres": 50,
+      "osmWay": "88660207",
+      "osmName": "FC Düdingen",
+      "registeredStadium": "FKB Stadion Birchhölzli",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/88660207",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 7438
+    },
+    {
+      "club": "FC Grenchen 15",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Ueberstorf",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Uster",
+      "venueId": "venue-fc-uster",
+      "oldLat": 47.35183,
+      "oldLon": 8.722714,
+      "lat": 47.3579397,
+      "lon": 8.7270372,
+      "distanceMetres": 754,
+      "osmWay": "1563484913",
+      "osmName": "",
+      "registeredStadium": "Stadion Buchholz",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/1563484913",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 5214
+    },
+    {
+      "club": "FC Bazenheid",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Willisau",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Frauenfeld",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "Chur 97",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Monthey",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Collina d’Oro",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "CS Chênois",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC La Chaux-de-Fonds",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Echallens Région",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Tuggen",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Wettswil-Bonstetten",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Schötz",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Wohlen 1904",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Langenthal",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Breitenrain",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Biel-Bienne 1896",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Bulle",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Aarau",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "Neuchâtel Xamax",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Luzern",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Zürich",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "Servette FC",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Thun Berner Oberland",
+      "venueId": "venue-fc-thun",
+      "oldLat": 46.740459,
+      "oldLon": 7.607642,
+      "lat": 46.7445792,
+      "lon": 7.6066046,
+      "distanceMetres": 465,
+      "osmWay": "211181856",
+      "osmName": "",
+      "registeredStadium": "VISANA STADION",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/211181856",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 8207
+    },
+    {
+      "club": "FC Lausanne-Sport",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Lugano",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "BSC Young Boys",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Sion",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Basel 1893",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC St. Gallen 1879",
+      "error": "HTTP Error 509: Unknown Error"
+    }
+  ],
+  "international": [
+    {
+      "club": "wembley",
+      "venueId": "wembley",
+      "oldLat": 51.556,
+      "oldLon": -0.2795,
+      "lat": 51.556,
+      "lon": -0.2795,
+      "distanceMetres": 6,
+      "osmWay": "116539074",
+      "osmName": "",
+      "registeredStadium": "Wembley Stadium",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/116539074",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 7928,
+      "coordinateNote": "Prompt-specified Wembley anchor; lies within the retrieved OSM football-pitch polygon."
+    },
+    {
+      "club": "bern",
+      "venueId": "bern",
+      "oldLat": 46.96278,
+      "oldLon": 7.465,
+      "lat": 46.9631152,
+      "lon": 7.4648706,
+      "distanceMetres": 39,
+      "osmWay": "48124462",
+      "osmName": "",
+      "registeredStadium": "Stadion Wankdorf",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/48124462",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 8207
+    },
+    {
+      "club": "thun",
+      "venueId": "thun",
+      "oldLat": 46.74472,
+      "oldLon": 7.60556,
+      "lat": 46.7445792,
+      "lon": 7.6066046,
+      "distanceMetres": 81,
+      "osmWay": "211181856",
+      "osmName": "",
+      "registeredStadium": "Arena Thun",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/211181856",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 8207
+    },
+    {
+      "club": "biel",
+      "venueId": "biel",
+      "oldLat": 47.1575,
+      "oldLon": 7.2833,
+      "lat": 47.1551492,
+      "lon": 7.2802863,
+      "distanceMetres": 347,
+      "osmWay": "385490382",
+      "osmName": "",
+      "registeredStadium": "Tissot Arena",
+      "status": "local-pitch-fallback",
+      "source": "https://www.openstreetmap.org/way/385490382",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 8286
+    },
+    {
+      "club": "geneva",
+      "venueId": "geneva",
+      "oldLat": 46.1778,
+      "oldLon": 6.1275,
+      "lat": 46.1777951,
+      "lon": 6.1274245,
+      "distanceMetres": 6,
+      "osmWay": "311021104",
+      "osmName": "",
+      "registeredStadium": "Stade de Genève",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/311021104",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 9120
+    },
+    {
+      "club": "sion",
+      "venueId": "sion",
+      "oldLat": 46.2333,
+      "oldLon": 7.3739,
+      "lat": 46.2333258,
+      "lon": 7.3759624,
+      "distanceMetres": 159,
+      "osmWay": "224458990",
+      "osmName": "",
+      "registeredStadium": "Stade de Tourbillon",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/224458990",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 8198
+    },
+    {
+      "club": "winterthur",
+      "venueId": "winterthur",
+      "oldLat": 47.5003,
+      "oldLon": 8.7186,
+      "lat": 47.5007715,
+      "lon": 8.7174828,
+      "distanceMetres": 99,
+      "osmWay": "71400856",
+      "osmName": "",
+      "registeredStadium": "Schützenwiese",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/71400856",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 7133
+    },
+    {
+      "club": "luzern",
+      "venueId": "luzern",
+      "oldLat": 47.0333,
+      "oldLon": 8.3058,
+      "lat": 47.0329207,
+      "lon": 8.3051385,
+      "distanceMetres": 66,
+      "osmWay": "121852652",
+      "osmName": "",
+      "registeredStadium": "Swissporarena",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/121852652",
+      "verifiedAt": "2026-10-16",
+      "pitchAreaSquareMetres": 7146
+    },
+    {
+      "club": "stgallen",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "lausanne",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "zurich",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "lugano",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "basel",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "munich",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "milan",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "paris",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "vienna",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "dortmund",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "leipzig",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "naples",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "turin",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "monaco",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "london",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "chelsea",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "tottenham",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "lisbon",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "porto",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "amsterdam",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "eindhoven",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "barcelona",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "madrid",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "atletico",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "istanbul",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "miami",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "leverkusen",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "manchester",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "city",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "liverpool",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "tokyo",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "rio",
+      "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "sydney",
+      "error": "HTTP Error 509: Unknown Error"
+    }
+  ],
+  "fictional": [
+    {
+      "club": "fictional-1",
+      "venueId": "chaos-ground-1",
+      "lat": 46.9466136,
+      "lon": 7.4146786,
+      "osmWay": "58113135",
+      "source": "https://www.openstreetmap.org/way/58113135",
+      "status": "local-pitch-fallback",
+      "pitchAreaSquareMetres": 5440,
+      "verifiedAt": "2026-10-16",
+      "osmName": ""
+    },
+    {
+      "club": "fictional-2",
+      "venueId": "chaos-ground-2",
+      "lat": 46.9429019,
+      "lon": 7.382853,
+      "osmWay": "44618624",
+      "source": "https://www.openstreetmap.org/way/44618624",
+      "status": "local-pitch-fallback",
+      "pitchAreaSquareMetres": 7018,
+      "verifiedAt": "2026-10-16",
+      "osmName": ""
+    },
+    {
+      "club": "fictional-3",
+      "venueId": "chaos-ground-3",
+      "lat": 46.9506832,
+      "lon": 7.3811868,
+      "osmWay": "44618669",
+      "source": "https://www.openstreetmap.org/way/44618669",
+      "status": "local-pitch-fallback",
+      "pitchAreaSquareMetres": 5297,
+      "verifiedAt": "2026-10-16",
+      "osmName": ""
+    },
+    {
+      "club": "fictional-4",
+      "venueId": "chaos-ground-4",
+      "lat": 46.9429019,
+      "lon": 7.382853,
+      "osmWay": "44618624",
+      "source": "https://www.openstreetmap.org/way/44618624",
+      "status": "local-pitch-fallback",
+      "pitchAreaSquareMetres": 7018,
+      "verifiedAt": "2026-10-16",
+      "osmName": ""
+    },
+    {
+      "club": "fictional-5",
+      "venueId": "chaos-ground-5",
+      "lat": 46.9466136,
+      "lon": 7.4146786,
+      "osmWay": "58113135",
+      "source": "https://www.openstreetmap.org/way/58113135",
+      "status": "local-pitch-fallback",
+      "pitchAreaSquareMetres": 5440,
+      "verifiedAt": "2026-10-16",
+      "osmName": ""
+    }
+  ]
+}

@@ -79,7 +79,18 @@ function flight(from:Hub,to:Hub):Segment {
  const km=distanceKm(from,to),seconds=km/(km<2000?700:850)*3600+1800;
  return {id:`flight:${from.id}:${to.id}`,mode:'plane',label:`Flug ${from.name} → ${to.name}`,from,to,points:routePoints(from,to,true),realSeconds:seconds,distanceKm:km,geometry:'great-circle',source:'Geografische Näherung und geschätzte Flugzeit; kein bestätigter Flugplan'};
 }
-function plan(segments:Segment[]):JourneyPlan { return {version:2,acceleration:TRAVEL_CONFIG.acceleration,segments,realSeconds:segments.reduce((n,s)=>n+s.realSeconds,0)}; }
+function plan(input:Segment[]):JourneyPlan {
+ const segments=input.flatMap(s=>{
+  if(s.mode!=='bus'||s.geometry!=='approximate'||cachedRoutes[s.id])return [s];
+  const candidates=Object.entries(cachedRoutes).filter(([key,r])=>key.startsWith('bus:')&&r.geometry==='road'&&r.points.length>=3&&distanceKm(r.points[0],s.from)<.001&&distanceKm(r.points.at(-1)!,s.to)<3).sort((a,b)=>distanceKm(a[1].points.at(-1)!,s.to)-distanceKm(b[1].points.at(-1)!,s.to));
+  const cached=candidates[0];if(!cached)return [s];
+  const [key,route]=cached,point=route.points.at(-1)!,hub={...point,id:`route-end:${key}`,name:'Ende der geprüften Strassenroute'};
+  const road:Segment={...s,id:`road:${key}`,to:hub,points:route.points.map(p=>({...p})),realSeconds:route.seconds*1.12,distanceKm:route.km,geometry:'road',source:route.source};
+  const connection=ground(hub,s.to,'bus',`${s.label} · Routenverlauf geschätzt`);
+  return [road,connection];
+ });
+ return {version:2,acceleration:TRAVEL_CONFIG.acceleration,segments,realSeconds:segments.reduce((n,s)=>n+s.realSeconds,0)};
+}
 export function planJourney(destination:Venue):JourneyPlan {
  const start=asHub(HOME_VENUE),end=asHub(destination),km=distanceKm(start,end);
  const road=plan([ground(start,end,'bus',`Teambus nach ${destination.city}`)]);

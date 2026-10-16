@@ -23,3 +23,4 @@ test('halftime changes apply before restart without consuming an in-play window'
  const f=ready(),batch=changes(f,2);f.cup.subWindowsUsed=3;f.cup.timedPause={kind:'halftime',id:'half',startsAt:2000,endsAt:12000,frozenAt:2000};
  assert.equal(queueMatchChanges(f,batch,3000),'');assert.equal(f.cup.substitutionsUsed,2);assert.equal(f.cup.subWindowsUsed,3);
 });
+test('five substitutions across three batches consume exactly three windows',()=>{const f=ready();for(const count of [2,2,1]){f.cup.matchPaused=true;const batch=changes(f,count);assert.equal(batch.length,count);assert.equal(queueMatchChanges(f,batch,2000+f.cup.substitutionsUsed*1000),'');}assert.equal(f.cup.substitutionsUsed,5);assert.equal(f.cup.subWindowsUsed,3);});

@@ -1,9 +1,10 @@
 import SWISS_CLUBS from './swiss-clubs.json';
+import STADIUM_AUDIT from './stadium-audit.json';
 /** Persistent grounds: verified address anchors, documented municipality fallbacks,
  * retained international stadium anchors, and explicitly fictional Bern grounds.
  * Ground routes are schematic; they are never presented as turn-by-turn directions. */
 export type GeoPoint = { lat: number; lon: number };
-export type Venue = GeoPoint & { id: string; stadium: string; city: string; country: string; source: string; canton?: string; address?: string; postalCode?: string; verification?: 'stadium'|'municipality'|'fictional'; coordinateNote?: string };
+export type Venue = GeoPoint & { id: string; stadium: string; city: string; country: string; source: string; canton?: string; address?: string; postalCode?: string; verification?: 'stadium'|'municipality'|'fictional'|'pitch-fallback'; registeredStadium?:string; coordinateSource?:string; coordinateNote?: string };
 const venue = (id: string, stadium: string, city: string, country: string, lat: number, lon: number): Venue => ({ id, stadium, city, country, lat, lon, verification:'stadium', coordinateNote:'Bestehender gerundeter Stadionanker aus OpenStreetMap; vor diesem Update gespeichert.', source: `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=16/${lat}/${lon}` });
 export const HOME_VENUE = venue('home-buempliz45', 'Heimstadion Bümplizstrasse 45', 'Bern', 'Schweiz', 46.94689, 7.39373);
 export const HOME_ADDRESS = 'Bümplizstrasse 45, 3027 Bern';
@@ -55,6 +56,10 @@ export const VENUES: Record<string, Venue> = Object.fromEntries([
 for(const [key,token] of [['lugano','fc-lugano'],['thun','fc-thun'],['stgallen','fc-st-gallen']] as const){const club=SWISS_CLUBS.find(c=>c.id.startsWith(token));if(club)VENUES[key]={...club.venue,id:key} as Venue;}
 // Inter Miami moved in 2026; retain its key with the verified new venue and a city fallback.
 VENUES.miami={...VENUES.miami,stadium:'Nu Stadium',city:'Miami',lat:25.77417,lon:-80.19361,verification:'municipality',source:'https://www.intermiamicf.com/news/the-heartbeat-of-miami-comes-alive-introducing-nu-stadium-inter-miami-cf-s-new-world-class-home',coordinateNote:'Dokumentierter Stadtanker Miami, keine präzise Stadionkoordinate. Quelle: https://en.wikipedia.org/wiki/Miami'};
+for(const record of STADIUM_AUDIT.international){
+ if(!('lat' in record)||!('lon' in record)||!record.venueId||!VENUES[record.venueId])continue;
+ const saved=VENUES[record.venueId];VENUES[record.venueId]={...saved,lat:record.lat!,lon:record.lon!,verification:record.status==='local-pitch-fallback'?'pitch-fallback':'stadium',coordinateSource:record.source,coordinateNote:'2026-10-16: Mittelpunkt eines kartierten Fussballfelds in OpenStreetMap.'};
+}
 export const REGION_LABELS = ['Berner Quartier', 'Stadt Bern', 'Agglomeration Bern', 'Region Bern', 'Kanton Bern', 'Nachbarkantone', 'Deutschschweiz', 'West- und Südschweiz', 'Gesamte Schweiz', 'Nachbarländer', 'Mitteleuropa', 'Europa', 'Europäische Eliteziele', 'International', 'Weltweite Fernziele'] as const;
 // Internal divisions remain ascending (1 weakest, 15 strongest) to preserve saves/unlocks.
 export const LEAGUE_LABELS = ['Chaosliga','Berner Quartierliga','Berner Stadtliga','Berner Agglomerationsliga','Berner Regionalliga','Kantonsliga Bern','Berner Regionalelite','Schweizer Mittellandliga','Deutschschweizer Liga','Schweizer Amateurliga','Schweizer 1. Liga','Schweizer Entwicklungsliga','Super League II','Super League I','Weltliga'] as const;
@@ -76,6 +81,7 @@ export type SeasonClub = {id:string;name:string;league:number;venue:Venue;fictio
 const FICTIONAL_NAMES = ['FC Tabellenkeller','SV Unentschieden','Real Zufall','FC Feierabendbier','Inter Timeout'];
 const FICTIONAL_GROUNDS = ['Stolperacker','Remiswiese','Zufallsrasen','Bierdeckel-Arena','Timeout-Platz'];
 const FICTIONAL = FICTIONAL_NAMES.map((name,i):SeasonClub=>({id:`geo-1-${i+1}`,name,league:15,fictional:true,venue:{...HOME_VENUE,id:`chaos-ground-${i+1}`,stadium:FICTIONAL_GROUNDS[i],lat:HOME_VENUE.lat+[.003,-.006,.009,-.003,.006][i],lon:HOME_VENUE.lon+[.009,-.005,.005,-.009,.012][i],verification:'fictional',source:'Fiktives Spielfeld in Bern',coordinateNote:'Absichtlich fiktiver Platz in Bern'}}));
+for(const club of FICTIONAL){const record=STADIUM_AUDIT.fictional.find(r=>r.venueId===club.venue.id);if(record)club.venue={...club.venue,registeredStadium:club.venue.stadium,stadium:record.osmName||'Fussballplatz Bern',lat:record.lat,lon:record.lon,verification:'pitch-fallback',source:record.source,coordinateSource:record.source,coordinateNote:'Fiktiver Club auf einem realen kartierten Fussballfeld.'};}
 const WORLD_IDS=['world-real-madreto','world-fc-barceloneta','world-liverpuhl-fc','world-manchester-cite','world-bayern-muenchan'];
 const WORLD = LEGACY_POOLS[7].map(([name,key],i):SeasonClub=>({id:WORLD_IDS[i],name,league:1,venue:VENUES[key]}));
 export const SEASON_CLUBS: SeasonClub[] = [...FICTIONAL,...SWISS_CLUBS as SeasonClub[],...WORLD];
@@ -136,4 +142,9 @@ export function routePoints(a: GeoPoint, b: GeoPoint, flight: boolean): GeoPoint
   const vz=x*Math.sin(a.lat*rad)+y*Math.sin(b.lat*rad);
   return {lat:Math.atan2(vz,Math.sqrt(vx*vx+vy*vy))/rad,lon:Math.atan2(vy,vx)/rad};
  });
+}
+
+/** Resolve future fixtures only. Historical fixtures and active journeys retain their snapshots. */
+export function currentVenue(saved:Venue):Venue {
+ return SEASON_CLUBS.find(c=>c.venue.id===saved.id)?.venue??VENUES[saved.id]??saved;
 }

@@ -110,7 +110,9 @@ test('career, album and match panels render real populated states with accessibl
 });
 test('real match engine completion survives normalization and generates a single report',()=>{
  const f=fixture();f.cup.homeScore=1;
- const result=advanceCupMatch(f.cup,80,f.cup.matchEndsAt,()=>.5,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions);
+ let result=advanceCupMatch(f.cup,80,f.cup.matchEndsAt,()=>.5,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions);
+ assert.equal(result.cup.timedPause?.kind,'halftime');
+ result=advanceCupMatch(result.cup,80,result.cup.matchEndsAt+10000,()=>.5,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions);
  assert.equal(result.finished,true);f.cup=result.cup;
  const season=recordSeasonModeMatch(f.seasonMode,f.cup.homeScore,f.cup.awayScore,f.club.name,f.cup.matchEndsAt,()=>.5,f.cup.opponentIds[0]);
  recordCareerMatch(f,f.cup.matchEndsAt,season.entry);

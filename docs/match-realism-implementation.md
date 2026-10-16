@@ -128,3 +128,49 @@ Architecture remains an event-driven abstract match engine. Offside snapshots
 are generated from formation-based event positions; they are not a persistent
 22-body collision simulation. The canvas never writes official outcomes.
 Remaining: venue corrections, route verification/map scroll, full QA.
+
+## Phase 6: partial, source verification blocked
+
+Implemented one-time ref-based map scrolling (with reduced-motion support),
+explicit `Routenverlauf geschätzt` labels, corrected venue resolution for new
+fixtures and cached road corridors plus separately labelled final connections.
+Existing journey endpoints, durations and plans remain unchanged. Fixed solo
+start retries after a lost response: the server returns the same consumed travel
+receipt; fixture-based career match identity prevents a duplicate match record.
+
+Audited coordinates using official club metadata and full-size OSM football-pitch
+polygons. Applied 35 Swiss and 8 international field corrections plus real Bern
+fields for the five fictional clubs. Explicitly marked nearest local pitch
+fallbacks when the registered ground could not be identified. The Worb club's
+linked map was used to select Worbboden, and the verified Thun modern-stadium
+anchor was reused for its league club. Wembley retains the requested
+51.5560, -0.2795 anchor inside its mapped pitch.
+
+`app/stadium-audit.json` records source way URLs, field areas, old/new coordinates,
+fallbacks and unresolved records. OSM returned HTTP 509 after partial retrieval:
+30 Swiss and 33 international records could not receive a fresh polygon audit.
+Several retain previously documented stadium anchors; unresolved municipality
+coordinates are still explicitly marked, never promoted to verified.
+Consequently the requested exhaustive stadium audit is NOT complete. No guessed
+pitch coordinates were substituted for failed lookups.
+
+### Verification limits and visual evidence
+
+Playwright is available but Chromium is absent. The requested headless attempt
+failed; downloading Chromium Headless Shell repeatedly returned a truncated/empty
+ZIP (`End of central directory record signature not found`). No browser screenshot
+or live desktop/mobile interaction is claimed.
+
+The existing production renderer generated 480 canvas animation frames. The
+contact sheet was inspected for pitch markings, spacing, player numbering, shot
+outcomes and contrast: `docs/qa/match-canvas.png`. This validates canvas rendering,
+not responsive HTML overlay layout or real browser event handling.
+
+The full Stage 3 realism brief remains only partially fulfilled: the engine is
+still event-driven, rather than a persistent spatial football engine. Expanded
+shot outcomes (woodwork, over, distinct deflections/rushes), fully causal attacking
+sequences and full club-colour coverage need additional implementation/visual QA.
+Phase 7 is not signed off because the stadium audit and browser verification
+remain blocked. The complete regression suite is still run to check this branch.
+
+Production deployment and merging into main were not performed.

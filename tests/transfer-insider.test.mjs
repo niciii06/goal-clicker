@@ -23,7 +23,7 @@ test("Fabrizio Romario transfer events are wired through singleplayer and coop",
   assert.match(pageSource, /resolveTransferInsiderEvent\(gameRef\.current\.features\)/);
   assert.match(pageSource, /transfer-insider-takeover/);
   assert.match(apiSource, /action === "transfer-insider-event"/);
-  assert.match(apiSource, /if \(game\.features\.cup\.active\) return Response\.json/);
+  assert.match(apiSource, /if \(game\.features\.squadLock \|\| game\.features\.cup\.active\) return Response\.json/);
   assert.match(pageSource, /!displayGame\.features\.cup\.active && displayGame\.features\.transferSaga\.nextAt/);
   assert.match(apiSource, /activatePendingTransferLoans/);
   assert.ok((apiSource.match(/completeTournamentRun/g) ?? []).length >= 3);

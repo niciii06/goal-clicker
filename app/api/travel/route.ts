@@ -25,9 +25,9 @@ export async function POST(request: Request) {
    if(!journey)journey=await db.putSoloJourney(p.playerId,fixture.id,createJourney(fixture,now,Math.random,f));
   } else if(p.action==='start') {
    if(!journey||journey.endsAt>now)return Response.json({error:'Die Mannschaft ist noch nicht angekommen.'},{status:409});
-   if(journey.consumed)return Response.json({error:'Diese Partie wurde bereits gestartet.'},{status:409});
+   if(journey.consumed)return Response.json({journey,serverNow:now},{headers:{'cache-control':'no-store'}});
    journey={...journey,consumed:true};
-   if(!await db.consumeSoloJourney(p.playerId,fixture.id,journey))return Response.json({error:'Diese Partie wurde bereits gestartet.'},{status:409});
+   if(!await db.consumeSoloJourney(p.playerId,fixture.id,journey)){const receipt=await db.getSoloJourney(p.playerId,fixture.id);return Response.json({journey:receipt,serverNow:now},{headers:{'cache-control':'no-store'}});}
   } else return Response.json({error:'Unbekannte Reiseaktion.'},{status:400});
   return Response.json({journey,serverNow:now},{headers:{'cache-control':'no-store'}});
  } catch {return Response.json({error:'Die Reise konnte nicht synchronisiert werden. Bitte erneut versuchen.'},{status:503});}
