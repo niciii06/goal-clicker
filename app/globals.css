@@ -1512,3 +1512,11 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 .gc-interactive-match .gc-score-scorers { overflow-wrap:anywhere; }
 @media(max-width:600px) { .gc-interactive-controls button { flex:1 1 40%; } .gc-interactive-match .gc-sub-pitch strong { font-size:9px; } .gc-interactive-match .gc-sub-pitch small { font-size:8px; } .gc-interactive-match .gc-viewer-scoreboard { min-width:0; } }
 .summary-match-stats,.summary-goals { display:flex; flex-wrap:wrap; gap:8px 18px; margin:12px 0; font-size:13px; }
+/* Readable text in the interactive match editor: the pause bar is light, the tactic buttons are dark green. */
+.gc-interactive-pause { color:#183c32; }
+.gc-sub-panel .gc-viewer-tactics button { color:#edfff2; }
+/* Player names in the substitution pitch break at German syllables instead of arbitrary letters. */
+.gc-sub-pitch .starxi-pitch-slot strong { hyphens:auto; -webkit-hyphens:auto; }
+@media(max-width:650px) { .gc-sub-pitch .starxi-pitch-slot { padding-left:1px; padding-right:1px; } .gc-sub-pitch .starxi-pitch-slot strong { font-size:8px; letter-spacing:-.1px; } }
+/* The substitution pitch uses light cards: hover and selection keep them light with a blue border so the dark text stays readable. */
+.gc-sub-pitch .starxi-pitch-slot:hover:not(:disabled), .gc-sub-pitch .starxi-pitch-slot.selected { background:var(--surface-raised); border-color:var(--accent); }
