@@ -1,6 +1,6 @@
 import { getSeasonModeNextOpponent, getTournament, getTournamentOpponentSchedule, getStarXISelection, getOpenTransferSquadVacancies, getStarXIRating, getEligibleEventPlayers, TOURNAMENTS, lockMatchSquad } from './feature-data';
 import type { GameFeatures, TournamentId } from './feature-data';
-import { HOME_VENUE, REGION_LABELS, distanceKm, seasonGeography, tournamentVenue, classifyDestination, HOME_ADDRESS, VENUES, currentVenue } from './travel-geography';
+import { HOME_VENUE, REGION_LABELS, distanceKm, seasonGeography, tournamentVenue, classifyDestination, VENUES, currentVenue } from './travel-geography';
 import type { Venue } from './travel-geography';
 import { planJourney, gameSeconds, segmentAt } from './journey-routing';
 import type { JourneyPlan } from './journey-routing';

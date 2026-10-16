@@ -1,6 +1,6 @@
 import { evaluateOffside, goalkeeperSaveProbability } from './football-rules';
 import type { OffsideSnapshot } from './football-rules';
-import { getCupMatchMinute, getCupRegularDurationMs, getStarFormation, getStarXIPlayer, STAR_XI_PLAYERS, STAR_FORMATIONS } from './feature-data';
+import { getCupMatchMinute, getCupRegularDurationMs, getStarXIPlayer, STAR_XI_PLAYERS, STAR_FORMATIONS } from './feature-data';
 import type { CupState, StarPosition, StarXIPlayer } from './feature-data';
 
 export type GoalPattern = 'one-on-one'|'low-shot'|'long-range'|'header'|'cross'|'rebound'|'corner'|'free-kick'|'penalty';
@@ -65,7 +65,6 @@ export function advanceMatchBroadcast(cup:CupState,clubPlayers:readonly StarXIPl
   if((cup.playerExitedAt[p.id]??121)<=b.fitnessMinute||cup.sentOffPlayerIds.includes(p.id))continue;
   const entered=cup.playerEnteredAt[p.id]??1,end=cup.playerExitedAt[p.id]??minute;
   const playedDelta=Math.max(0,Math.min(minute,end)-Math.max(b.fitnessMinute,entered));
-  const strategy='ballbesitz';
   const raw=p.source?.originalAttributes?.stats?.stamina?.value;
   const stamina=typeof raw==='number'?raw:p.source?.rating??70;
   const workload=(p.role==='TW'?.13:['LV','RV','LAV','RAV','LF','RF','LM','RM'].includes(p.role)?.49:.4)*(1+(70-stamina)/200);

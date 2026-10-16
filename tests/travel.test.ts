@@ -1,3 +1,4 @@
+import { TravelMap } from '../app/travel-map.tsx';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { initialGameFeatures, normalizeGameFeatures, setBestStarXI, STAR_XI_PLAYERS, TOURNAMENTS, beginCupMatch, getStarXISelection } from '../app/feature-data.ts';
@@ -80,7 +81,8 @@ test('lineup, cooldown, red card and active match validation remain enforced',()
 test('map, controls, event area, arrival and manual-start button render in German',()=>{
  const travel=emptyTravel();travel.journey=createJourney(fixtureFor(ready(),'tournament'),now,()=>0);
  const during=renderToStaticMarkup(createElement(TravelPanel,{travel,serverNow:()=>now,onStart:()=>{},busy:false}));
- assert.match(during,/tile.openstreetmap.org/);assert.match(during,/Bümplizstrasse 45/);assert.match(during,/OpenStreetMap/);assert.match(during,/Folgen/);assert.doesNotMatch(during,/>Match starten</);
+ const map=renderToStaticMarkup(createElement(TravelMap,{journey:travel.journey!,now,progress:0}));
+ assert.match(map,/tile.openstreetmap.org/);assert.match(during,/Bümplizstrasse 45/);assert.match(map,/OpenStreetMap/);assert.match(map,/Folgen/);assert.match(during,/Reisekarte wird geladen/);assert.doesNotMatch(during,/>Match starten</);
  const arrived=renderToStaticMarkup(createElement(TravelPanel,{travel,serverNow:()=>travel.journey!.endsAt,onStart:()=>{},busy:false}));assert.match(arrived,/Am Stadion angekommen!/);assert.match(arrived,/>Match starten</);
  const stats=renderToStaticMarkup(createElement(TravelStatsPanel,{travel,now:travel.journey.endsAt}));assert.match(stats,/Auswärtsreisen/);
 });

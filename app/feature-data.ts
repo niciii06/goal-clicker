@@ -2033,6 +2033,7 @@ export function getCupMatchStrength(cup: CupState, starRating: number) {
 }
 
 export function openStarPack(packId: StarPackId, ownedIds: string[], random = Math.random, formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS): StarPackOpening {
+  void formationPositions;
   const pack = getStarPack(packId) ?? getStarPack("scout")!;
   if(isRewardPack(pack.id)) {
     const groups=getRewardPackOdds(pack.id);let cursor=0;const roll=boundedRandom(random);
@@ -2444,8 +2445,6 @@ function finishCupRound(cup: CupState, starRating: number, won: boolean, now: nu
 }
 
 export function advanceCupMatch(cup: CupState, starRating: number, now = Date.now(), random = Math.random, homePlayers: readonly StarXIPlayer[] = [], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS) {
-  const tournament = getTournament(cup.tournamentId) ?? TOURNAMENTS[0];
-  const opponent = getCupOpponent(cup, tournament);
   const baseResult = getCupBaseResult(cup, starRating);
   if (!cup.active) return { cup, ...baseResult };
   if(cup.timedPause){
@@ -2677,8 +2676,6 @@ function getPenaltyWinner(homeScore: number, awayScore: number, homeTaken: numbe
 export function resolveCupPenalty(cup: CupState, starRating: number, direction: PenaltyDirection, now = Date.now(), random = Math.random, homePlayers: readonly StarXIPlayer[] = [], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS) {
   const baseResult = getCupBaseResult(cup, starRating);
   if (!cup.active || cup.phase !== "penalties" || !PENALTY_DIRECTIONS.includes(direction)) return { cup, ...baseResult };
-  const tournament = getTournament(cup.tournamentId) ?? TOURNAMENTS[0];
-  const opponent = getCupOpponent(cup, tournament);
   let penaltyHomeScore = cup.penaltyHomeScore;
   let penaltyAwayScore = cup.penaltyAwayScore;
   let penaltyHomeTaken = cup.penaltyHomeTaken;

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { initialGameFeatures, setBestStarXI, STAR_XI_PLAYERS, TOURNAMENTS, getStarXIPlayer, getStarXIPositions, setStarXIStarter, setStarXIBenchPlayer, normalizeGameFeatures, lockMatchSquad, releaseMatchSquad, resolveTransferInsiderEvent, beginCupMatch, advanceCupMatch, getStarXISelection, drawRandomStarXICustomCard, getCupPlayerMatchRating, canStarXIPlayerFillSlot } from '../app/feature-data.ts';
-import { fixtureFor, travelGate } from '../app/travel-data.ts';
+import { initialGameFeatures, setBestStarXI, STAR_XI_PLAYERS, TOURNAMENTS, getStarXIPlayer, getStarXIPositions, setStarXIStarter, setStarXIBenchPlayer, normalizeGameFeatures, lockMatchSquad, releaseMatchSquad, resolveTransferInsiderEvent, beginCupMatch, getStarXISelection, drawRandomStarXICustomCard, getCupPlayerMatchRating, canStarXIPlayerFillSlot } from '../app/feature-data.ts';
+import { fixtureFor } from '../app/travel-data.ts';
 import { baseActors } from '../app/match-viewer.tsx';
 function ready(){const f=initialGameFeatures();f.starXI=setBestStarXI({...f.starXI,ownedIds:STAR_XI_PLAYERS.map(p=>p.id)});return f;}
 test('every new cup fixture is away; only highest cup final uses neutral Wembley',()=>{
@@ -40,4 +40,24 @@ test('opponent dismissals persist by roster ID and remove actors without replace
  const f=ready();f.cup=beginCupMatch(f.cup,1000,'stadium',getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds));
  f.cup.cardEvents=[{id:'red',side:'away',playerId:'opponent-2',player:'Defender',reason:'Notbremse',card:'red',minute:1,createdAt:1001,homeScore:0,awayScore:0},{id:'red2',side:'away',playerId:'opponent-3',player:'Defender 2',reason:'grobes Foul',card:'red',minute:1,createdAt:1002,homeScore:0,awayScore:0}];
  const n=normalizeGameFeatures(f);assert.equal(n.cup.cardEvents[0].playerId,'opponent-2');assert.equal(baseActors(n,n.cup,3,true).filter(a=>a.team==='opponent').length,9);
+});
+
+test('opponent red cards rebalance every remaining line and survive save reload, including emergency keeper',()=>{
+ for(const role of ['IV','midfield','ST','TW']) for(const direction of [true,false]) {
+  const f=ready();f.cup=beginCupMatch(f.cup,1000,'stadium',getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds));
+  const before=baseActors(f,f.cup,10,direction).filter(p=>p.team==='opponent');
+  const dismissed=before.find(p=>role==='midfield'?['ZM','ZDM','ZOM','LM','RM'].includes(p.role):p.role===role);assert.ok(dismissed,`fixture must contain ${role}`);
+  f.cup.cardEvents=[{id:'rebalance-red',side:'away',playerId:dismissed.id,player:dismissed.label,reason:'Notbremse',card:'red',minute:10,createdAt:2000,homeScore:0,awayScore:0}];
+  const after=baseActors(f,f.cup,11,direction).filter(p=>p.team==='opponent');
+  assert.equal(after.length,10);assert.ok(!after.some(p=>p.id===dismissed.id));
+  assert.equal(after.filter(p=>p.goalkeeper).length,1);
+  assert.equal(after.filter(p=>p.role==='IV').length,4);
+  assert.ok(after.some(p=>{const old=before.find(q=>q.id===p.id)!;return old.x!==p.x||old.y!==p.y||old.role!==p.role;}));
+  assert.deepEqual(baseActors(f,f.cup,9,direction).filter(p=>p.team==='opponent'),before);
+  const restored=normalizeGameFeatures(JSON.parse(JSON.stringify(f)));
+  assert.deepEqual(baseActors(restored,restored.cup,11,direction).filter(p=>p.team==='opponent'),after);
+  f.cup.cardEvents.push({...f.cup.cardEvents[0],id:'second-red',playerId:after.find(p=>!p.goalkeeper)!.id,minute:12});
+  const nine=baseActors(f,f.cup,13,direction).filter(p=>p.team==='opponent');
+  assert.equal(nine.length,9);assert.equal(nine.filter(p=>p.goalkeeper).length,1);
+ }
 });

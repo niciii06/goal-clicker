@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { getDb } from '../../../db';
 import { normalizeGameFeatures, openStarPack } from '../../feature-data';
 // Reuse the existing insert-once solo receipt ledger with a separate key namespace.

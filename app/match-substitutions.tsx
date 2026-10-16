@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { matchChangeError, canStarXIPlayerFillSlot, getStarFormation, getStarXIPlayer, getStarXIPositions, STAR_XI_MAX_SUBSTITUTIONS } from './feature-data';
+import { matchChangeError, getStarFormation, getStarXIPlayer, getStarXIPositions, STAR_XI_MAX_SUBSTITUTIONS } from './feature-data';
 import type { GameFeatures } from './feature-data';
 import { CareerPlayerBadge } from './career-panels';
 export function substitutionError(features:GameFeatures,id:string,slot:number) {

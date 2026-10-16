@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { getDb } from '../../../db';
 import { normalizeGameFeatures, getTournament } from '../../feature-data';
 import { createJourney, eligibilityError, fixtureFor } from '../../travel-data';

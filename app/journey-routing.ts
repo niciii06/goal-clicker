@@ -1,6 +1,6 @@
 import { HOME_VENUE, distanceKm, routePoints } from './travel-geography';
 import type { GeoPoint, Venue } from './travel-geography';
-import ROUTES from './travel-route-cache.json';
+import ROUTES from './travel-route-cache';
 
 export const TRAVEL_CONFIG = { acceleration: 60, version: 2 } as const;
 export type Hub = GeoPoint & { id: string; name: string };

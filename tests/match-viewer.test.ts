@@ -42,7 +42,7 @@ test("visual match events come exclusively from recorded authoritative goal, car
 });
 
 import { baseActors, clubAttacksRight, getVisualFrame, type Replay } from '../app/match-viewer.tsx';
-import { STAR_FORMATIONS, STAR_XI_PLAYERS, setBestStarXI, getStarXISelection, advanceCupMatch, getStarXIPlayer, normalizeGameFeatures } from '../app/feature-data.ts';
+import { STAR_FORMATIONS, STAR_XI_PLAYERS, setBestStarXI, getStarXISelection, advanceCupMatch, normalizeGameFeatures } from '../app/feature-data.ts';
 import { recordCareerMatch } from '../app/career-data.ts';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';

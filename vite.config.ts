@@ -54,6 +54,16 @@ export default defineConfig(async () => {
     plugins: [
       vinext(),
       sites(),
+      {
+        name: 'goal-clicker-client-chunks',
+        configEnvironment(name: string) {
+          if(name !== 'client') return;
+          return { build: { rolldownOptions: { output: { codeSplitting: {
+            maxSize: 350_000,
+            groups: [{ name: 'game', test: /\/app\//, maxSize: 350_000 }],
+          } } } } };
+        },
+      },
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,
