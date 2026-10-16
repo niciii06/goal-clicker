@@ -6,7 +6,7 @@ import { sites } from "./build/sites-vite-plugin";
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
 
-const { d1, r2 } = hostingConfig;
+const { d1, r2 } = hostingConfig as { d1?: string | null; r2?: string | null };
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
@@ -45,7 +45,7 @@ export default defineConfig(async () => {
 
   return {
     server: {
-      host: "0.0.0.0",
+      host: process.env.VITE_DEV_HOST ?? "0.0.0.0",
       allowedHosts: ["terminal.local"],
       ...(isCodexSeatbeltSandbox
         ? { watch: { useFsEvents: false, usePolling: true } }
@@ -55,13 +55,27 @@ export default defineConfig(async () => {
       vinext(),
       sites(),
       {
-        name: 'goal-clicker-client-chunks',
+        name: "goal-clicker-client-chunks",
         configEnvironment(name: string) {
-          if(name !== 'client') return;
-          return { build: { rolldownOptions: { output: { codeSplitting: {
-            maxSize: 350_000,
-            groups: [{ name: 'game', test: /\/app\//, maxSize: 350_000 }],
-          } } } } };
+          if (name !== "client") return;
+          return {
+            build: {
+              rolldownOptions: {
+                output: {
+                  codeSplitting: {
+                    maxSize: 350_000,
+                    groups: [
+                      {
+                        name: "game",
+                        test: /[\\/]app[\\/]/,
+                        maxSize: 350_000,
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          };
         },
       },
       cloudflare({

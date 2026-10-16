@@ -22,6 +22,8 @@ jobs:
           cache: npm
       - name: Install exact dependencies
         run: npm ci --no-fund
+      - name: Check lockfile repair
+        run: node --test tests/repair-lockfile.test.mjs
       - name: Check TypeScript
         run: npm run typecheck
       - name: Check lint

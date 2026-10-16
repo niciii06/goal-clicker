@@ -53,3 +53,32 @@ Der von npm angebotene erzwungene Wechsel zu eslint-config-next 14.2.35 ist eine
 Der bestehende Workflow führt künftig zusätzlich Lint und den Audit der Produktionsabhängigkeiten aus. npm ci deaktiviert die Sicherheitsprüfung nicht mehr. Die bestehenden Tests und die Typprüfung bleiben erhalten.
 
 Ein Push auf main aktualisiert den GitHub Quellstand. Die bestehende ChatGPT Site und externe Worker werden dadurch nicht veröffentlicht oder verändert.
+
+## Ergänzende Reparatur vom 16. Oktober 2026
+
+Ausgangsbasis dieser Nachprüfung ist Commit `09d6526143594d31f184804a80a4d88a08190be6`. Die erneute Aufgabenbeschreibung wurde in der Reihenfolge kritisch, hoch, mittel und niedrig abgearbeitet. Bereits passende Dateien behalten denselben Inhalt. Spiellogik, Datenbankmigrationen, Skripte und Abhängigkeiten wurden nicht entfernt.
+
+* TypeScript ignoriert jetzt auch generierte Build- und Laufzeitverzeichnisse.
+* Vite verwendet die vorgegebene optionale Host-Umgebungsvariable und erkennt Windows- sowie Unix-Pfade für die bestehenden Client-Chunks. Die Typangabe für Hosting-Bindings erlaubt zusätzlich `null`, weil das vorhandene Manifest `r2: null` enthält; die unveränderte Typangabe aus dem Auftrag scheitert an der Typprüfung.
+* `tsx` ist direkt mit Version `4.22.1` deklariert. Das vollständige Lockfile bleibt erhalten und stimmt mit dem Manifest überein. Das angeforderte Skript `scripts/repair-lockfile.mjs` wurde vollständig übernommen und ausgeführt.
+* `npm run types:worker` hat die vollständigen Typen mit dem installierten Wrangler 4.151.1 und workerd 1.20261012.1 erzeugt. Die kurze Typdatei im Auftrag wurde nicht als Ersatz verwendet, da sie bestehende Laufzeitdeklarationen entfernen würde. Abschliessende Leerzeichen der generierten Datei wurden normalisiert.
+* `.npmrc`, `.gitattributes`, Drizzle, ESLint, Next, PostCSS und `.gitignore` entsprechen bereits den angeforderten Inhalten.
+* `README.md`, `HOSTING.md` und `TRAVEL.md` wurden auf UTF-8, Ersatzzeichen, Schweizer Schreibweise und geschlossene Markdown-Codeblöcke geprüft. Ihre bestehenden Inhalte bleiben erhalten. Der Anhang enthält die erwähnten Dokumentfassungen aus «Issue 12» nicht. Der Abruf von `niciii06/goal-clicker#12` über GitHub lieferte 404; eine inhaltlich identische Wiederherstellung dieser unbekannten Fassungen ist daher nicht belegt.
+
+| Aktuelle Prüfung | Ergebnis |
+| :--- | :--- |
+| `npm run types:worker` | Vollständige Typdatei erzeugt |
+| `npm run typecheck` | Erfolgreich |
+| `npm run lint` | Erfolgreich, keine Warnungen |
+| `npm test` | Produktionsbuild, 182 TypeScript-Tests und 41 weitere Tests erfolgreich |
+| Client-Chunk-Budget | 23 Chunks; grösster Chunk 480996 Bytes bei maximal 500000 |
+| `node --test tests/repair-lockfile.test.mjs` | Zwei Tests erfolgreich; gültiges JSON, fehlende Klammern, wiederholte Ausführung, Erhalt ungültiger Eingaben und Abhängigkeitsabgleich geprüft |
+| GitHub-Workflow | Bestehende Prüfungen erhalten; Lockfile-Tests ergänzt |
+| `npm audit --omit=dev --json` | Null bekannte Befunde |
+| `npm audit --json` | Acht hohe Befunde in Entwicklungsabhängigkeiten, null kritische Befunde |
+
+Die erneuten Audit-Befunde betreffen weiterhin die bereits oben beschriebene braces-Abhängigkeit. Sie sind durch diese Konfigurationsreparatur nicht behoben. Es wurde kein inkompatibler Downgrade vorgenommen.
+
+Prüfausgaben: [Typprüfung](qa/config-remediation-followup/typecheck.log), [Lint](qa/config-remediation-followup/lint.log), [Tests und Build](qa/config-remediation-followup/tests.log), [Lockfile-Tests](qa/config-remediation-followup/lockfile.log), [Produktionsaudit](qa/config-remediation-followup/audit-production.json) und [vollständiger Audit](qa/config-remediation-followup/audit.json).
+
+Diese Nachprüfung umfasst lokale automatisierte Prüfungen unter Windows mit Git Bash. Es wurden keine Site veröffentlicht, keine Datenbank migriert und keine manuellen Mehrgeräte- oder Kontotests ausgeführt. Die GitHub-Prüfung des neuen Commits muss separat beobachtet werden.

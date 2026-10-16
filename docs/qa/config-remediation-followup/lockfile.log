@@ -1,0 +1,10 @@
+✔ lockfile repair handles supported endings, is idempotent and preserves invalid input (5060.0236ms)
+✔ lockfile root dependencies match the package manifest (2.6733ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5653.4081
