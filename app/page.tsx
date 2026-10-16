@@ -302,6 +302,9 @@ function getCurrentTime() {
   return sessionClock.wall+performance.now()-sessionClock.monotonic;
 }
 
+// A lost response for these actions may hide a purchase that the server already applied.
+const NETWORK_RETRY_UNSAFE_COOP_ACTIONS = new Set(["buy", "star-pack", "star-custom-draw", "star-custom-buy"]);
+
 function notifyCoopOffline(code: string | undefined, playerId: string | undefined) {
   if (!code || !playerId || typeof navigator === "undefined") return;
   const body = JSON.stringify({ action: "presence-offline", code, playerId, protocol: MULTIPLAYER_PROTOCOL_VERSION });
@@ -780,14 +783,15 @@ function App() {
     const sync=async()=>{try{
       const response=await fetch('/api/travel',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'status',playerId,fixtureId:soloJourneyId})});
       const data=await response.json() as {journey?:Journey;serverNow?:number};
-      if(stopped||!response.ok||!data.journey)return;
-      syncTravelClock(data.serverNow);
+      const serverJourney=data.journey, serverNow=data.serverNow;
+      if(stopped||!response.ok||!serverJourney||typeof serverNow!=='number'||!Number.isFinite(serverNow))return;
+      syncTravelClock(serverNow);
       setGame(current=>{
         if(current.features.travel.journey?.id!==soloJourneyId)return current;
         const old=current.features.travel;
-        const j={...data.journey,consumed:old.journey!.consumed};
+        const j={...serverJourney,consumed:old.journey!.consumed};
         const counted=(old.journey as Journey & {counted?:boolean}).counted;
-        const travel=settleTravel({...old,journey:{...j,counted} as Journey},data.serverNow!);
+        const travel=settleTravel({...old,journey:{...j,counted} as Journey},serverNow);
         return {...current,features:{...current.features,travel}};
       });
     }catch{ /* Last authoritative clock continues; kickoff always revalidates. */ }};
@@ -1467,8 +1471,9 @@ function App() {
           }
           return data;
         } catch {
-          if (action !== "click" && attempt + 1 < Math.min(3, maxAttempts)) continue;
-          setCoopMessage("Die Verbindung zum Koop-Raum ist gerade unterbrochen.");
+          const retryUnsafe = NETWORK_RETRY_UNSAFE_COOP_ACTIONS.has(action);
+          if (action !== "click" && !retryUnsafe && attempt + 1 < Math.min(3, maxAttempts)) continue;
+          setCoopMessage(retryUnsafe ? "Die Verbindung wurde unterbrochen. Prüfe den gemeinsamen Kontostand, bevor du den Kauf wiederholst." : "Die Verbindung zum Koop-Raum ist gerade unterbrochen.");
           return null;
         }
       }
@@ -1698,7 +1703,13 @@ function App() {
       }
       return;
     }
-      const opening = openStarPack(pack.id, displayGame.features.starXI.ownedIds, Math.random, displayGame.features.starXI.formationPositions);
+    const latestGame = gameRef.current;
+    if (latestGame.goals < pack.price || latestGame.features.cup.active) {
+      packPurchaseRef.current = false;
+      showToast(latestGame.features.cup.active ? "Während eines Pokalspiels keine Packs." : `${pack.label} kostet ${formatNumber(pack.price)} Tore.`);
+      return;
+    }
+    const opening = openStarPack(pack.id, latestGame.features.starXI.ownedIds, Math.random, latestGame.features.starXI.formationPositions);
     const reveal: StarPackReveal = { packId: opening.packId, packName: opening.packName, player: opening.player, duplicate: opening.duplicate, fragmentCompensation: opening.fragmentCompensation, source: opening.source, openedAt: Date.now(), openedBy: "Du", troll: shouldTriggerPackTroll(opening.player) };
     setGame((current) => {
       const features = normalizeGameFeatures(current.features);
@@ -2561,6 +2572,11 @@ function App() {
 
   function resetGame() {
     if (isCoopLive) {
+      if (coopSession?.role !== "host") {
+        setCoopMessage("Nur der Host kann den gemeinsamen Spielstand zurücksetzen.");
+        showToast("Nur der Host kann zurücksetzen");
+        return;
+      }
       if (!window.confirm("Soll der gemeinsame Koop Spielstand neu gestartet werden?")) return;
       setCoopBusy(true);
       void sendCoopAction("reset").then((data) => {
@@ -2571,7 +2587,10 @@ function App() {
     }
     if (!window.confirm("Wirklich den kompletten Spielstand löschen?")) return;
     const sound = game.sound;
-    setGame({ ...initialGame(), sound });
+    const freshGame: GameState = { ...initialGame(), sound };
+    // Update the ref synchronously so the autosave interval or pagehide cannot persist the old state again.
+    gameRef.current = freshGame;
+    setGame(freshGame);
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(BACKUP_STORAGE_KEY);
     localStorage.removeItem(RECOVERY_STORAGE_KEY);
