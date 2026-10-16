@@ -1,5 +1,7 @@
 # Goal Clicker – abschliessender QA-Audit
 
+> Historischer NO-GO-Audit vor dem Folgeauftrag. Die anschliessende Freigabe der vier nachgeforderten Blocker ist in [Release verification](../release-match-realism.md) dokumentiert. Die verlinkten alten Rohprotokolle wurden später gemäss Auftrag nur bei Whitespace/Zeilenenden normalisiert.
+
 Datum: 16. Oktober 2026. **Freigabe abgelehnt. Kein Merge, kein Push, kein Deployment.**
 
 Die Veröffentlichungsvoraussetzung „alle Prüfungen ohne Fehler, Warnungen oder offene

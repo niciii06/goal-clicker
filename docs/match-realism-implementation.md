@@ -1,5 +1,7 @@
 # Match realism implementation
 
+> Historischer Stand. Aktuelle Regeln und Freigabe: [Release verification](release-match-realism.md) und [Sites project knowledge](chatgpt-sites-knowledge.md).
+
 ## Phase 1: repository audit
 
 Baseline: a8ab9a2 (origin/main). Clean checkout on feature branch

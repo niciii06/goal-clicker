@@ -1,5 +1,7 @@
 # Goal Clicker: Umsetzungs- und Prüfbericht
 
+> Historischer Stand. Aktuelle Regeln und Freigabe: [Release verification](release-match-realism.md) und [Sites project knowledge](chatgpt-sites-knowledge.md).
+
 Stand: 16. Oktober 2026. Branch: `feat/match-realism-cup-travel`.
 
 **Status: Teilumsetzung, noch nicht zur Produktionsfreigabe bereit.** Die Kernregeln

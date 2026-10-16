@@ -1,7 +1,8 @@
 # Goal Clicker selbst bearbeiten und hosten
 
-Dieser Stand übernimmt den Spielcode der Sites Version 125, Commit
-`30ecda8bbb57146fc6a7b0a683ac0b582f668d1a`, und ergänzt externes Hosting.
+Der aktuelle GitHub-Release ist in [Release verification](docs/release-match-realism.md) dokumentiert; [Sites Projektwissen](docs/chatgpt-sites-knowledge.md) enthält Spielregeln und Hosting-Provenienz. Hauptziel bleibt ChatGPT Sites. Die folgenden externen Hosting-Möglichkeiten bleiben optional.
+
+Historischer Import: Sites Version 125, Commit `30ecda8bbb57146fc6a7b0a683ac0b582f668d1a`. Die separat weiterentwickelte Live-Site (Version 132) wird durch einen GitHub-Push nicht automatisch ersetzt.
 
 ## Voraussetzungen
 

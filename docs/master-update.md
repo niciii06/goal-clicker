@@ -1,5 +1,7 @@
 # Goal Clicker: Master-Update vom 12. Oktober 2026
 
+> Historischer Stand. Aktuelle Regeln und Freigabe: [Release verification](release-match-realism.md) und [Sites project knowledge](chatgpt-sites-knowledge.md).
+
 ## Umsetzung
 
 Die bestehenden Saison-, Reise-, Pack-, Karriere- und Koop-Systeme wurden erweitert. 15 Ligen mit jeweils deinem Club und fünf Gegnern, geografisch berechnete Reisen, stabile Stadien und sechs Turnier-Prämienpack-Stufen sind integriert. Die internen Divisionen bleiben 1 bis 15 aufsteigend, um Freischaltungen und Spielstände zu erhalten. Sichtbar werden die Ligen 15 bis 1 angezeigt.

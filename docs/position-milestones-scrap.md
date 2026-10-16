@@ -1,5 +1,7 @@
 # Position milestones and Schrott-Pack
 
+> Historischer Stand. Aktuelle Regeln und Freigabe: [Release verification](release-match-realism.md) und [Sites project knowledge](chatgpt-sites-knowledge.md).
+
 ## Implemented behaviour
 
 Career schema version 2 fixes each card's milestone category from its catalogue primary position. Match-position changes and alternate positions do not alter the category. Existing lifetime statistics, unlocked legacy milestone IDs, accumulated album collections and claimed album rewards survive normalization. On migration from version 1, previously earned legacy entitlements are granted once before switching to positional thresholds. New tiers unlock automatically; the strongest version applies, bonuses never stack and OVR never exceeds 100. The existing album bulk-claim button continues to collect all complete unclaimed groups once.

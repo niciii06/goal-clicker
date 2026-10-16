@@ -1,0 +1,93 @@
+
+> goal-clicker@0.1.0 verify:physics
+> node --import tsx scripts/verify-match-physics.ts
+
+[
+  {
+    "name": "league-60fps",
+    "seed": 101,
+    "fps": 60,
+    "frames": 15318,
+    "checked": 12470,
+    "excluded": 2847,
+    "maxSpeedMetresPerSecond": 55.000000000000455,
+    "maxDeltaMetres": 0.9166666666709429,
+    "simulatedSeconds": 255.3000000008496,
+    "halftimes": 1,
+    "goalPauses": 7,
+    "reloads": 1,
+    "reasons": {
+      "kickoff": 10,
+      "pause": 2335,
+      "offside": 402,
+      "corner": 85
+    },
+    "completed": true
+  },
+  {
+    "name": "stadium-30fps",
+    "seed": 202,
+    "fps": 30,
+    "frames": 7969,
+    "checked": 6988,
+    "excluded": 980,
+    "maxSpeedMetresPerSecond": 55.00000000000022,
+    "maxDeltaMetres": 1.8333333333354742,
+    "simulatedSeconds": 265.6333333328846,
+    "halftimes": 1,
+    "goalPauses": 3,
+    "reloads": 1,
+    "reasons": {
+      "kickoff": 6,
+      "offside": 170,
+      "throw-in": 45,
+      "corner": 84,
+      "pause": 663
+    },
+    "completed": true
+  },
+  {
+    "name": "champions-variable",
+    "seed": 303,
+    "fps": 30,
+    "frames": 8535,
+    "checked": 7628,
+    "excluded": 906,
+    "maxSpeedMetresPerSecond": 55.00000000000022,
+    "maxDeltaMetres": 3.300000000000005,
+    "simulatedSeconds": 294.8333333328385,
+    "halftimes": 1,
+    "goalPauses": 3,
+    "reloads": 1,
+    "reasons": {
+      "kickoff": 5,
+      "free-kick": 77,
+      "corner": 84,
+      "pause": 649,
+      "offside": 81
+    },
+    "completed": true
+  },
+  {
+    "name": "world-60fps",
+    "seed": 404,
+    "fps": 60,
+    "frames": 19773,
+    "checked": 17573,
+    "excluded": 2199,
+    "maxSpeedMetresPerSecond": 55.00000000000041,
+    "maxDeltaMetres": 0.9166666666709422,
+    "simulatedSeconds": 329.5500000011954,
+    "halftimes": 1,
+    "goalPauses": 4,
+    "reloads": 1,
+    "reasons": {
+      "kickoff": 7,
+      "pause": 1586,
+      "corner": 171,
+      "free-kick": 88,
+      "offside": 334
+    },
+    "completed": true
+  }
+]
