@@ -3584,7 +3584,7 @@ export function queueMatchChanges(features:GameFeatures,changes:readonly MatchCh
 export function applyPendingMatchChanges(features:GameFeatures,now:number) {
  const c=features.cup,p=c.pendingSubstitutions;if(!p||!c.active)return;
  const halftime=c.timedPause?.kind==='halftime'&&now<c.timedPause.endsAt;
- const stoppage=halftime||c.matchPaused||[...c.matchEvents,...c.cardEvents].some(e=>e.createdAt>=p.requestedAt)||c.broadcast?.events.some(e=>e.at>=p.requestedAt&&['corner','throw-in','free-kick','yellow'].includes(e.kind));
+ const stoppage=halftime||c.matchPaused||[...c.matchEvents,...c.cardEvents].some(e=>e.createdAt>=p.requestedAt)||c.broadcast?.events.some(e=>e.at>=p.requestedAt&&['corner','throw-in','free-kick','yellow','offside'].includes(e.kind));
  if(!stoppage)return;
  if(p.changes.some(x=>features.starXI.lineupIds[x.slot]!==x.outgoingId)||matchChangeError(features,p.changes)){delete c.pendingSubstitutions;return;}
  const minute=getCupMatchMinute(c,now);

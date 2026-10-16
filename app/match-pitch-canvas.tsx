@@ -48,7 +48,23 @@ export function drawFootballPitch(ctx:CanvasRenderingContext2D) {
  for(const [x,y,start] of [[0,0,0],[105,0,Math.PI/2],[105,68,Math.PI],[0,68,Math.PI*1.5]]){ctx.beginPath();ctx.arc(x,y,1,start,start+Math.PI/2);ctx.stroke();}
  ctx.fillStyle='#d5eddb';ctx.beginPath();ctx.arc(52.5,34,.38,0,Math.PI*2);ctx.fill();
 }
-export function drawMatchFrame(ctx:CanvasRenderingContext2D,frame:ReturnType<typeof getVisualFrame>,actors:Actor[],colours:{club:string;opponent:string},cup:GameFeatures['cup']) {
+export function resolvedBall(frame:ReturnType<typeof getVisualFrame>,actors:Actor[]) {
+ let ball={...frame.ball};
+   if(frame.ballOwnerId&&!frame.pass&&!frame.shotFlight){const owner=actors.find(p=>p.id===frame.ballOwnerId),ideal=frame.actors.find(p=>p.id===frame.ballOwnerId);if(owner&&ideal){ball.x+=owner.x-ideal.x;ball.y+=owner.y-ideal.y;}}
+   if(frame.pass){const a=actors.find(p=>p.id===frame.pass!.fromId),b=actors.find(p=>p.id===frame.pass!.toId);if(a&&b)ball={x:a.x+(b.x-a.x)*frame.pass.progress,y:a.y+(b.y-a.y)*frame.pass.progress};}
+   if(frame.shotFlight){const a=actors.find(p=>p.id===frame.shotFlight!.fromId),ideal=frame.actors.find(p=>p.id===frame.shotFlight!.fromId);if(a&&ideal){ball.x+=(a.x-ideal.x)*(1-frame.shotFlight.progress);ball.y+=(a.y-ideal.y)*(1-frame.shotFlight.progress);}}
+ return ball;
+}
+export class BallMotion {
+ point?: {x:number;y:number};
+ step(target:{x:number;y:number},dt:number,restart=false){
+  if(!this.point||restart){this.point={...target};return {...target};}
+  const delta=Math.max(0,Math.min(.06,dt)),dx=target.x-this.point.x,dy=target.y-this.point.y,d=Math.hypot(dx,dy),distance=Math.min(d,55*delta);
+  if(d>0){this.point.x+=dx/d*distance;this.point.y+=dy/d*distance;}
+  return {...this.point};
+ }
+}
+export function drawMatchFrame(ctx:CanvasRenderingContext2D,frame:ReturnType<typeof getVisualFrame>,actors:Actor[],colours:{club:string;opponent:string},cup:GameFeatures['cup'],renderedBall?:{x:number;y:number}) {
  drawFootballPitch(ctx);
    for(const p of actors){
     const keeper=p.goalkeeper;ctx.fillStyle=keeper?p.team==='club'?'#c684f4':'#74d0ed':colours[p.team];ctx.strokeStyle='#effff3';ctx.lineWidth=.35;
@@ -56,10 +72,7 @@ export function drawMatchFrame(ctx:CanvasRenderingContext2D,frame:ReturnType<typ
     ctx.font='bold 1.9px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineWidth=.18;ctx.strokeStyle='#071b12';ctx.strokeText(p.shirt,p.x,p.y+.08);ctx.fillStyle='white';ctx.fillText(p.shirt,p.x,p.y+.08);
     if(cup.broadcast?.events.some(e=>e.kind==='yellow'&&e.playerId===p.id&&e.minute<=frame.minute)){ctx.fillStyle='#ffe449';ctx.fillRect(p.x+1.2,p.y-2.8,.9,1.4);}
    }
-   let ball={...frame.ball};
-   if(frame.ballOwnerId&&!frame.pass&&!frame.shotFlight){const owner=actors.find(p=>p.id===frame.ballOwnerId),ideal=frame.actors.find(p=>p.id===frame.ballOwnerId);if(owner&&ideal){ball.x+=owner.x-ideal.x;ball.y+=owner.y-ideal.y;}}
-   if(frame.pass){const a=actors.find(p=>p.id===frame.pass!.fromId),b=actors.find(p=>p.id===frame.pass!.toId);if(a&&b)ball={x:a.x+(b.x-a.x)*frame.pass.progress,y:a.y+(b.y-a.y)*frame.pass.progress};}
-   if(frame.shotFlight){const a=actors.find(p=>p.id===frame.shotFlight!.fromId),ideal=frame.actors.find(p=>p.id===frame.shotFlight!.fromId);if(a&&ideal){ball.x+=(a.x-ideal.x)*(1-frame.shotFlight.progress);ball.y+=(a.y-ideal.y)*(1-frame.shotFlight.progress);}}
+   const ball=renderedBall??resolvedBall(frame,actors);
    ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(ball.x,ball.y+.8,1.1,.5,0,0,Math.PI*2);ctx.fill();
    ctx.fillStyle='#fff';ctx.strokeStyle='#132319';ctx.lineWidth=.23;ctx.beginPath();ctx.arc(ball.x,ball.y-frame.height*.7,.75+frame.height*.06,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#132319';ctx.beginPath();ctx.arc(ball.x-.15,ball.y-frame.height*.7-.12,.19,0,Math.PI*2);ctx.fill();
 
@@ -72,6 +85,7 @@ export function MatchPitchCanvas({features,now,replay,colours,camera,reducedMoti
   const el=canvas.current;if(!el)return;
   const ctx=el.getContext('2d');if(!ctx)return;
   let request=0,previous=0,lastDraw=0,sampleAt=0,frames=0,stopped=false;
+  const ballMotion=new BallMotion();let restartKey='';
   const render=(timestamp:number)=>{
    if(stopped||document.visibilityState!=='visible')return;
    const data=latest.current;
@@ -89,7 +103,9 @@ export function MatchPitchCanvas({features,now,replay,colours,camera,reducedMoti
    const scale=Math.min(width/113,height/76)*view.current.zoom;
    const center=data.camera==='full'?{x:52.5,y:34}:view.current;
    ctx.setTransform(scale,0,0,scale,width/2-center.x*scale,height/2-center.y*scale);
-   drawMatchFrame(ctx,frame,actors,data.colours,data.features.cup);
+   const keyRestart=['Anpfiff','Wiederanpfiff','Seitenwechsel'].includes(frame.status)?`${data.features.cup.restartAt??0}:${frame.status}`:'';
+   const ball=ballMotion.step(resolvedBall(frame,actors),data.features.cup.timedPause&&wall>=data.features.cup.timedPause.startsAt||data.features.cup.matchPaused?0:dt,Boolean(keyRestart&&keyRestart!==restartKey));
+   restartKey=keyRestart;drawMatchFrame(ctx,frame,actors,data.colours,data.features.cup,ball);
    ctx.setTransform(1,0,0,1,0,0);
    frames++;if(timestamp-sampleAt>=1000){data.onFps(Math.round(frames*1000/(timestamp-sampleAt)));frames=0;sampleAt=timestamp;}
    request=requestAnimationFrame(render);

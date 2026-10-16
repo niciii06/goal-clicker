@@ -1,4 +1,5 @@
 "use client";
+import { chooseBallAction, restartPoint } from "./football-rules";
 
 import { useEffect, useState, useRef } from "react";
 import { getCupMatchMinute, getCupRegularDurationMs, getCupPlayerMatchRating, getStarFormation, getStarXIPlayer, STAR_XI_MAX_SUBSTITUTIONS } from "./feature-data";
@@ -23,7 +24,7 @@ const smooth = (x: number) => { const v = clamp(x, 0, 1); return v * v * (3 - 2 
 const hash = (text: string) => { let x = 2166136261; for (let i = 0; i < text.length; i++) x = Math.imul(x ^ text.charCodeAt(i), 16777619); return (x >>> 0) / 4294967295; };
 
 export function eventLabel(event:MatchEvent) {
- const labels:Record<string,string>={goal:'Tor',card:'Rote Karte',injury:'Verletzung',penalty:'Penalty','build-up':'Spielaufbau',counter:'Konter',wide:'Flügelangriff',combination:'Doppelpass',shot:'Torschuss',corner:'Ecke','free-kick':'Freistoss','throw-in':'Einwurf',yellow:'Gelbe Karte',substitution:'Wechsel'};
+ const labels:Record<string,string>={goal:'Tor',card:'Rote Karte',injury:'Verletzung',penalty:'Penalty','build-up':'Spielaufbau',counter:'Konter',wide:'Flügelangriff',combination:'Doppelpass',shot:'Torschuss',corner:'Ecke','free-kick':'Freistoss','throw-in':'Einwurf',yellow:'Gelbe Karte',substitution:'Wechsel',offside:'Abseits · indirekter Freistoss'};
  return labels[event.kind]??'Spielereignis';
 }
 function goalStyle(cup:CupState,id:string|null,eventId:string) {
@@ -34,8 +35,10 @@ function renderBroadcastAction(actors:Actor[],event:BroadcastEvent,age:number,cl
  const right=event.side==='club'?clubRight:!clubRight;
  const taker=actors.find(p=>p.id===event.playerId)??actors.find(p=>p.team===event.side&&!p.goalkeeper);
  const keeper=actors.find(p=>p.team!==event.side&&p.goalkeeper);
- const origin={x:taker?.x??52.5,y:taker?.y??34};
+ const restart=event.kind==='corner'?'corner':event.kind==='throw-in'?'throw-in':event.kind==='free-kick'?'free-kick':undefined;
+ const origin=event.kind==='offside'&&event.passSnapshot?event.passSnapshot.receiver:restart?restartPoint(restart,right,event.lane):{x:taker?.x??52.5,y:taker?.y??34};
  let ball={...origin},height=0,status=eventLabel({...event,action:event}),keeperDive:string|undefined,ballOwnerId=taker?.id;
+ if(event.kind==='offside'){return {ball:{...origin},height:0,status:'Abseits · indirekter Freistoss',keeperDive:undefined,ballOwnerId:undefined};}
  if(event.outcome){
   const finish={x:right?(event.outcome==='save'?102:event.outcome==='blocked'?Math.min(96,origin.x+9):108):(event.outcome==='save'?3:event.outcome==='blocked'?Math.max(9,origin.x-9):-3),y:event.outcome==='wide'?24:30.8+event.seed*6};
   const t=clamp((age-.25)/.75,0,1);ball={x:mix(origin.x,finish.x,t),y:mix(origin.y,finish.y,t)};ballOwnerId=t===0?taker?.id:undefined;
@@ -148,16 +151,22 @@ function openPlay(features:GameFeatures,at:number,minute:number,clubRight:boolea
   const start = separateTargets(targetsAtNode(base,possession,from,strategy,defendingStrategy)), end = separateTargets(targetsAtNode(base,possession,to,strategy,defendingStrategy));
   const actorAt = (index:number,phase:number) => ({...start[index],x:mix(start[index].x,end[index].x,smooth(phase)),y:mix(start[index].y,end[index].y,smooth(phase))});
   const actors = base.map((_,i) => actorAt(i,t));
-  const passer = closestCarrier(base,possession,from), receiver = closestCarrier(base,possession,to);
+  const passer = closestCarrier(base,possession,from);
+  const decisionPlayers=actors.filter(p=>p.team===possession&&!p.goalkeeper).map(p=>{const card=getStarXIPlayer(p.id)??getStarXIPlayer(cup.broadcast?.opponentXI.find(q=>q.id===p.id)?.sourceId??'');return {...p,passing:card?.originalAttributes?.stats.shortPassing?.value??card?.rating??70,finishing:card?.originalAttributes?.stats.finishing?.value??card?.rating??70,control:card?.originalAttributes?.stats.ballControl?.value??70,stamina:cup.broadcast?.fitness[p.id]??100};});
+  const carrier=decisionPlayers.find(p=>p.id===passer?.id);
+  const decision=carrier?chooseBallAction(carrier,decisionPlayers,actors.filter(p=>p.team!==possession),right):undefined;
+  const receiver=closestCarrier(base,possession,to);
+  const release=decision?.kind==='pass'?.15:.2;
+  const arrival=decision?.kind==='shield'?.85:.75;
   const pi = actors.findIndex(p => p.id === passer?.id), ri = actors.findIndex(p => p.id === receiver?.id);
   let ball = {x:52.5,y:34};
   let pass:VisualPass|undefined;
   let height = 0;
-  let ballOwnerId=pi===ri||t<.2?passer?.id:t>=.75?receiver?.id:undefined;
+  let ballOwnerId=pi===ri||t<release?passer?.id:t>=arrival?receiver?.id:undefined;
   if (pi >= 0 && ri >= 0) {
-    if (pi === ri || t < .2) ball={x:actors[pi].x+(right ? .8 : -.8),y:actors[pi].y+.35};
-    else if (t < .75) {
-      const a=actorAt(pi,.2),b=actorAt(ri,.75),progress=(t-.2)/.55;
+    if (pi === ri || t < release) ball={x:actors[pi].x+(right ? .8 : -.8),y:actors[pi].y+.35};
+    else if (t < arrival) {
+      const a=actorAt(pi,release),b=actorAt(ri,arrival),progress=(t-release)/(arrival-release);
       pass={fromId:actors[pi].id,toId:actors[ri].id,progress};
       ball={x:mix(a.x+(right ? .8 : -.8),b.x+(right ? .8 : -.8),progress),y:mix(a.y+.35,b.y+.35,progress)};
       if (Math.hypot(a.x-b.x,a.y-b.y)>25 || nodeIndex === 4) height=Math.sin(progress*Math.PI)*2;
@@ -208,7 +217,7 @@ export function getVisualFrame(features: GameFeatures, wallNow: number, replay?:
     }
     status=age<lead?'Angriff · Zuspiel':shotProgress<1?'Torschuss':scored?'TOOOR!':recent.outcome==='save'?'Gehalten!':'Vorbei!';
 
-  } else if (recent?.action?.outcome && age<(replay?10:1.5)) {
+  } else if (recent?.action && (recent.action.outcome||recent.action.kind==='offside') && age<(replay?10:1.5)) {
     const scene=renderBroadcastAction(actors,recent.action,age,clubRight);
     ball=scene.ball;height=scene.height;status=scene.status;keeperDive=scene.keeperDive;ballOwnerId=scene.ballOwnerId;pass=undefined;shotFlight={fromId:recent.action.playerId,progress:clamp((age-.25)/.75,0,1)};
   } else if (recent && age<1.5) {status=recent.action?eventLabel(recent):recent.kind==="card" ? "Rote Karte" : "Spielunterbruch";}
@@ -325,6 +334,6 @@ function MatchStatistics({features,clubName}:{features:GameFeatures;clubName:str
  const c=features.cup,b=c.broadcast,a=b?.clubStats,o=b?.opponentStats;
  const goals=c.matchEvents,ownGoals=goals.filter(e=>e.side==='home'),otherGoals=goals.filter(e=>e.side==='away');
  const total=(a?.possessionSeconds??0)+(o?.possessionSeconds??0),own=total?Math.round((a!.possessionSeconds/total)*100):50;
- const rows:[string,string|number,string|number][]=[['Tore',c.homeScore,c.awayScore],['Ballbesitz',`${own}%`,`${100-own}%`],['Schüsse',(a?.shots??0)+ownGoals.length,(o?.shots??0)+otherGoals.length],['Aufs Tor',(a?.onTarget??0)+ownGoals.length,(o?.onTarget??0)+otherGoals.length],['Paraden',a?.saves??0,o?.saves??0],['Ecken',(a?.corners??0)+ownGoals.filter(e=>e.pattern==='corner').length,(o?.corners??0)+otherGoals.filter(e=>e.pattern==='corner').length],['Freistösse',(a?.freeKicks??0)+ownGoals.filter(e=>e.pattern==='free-kick').length,(o?.freeKicks??0)+otherGoals.filter(e=>e.pattern==='free-kick').length],['Gelbe Karten',a?.yellowCards??0,o?.yellowCards??0],['Rote Karten',c.cardEvents.filter(e=>e.side==='home').length,c.cardEvents.filter(e=>e.side==='away').length]];
+ const rows:[string,string|number,string|number][]=[['Tore',c.homeScore,c.awayScore],['Ballbesitz',`${own}%`,`${100-own}%`],['Schüsse',(a?.shots??0)+ownGoals.length,(o?.shots??0)+otherGoals.length],['Aufs Tor',(a?.onTarget??0)+ownGoals.length,(o?.onTarget??0)+otherGoals.length],['Paraden',a?.saves??0,o?.saves??0],['Ecken',(a?.corners??0)+ownGoals.filter(e=>e.pattern==='corner').length,(o?.corners??0)+otherGoals.filter(e=>e.pattern==='corner').length],['Freistösse',(a?.freeKicks??0)+ownGoals.filter(e=>e.pattern==='free-kick').length,(o?.freeKicks??0)+otherGoals.filter(e=>e.pattern==='free-kick').length],['Abseits',a?.offsides??0,o?.offsides??0],['Gelbe Karten',a?.yellowCards??0,o?.yellowCards??0],['Rote Karten',c.cardEvents.filter(e=>e.side==='home').length,c.cardEvents.filter(e=>e.side==='away').length]];
  return <table className="gc-match-statistics"><thead><tr><th>{clubName}</th><th>Statistik</th><th>{c.opponent}</th></tr></thead><tbody>{rows.map(([label,club,opponent])=><tr key={label}><td>{club}</td><th>{label}</th><td>{opponent}</td></tr>)}</tbody></table>;
 }

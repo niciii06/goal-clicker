@@ -105,3 +105,26 @@ passed. Tests cover boundary timestamps, reload, frozen RNG, single restart,
 legacy durations, no repeated goal, kit clash and halftime window exemption.
 React review checked effect cleanup, refs and accessibility of modified UI.
 Remaining: football decision/restart fidelity, ground audit/routing and visual QA.
+
+## Phase 5
+
+Added shared football rule helpers for release-time offside (second-last
+opponent, ball, attacking half, involvement and direct-restart exceptions),
+pressure-based ball-action decisions, goalkeeper save probabilities and restart
+origins. Broadcast counterattacks persist offside snapshots and award indirect
+free kicks at the receiver's location; these are valid substitution stoppages.
+Recorded unsuccessful shots use goalkeeper attributes. Added offside statistics,
+corner/throw/free-kick origins and frame-bounded canvas ball motion, retaining
+bounded actor acceleration and authoritative scoring.
+
+Rule reference: https://www.theifab.com/laws/latest/offside/
+
+Validation: 42/42 football/viewer/broadcast/timing tests passed, including
+mirrored offside, exceptions, keeper monotonicity, striker decision, bounded
+ball recovery, frozen delta and legacy continuous-pass regressions. Typecheck
+and production build/artifact validation passed.
+
+Architecture remains an event-driven abstract match engine. Offside snapshots
+are generated from formation-based event positions; they are not a persistent
+22-body collision simulation. The canvas never writes official outcomes.
+Remaining: venue corrections, route verification/map scroll, full QA.
