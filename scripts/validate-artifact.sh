@@ -19,11 +19,13 @@ hosting="${SITES_PROJECT_ROOT}/dist/.openai/hosting.json"
   exit 66
 }
 
-node --loader "${script_dir}/cloudflare-node-loader.mjs" --input-type=module - "${worker}" "${hosting}" <<'NODE'
+node --input-type=module - "${worker}" "${hosting}" "${script_dir}/cloudflare-node-loader.mjs" <<'NODE'
+import { register } from "node:module";
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
-const [workerPath, hostingPath] = process.argv.slice(2);
+const [workerPath, hostingPath, loaderPath] = process.argv.slice(2);
+register(pathToFileURL(loaderPath).href, import.meta.url);
 JSON.parse(await readFile(hostingPath, "utf8"));
 
 const workerUrl = pathToFileURL(workerPath);

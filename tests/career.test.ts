@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { beginSeasonCupMatch, initialGameFeatures, normalizeGameFeatures, pauseGameFeatureTimers, setBestStarXI, STAR_XI_PLAYERS, getStarXISelection, advanceCupMatch, getStarXIEffectiveMatchRating, recordSeasonModeMatch, startSeasonPrestige } from '../app/feature-data.ts';
+import { beginSeasonCupMatch, initialGameFeatures, normalizeGameFeatures, pauseGameFeatureTimers, setBestStarXI, STAR_XI_PLAYERS, getStarXISelection, advanceCupMatch, getStarXIEffectiveMatchRating, recordSeasonModeMatch, startSeasonPrestige, resumeCupMatch } from '../app/feature-data.ts';
 import { claimAlbumReward, emptyPlayerStats, getAlbumGroups, getCareerCard, getMatchRatingBreakdown, getPlayerForm, getPlayerMilestones, normalizeCareerState, prepareCareerMatch, recordCareerMatch, rivalryKey } from '../app/career-data.ts';
 import { AlbumPanel, CareerPanel, MatchRatingsPanel } from '../app/career-panels.tsx';
 
@@ -109,8 +109,9 @@ test('career, album and match panels render real populated states with accessibl
  assert.doesNotMatch(career+album+report,/NaN|undefined/);
 });
 test('real match engine completion survives normalization and generates a single report',()=>{
- const f=fixture();f.cup.homeScore=1;
- const result=advanceCupMatch(f.cup,80,f.cup.matchEndsAt,()=>.5,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions);
+ const f=fixture();
+ let result=advanceCupMatch(f.cup,80,f.cup.matchEndsAt,()=>.5,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions);
+ while(result.cup.active){const cup=result.cup.matchPaused?resumeCupMatch(result.cup,result.cup.lastTickAt):result.cup;result=advanceCupMatch(cup,80,cup.matchEndsAt,()=>.5,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions);}
  assert.equal(result.finished,true);f.cup=result.cup;
  const season=recordSeasonModeMatch(f.seasonMode,f.cup.homeScore,f.cup.awayScore,f.club.name,f.cup.matchEndsAt,()=>.5,f.cup.opponentIds[0]);
  recordCareerMatch(f,f.cup.matchEndsAt,season.entry);

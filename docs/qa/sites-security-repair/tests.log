@@ -1,0 +1,302 @@
+
+> goal-clicker@0.1.0 test
+> npm run build && node --import tsx --test tests/best-lineup.test.ts tests/game-balance.test.ts tests/career.test.ts tests/match-viewer.test.ts tests/match-broadcast.test.ts tests/live-quality.test.ts tests/interactive-match.test.ts tests/career-api.test.ts tests/journey-routing.test.ts tests/travel.test.ts tests/travel-api.test.ts tests/master-update.test.ts tests/rewards-api.test.ts tests/position-scrap.test.ts tests/scrap-fc27.test.ts && node --test tests/rendered-html.test.mjs tests/save-safety.test.mjs tests/test-mode-access.test.mjs tests/walkout-reveal.test.mjs tests/multiplayer-concurrency.test.mjs tests/click-progression.test.mjs tests/squad-drag-drop.test.mjs tests/event-restore.test.mjs tests/transfer-insider.test.mjs
+
+
+> goal-clicker@0.1.0 build
+> bash scripts/build-verified.sh
+
+Running bounded vinext build...
+
+  vinext build  (Vite 8.0.16)
+
+[1/5] analyze client references...
+[2K
+transforming...✓ 269 modules transformed.
+rendering chunks...
+✓ built in 800ms
+[2/5] analyze server references...
+[2K
+transforming...✓ 82 modules transformed.
+rendering chunks...
+✓ built in 170ms
+[3/5] build rsc environment...
+[2K
+transforming...✓ 275 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 885ms
+[4/5] build client environment...
+[2K
+transforming...✓ 90 modules transformed.
+rendering chunks...
+computing gzip size...
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 373ms
+[5/5] build ssr environment...
+[2K
+transforming...✓ 88 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 393ms
+[0m
+  Route (app)
+  ┌ ? /
+  ├ λ /api/multiplayer
+  ├ λ /api/rewards
+  └ λ /api/travel
+
+  λ API  ? Unknown
+
+  ? Some routes could not be classified. vinext currently uses static analysis
+    and cannot detect dynamic API usage (headers(), cookies(), etc.) at build time.
+    Automatic classification will be improved in a future release.
+  Build complete. Run `vinext start` to start the production server.
+
+Validated Sites artifact: ESM Worker default.fetch and hosting manifest are present.
+✔ form uses existing bounded bonus and missing data stays neutral (1.4641ms)
+✔ live context ignores old matches and prepared bonuses do not stack (0.7172ms)
+✔ whole collection produces valid stable saved assignments and safe match lock (196.6686ms)
+✔ form changes a close contested slot and secondary positions score equally (89.0136ms)
+✔ API protects career state from obsolete clients and unknown players (27.4657ms)
+✔ API album reward is persisted once and visible to both room members (19.245ms)
+✔ API kickoff snapshots form and special bonuses, tick finishes with awards and derby reward only once (250.8337ms)
+✔ API concurrent collection claims cannot pay twice (12.3416ms)
+✔ API bulk claim collects all complete groups once, including concurrent individual claims (20.2322ms)
+✔ API scrap purchases charge exactly once under concurrent requests, persist cards and reject outdated clients (16.4016ms)
+✔ API random scrap purchases allow duplicates and persist a playable team for a season game (81.6614ms)
+✔ API interactive edits validate atomically and normal completion is persisted once (705.9514ms)
+✔ legacy saves preserve the roster, trophies, counters and collected players, without inventing form (40.5182ms)
+✔ migration during an active game subtracts its live counters so its finish is counted once (18.1435ms)
+✔ rating details show actual goal/assist/conceded contributions and freeze substituted player minutes (7.0121ms)
+✔ short substitutions do not change persistent form, and form uses only five performances with bounded effects (10.2474ms)
+✔ special variants unlock at exact milestones, do not stack, and affect the next match (14.0903ms)
+✔ finish is idempotent even after JSON restoration or offline timer adjustment (20.693ms)
+✔ season awards use league games, eligibility thresholds and reset only season stats (11.3138ms)
+✔ insufficient season samples and no poor players give honest empty awards (9.527ms)
+✔ rivalries activate after close duels, then award a derby once and preserve the direct balance (22.0607ms)
+✔ album tracks sold cards and pays only validated completed groups once (22.0259ms)
+✔ career, album and match panels render real populated states with accessible controls and report details (95.7096ms)
+✔ real match engine completion survives normalization and generates a single report (66.9983ms)
+✔ offline pause retains the match rating seed and all rating explanations (9.9601ms)
+✔ derby draws and losses update the balance without a win reward (7.1881ms)
+✔ penalty shootouts settle rivalry wins but never count shootout goals as career goals (8.6192ms)
+✔ archive evicts only the oldest detail after eleven completions and keeps cumulative stats across save restoration (13.9242ms)
+✔ eight-report legacy saves retain available data and the historical panel vanishes during live play (13.4268ms)
+✔ pack odds are complete and remain intentionally conservative (1.2134ms)
+✔ pack prices and season unlocks match the current progression (0.1134ms)
+✔ pack positions follow a football squad distribution instead of source ordering (839.0101ms)
+✔ duplicates stay close to one in twenty while unseen cards remain (1614.0897ms)
+✔ duplicates always award fragments instead of goal compensation (0.5654ms)
+✔ fragment compensation rises with rating and card rarity (0.5072ms)
+✔ custom cards are only available through the fixed random 25k fragment draw (1.5492ms)
+✔ contains every tracked YB player with its FC27 rating where available (0.2794ms)
+✔ FC27 ratings cover every current base card without changing stable player IDs (2.2957ms)
+✔ FC27 primary and alternate positions cover the same official base cards (2.437ms)
+✔ late season targets keep growing instead of collapsing into ten second seasons (0.1712ms)
+✔ tournament strength really uses seventy percent squad and thirty percent tactics (1.6914ms)
+✔ tournaments draw four times as many tier-safe opponents as they have rounds (3.1617ms)
+✔ best XI chooses a full valid high-rated lineup without duplicate players (51.6204ms)
+✔ best XI bench only contains players who fit the active formation (38.8911ms)
+✔ best XI bench spreads available players across the active roles (33.2613ms)
+✔ best XI bench mirrors a back three without overloading the number ten role (42.2454ms)
+✔ best XI bench keeps at most one dedicated goalkeeper (32.7391ms)
+✔ complete tournament wins award the exact three-minute goal boosts (0.2243ms)
+✔ tournament rounds and trophies no longer award direct goals (6.4678ms)
+✔ a won tournament round pauses before the next manual kickoff (4.6936ms)
+✔ a completed tournament blocks a new run for exactly five minutes (4.321ms)
+✔ manual tournament rounds never reuse the previous opponent after restore (11.9136ms)
+✔ season mode advances by table matches and resets after ten fixtures (5.3155ms)
+✔ season fixtures use the live cup state and record the real final score (35.4504ms)
+✔ Hall of Fame prestige starts a fresh table without losing the record (0.2916ms)
+✔ a red card removes the player and blocks the next round until replacement (68.1945ms)
+✔ a live injury pauses the match and a replacement resumes it (42.6005ms)
+✔ substitutions update both live OVR and match momentum (4.7348ms)
+✔ goal boosts multiply only the active part of passive production (0.2892ms)
+✔ a closed game pauses the remaining tournament boost (0.6632ms)
+✔ match form is stable, gradual and goals improve it (1.9393ms)
+✔ bench players have no live form until they enter the match (0.4655ms)
+✔ AZB upgrades ignore overflowed prices while multiplier caps remain (0.326ms)
+✔ drag-style squad moves swap starters, bench and reserve without losing players (1.1046ms)
+✔ transfer insider timing and outcome probabilities stay exact (153.439ms)
+✔ Romario waits through a live match but can move a player after its final whistle (103.226ms)
+✔ every completed tournament starts a five-minute Deadline Day and publishes a Gazette (72.0504ms)
+✔ pack trolls stay rare and only target real walkout cards (0.305ms)
+✔ a loaned squad player disappears for one whole tournament and then returns (52.8964ms)
+✔ a transfer from the bench leaves a manual vacancy until a reserve is selected (46.8678ms)
+✔ sales pay the card value sixty percent of the time and can be free (86.8648ms)
+✔ failed Fabrizio Romario reports never repeat the previous reason (51.805ms)
+✔ VAR keeps its exact timing, probability and payout rules (16.8034ms)
+✔ Johhny Elefantino remains a one-percent random-event risk (0.2737ms)
+Interactive 100-match batch {"goals":300,"meanGoals":3,"draws":14,"zeros":4,"shots":1075,"onTarget":703,"scorelines":25,"endingActionKinds":["pass","interception","tackle","carry","shot","restart","yellow","red","cross","injury"]}
+Paired strength batch (300 matches) [{"pair":[90,90],"forGoals":115,"against":97,"wins":44,"draws":25,"zeros":8,"shots":995},{"pair":[90,65],"forGoals":180,"against":35,"wins":74,"draws":21,"zeros":11,"shots":1025},{"pair":[65,90],"forGoals":52,"against":158,"wins":15,"draws":20,"zeros":10,"shots":958}]
+✔ 100 complete matches: valid actors, score/event parity, variation, bounds and statistics (8311.4438ms)
+✔ seed/checkpoint replay: normal, headless, different step sizes and renderer agree (18599.3045ms)
+✔ speculation never changes score/statistics or leaks goals into the UI (30.8834ms)
+✔ reload checkpoint, editing pause, hidden tab and halftime preserve progress (188.7597ms)
+✔ atomic multiple substitutions, cancellation and tactical invalidation (75.9164ms)
+✔ completion/retries and career finalization are idempotent (72.298ms)
+✔ legacy running matches retain their engine and timing (31.6461ms)
+✔ paired strength scenarios favour better squads in both directions (16073.2315ms)
+✔ a two-second stalled frame resumes smoothly instead of skipping 30 game seconds (0.9928ms)
+✔ sparse authoritative updates keep ticker minutes consecutive and never rewind (1.0645ms)
+✔ committed action history survives normalization for continuous delayed playback (38.4074ms)
+✔ live match controls contain no quick simulation control (28.6431ms)
+✔ ordinary 15/30/60 FPS keeps the same displayed match time (0.5014ms)
+✔ independent renderer interpolates the same prepared actions without mutating the match (27.0145ms)
+Worker stall test: 24 frames drawn while main thread was blocked for 1.1 seconds
+✔ worker drawing continues through a real one-second main-thread stall (1301.8113ms)
+✔ universal acceleration preserves a 48:1 ratio and has no tier cap (4.1822ms)
+✔ Sydney itinerary contains real airport anchors, connecting flight, overhead and final bus (1.4216ms)
+✔ local games use bus only and Barcelona has ground transfers (0.6309ms)
+✔ timeline waits at transfer hubs, follows segment duration, reloads and settles once (3.755ms)
+✔ legacy active trip keeps its timestamp and receives no longer replacement plan (0.2668ms)
+✔ distance interpolation handles uneven vertices and the international date line (0.1432ms)
+✔ malformed route plans cannot become active save data (0.6849ms)
+✔ unsupported ground geometry stays explicitly approximate with independent estimated duration (0.3049ms)
+✔ cached Bern roads have bends and retained endpoint coordinates (0.426ms)
+900 balance simulations: [{"rating":65,"wins":69,"goals":321,"against":584},{"rating":75,"wins":131,"goals":495,"against":439},{"rating":85,"wins":190,"goals":654,"against":298}]
+✔ kickoff keeps both formations in their own half with only the taker at centre (1027.0208ms)
+✔ legacy match timing compresses open play along with its match clock (35.1226ms)
+✔ new shot events do not teleport player bodies; paused steps remain frozen (37.3662ms)
+✔ explicit assists survive reload and the score waits for ball arrival (72.5607ms)
+✔ penalties and rebounds do not infer assists (41.2591ms)
+✔ confirmation rejects ineligible bench players, spent limits and red-card slots (41.704ms)
+✔ sequential action identifiers cover the random distribution (4.252ms)
+✔ 900 balance simulations favour stronger teams but retain underdog wins (555.1153ms)
+reward-1: mean 59.286, counts 60067,29966,8916,1051
+reward-2: mean 66.185, counts 25011,45014,24931,4558,486
+reward-3: mean 73.743, counts 4930,19935,55215,17912,1901,107
+reward-4: mean 78.711, counts 5037,40019,47825,6619,500
+reward-5: mean 81.796, counts 20274,54864,22912,1950
+reward-6: mean 83.997, counts 4963,50020,39979,5038
+✔ 75 distinct opponents populate exactly fifteen six-team leagues, local to international (6.2781ms)
+✔ full ten-match round robin has balanced return fixtures and every pair meets twice (70.232ms)
+✔ legacy active standings, completed results, players and travel snapshots survive repeated normalization (56.699ms)
+✔ fifteen unchanged tiers, geographic classification, deterministic duration, zero home wait (63.7228ms)
+✔ events exclude collection reserves, sold, loaned and unavailable players; update after squad edits (29.8623ms)
+✔ six reward distributions total100%, simulations match configured chances and increasing means (6285.0146ms)
+✔ completion and reward openings persist exactly once, replay gives separate valid rewards (54.9093ms)
+✔ match stores actual home-away venue while internal scores retain club ownership semantics (28.0876ms)
+✔ opponent game XI has eleven unique real card identities and eligible primary or secondary positions (91.3682ms)
+✔ authoritative added actions and their statistics survive JSON roundtrip and replaying the same tick is idempotent (70.1957ms)
+✔ broadcast uses no match RNG, rendering and replays cannot fabricate goals or mutate state (63.5653ms)
+✔ fitness is saved, decreases by role and workload, stays frozen when paused and is independent of tick cadence (61.0763ms)
+✔ a substitution keeps historic slot identity and gives the incoming player 100 fitness (43.8209ms)
+✔ corner, free-kick and normal shot animations never enter the goal for unsuccessful outcomes (354.3667ms)
+✔ future added action events are hidden from both live pitch and chronological highlight presentation (44.1441ms)
+✔ all planned goal types are valid saved metadata and normalize without altering official scores (41.8671ms)
+✔ motion has bounded acceleration and speeds, removes departed actors and never modifies authoritative state (57.7404ms)
+✔ compact viewer exposes three tabs, canvas, cameras and one substitution entry point (40.2612ms)
+✔ pitch geometry draws both goals, penalty areas and centre circle through a canvas context (0.3967ms)
+✔ malformed broadcasts fail closed without breaking legacy saves (36.7704ms)
+✔ new regular fixture has six real minutes and a synchronized 90-minute clock (3.5012ms)
+✔ saved three-minute fixture keeps its old match clock and event calibration (0.6867ms)
+✔ visual match events come exclusively from recorded authoritative goal, card and penalty events (1.4327ms)
+✔ all formation slots render one unique actor with valid bounded coordinates and goalkeeper at own goal (1072.9108ms)
+✔ both home and away identities switch sides at 45, 90 and 105 minutes (0.1709ms)
+✔ missed penalties stay outside the goal and saved penalties end at the goalkeeper (101.1949ms)
+✔ injury and red card remove players while replay before their exit reconstructs the original eleven (28.5475ms)
+✔ continuous passes, deterministic refresh and bounded movement throughout normal play (1013.0037ms)
+✔ paused clock and pitch freeze, future authoritative events stay hidden, replays cannot mutate game state (38.5201ms)
+✔ six-minute career report records 90 minutes, extra time records 120, short substitutes do not gain 30 phantom minutes (81.3368ms)
+✔ fractional tick cadence preserves whole simulation seconds instead of losing time every poll (40.9877ms)
+✔ viewer renders accessible pitch and correct home scoreboard after normalization without restarting a saved game (61.9311ms)
+✔ injury resume retains match minute, remaining duration, fitness and recorded scenes without catching up paused time (90.2984ms)
+✔ every primary position receives increasing realistic goals with unchanged nonstacking rewards (7.8826ms)
+✔ multi-position categories stay fixed across match slots, saved reloads and changed primary position (0.3684ms)
+✔ legacy migration preserves exact stats, earned old entitlements and claimed rewards without new goalkeeper scorer unlocks (0.4782ms)
+✔ bulk album claim preserves previous claims and pays all newly completed groups exactly once (107.063ms)
+✔ solo reward concurrency, lost responses and retries return one immutable server draw (25.7479ms)
+✔ solo reward validates owner, missing entitlement and active game, keeps failed attempts retryable (2.9879ms)
+✔ shared pack consumption gives one card/compensation under simultaneous different members (45.3501ms)
+✔ reward tiers cannot be purchased for zero currency through regular shop action (2.431ms)
+✔ server tournament victory grants pack once, keeps trophy, gazette, cooldown and no new multiplier (66.5628ms)
+DROP-RATE RESULT {"n":100000,"groups":[50167,34892,12958,1983],"percent":[50.166999999999994,34.892,12.958,1.983],"chiSquare":216.95683098901102}
+✔ complete official source: all IDs, original ratings, names, positions, attributes and unique catalogue entries (10.6452ms)
+✔ 100000 production draws match group rates and uniform player rates with duplicates independent of ownership (425.7596ms)
+✔ every player is reachable at deterministic group/player quantiles; empty groups redistribute proportionally (14.311ms)
+✔ all new cards survive saves, play original positions, receive milestones/upgrades and count in collections (344.5714ms)
+✔ public pack metadata shows rating odds without the nationality restriction; other pack pools, prices and definitions remain unchanged (204.8145ms)
+✔ server home match starts immediately at Bümplizstrasse 45 and no journey (92.1772ms)
+✔ shared server full departure → arrival → manual match start, duplicate clicks and alternate session (196.9922ms)
+✔ server cannot bypass journey using alternative season action or another competition (65.2961ms)
+✔ server revalidates red cards after arrival, preserves readiness for corrected lineup (50.0206ms)
+✔ tournament away destination matches persisted opponent schedule and retains cooldown rules (103.8171ms)
+✔ solo server timestamps reject fabricated arrival and local clock, reopens same receipt (35.8456ms)
+✔ unregistered shared player and incomplete solo lineup cannot depart (22.3143ms)
+✔ server season alternates home/away across all ten matchdays (640.5938ms)
+✔ 15 existing divisions cover ten monotonic regions, Bern to worldwide (2.0913ms)
+✔ all tournament opponents have explicit geographical anchors (0.7282ms)
+✔ season alternates home and away every matchday and faces each opponent at both venues (69.1008ms)
+✔ away gate persists once, survives reload, waits for manual start and cannot be bypassed (57.3712ms)
+✔ home game has no journey, old active matches and saves retain all data (37.0485ms)
+✔ duration calculation uses uncapped door-to-door timing and selects transport correctly (65.7131ms)
+✔ event progress is continuous, monotonic and countdown follows adjustments (34.3621ms)
+✔ random events occur around 50 percent and never mutate football state (47.8594ms)
+✔ trip statistics count arrival once and survive refresh (29.0215ms)
+✔ tournament plan is stable, real opponent matches travelled destination and next rounds alternate (29.1836ms)
+✔ lineup, cooldown, red card and active match validation remain enforced (27.8585ms)
+✔ map, controls, event area, arrival and manual-start button render in German (48.9001ms)
+✔ flight geometry follows great circle and ends at the correct stadium (0.4136ms)
+ℹ tests 174
+ℹ suites 0
+ℹ pass 174
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 48271.0272
+✔ singleplayer and multiplayer share the complete click progression (3.8477ms)
+✔ holding Enter or Space cannot repeat ball clicks (2.048ms)
+✔ restored VAR and special events are presented without applying rewards again (4.1872ms)
+✔ restored cooperative events are not cleared after presentation (1.448ms)
+✔ multiplayer state writes use a monotonic revision and retry stale actions (4.1465ms)
+✔ live tournament ticks yield to foreground upgrade purchases (2.287ms)
+✔ singleplayer and multiplayer tournaments never add direct goal rewards (1.3842ms)
+✔ tournament cooldown stays server-safe while season matches share the game picker (2.0744ms)
+✔ minimised multiplayer sessions receive a long passive grace period (0.8821ms)
+✔ multiplayer rooms preserve old slots and accept four players (0.923ms)
+✔ renders production HTML without development preview metadata (223.974ms)
+✔ loads the strongest valid save instead of an empty primary save (0.9001ms)
+✔ keeps a progressed primary save when a new render tries to write zero (0.1657ms)
+✔ accepts normal progress and purchases without comparing the spendable balance (0.1208ms)
+✔ uses the newest valid snapshot when progress is otherwise identical (0.1224ms)
+✔ squad drag and drop keeps click controls, positions and multiplayer actions (4.415ms)
+✔ AZB bypasses season locks without changing normal progression (0.5738ms)
+✔ AZB upgrade purchases bypass overflowed prices in client and multiplayer (4.8358ms)
+✔ new AZB redemptions are disabled without removing existing test rooms (0.9142ms)
+✔ client and multiplayer server apply AZB to every season gated category (1.3185ms)
+✔ lobby code history stays hidden while duplicate codes remain blocked (1.2417ms)
+✔ season mode uses the live match flow and table results instead of goal targets (1.8336ms)
+✔ season match results use an inline expandable standings panel (1.66ms)
+✔ purchase surfaces always show full prices instead of missing amounts (1.7122ms)
+✔ progress surfaces show full targets instead of remaining amounts (1.4587ms)
+✔ Fabrizio Romario transfer events are wired through singleplayer and coop (4.9276ms)
+✔ loaned players disappear from every squad list without looking suspended (2.1668ms)
+✔ Fabrizio stays available while the player transfer market is closed (1.5404ms)
+✔ failed deals have a large pool of funny non-repeating reasons (0.9672ms)
+✔ walkout avatar renders the revealed player without crashing (4.125ms)
+✔ walkout keeps only the fireworks and confetti effects (2.4591ms)
+✔ walkout continue action unlocks when the visible animation finishes (1.3488ms)
+✔ every Icon and current 86+ base card has a fixed appearance (3.7202ms)
+✔ walkout uses real SVG flags and shortens GOAT Nicu positions (0.8969ms)
+✔ Flurin Fabrice is a 69-rated card with a slim fixed walkout appearance independent of clothing (1.3897ms)
+✔ Champ Simu keeps a slim long-haired walkout appearance independent of clothing (0.7171ms)
+✔ Mätthu matches Nedu's strong walkout appearance except for being bald (1.1389ms)
+✔ Silvuz is a fixed Swiss 100-rated pack player with the SILVAN lobby code (1.7177ms)
+✔ Mikeboy Jr. is a Swiss 67-rated legendary centre-back with a fixed walkout (1.3035ms)
+✔ Nedu Mann Yesss is a Bosnian legendary 100-rated ZM and ZDM pack player (2.1903ms)
+✔ Di Santo is a Dutch 100-rated ST whose walkout borrows only the body (0.9414ms)
+ℹ tests 41
+ℹ suites 0
+ℹ pass 41
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4634.5942

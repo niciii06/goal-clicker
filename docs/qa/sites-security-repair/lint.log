@@ -1,0 +1,54 @@
+
+> goal-clicker@0.1.0 lint
+> bash scripts/sites-env.sh -- eslint .
+
+
+C:\Users\nicol\.codex\.chatgpt-projects\g-p-6a7aca5dd7548191b3244ebbcc607f45\goal-clicker-sites\app\api\multiplayer\route.ts
+  7:574   warning  'getTournamentGoalBoostMultiplier' is defined but never used  @typescript-eslint/no-unused-vars
+  7:663   warning  'getRewardPackOdds' is defined but never used                 @typescript-eslint/no-unused-vars
+  7:1084  warning  'startTournamentGoalBoost' is defined but never used          @typescript-eslint/no-unused-vars
+
+C:\Users\nicol\.codex\.chatgpt-projects\g-p-6a7aca5dd7548191b3244ebbcc607f45\goal-clicker-sites\app\feature-data.ts
+     1:30  warning  'invalidateInteractive' is defined but never used        @typescript-eslint/no-unused-vars
+  2009:92  warning  'formationPositions' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  2408:9   warning  'opponent' is assigned a value but never used            @typescript-eslint/no-unused-vars
+  2612:9   warning  'opponent' is assigned a value but never used            @typescript-eslint/no-unused-vars
+
+C:\Users\nicol\.codex\.chatgpt-projects\g-p-6a7aca5dd7548191b3244ebbcc607f45\goal-clicker-sites\app\match-broadcast.ts
+  1:54  warning  'getStarFormation' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\nicol\.codex\.chatgpt-projects\g-p-6a7aca5dd7548191b3244ebbcc607f45\goal-clicker-sites\app\page.tsx
+   6:96    warning  'REGION_LABELS' is defined but never used             @typescript-eslint/no-unused-vars
+   8:10    warning  'regionForDivision' is defined but never used         @typescript-eslint/no-unused-vars
+  17:1213  warning  'startTournamentGoalBoost' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\nicol\.codex\.chatgpt-projects\g-p-6a7aca5dd7548191b3244ebbcc607f45\goal-clicker-sites\app\travel-data.ts
+  3:104  warning  'HOME_ADDRESS' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\nicol\.codex\.chatgpt-projects\g-p-6a7aca5dd7548191b3244ebbcc607f45\goal-clicker-sites\tests\match-viewer.test.ts
+  45:96  warning  'getStarXIPlayer' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\nicol\.codex\.chatgpt-projects\g-p-6a7aca5dd7548191b3244ebbcc607f45\goal-clicker-sites\tests\position-scrap.test.ts
+  3:10   warning  'readFileSync' is defined but never used            @typescript-eslint/no-unused-vars
+  4:10   warning  'runInNewContext' is defined but never used         @typescript-eslint/no-unused-vars
+  5:8    warning  'ts' is defined but never used                      @typescript-eslint/no-unused-vars
+  6:10   warning  'SCRAP_PLAYERS' is defined but never used           @typescript-eslint/no-unused-vars
+  6:25   warning  'STAR_FORMATIONS' is defined but never used         @typescript-eslint/no-unused-vars
+  6:42   warning  'STAR_PACKS' is defined but never used              @typescript-eslint/no-unused-vars
+  6:71   warning  'addStarXIPlayer' is defined but never used         @typescript-eslint/no-unused-vars
+  6:88   warning  'beginSeasonCupMatch' is defined but never used     @typescript-eslint/no-unused-vars
+  6:109  warning  'beginCupMatch' is defined but never used           @typescript-eslint/no-unused-vars
+  6:124  warning  'advanceCupMatch' is defined but never used         @typescript-eslint/no-unused-vars
+  6:141  warning  'getBestStarXISelection' is defined but never used  @typescript-eslint/no-unused-vars
+  6:165  warning  'getStarXISelection' is defined but never used      @typescript-eslint/no-unused-vars
+  6:185  warning  'getStarXIRating' is defined but never used         @typescript-eslint/no-unused-vars
+  6:202  warning  'getTransferBonuses' is defined but never used      @typescript-eslint/no-unused-vars
+  6:266  warning  'openStarPack' is defined but never used            @typescript-eslint/no-unused-vars
+  6:280  warning  'setBestStarXI' is defined but never used           @typescript-eslint/no-unused-vars
+  6:295  warning  'setStarXIBenchPlayer' is defined but never used    @typescript-eslint/no-unused-vars
+  6:317  warning  'shouldTriggerPackTroll' is defined but never used  @typescript-eslint/no-unused-vars
+  8:10   warning  'getPackUnlockSeason' is defined but never used     @typescript-eslint/no-unused-vars
+  8:31   warning  'getUpgradeUnlockSeason' is defined but never used  @typescript-eslint/no-unused-vars
+  9:10   warning  'random' is defined but never used                  @typescript-eslint/no-unused-vars
+
+✖ 34 problems (0 errors, 34 warnings)

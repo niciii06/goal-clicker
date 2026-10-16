@@ -1,14 +1,3 @@
-# Goal Clicker
-
-Aktueller Spielcode mit Spielerpool, Saisons, Walkouts und Multiplayer.
-
-**Manuell bearbeiten und extern hosten:** [HOSTING.md](HOSTING.md).
-
-Die externe Cloudflare Konfiguration ist `wrangler.external.json`. Laufende
-Datenbankinhalte und Browser Spielstände sind separat zu übernehmen.
-
-## Ursprüngliche Sites Dokumentation
-
 # vinext-starter
 
 A clean full-stack starter running on
@@ -117,3 +106,7 @@ The timeout defaults can be overridden for a controlled canary with `SITES_INSTA
 
 - [vinext Documentation](https://github.com/cloudflare/vinext)
 - [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+
+## Aktuelle Sites Reparatur
+
+Die Konfigurationskorrekturen, Sicherheitsupdates und Prüfergebnisse der bestehenden Sites Fassung sind in [Sites Konfigurationsreparatur und Sicherheitsupdates](docs/sites-security-repair.md) dokumentiert.

@@ -6,6 +6,9 @@ import { createMatchBroadcast } from './match-broadcast';
 import type { BroadcastKind, BroadcastEvent } from './match-broadcast';
 import { goalLabel, goalAssistId } from './match-goals';
 import { MatchSubstitutions } from './match-substitutions';
+import { interactiveFrame } from "./interactive-match";
+import { InteractiveMatchPanel } from "./interactive-match-panel";
+import type { InteractivePanelProps } from "./interactive-match-panel";
 import { MatchPitchCanvas } from './match-pitch-canvas';
 import type { CupState, GameFeatures, StarPosition } from "./feature-data";
 
@@ -34,7 +37,8 @@ function renderBroadcastAction(actors:Actor[],event:BroadcastEvent,age:number,cl
  const taker=actors.find(p=>p.id===event.playerId)??actors.find(p=>p.team===event.side&&!p.goalkeeper);
  const keeper=actors.find(p=>p.team!==event.side&&p.goalkeeper);
  const origin={x:taker?.x??52.5,y:taker?.y??34};
- let ball={...origin},height=0,status=eventLabel({...event,action:event}),keeperDive:string|undefined,ballOwnerId=taker?.id;
+ const height=0;
+ let ball={...origin},status=eventLabel({...event,action:event}),keeperDive:string|undefined,ballOwnerId=taker?.id;
  if(event.outcome){
   const finish={x:right?(event.outcome==='save'?102:event.outcome==='blocked'?Math.min(96,origin.x+9):108):(event.outcome==='save'?3:event.outcome==='blocked'?Math.max(9,origin.x-9):-3),y:event.outcome==='wide'?24:30.8+event.seed*6};
   const t=clamp((age-.25)/.75,0,1);ball={x:mix(origin.x,finish.x,t),y:mix(origin.y,finish.y,t)};ballOwnerId=t===0?taker?.id:undefined;
@@ -151,7 +155,7 @@ function openPlay(features:GameFeatures,at:number,minute:number,clubRight:boolea
   let ball = {x:52.5,y:34};
   let pass:VisualPass|undefined;
   let height = 0;
-  let ballOwnerId=pi===ri||t<.2?passer?.id:t>=.75?receiver?.id:undefined;
+  const ballOwnerId=pi===ri||t<.2?passer?.id:t>=.75?receiver?.id:undefined;
   if (pi >= 0 && ri >= 0) {
     if (pi === ri || t < .2) ball={x:actors[pi].x+(right ? .8 : -.8),y:actors[pi].y+.35};
     else if (t < .75) {
@@ -165,6 +169,12 @@ function openPlay(features:GameFeatures,at:number,minute:number,clubRight:boolea
 }
 export function getVisualFrame(features: GameFeatures, wallNow: number, replay?: Replay) {
   const cup = features.cup;
+  if(cup.simulation && cup.phase!=='penalties' && !replay){
+    const f=interactiveFrame(cup,wallNow),recent=getViewerEvents(cup).filter(e=>e.at<=cup.lastTickAt).at(-1);
+    const a=f.action,travelling=a&&['pass','cross','shot','interception','restart'].includes(a.kind);
+    const actors:Actor[]=f.players.map(p=>({id:p.id,label:p.name,shirt:String(p.number),team:p.side,role:p.role,x:p.x,y:p.y,goalkeeper:p.role==='TW',rating:getCupPlayerMatchRating(cup,p.id,Math.max(1,Math.ceil(f.time/60)))}));
+    return {actors,ball:f.ball,height:a?.kind==='cross'?Math.sin(f.progress*Math.PI)*2:0,minute:Math.max(1,Math.min(120,Math.ceil(f.time/60))),status:cup.matchPaused?'Pausiert':a?.kind==='shot'?'Torschuss':a?.kind==='restart'?'Anspiel':a?.kind==='carry'?'Dribbling':'Spielaufbau',recent,age:recent?(wallNow-recent.at)/1000:Infinity,keeperDive:undefined,ballOwnerId:travelling?undefined:a?.actor,pass:undefined,shotFlight:undefined};
+  }
   const at = cup.matchPaused || !cup.active ? cup.lastTickAt : Math.min(wallNow,cup.matchEndsAt);
   const minute = replay ? replay.event.minute : getCupMatchMinute(cup,at);
   const clubRight = clubAttacksRight(minute,Boolean(cup.fixture?.away));
@@ -222,7 +232,7 @@ export function getVisualFrame(features: GameFeatures, wallNow: number, replay?:
   return {actors,ball,height,minute,status,recent,age,keeperDive,ballOwnerId,pass,shotFlight};
 }
 
-export function LiveMatchViewer({ features, now, clubName, clubColor, disabled=false, onTactic, onSubstitute }: { features: GameFeatures; now: number; clubName: string; clubColor: string; disabled?:boolean; onTactic?:(id:GameFeatures["cup"]["strategyId"])=>void; onSubstitute?:(id:string,slot:number)=>void }) {
+export function LegacyLiveMatchViewer({ features, now, clubName, clubColor, disabled=false, onTactic, onSubstitute }: { features: GameFeatures; now: number; clubName: string; clubColor: string; disabled?:boolean; onTactic?:(id:GameFeatures["cup"]["strategyId"])=>void; onSubstitute?:(id:string,slot:number)=>void }) {
   const [tab, setTab] = useState<Phase>("live");
   const [clock, setClock] = useState(now);
   const [replay, setReplay] = useState<Replay>();
@@ -307,10 +317,13 @@ export function LiveMatchViewer({ features, now, clubName, clubColor, disabled=f
   </section>;
 }
 
-function MatchStatistics({features,clubName}:{features:GameFeatures;clubName:string}) {
+export function MatchStatistics({features,clubName}:{features:GameFeatures;clubName:string}) {
  const c=features.cup,b=c.broadcast,a=b?.clubStats,o=b?.opponentStats;
  const goals=c.matchEvents,ownGoals=goals.filter(e=>e.side==='home'),otherGoals=goals.filter(e=>e.side==='away');
  const total=(a?.possessionSeconds??0)+(o?.possessionSeconds??0),own=total?Math.round((a!.possessionSeconds/total)*100):50;
- const rows:[string,string|number,string|number][]=[['Tore',c.homeScore,c.awayScore],['Ballbesitz',`${own}%`,`${100-own}%`],['Schüsse',(a?.shots??0)+ownGoals.length,(o?.shots??0)+otherGoals.length],['Aufs Tor',(a?.onTarget??0)+ownGoals.length,(o?.onTarget??0)+otherGoals.length],['Paraden',a?.saves??0,o?.saves??0],['Ecken',(a?.corners??0)+ownGoals.filter(e=>e.pattern==='corner').length,(o?.corners??0)+otherGoals.filter(e=>e.pattern==='corner').length],['Freistösse',(a?.freeKicks??0)+ownGoals.filter(e=>e.pattern==='free-kick').length,(o?.freeKicks??0)+otherGoals.filter(e=>e.pattern==='free-kick').length],['Gelbe Karten',a?.yellowCards??0,o?.yellowCards??0],['Rote Karten',c.cardEvents.filter(e=>e.side==='home').length,c.cardEvents.filter(e=>e.side==='away').length]];
+ const extra=c.simulation?0:1;
+ const rows:[string,string|number,string|number][]=[['Tore',c.homeScore,c.awayScore],['Ballbesitz',`${own}%`,`${100-own}%`],['Schüsse',(a?.shots??0)+ownGoals.length*extra,(o?.shots??0)+otherGoals.length*extra],['Aufs Tor',(a?.onTarget??0)+ownGoals.length*extra,(o?.onTarget??0)+otherGoals.length*extra],['Paraden',a?.saves??0,o?.saves??0],['Ecken',(a?.corners??0)+ownGoals.filter(e=>e.pattern==='corner').length,(o?.corners??0)+otherGoals.filter(e=>e.pattern==='corner').length],['Freistösse',(a?.freeKicks??0)+ownGoals.filter(e=>e.pattern==='free-kick').length,(o?.freeKicks??0)+otherGoals.filter(e=>e.pattern==='free-kick').length],['Gelbe Karten',a?.yellowCards??0,o?.yellowCards??0],['Rote Karten',c.cardEvents.filter(e=>e.side==='home').length,c.cardEvents.filter(e=>e.side==='away').length]];
  return <table className="gc-match-statistics"><thead><tr><th>{clubName}</th><th>Statistik</th><th>{c.opponent}</th></tr></thead><tbody>{rows.map(([label,club,opponent])=><tr key={label}><td>{club}</td><th>{label}</th><td>{opponent}</td></tr>)}</tbody></table>;
 }
+
+export function LiveMatchViewer(props:InteractivePanelProps & {onTactic?:(id:GameFeatures['cup']['strategyId'])=>void;onSubstitute?:(id:string,slot:number)=>void}){return props.features.cup.simulation?<InteractiveMatchPanel {...props}/>:<LegacyLiveMatchViewer {...props}/>;}

@@ -24,7 +24,7 @@ export MINIFLARE_REGISTRY_PATH="${runtime_root}/wrangler/registry"
 # seed separate and make this project's writable cache authoritative.
 unset NPM_CONFIG_CACHE npm_config_cache || true
 export npm_config_cache="${runtime_root}/npm-cache"
-export npm_config_audit=false
+export npm_config_audit=true
 export npm_config_fund=false
 export npm_config_update_notifier=false
 

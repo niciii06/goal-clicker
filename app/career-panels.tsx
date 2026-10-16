@@ -1,5 +1,6 @@
 'use client';
 
+import { goalLabel } from './match-goals';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { getStarXIPlayer, getStarXIPositions, getUnavailableStarXIPlayerIds, STAR_POSITIONS, STAR_XI_PLAYERS } from './feature-data';
@@ -98,6 +99,8 @@ export function PostMatchSummary({features,onCareer,onContinue}:{features:GameFe
   const rewards=features.history.filter(e=>e.timestamp>= (report?.createdAt??c.lastTickAt)-1000 && /prämie|freigeschaltet|gewonnen|aufstieg|turnieraus|derby/i.test(e.title)).slice(-6);
   return <section className="post-match-summary" aria-label="Matchabschluss"><p className="eyebrow">ABPFIFF · {report?.competition??(c.mode==='season'?'SAISON':'TURNIER')}</p><div className="summary-score"><strong>{away?c.opponent:features.club.name}</strong><b>{away?c.awayScore:c.homeScore} : {away?c.homeScore:c.awayScore}</b><strong>{away?features.club.name:c.opponent}</strong></div>
   <p>{c.lastResult}{c.penaltyEvents.length>0&&` · Elfmeterschiessen ${c.penaltyHomeScore}:${c.penaltyAwayScore}`}</p>
+  {c.simulation&&<div className="summary-match-stats"><span>Schüsse: {c.broadcast?.clubStats.shots??0} : {c.broadcast?.opponentStats.shots??0}</span><span>Aufs Tor: {c.broadcast?.clubStats.onTarget??0} : {c.broadcast?.opponentStats.onTarget??0}</span></div>}
+  {c.matchEvents.length>0&&<div className="summary-goals">{c.matchEvents.map(e=><span key={e.id}>{goalLabel(e)}</span>)}</div>}
   <div className="summary-performances">{top.map(p=><span key={p.playerId}><strong>{name(p.playerId)}{report?.motmId===p.playerId?' ★':''}</strong><b>{p.rating.toFixed(1)}</b><small>{p.goals} Tore · {p.assists} Vorlagen</small></span>)}</div>
   {report?.events?.length ? <details><summary>Tore und wichtige Ereignisse</summary><ol className="archive-events">{report.events.map(e=><li key={e.id}>{e.minute}′ · {e.label}</li>)}</ol></details> : null}
   {rewards.length>0&&<details><summary>Prämien und Karrierefortschritt</summary>{rewards.map(e=><p key={e.id}><strong>{e.title}</strong> · {e.detail}</p>)}</details>}
