@@ -25,7 +25,14 @@ export const STATIONS: Record<string,Hub> = {
  sion:{id:'rail-sion',name:'Bahnhof Sion',lat:46.228,lon:7.359},
  thun:{id:'rail-thun',name:'Bahnhof Thun',lat:46.755,lon:7.63},
  biel:{id:'rail-biel',name:'Bahnhof Biel',lat:47.132,lon:7.243},
+ chur:{id:'rail-chur',name:'Bahnhof Chur',lat:46.8532,lon:9.5288},
+ milano:{id:'rail-milano',name:'Milano Centrale',lat:45.4862,lon:9.2045},
+ paris:{id:'rail-paris',name:'Paris Gare de Lyon',lat:48.8443,lon:2.3743},
 };
+// Typical scheduled travel time from Bern in minutes, rounded from the SBB/SNCF timetable
+// including one change where needed. Not a live timetable; geometry comes from the rail cache.
+const RAIL_MINUTES_FROM_BERN: Record<string,number> = {'rail-zurich':56,'rail-basel':55,'rail-luzern':60,'rail-lausanne':66,'rail-geneva':105,'rail-stgallen':125,'rail-winterthur':78,'rail-sion':87,'rail-thun':19,'rail-biel':26,'rail-lugano':165,'rail-chur':135,'rail-milano':176,'rail-paris':245};
+const RAIL_SERVICE: Record<string,string> = {'rail-milano':'EuroCity','rail-paris':'TGV Lyria'};
 export const AIRPORTS: Record<string,Hub> = {
  ZRH:{id:'airport-ZRH',name:'Zürich Flughafen (ZRH)',lat:47.458,lon:8.555},
  GVA:{id:'airport-GVA',name:'Genève Aéroport (GVA)',lat:46.238,lon:6.109},
@@ -47,8 +54,14 @@ export const AIRPORTS: Record<string,Hub> = {
  GIG:{id:'airport-GIG',name:'Rio Galeão (GIG)',lat:-22.81,lon:-43.25},
  SIN:{id:'airport-SIN',name:'Singapore Changi (SIN)',lat:1.364,lon:103.992},
  SYD:{id:'airport-SYD',name:'Sydney Airport (SYD)',lat:-33.94,lon:151.175},
+ NCE:{id:'airport-NCE',name:'Nice Côte d’Azur (NCE)',lat:43.6584,lon:7.2159},
+ CGN:{id:'airport-CGN',name:'Köln/Bonn Flughafen (CGN)',lat:50.8659,lon:7.1427},
+ DTM:{id:'airport-DTM',name:'Dortmund Flughafen (DTM)',lat:51.5183,lon:7.6122},
+ EIN:{id:'airport-EIN',name:'Eindhoven Airport (EIN)',lat:51.4501,lon:5.3745},
+ LEJ:{id:'airport-LEJ',name:'Leipzig/Halle Flughafen (LEJ)',lat:51.4239,lon:12.2364},
+ TRN:{id:'airport-TRN',name:'Torino Caselle (TRN)',lat:45.2008,lon:7.6497},
 };
-const AIRPORT_FOR_VENUE: Record<string,string> = {barcelona:'BCN',madrid:'MAD',atletico:'MAD',london:'LHR',chelsea:'LHR',tottenham:'LHR',manchester:'MAN',city:'MAN',liverpool:'MAN',paris:'CDG',munich:'MUC',milan:'MXP',turin:'MXP',vienna:'VIE',amsterdam:'AMS',eindhoven:'AMS',lisbon:'LIS',porto:'OPO',naples:'NAP',istanbul:'IST',miami:'MIA',tokyo:'HND',rio:'GIG',sydney:'SYD',dortmund:'AMS',leverkusen:'AMS',leipzig:'MUC',monaco:'MXP'};
+const AIRPORT_FOR_VENUE: Record<string,string> = {barcelona:'BCN',madrid:'MAD',atletico:'MAD',london:'LHR',chelsea:'LHR',tottenham:'LHR',manchester:'MAN',city:'MAN',liverpool:'MAN',paris:'CDG',munich:'MUC',milan:'MXP',turin:'TRN',vienna:'VIE',amsterdam:'AMS',eindhoven:'EIN',lisbon:'LIS',porto:'OPO',naples:'NAP',istanbul:'IST',miami:'MIA',tokyo:'HND',rio:'GIG',sydney:'SYD',dortmund:'DTM',leverkusen:'CGN',leipzig:'LEJ',monaco:'NCE'};
 export const asHub = (v:Venue):Hub => ({id:v.id,name:v.stadium,lat:v.lat,lon:v.lon});
 export const routeKey = (a:GeoPoint,b:GeoPoint,mode:'bus'|'train') => `${mode}:${a.lat.toFixed(5)},${a.lon.toFixed(5)}:${b.lat.toFixed(5)},${b.lon.toFixed(5)}`;
 export const gameSeconds = (realSeconds:number,acceleration:number=TRAVEL_CONFIG.acceleration) => realSeconds/acceleration;
@@ -72,7 +85,8 @@ function ground(from:Hub,to:Hub,mode:'bus'|'train',label:string):Segment {
  // Urban bus: 25 km/h, regional roads: 55, motorway: 75. IC rail: 95 km/h,
  // including intermediate stops; no unsupported high-speed assumption.
  const seconds=cache?cache.seconds*(mode==='bus'?1.12:1)+(mode==='bus'?180:0):(km/(mode==='bus'?(direct<15?25:direct<80?55:75):95)*3600+(mode==='bus'?180:600));
- return {id:key,mode,label,from,to,points:cache?.points??[from,to],realSeconds:seconds,distanceKm:km,geometry:cache?.geometry??'approximate',source:cache?.source??'Geschätzte Verbindung, keine geprüfte Streckengeometrie'};
+ const timetable=mode==='train'&&from.id===STATIONS.bern.id?RAIL_MINUTES_FROM_BERN[to.id]:undefined;
+ return {id:key,mode,label,from,to,points:cache?.points??[from,to],realSeconds:timetable?timetable*60:seconds,distanceKm:km,geometry:cache?.geometry??'approximate',source:cache?.source??'Geschätzte Verbindung, keine geprüfte Streckengeometrie'};
 }
 function wait(at:Hub,minutes:number,label:string):Segment { return {id:`wait:${at.id}:${label}`,mode:'wait',label,from:at,to:at,points:[at,at],realSeconds:minutes*60,distanceKm:0,geometry:'stationary',source:'Dokumentierte Zeitannahme, kein veröffentlichter Fahrplan'}; }
 function flight(from:Hub,to:Hub):Segment {
@@ -91,31 +105,40 @@ function plan(input:Segment[]):JourneyPlan {
  });
  return {version:2,acceleration:TRAVEL_CONFIG.acceleration,segments,realSeconds:segments.reduce((n,s)=>n+s.realSeconds,0)};
 }
-export function planJourney(destination:Venue):JourneyPlan {
+const FOREIGN_ROAD_LIMIT_KM=900;
+const NO_ROAD_COUNTRIES=['England','Schottland','Irland','Wales'];
+/** Raw door-to-door alternatives before cached partial roads are spliced in. The travel
+ * cache tooling (scripts/travel/fetch-real-routes.mts) reads the same legs. */
+export function journeyCandidates(destination:Venue) {
  const start=asHub(HOME_VENUE),end=asHub(destination),km=distanceKm(start,end);
- const road=plan([ground(start,end,'bus',`Teambus nach ${destination.city}`)]);
- if(km<80)return road;
- const station=Object.values(STATIONS).sort((a,b)=>distanceKm(a,end)-distanceKm(b,end))[0];
- const rail=distanceKm(station,end)<35?plan([ground(start,STATIONS.bern,'bus','Teambus zum Bahnhof Bern'),wait(STATIONS.bern,15,'Einsteigen und Warten auf den Zug'),ground(STATIONS.bern,station,'train',`Intercity nach ${station.name}`),wait(station,10,'Umsteigen zum Teambus'),ground(station,end,'bus',`Teambus zum ${destination.stadium}`)]):null;
  const domestic=['Schweiz','Switzerland','CH'].includes(destination.country);
- if(domestic)return rail&&rail.realSeconds<road.realSeconds?rail:road;
- if(km<700&&!['England','Schottland','Irland','Wales'].includes(destination.country))return road;
+ const road=[ground(start,end,'bus',`Teambus nach ${destination.city}`)];
+ if(km<80)return {km,domestic,road,roadAllowed:true,rail:null,air:[] as Segment[][]};
+ const station=Object.values(STATIONS).sort((a,b)=>distanceKm(a,end)-distanceKm(b,end))[0];
+ const rail=station.id!==STATIONS.bern.id&&distanceKm(station,end)<35?[ground(start,STATIONS.bern,'bus','Teambus zum Bahnhof Bern'),wait(STATIONS.bern,15,'Einsteigen und Warten auf den Zug'),ground(STATIONS.bern,station,'train',`${RAIL_SERVICE[station.id]??'Intercity'} nach ${station.name}`),wait(station,10,'Umsteigen zum Teambus'),ground(station,end,'bus',`Teambus zum ${destination.stadium}`)]:null;
+ if(domestic)return {km,domestic,road,roadAllowed:true,rail,air:[] as Segment[][]};
  const nearestAirport=Object.values(AIRPORTS).filter(a=>!['airport-SIN','airport-ZRH','airport-GVA'].includes(a.id)).sort((a,b)=>distanceKm(a,end)-distanceKm(b,end))[0];
  const airport=AIRPORTS[AIRPORT_FOR_VENUE[destination.id]]??(distanceKm(nearestAirport,end)<400?nearestAirport:undefined);
  // Unknown generated grounds use road estimates locally; across oceans they need
  // explicit airport metadata before a commercially plausible air itinerary exists.
- if(!airport)return road;
- const airCandidates=[AIRPORTS.ZRH,AIRPORTS.GVA].map(departure=>{
+ const roadAllowed=!airport||(km<FOREIGN_ROAD_LIMIT_KM&&!NO_ROAD_COUNTRIES.includes(destination.country));
+ // Zurich is the configured long-haul hub; within Europe Zurich and Geneva compete.
+ const air=!airport?[]:(km>3500?[AIRPORTS.ZRH]:[AIRPORTS.ZRH,AIRPORTS.GVA]).map(departure=>{
   const segments=[ground(start,departure,'bus',`Teambus zum ${departure.name}`),wait(departure,120,'Check-in, Sicherheitskontrolle und Boarding')];
   if(airport.id==='airport-SYD')segments.push(flight(departure,AIRPORTS.SIN),wait(AIRPORTS.SIN,120,'Umsteigen in Singapore'),flight(AIRPORTS.SIN,airport));
   else segments.push(flight(departure,airport));
   segments.push(wait(airport,60,'Aussteigen, Einreise und Gepäck'),ground(airport,end,'bus',`Teambus zum ${destination.stadium}`));
-  return plan(segments);
+  return segments;
  });
- // Zurich is the configured long-haul hub. European alternatives compare total
- // estimated door-to-door time; the hub graph is an estimate, never a timetable.
- const air=km>3500?airCandidates[0]:airCandidates.sort((a,b)=>a.realSeconds-b.realSeconds)[0];
- return km<1600&&!['England','Schottland','Irland','Wales'].includes(destination.country)&&road.realSeconds<air.realSeconds?road:air;
+ return {km,domestic,road,roadAllowed,rail,air};
+}
+/** The team takes the fastest door-to-door option: the team bus below 80 km and as long as
+ * it beats the train or the plane, the train where a direct main line ends near the stadium,
+ * and the plane for long distances, overseas and across the Channel. Estimates, no timetable. */
+export function planJourney(destination:Venue):JourneyPlan {
+ const {road,roadAllowed,rail,air}=journeyCandidates(destination);
+ const options=[...(roadAllowed?[plan(road)]:[]),...(rail?[plan(rail)]:[]),...air.map(plan)];
+ return options.reduce((best,option)=>option.realSeconds<best.realSeconds?option:best);
 }
 export function segmentAt(plan:JourneyPlan,elapsedGameSeconds:number) {
  let elapsed=Math.max(0,elapsedGameSeconds)*plan.acceleration;

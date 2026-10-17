@@ -13,6 +13,8 @@ Browser Prüfung: `npm run test:browser` startet den gebauten Worker lokal und p
 
 **Projektstruktur:** `app/page.tsx` enthält die App Komponente; Typen, Konstanten, Wirtschaft, Spielstand, Formatierung, Koop Hilfen und kleine Komponenten liegen in `app/game/`. `app/feature-data.ts` enthält die Spiellogik; Typen, Kataloge und Texte liegen in `app/features/` und werden von `feature-data.ts` unverändert weiter exportiert. Reiserouten (`app/route-cache/`) lädt der Browser erst nach dem Start (`build/client-data-plugin.ts`).
 
+**Reisen:** Die Mannschaft nimmt die schnellste Verbindung von Tür zu Tür: unter 80 km immer den Teambus, sonst Bus, Zug (Intercity ab Bern, EuroCity nach Mailand, TGV Lyria nach Paris) oder Flugzeug ab Zürich bzw. Genf. Busse fahren auf echten Strassen (OSRM), Züge auf echten Gleisen (BRouter, Fahrzeiten gerundet nach Fahrplan). `npx tsx scripts/travel/fetch-real-routes.mts` ergänzt fehlende Strecken im Routencache und teilt ihn neu auf; die Heimadresse wird dabei nie an einen Routingdienst geschickt.
+
 **Manuell bearbeiten und extern hosten:** [HOSTING.md](HOSTING.md). Die externe Cloudflare Konfiguration ist `wrangler.external.json`. Laufende Datenbankinhalte und Browser Spielstände sind nicht Teil dieses Repositories.
 
 ## Sites Vorlage
