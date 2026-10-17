@@ -9,6 +9,10 @@ Aktueller Spielcode mit Spielerpool, Saisons, Walkouts und Multiplayer. Release 
 
 Verifikation: `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`; ergänzend `npm run verify:physics`. Der Build erzwingt maximal 500000 Bytes pro Client JavaScript Chunk. Sites Deployment und GitHub Quellstand besitzen getrennte Historien; ein GitHub Push veröffentlicht keine neue Site Version.
 
+Browser Prüfung: `npm run test:browser` startet den gebauten Worker lokal und prüft mit Chromium alle Tabs auf Desktop und Handy (Fehler, Überlauf, überlappender oder schwer lesbarer Text) sowie Combo, tägliche Prämie, Live Spiel und Pressekonferenz. Der GitHub Workflow führt sie nach `npm test` aus.
+
+**Projektstruktur:** `app/page.tsx` enthält die App Komponente; Typen, Konstanten, Wirtschaft, Spielstand, Formatierung, Koop Hilfen und kleine Komponenten liegen in `app/game/`. `app/feature-data.ts` enthält die Spiellogik; Typen, Kataloge und Texte liegen in `app/features/` und werden von `feature-data.ts` unverändert weiter exportiert. Reiserouten (`app/route-cache/`) lädt der Browser erst nach dem Start (`build/client-data-plugin.ts`).
+
 **Manuell bearbeiten und extern hosten:** [HOSTING.md](HOSTING.md). Die externe Cloudflare Konfiguration ist `wrangler.external.json`. Laufende Datenbankinhalte und Browser Spielstände sind nicht Teil dieses Repositories.
 
 ## Sites Vorlage

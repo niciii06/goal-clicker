@@ -1,407 +1,64 @@
-import { advanceInteractive, normalizeInteractive, resumeInteractive } from './interactive-match';
-import type { InteractiveMatch } from './interactive-match';
-import { recordedActionRating, advanceMatchBroadcast, addBroadcastSubstitution, normalizeMatchBroadcast, chooseGoalPattern, createMatchBroadcast } from './match-broadcast';
-import type { MatchBroadcast, GoalPattern } from './match-broadcast';
-import type { Venue } from './travel-geography';
-import { normalizeTravel, emptyTravel } from './travel-data';
-import { normalizeDailyRewards } from './daily-reward';
-import type { DailyRewardState } from './daily-reward';
-import { normalizePress } from './press-conference';
-import type { PressState } from './press-conference';
-import type { TravelState } from './travel-data';
-import { seasonGeography, LEAGUE_LABELS, HOME_VENUE, venueForClubName } from './travel-geography';
-import { initialCareerState, normalizeCareerState, getPlayerForm, getCareerCard } from "./career-data";
 import type { CareerState } from "./career-data";
-import { FC26_STAR_PROFILES, type StarPosition } from "./fc26-player-pool";
-import { getFC27Positions } from "./fc27-positions";
-import { getFC27Rating } from "./fc27-ratings";
+import type { ClubProfile, CoopMission, CupCardEvent, CupGoalEvent, CupInjuryEvent, CupMatchMode, CupMatchPhase, CupPenaltyEvent, CupState, CupStrategyId, CupSubstitutionImpact, EarnedPack, GoalBoostState, IconSeed, MatchChange, MatchHistoryEntry, MissionProgressSource, PenaltyDirection, RandomEvent, RewardPackId, SeasonFixture, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationId, StarPackDefinition, StarPackId, StarPackOpening, StarPackReveal, StarXIEvaluationContext, StarXIPlayer, StarXIState, TournamentCompletionSummary, TournamentDefinition, TournamentGazetteIssue, TournamentId, TransferInsiderEvent, TransferInsiderOutcome, TransferMarketState, TransferSagaState, TransferSquadVacancy } from "./features/types";
+import type { DailyRewardState } from "./daily-reward";
+import type { GoalPattern } from "./match-broadcast";
+import type { PressState } from "./press-conference";
+import type { StarPosition } from "./fc26-player-pool";
+import type { TravelState } from "./travel-data";
+import type { Venue } from "./travel-geography";
+import { ASSIST_POSITION_WEIGHTS, DEFENSIVE_FAULT_WEIGHTS, GOAL_POSITION_WEIGHTS, MISSION_TEMPLATES, STAR_FORMATIONS, STAR_POSITIONS, STAR_XI_FORMATION_POSITIONS, TOURNAMENTS, TRANSFER_PLAYERS, YB_FC26_PLAYERS, getStarFormation, specialAttributes } from "./features/catalog";
+import { FC26_STAR_PROFILES } from "./fc26-player-pool";
 import { FC27_INDIA_PROFILES, SCRAP_RATING_GROUPS, drawScrapPlayer } from "./scrap-pack";
+import { GAZETTE_CHAMPION_HEADLINES, GAZETTE_EXIT_HEADLINES, TRANSFER_INTERESTED_CLUBS } from "./features/news-data";
+import { HOME_VENUE, LEAGUE_LABELS, seasonGeography, venueForClubName } from "./travel-geography";
+import { addBroadcastSubstitution, advanceMatchBroadcast, chooseGoalPattern, createMatchBroadcast, normalizeMatchBroadcast, recordedActionRating } from "./match-broadcast";
+import { advanceInteractive, normalizeInteractive, resumeInteractive } from "./interactive-match";
+import { emptyTravel, normalizeTravel } from "./travel-data";
+import { getCareerCard, getPlayerForm, initialCareerState, normalizeCareerState } from "./career-data";
 import { getFunnyPlayerName } from "./funny-player-names";
+import { normalizeDailyRewards } from "./daily-reward";
+import { normalizePress } from "./press-conference";
+export type { ClubProfile, CoopMission, CupCardEvent, CupGoalEvent, CupInjuryEvent, CupMatchMode, CupMatchPhase, CupPenaltyEvent, CupState, CupStrategyId, CupSubstitutionImpact, EarnedPack, GoalBoostState, HistoryTone, MatchChange, MatchHistoryEntry, MissionKind, MissionProgressSource, PenaltyDirection, RandomEvent, RewardPackId, SeasonFixture, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationDefinition, StarFormationId, StarFormationSlot, StarPackDefinition, StarPackId, StarPackOdds, StarPackOpening, StarPackReveal, StarXIEvaluationContext, StarXIPlayer, StarXIState, TournamentCompletionSummary, TournamentDefinition, TournamentGazetteIssue, TournamentId, TournamentOpponent, TransferInsiderEvent, TransferInsiderOutcome, TransferLoan, TransferMarketState, TransferPlayer, TransferSagaState, TransferSquadVacancy } from "./features/types";
+export { STAR_FORMATIONS, STAR_POSITIONS, STAR_POSITION_NAMES, STAR_XI_FORMATION_POSITIONS, TOURNAMENTS, TOURNAMENT_OPPONENT_MULTIPLIER, TRANSFER_PLAYERS, YB_FC26_SOURCE_IDS, getStarFormation } from "./features/catalog";
 
 export type { StarPosition } from "./fc26-player-pool";
 
-export type TransferPlayer = {
-  id: string;
-  name: string;
-  position: string;
-  rating: number;
-  price: number;
-  clickBonus: number;
-  passiveBonus: number;
-  incomeBonus: number;
-  accent: string;
-};
 
-export type TransferMarketState = {
-  offerIds: string[];
-  ownedIds: string[];
-};
 
-export type ClubProfile = {
-  name: string;
-  badge: string;
-  color: string;
-};
 
-export type TournamentId = "stadium" | "champions" | "world";
-export type CupStrategyId = "angriff" | "konter" | "ballbesitz";
-export type CupMatchPhase = "regular" | "extra-time" | "penalties";
-export type CupMatchMode = "tournament" | "season";
-export type PenaltyDirection = "left" | "center" | "right";
 
-export type GoalBoostState = {
-  tournamentId: TournamentId | null;
-  multiplier: number;
-  startedAt: number;
-  endsAt: number;
-};
 
-export type CupState = {
-  simulation?: InteractiveMatch;
-  broadcast?: MatchBroadcast;
-  fixture?: {id:string;away:boolean;neutral?:boolean;venue:Venue;opponentId:string};
-  careerMatchId?: string;
-  careerRatingSeed?: number;
-  careerBonuses?: Record<string, number>;
-  active: boolean;
-  mode: CupMatchMode;
-  phase: CupMatchPhase;
-  tournamentId: TournamentId;
-  round: number;
-  wins: number;
-  best: number;
-  trophies: Record<TournamentId, number>;
-  lastResult: string;
-  matchStartedAt: number;
-  matchEndsAt: number;
-  lastTickAt: number;
-  homeScore: number;
-  awayScore: number;
-  opponent: string;
-  opponentRating: number;
-  opponentStrategyId: CupStrategyId;
-  opponentIds: string[];
-  strategyId: CupStrategyId;
-  substitutionsUsed: number;
-  restartAt?: number;
-  restartSide?: 'club'|'opponent';
-  regularDurationMs?: number;
-  halftimeTaken?: boolean;
-  timedPause?: {kind:'goal'|'halftime';id:string;startsAt:number;endsAt:number;frozenAt:number};
-  subWindowsUsed?: number;
-  pendingSubstitutions?: {id: string; requestedAt: number; changes: {playerId:string;slot:number;outgoingId:string}[]};
-  matchMomentum: number;
-  originalLineupIds: string[];
-  originalBenchIds: string[];
-  playerEnteredAt: Record<string, number>;
-  playerExitedAt: Record<string, number>;
-  playerMatchPositions: Record<string, StarPosition>;
-  lastGoal: CupGoalEvent | null;
-  lastInjury: CupInjuryEvent | null;
-  matchEvents: CupGoalEvent[];
-  cardEvents: CupCardEvent[];
-  injuryEvents: CupInjuryEvent[];
-  sentOffPlayerIds: string[];
-  suspendedPlayerIds: string[];
-  injuredPlayerIds: Record<string, number>;
-  matchPaused: boolean;
-  pendingNextRound: boolean;
-  nextTournamentAt: number;
-  penaltyHomeScore: number;
-  penaltyAwayScore: number;
-  penaltyHomeTaken: number;
-  penaltyAwayTaken: number;
-  penaltyTurn: "home" | "away";
-  penaltyEvents: CupPenaltyEvent[];
-  penaltyMessage: string;
-  allTimeScorers: Record<string, number>;
-  allTimeAppearances: Record<string, number>;
-};
 
-export type CupGoalEvent = {
-  assistId?: string | null;
-  assistName?: string;
-  pattern?: GoalPattern;
-  id: string;
-  side: "home" | "away";
-  scorerId: string | null;
-  scorer: string;
-  minute: number;
-  createdAt: number;
-  homeScore: number;
-  awayScore: number;
-  ratingImpacts: Record<string, number>;
-};
 
-export type CupCardEvent = {
-  id: string;
-  side: "home" | "away";
-  playerId: string | null;
-  player: string;
-  reason: string;
-  card: "red";
-  minute: number;
-  createdAt: number;
-  homeScore: number;
-  awayScore: number;
-};
 
-export type CupInjuryEvent = {
-  id: string;
-  playerId: string;
-  player: string;
-  reason: string;
-  matches: number;
-  minute: number;
-  createdAt: number;
-  homeScore: number;
-  awayScore: number;
-};
 
-export type CupPenaltyEvent = {
-  id: string;
-  side: "home" | "away";
-  playerId: string | null;
-  player: string;
-  direction: PenaltyDirection;
-  keeperDirection: PenaltyDirection;
-  outcome: "goal" | "save" | "miss";
-  createdAt: number;
-  homeScore: number;
-  awayScore: number;
-  homeTaken: number;
-  awayTaken: number;
-};
 
-export type StarXIPlayer = {
-  id: string;
-  sourceId?: string;
-  countryCode?: string;
-  name: string;
-  position: StarPosition | null;
-  benchOnly?: boolean;
-  symbol?: string;
-  positions: StarPosition[];
-  rating: number;
-  price: number;
-  accent: string;
-  isCustom?: boolean;
-  cardType?: "base" | "icon" | "legendary";
-  packWeight?: number;
-  originalAttributes?: (typeof FC27_INDIA_PROFILES)[number]["attributes"];
-};
 
-export type StarFormationId =
-  | "3142" | "3412" | "3421" | "352" | "343"
-  | "41212" | "41212-2" | "4132" | "4141" | "4213"
-  | "4222" | "4231" | "4231-2" | "424" | "4312"
-  | "4321" | "433" | "433-2" | "433-3" | "433-4"
-  | "4411-2" | "442" | "442-2" | "451" | "451-2"
-  | "5212" | "523" | "532" | "541";
 
-export type StarFormationSlot = {
-  position: StarPosition;
-  x: number;
-  y: number;
-};
 
-export type StarFormationDefinition = {
-  id: StarFormationId;
-  label: string;
-  slots: readonly StarFormationSlot[];
-};
 
-export type StarXIState = {
-  lockedPlayerIds?: string[];
-  ownedIds: string[];
-  fragments: number;
-  lineupIds: string[];
-  benchIds: string[];
-  formationId: StarFormationId;
-  formationPositions: StarPosition[];
-};
 
-export type RewardPackId = `reward-${1|2|3|4|5|6}`;
-export type StarPackId = "scrap" | "scout" | "elite" | "legend" | RewardPackId;
-export type EarnedPack = { id:string; packId:RewardPackId; earnedAt:number; opening?:StarPackOpening };
 
-export type StarPackOdds = {
-  label: string;
-  minRating: number;
-  maxRating: number;
-  chance: number;
-};
 
-export type StarPackDefinition = {
-  id: StarPackId;
-  label: string;
-  price: number;
-  description: string;
-  odds: readonly StarPackOdds[];
-};
 
-export type StarPackOpening = {
-  packId: StarPackId;
-  packName: string;
-  player: StarXIPlayer;
-  duplicate: boolean;
-  fragmentCompensation: number;
-  source?: "pack" | "custom-draw";
-};
 
-export type StarPackReveal = StarPackOpening & {
-  openedAt: number;
-  openedBy: string;
-  troll: boolean;
-};
 
-export type TournamentOpponent = {
-  id: string;
-  name: string;
-  rating: number;
-  strategyId: CupStrategyId;
-  scorers: readonly string[];
-};
 
-export type TournamentDefinition = {
-  id: TournamentId;
-  label: string;
-  trophyName: string;
-  trophyIcon: string;
-  description: string;
-  minimumRating: number;
-  rounds: number;
-  opponents: readonly TournamentOpponent[];
-  accent: string;
-};
 
-export type MissionKind = "goals" | "clicks" | "minigames" | "cupWins";
 
-export type CoopMission = {
-  id: string;
-  title: string;
-  description: string;
-  kind: MissionKind;
-  target: number;
-  reward: number;
-  claimed: boolean;
-};
 
-export type HistoryTone = "positive" | "negative" | "neutral";
 
-export type MatchHistoryEntry = {
-  id: string;
-  title: string;
-  detail: string;
-  tone: HistoryTone;
-  timestamp: number;
-};
 
-export type RandomEvent = {
-  id: "var" | "elefantino" | "sponsor" | "fans" | "injury" | "weather";
-  title: string;
-  message: string;
-  amount: number;
-  tone: HistoryTone;
-  createdAt: number;
-};
 
-export type TransferInsiderOutcome = "loan" | "sale" | "failed" | "return";
 
-export type TransferLoan = {
-  playerId: string;
-  club: string;
-  status: "pending" | "active";
-  tournamentId: TournamentId | null;
-  createdAt: number;
-};
 
-export type TransferSquadVacancy = {
-  area: "lineup" | "bench";
-  index: number;
-  requiredPlayers: number;
-  createdAt: number;
-};
 
-export type TransferInsiderEvent = {
-  id: string;
-  outcome: TransferInsiderOutcome;
-  playerId: string | null;
-  playerName: string | null;
-  club: string;
-  headline: string;
-  message: string;
-  reason: string;
-  fee: number;
-  createdAt: number;
-};
 
-export type TransferSagaState = {
-  loans: TransferLoan[];
-  vacancies: TransferSquadVacancy[];
-  archive: TransferInsiderEvent[];
-  latestEvent: TransferInsiderEvent | null;
-  lastFailedReason: string;
-  nextAt: number;
-  deadlineDayStartedAt: number;
-  deadlineDayEndsAt: number;
-};
 
-export type TournamentGazetteIssue = {
-  id: string;
-  headline: string;
-  strapline: string;
-  body: string;
-  tone: "champion" | "exit";
-  tournamentId: TournamentId;
-  opponent: string;
-  homeScore: number;
-  awayScore: number;
-  completedRound: number;
-  tieBreak: boolean;
-  createdAt: number;
-};
 
-export type TournamentCompletionSummary = {
-  tournamentId: TournamentId;
-  tournamentWon: boolean;
-  completedRound: number;
-  opponent: string;
-  homeScore: number;
-  awayScore: number;
-  tieBreak: boolean;
-};
 
-export type SeasonTableRow = {
-  clubId?: string;
-  venue?: Venue;
-  id: string;
-  name: string;
-  rating: number;
-  played: number;
-  wins: number;
-  draws: number;
-  losses: number;
-  goalsFor: number;
-  goalsAgainst: number;
-  points: number;
-};
 
-export type SeasonMatchHistoryEntry = {
-  id: string;
-  division: number;
-  matchday: number;
-  opponent: string;
-  opponentRating: number;
-  clubScore: number;
-  opponentScore: number;
-  outcome: "win" | "draw" | "loss";
-  completedSeason: boolean;
-  seasonOutcome: "promoted" | "relegated" | "stayed" | "hall-of-fame" | null;
-  createdAt: number;
-};
 
-export type SeasonFixture = { opponentId:string; away:boolean; venue:Venue; clubId:string };
 export type SeasonModeState = {
   fixtures?: SeasonFixture[];
   division: number;
@@ -441,12 +98,6 @@ export type GameFeatures = {
   nextVarAt: number;
 };
 
-export type MissionProgressSource = {
-  seasonGoals: number;
-  clicks: number;
-  minigameWins: number;
-  cupWins: number;
-};
 
 export const CLUB_BADGES = ["⚽", "🦅", "🔥", "🦁", "⭐", "🛡️"];
 export const CLUB_COLORS = ["#0071e3", "#1d1d1f", "#e85d04", "#16845b", "#8b5cf6", "#d12c54"];
@@ -506,178 +157,12 @@ export const TRANSFER_DEADLINE_LOAN_CHANCE = 0.60;
 export const TRANSFER_DEADLINE_EVENT_MIN_DELAY_MS = 45000;
 export const TRANSFER_DEADLINE_EVENT_MAX_DELAY_MS = 75000;
 export const PACK_TROLL_CHANCE = 0.05;
-export const STAR_POSITIONS: readonly StarPosition[] = ["TW", "LV", "LAV", "IV", "RV", "RAV", "ZDM", "ZM", "ZOM", "LM", "RM", "LF", "RF", "MS", "ST"];
-export const STAR_POSITION_NAMES: Record<StarPosition, string> = {
-  TW: "Torwart",
-  LV: "Linker Verteidiger",
-  LAV: "Linker Aussenverteidiger",
-  IV: "Innenverteidiger",
-  RV: "Rechter Verteidiger",
-  RAV: "Rechter Aussenverteidiger",
-  ZDM: "Zentrales defensives Mittelfeld",
-  ZM: "Zentrales Mittelfeld",
-  ZOM: "Zentrales offensives Mittelfeld",
-  LM: "Linkes Mittelfeld",
-  RM: "Rechtes Mittelfeld",
-  LF: "Linker Flügel",
-  RF: "Rechter Flügel",
-  MS: "Mittelstürmer",
-  ST: "Stürmer",
-};
 
-function defineStarFormation(id: StarFormationId, label: string, rows: readonly (readonly StarPosition[])[]): StarFormationDefinition {
-  const laidOutRows = rows.map((positions, rowIndex) => {
-    const y = rows.length === 1 ? 50 : 11 + rowIndex * (80 / (rows.length - 1));
-    return positions.map((position, positionIndex) => ({
-      position,
-      x: ((positionIndex + 1) / (positions.length + 1)) * 100,
-      y,
-    }));
-  });
-  return { id, label, slots: [...laidOutRows].reverse().flat() };
-}
 
-const BACK_THREE = ["IV", "IV", "IV"] as const;
-const BACK_FOUR = ["LV", "IV", "IV", "RV"] as const;
-const BACK_FIVE = ["LAV", "IV", "IV", "IV", "RAV"] as const;
-const GOALKEEPER = ["TW"] as const;
 
-export const STAR_FORMATIONS: readonly StarFormationDefinition[] = [
-  defineStarFormation("3142", "3-1-4-2", [["ST", "ST"], ["LM", "ZM", "ZM", "RM"], ["ZDM"], BACK_THREE, GOALKEEPER]),
-  defineStarFormation("3412", "3-4-1-2", [["ST", "ST"], ["ZOM"], ["LM", "ZM", "ZM", "RM"], BACK_THREE, GOALKEEPER]),
-  defineStarFormation("3421", "3-4-2-1", [["ST"], ["LF", "RF"], ["LM", "ZM", "ZM", "RM"], BACK_THREE, GOALKEEPER]),
-  defineStarFormation("352", "3-5-2", [["ST", "ST"], ["LM", "ZOM", "RM"], ["ZDM", "ZDM"], BACK_THREE, GOALKEEPER]),
-  defineStarFormation("343", "3-4-3", [["LF", "ST", "RF"], ["LM", "ZM", "ZM", "RM"], BACK_THREE, GOALKEEPER]),
-  defineStarFormation("41212", "4-1-2-1-2 (Breit)", [["ST", "ST"], ["ZOM"], ["LM", "RM"], ["ZDM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("41212-2", "4-1-2-1-2 (Eng)", [["ST", "ST"], ["ZOM"], ["ZM", "ZM"], ["ZDM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("4132", "4-1-3-2", [["ST", "ST"], ["LM", "ZM", "RM"], ["ZDM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("4141", "4-1-4-1", [["ST"], ["LM", "ZM", "ZM", "RM"], ["ZDM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("4213", "4-2-1-3", [["LF", "ST", "RF"], ["ZOM"], ["ZDM", "ZDM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("4222", "4-2-2-2", [["ST", "ST"], ["ZOM", "ZOM"], ["ZDM", "ZDM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("4231", "4-2-3-1 (Eng)", [["ST"], ["ZOM", "ZOM", "ZOM"], ["ZDM", "ZDM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("4231-2", "4-2-3-1 (Breit)", [["ST"], ["LM", "ZOM", "RM"], ["ZDM", "ZDM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("424", "4-2-4", [["LF", "ST", "ST", "RF"], ["ZM", "ZM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("4312", "4-3-1-2", [["ST", "ST"], ["ZOM"], ["ZM", "ZM", "ZM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("4321", "4-3-2-1", [["ST"], ["LF", "RF"], ["ZM", "ZM", "ZM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("433", "4-3-3", [["LF", "ST", "RF"], ["ZM", "ZM", "ZM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("433-2", "4-3-3 (2) Holding", [["LF", "ST", "RF"], ["ZM", "ZM"], ["ZDM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("433-3", "4-3-3 (3) Defensiv", [["LF", "ST", "RF"], ["ZM"], ["ZDM", "ZDM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("433-4", "4-3-3 (4) Offensiv", [["LF", "ST", "RF"], ["ZOM"], ["ZM", "ZM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("4411-2", "4-4-1-1 (2)", [["ST"], ["ZOM"], ["LM", "ZM", "ZM", "RM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("442", "4-4-2", [["ST", "ST"], ["LM", "ZM", "ZM", "RM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("442-2", "4-4-2 (2) Holding", [["ST", "ST"], ["LM", "ZDM", "ZDM", "RM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("451", "4-5-1", [["ST"], ["LM", "ZM", "ZM", "ZM", "RM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("451-2", "4-5-1 (2) Offensiv", [["ST"], ["ZOM"], ["LM", "ZM", "ZM", "RM"], BACK_FOUR, GOALKEEPER]),
-  defineStarFormation("5212", "5-2-1-2", [["ST", "ST"], ["ZOM"], ["ZM", "ZM"], BACK_FIVE, GOALKEEPER]),
-  defineStarFormation("523", "5-2-3", [["LF", "ST", "RF"], ["ZM", "ZM"], BACK_FIVE, GOALKEEPER]),
-  defineStarFormation("532", "5-3-2", [["ST", "ST"], ["ZM", "ZM", "ZM"], BACK_FIVE, GOALKEEPER]),
-  defineStarFormation("541", "5-4-1", [["ST"], ["LM", "ZM", "ZM", "RM"], BACK_FIVE, GOALKEEPER]),
-] as const;
 
-export function getStarFormation(id: unknown) {
-  return STAR_FORMATIONS.find((formation) => formation.id === id) ?? STAR_FORMATIONS.find((formation) => formation.id === "433")!;
-}
 
-export const STAR_XI_FORMATION_POSITIONS: readonly StarPosition[] = getStarFormation("433").slots.map((slot) => slot.position);
-export const TOURNAMENT_OPPONENT_MULTIPLIER = 4;
-const TOURNAMENT_SEEDS: readonly TournamentDefinition[] = [
-  {
-    id: "stadium",
-    label: "Stadionpokal",
-    trophyName: "Stadionpokal",
-    trophyIcon: "🏆",
-    description: "Drei Spiele am Stück · 12 mögliche Gegner für deine erste Star XI.",
-    minimumRating: 55,
-    rounds: 3,
-    opponents: [
-      { id: "stadium-servette-genevois", name: "Servette Genevois", rating: 56, strategyId: "ballbesitz", scorers: ["Dereck Kutesa", "Enzo Crivelli", "Miroslav Stevanovic"] },
-      { id: "stadium-fc-sionais", name: "FC Sionais", rating: 57, strategyId: "konter", scorers: ["Benjamin Kololli", "Dejan Sorgic", "Joël Schmied"] },
-      { id: "stadium-fc-thoune", name: "FC Thoune", rating: 57, strategyId: "angriff", scorers: ["Marc Gut", "Miguel Castroman", "Kreshnik Hajrizi"] },
-      { id: "stadium-fc-winterthure", name: "FC Winterthure", rating: 58, strategyId: "ballbesitz", scorers: ["Matteo Di Giusto", "Aldin Turkes", "Nishan Burkart"] },
-      { id: "stadium-fc-luzerne", name: "FC Luzerne", rating: 59, strategyId: "konter", scorers: ["Lars Villiger", "Luca Jaquez", "Pius Dorn"] },
-      { id: "stadium-fc-st-gallo", name: "FC St. Gallo", rating: 60, strategyId: "angriff", scorers: ["Chadrac Akolo", "Willem Geubbels", "Jordi Quintilla"] },
-      { id: "stadium-fc-lausanne", name: "FC Lausanne", rating: 60, strategyId: "ballbesitz", scorers: ["Alvyn Sanches", "Kaly Sene", "Brighton Labeau"] },
-      { id: "stadium-grasshopper-zurich", name: "Grasshopper Zürich", rating: 61, strategyId: "konter", scorers: ["Giotto Morandi", "Pascal Schürpf", "Awer Mabil"] },
-      { id: "stadium-fc-lugano", name: "FC Lugano", rating: 62, strategyId: "angriff", scorers: ["Mattia Bottani", "Shkelqim Vladi", "Ignacio Aliseda"] },
-      { id: "stadium-bsc-young-burs", name: "BSC Young Burs", rating: 63, strategyId: "angriff", scorers: ["Cédric Ittan", "Joël Monteiroh", "Filip Ugrinic"] },
-      { id: "stadium-fc-zurique", name: "FC Zurique", rating: 64, strategyId: "ballbesitz", scorers: ["Jonathan Okita", "Bledian Krasniqi", "Antonio Marchesano"] },
-      { id: "stadium-fc-basilea", name: "FC Basilea", rating: 68, strategyId: "konter", scorers: ["Xherdan Shaqiry", "Albian Ajati", "Kevin Carloso"] },
-    ],
-    accent: "#16845b",
-  },
-  {
-    id: "champions",
-    label: "Champions Cup",
-    trophyName: "Champions Pokal",
-    trophyIcon: "🏆",
-    description: "Vier Runden · 16 mögliche Gegner auf internationalem Topniveau.",
-    minimumRating: 74,
-    rounds: 4,
-    opponents: [
-      { id: "champions-benfica-lissabonne", name: "Benfica Lissabonne", rating: 74, strategyId: "ballbesitz", scorers: ["Angel Di Maria", "Vangelis Pavlidis", "Rafa Silvaz"] },
-      { id: "champions-ajax-amsterdamo", name: "Ajax Amsterdamo", rating: 74, strategyId: "angriff", scorers: ["Brian Brobbey", "Steven Berghuiss", "Kenneth Taylor"] },
-      { id: "champions-porto-alegre", name: "Porto Alegre", rating: 75, strategyId: "konter", scorers: ["Pepê Costao", "Samu Omorodion", "Galeno"] },
-      { id: "champions-psv-eindhoven", name: "PSV Eindhoven", rating: 75, strategyId: "ballbesitz", scorers: ["Luuk de Jong", "Noa Lang", "Johan Bakayoko"] },
-      { id: "champions-borussia-dortmundt", name: "Borussia Dortmundt", rating: 76, strategyId: "ballbesitz", scorers: ["Serhou Girassy", "Karim Adejemi", "Julian Brandto"] },
-      { id: "champions-rb-leipziga", name: "RB Leipziga", rating: 77, strategyId: "angriff", scorers: ["Benjamin Sesko", "Lois Openda", "Xavi Simons"] },
-      { id: "champions-napoli-italiano", name: "Napoli Italiano", rating: 77, strategyId: "konter", scorers: ["Romelu Lukaku", "Khvicha Kvaradona", "Scott McTominay"] },
-      { id: "champions-juventus-turino", name: "Juventus Turino", rating: 78, strategyId: "ballbesitz", scorers: ["Dusan Vlahovic", "Kenan Yildiz", "Teun Koopmeiners"] },
-      { id: "champions-monaco-asm", name: "AS Monaco", rating: 78, strategyId: "konter", scorers: ["Folarin Balogun", "Takumi Minamino", "Breel Embolo"] },
-      { id: "champions-chelsea-londra", name: "Chelsea Londra", rating: 79, strategyId: "angriff", scorers: ["Cole Palmer", "Nicolas Jackson", "Christopher Nkunku"] },
-      { id: "champions-inter-milano", name: "Inter Milano", rating: 79, strategyId: "ballbesitz", scorers: ["Lautaro Martinezo", "Marcus Thuram", "Nicolo Barella"] },
-      { id: "champions-tottenham-hotspur", name: "Tottenham Hotspur", rating: 80, strategyId: "konter", scorers: ["Heung-min Son", "James Maddison", "Dominic Solanke"] },
-      { id: "champions-ac-milana", name: "AC Milana", rating: 80, strategyId: "angriff", scorers: ["Rafael Leao", "Kristjan Pulisik", "Santiago Gimenez"] },
-      { id: "champions-barceloneta", name: "FC Barceloneta", rating: 82, strategyId: "ballbesitz", scorers: ["Robert Lewandowski", "Lamine Yamalo", "Raphinha"] },
-      { id: "champions-atletico-madrido", name: "Atlético Madrido", rating: 84, strategyId: "konter", scorers: ["Antwan Griezman", "Julián Alvares", "Alexander Sorloth"] },
-      { id: "champions-arsenal-londra", name: "Arsenal Londra", rating: 88, strategyId: "ballbesitz", scorers: ["Bukayo Sako", "Martin Odegard", "Kai Hawertz"] },
-    ],
-    accent: "#0071e3",
-  },
-  {
-    id: "world",
-    label: "Weltmeisterschaft",
-    trophyName: "Weltpokal",
-    trophyIcon: "🌍",
-    description: "Sechs Runden · 24 mögliche Gegner aus der Weltspitze.",
-    minimumRating: 86,
-    rounds: 6,
-    opponents: [
-      { id: "world-napoli-italiano", name: "Napoli Italiano", rating: 86, strategyId: "konter", scorers: ["Romelu Lukaku", "Khvicha Kvaradona", "Scott McTominay"] },
-      { id: "world-benfica-lissabonne", name: "Benfica Lissabonne", rating: 86, strategyId: "ballbesitz", scorers: ["Angel Di Maria", "Vangelis Pavlidis", "Rafa Silvaz"] },
-      { id: "world-porto-alegre", name: "Porto Alegre", rating: 86, strategyId: "angriff", scorers: ["Pepê Costao", "Samu Omorodion", "Galeno"] },
-      { id: "world-psv-eindhoven", name: "PSV Eindhoven", rating: 86, strategyId: "ballbesitz", scorers: ["Luuk de Jong", "Noa Lang", "Johan Bakayoko"] },
-      { id: "world-ajax-amsterdam", name: "Ajax Amsterdam", rating: 86, strategyId: "konter", scorers: ["Brian Brobbey", "Steven Berghuiss", "Kenneth Taylor"] },
-      { id: "world-galatasaray", name: "Galatasaray", rating: 86, strategyId: "angriff", scorers: ["Victor Osimhen", "Mauro Icardi", "Dries Mertens"] },
-      { id: "world-borussia-dortmundt", name: "Borussia Dortmundt", rating: 87, strategyId: "ballbesitz", scorers: ["Serhou Girassy", "Karim Adejemi", "Julian Brandto"] },
-      { id: "world-tottenham-hotspur", name: "Tottenham Hotspur", rating: 87, strategyId: "konter", scorers: ["Heung-min Son", "James Maddison", "Dominic Solanke"] },
-      { id: "world-juventus-turino", name: "Juventus Turino", rating: 87, strategyId: "ballbesitz", scorers: ["Dusan Vlahovic", "Kenan Yildiz", "Teun Koopmeiners"] },
-      { id: "world-inter-miami", name: "Inter Miami", rating: 87, strategyId: "angriff", scorers: ["Lionel Messy", "Luis Suarezo", "Jordi Alba"] },
-      { id: "world-paris-saint-german", name: "Paris Saint German", rating: 88, strategyId: "angriff", scorers: ["Ousmane Dembelé", "Khvicha Kvaradona", "Bradley Barcolá"] },
-      { id: "world-chelsea-londra", name: "Chelsea Londra", rating: 88, strategyId: "ballbesitz", scorers: ["Cole Palmer", "Nicolas Jackson", "Christopher Nkunku"] },
-      { id: "world-ac-milana", name: "AC Milana", rating: 88, strategyId: "konter", scorers: ["Rafael Leao", "Kristjan Pulisik", "Santiago Gimenez"] },
-      { id: "world-bayer-leverkusen", name: "Bayer Leverkusen", rating: 88, strategyId: "ballbesitz", scorers: ["Florian Wirtz", "Victor Boniface", "Patrik Schick"] },
-      { id: "world-atletico-madrido", name: "Atlético Madrido", rating: 89, strategyId: "konter", scorers: ["Antwan Griezman", "Julián Alvares", "Alexander Sorloth"] },
-      { id: "world-manchester-united", name: "Manchester United", rating: 89, strategyId: "angriff", scorers: ["Bruno Fernandes", "Rasmus Hojlundo", "Alejandro Garnacho"] },
-      { id: "world-inter-milano", name: "Inter Milano", rating: 90, strategyId: "ballbesitz", scorers: ["Lautaro Martinezo", "Marcus Thuram", "Nicolo Barella"] },
-      { id: "world-arsenal-londra", name: "Arsenal Londra", rating: 90, strategyId: "ballbesitz", scorers: ["Bukayo Sako", "Martin Odegard", "Kai Hawertz"] },
-      { id: "world-liverpuhl-fc", name: "Liverpuhl FC", rating: 91, strategyId: "ballbesitz", scorers: ["Mohamed Salahm", "Luis Diazo", "Darwin Nunez"] },
-      { id: "world-fc-barceloneta", name: "FC Barceloneta", rating: 92, strategyId: "angriff", scorers: ["Robert Lewandowski", "Lamine Yamalo", "Raphinha"] },
-      { id: "world-bayern-muenchan", name: "Bayern Münchan", rating: 94, strategyId: "konter", scorers: ["Harry Kané", "Jamal Musiala", "Michael Olisé"] },
-      { id: "world-manchester-cite", name: "Manchester Cité", rating: 96, strategyId: "ballbesitz", scorers: ["Erling Haland", "Phil Fodenh", "Kevin de Bruyne"] },
-      { id: "world-real-madreto", name: "Real Madreto", rating: 98, strategyId: "angriff", scorers: ["Kylian Mbappo", "Vinícius Juniora", "Jude Bellingam"] },
-      { id: "world-galacticos-xi", name: "Galácticos XI", rating: 99, strategyId: "konter", scorers: ["Cristiano Rinaldo", "Lionel Messy", "Ronaldo Nazárioh"] },
-    ],
-    accent: "#c69214",
-  },
-];
 
-export const TOURNAMENTS: readonly TournamentDefinition[] = TOURNAMENT_SEEDS.map((tournament) => ({
-  ...tournament,
-  opponents: tournament.opponents.map((opponent) => ({
-    ...opponent,
-    scorers: opponent.scorers.map((scorer) => getFunnyPlayerName(scorer, `tournament-scorer:${scorer}`, { position: "ST", rating: opponent.rating })),
-  })),
-}));
 
 export function getRandomEventDelay(random = Math.random()) {
   return 60000 + Math.floor(Math.max(0, Math.min(0.999999, random)) * 120000);
@@ -698,23 +183,7 @@ export function shouldTriggerPackTroll(player: StarXIPlayer, random: () => numbe
   return eligible && Math.max(0, Math.min(0.999999, Number(random()) || 0)) < PACK_TROLL_CHANCE;
 }
 
-export const TRANSFER_PLAYERS: TransferPlayer[] = [
-  { id: "turbo", name: "Luca Turbo", position: "Flügel", rating: 78, price: 1800, clickBonus: 3, passiveBonus: 0, incomeBonus: 0, accent: "#0071e3" },
-  { id: "wall", name: "Nora Wand", position: "Torhüterin", rating: 82, price: 3200, clickBonus: 0, passiveBonus: 30, incomeBonus: 0, accent: "#16845b" },
-  { id: "maestro", name: "Milo Maestro", position: "Mittelfeld", rating: 86, price: 7500, clickBonus: 0, passiveBonus: 120, incomeBonus: 0.03, accent: "#8b5cf6" },
-  { id: "finisher", name: "Sofia Finisher", position: "Sturm", rating: 89, price: 15000, clickBonus: 15, passiveBonus: 0, incomeBonus: 0, accent: "#d12c54" },
-  { id: "engine", name: "Dario Dauerläufer", position: "Box to Box", rating: 91, price: 42000, clickBonus: 20, passiveBonus: 350, incomeBonus: 0, accent: "#e85d04" },
-  { id: "captain", name: "Amira Captain", position: "Leaderin", rating: 94, price: 110000, clickBonus: 60, passiveBonus: 600, incomeBonus: 0.05, accent: "#c69214" },
-  { id: "wonderkid", name: "Noah Wonderkid", position: "Talent", rating: 96, price: 280000, clickBonus: 120, passiveBonus: 1200, incomeBonus: 0.08, accent: "#0071e3" },
-  { id: "legend", name: "Die Legende", position: "Ikone", rating: 99, price: 900000, clickBonus: 300, passiveBonus: 4000, incomeBonus: 0.12, accent: "#1d1d1f" },
-];
 
-function specialAttributes(rating: number) {
-  const template = structuredClone(FC27_INDIA_PROFILES[0].attributes);
-  template.overallRating = rating;
-  for (const stat of Object.values(template.stats)) stat.value = rating;
-  return template;
-}
 const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
   { id: "star-pfuschi", name: "Pfuschi", isCustom: true, benchOnly: true,
     position: null, positions: [], rating: 1, price: 1000, accent: "#64748b",
@@ -821,55 +290,10 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
   },
 ];
 
-// The YB cards are kept in the shared pool as well. Two of
-// them already exist in the imported base dataset; the source-id list below
-// covers the complete YB set so it cannot silently lose a player when the
-// dataset changes.
-export const YB_FC26_SOURCE_IDS = [
-  "215556", "260272", "258924", "220665", "251617", "256726", "234913", "225853",
-  "229900", "193468", "251532", "252526", "225533", "258230", "270371", "75499", "257319",
-] as const;
 
-type YBPlayerSeed = readonly [sourceId: string, name: string, rating: number, positions: readonly StarPosition[], countryCode?: string];
 
-const YB_FC26_PLAYER_SEEDS: readonly YBPlayerSeed[] = [
-  ["215556", "Edimilson Fernandis", 74, ["ZDM", "IV", "ZM"], "CH"],
-  ["258924", "Joël Monteiroh", 73, ["LM", "RM", "ZM", "LF"], "CH"],
-  ["220665", "Gregory Wüthricha", 73, ["IV"], "CH"],
-  ["251617", "Armin Gigovik", 72, ["ZM", "ZDM"], "BA"],
-  ["234913", "Christian Fassnachtt", 72, ["RM", "LM", "ST", "RF"], "CH"],
-  ["225853", "Rayan Ravelosonn", 71, ["ZM", "ZDM"]],
-  ["229900", "Sandro Lauperr", 70, ["IV", "ZDM", "ZM"], "CH"],
-  ["193468", "Loris Benitto", 70, ["IV"], "CH"],
-  ["251532", "Meschack Eliá", 70, ["ST"]],
-  ["252526", "Darian Malesz", 70, ["RM", "LM", "ZOM", "ST"], "CH"],
-  ["225533", "Chris Bediaa", 70, ["ST"], "CI"],
-  ["258230", "Jaouen Hadjamm", 69, ["LV"], "FR"],
-  ["270371", "Ryan Andrewz", 68, ["RV", "RM"], "EN"],
-  ["75499", "Dominik Pechh", 68, ["ZM"], "CZ"],
-  ["257319", "Alan Virginiuz", 68, ["RM", "LM", "RF"], "FR"],
-];
 
-const YB_FC26_PLAYERS: StarXIPlayer[] = YB_FC26_PLAYER_SEEDS.map(([sourceId, name, previousRating, positions, countryCode]) => {
-  const rating = getFC27Rating(sourceId, previousRating);
-  const updatedPositions = getFC27Positions(sourceId, positions);
-  return {
-    id: `yb-${sourceId}`,
-    sourceId,
-    countryCode,
-    name: getFunnyPlayerName(name, `yb-${sourceId}`, { position: updatedPositions[0], rating }),
-    position: updatedPositions[0],
-    positions: [...updatedPositions],
-    rating,
-    price: Math.round(Math.min(1500000000, 5000 * 1.28 ** (rating - 70))),
-    accent: "#f4c400",
-  };
-});
 
-// The imported FC26 base-player dataset does not contain Ultimate Team ICON
-// items. This separate pool contains the full 129-player FC26 Icon roster.
-// Names stay deliberately altered, as requested for the rest of the game.
-type IconSeed = readonly [id: string, name: string, rating: number, countryCode: string, positions: readonly StarPosition[]];
 const FC26_ICON_DATA = [
   ["pele", "Peléo", 95, "BR", ["ZOM", "ST"]],
   ["diego-maradona", "Diego Maradono", 95, "AR", ["ZOM", "ST"]],
@@ -1600,7 +1024,6 @@ function countBits(value: number) {
   return count;
 }
 
-export type StarXIEvaluationContext = { career?: CareerState; cup?: CupState; minute?: number };
 
 /** Matches the existing performance scale; live match notes never survive their match. */
 export function getStarXISelectionRating(player: StarXIPlayer, context: StarXIEvaluationContext = {}) {
@@ -1851,14 +1274,6 @@ export function getCupPlayerMatchRating(cup: CupState, playerId: string, minute:
   return getStarXIPlayerMatchRating(playerId, cup.careerRatingSeed ?? cup.matchStartedAt, effectiveMinute, 0, enteredAtMinute, eventImpact + cleanSheetBoost + recordedActionRating(cup,playerId,effectiveMinute), position);
 }
 
-export type CupSubstitutionImpact = {
-  cup: CupState;
-  incomingRating: number;
-  outgoingRating: number;
-  ratingDelta: number;
-  outgoingMatchRating: number;
-  momentumDelta: number;
-};
 
 export function applyCupSubstitution(cup: CupState, outgoingPlayerId: string | undefined, incomingPlayerId: string, minute: number, now = Date.now()): CupSubstitutionImpact {
   const incoming = getStarXIPlayer(incomingPlayerId);
@@ -2236,59 +1651,8 @@ export function beginSeasonCupMatch(cup: CupState, seasonValue: unknown, now = D
   };
 }
 
-const GOAL_POSITION_WEIGHTS: Record<StarPosition, number> = {
-  TW: 0.06,
-  LV: 0.45,
-  LAV: 0.55,
-  IV: 0.34,
-  RV: 0.45,
-  RAV: 0.55,
-  ZDM: 0.65,
-  ZM: 1.25,
-  ZOM: 2,
-  LM: 1.9,
-  RM: 1.9,
-  LF: 3.2,
-  RF: 3.2,
-  MS: 4,
-  ST: 4.8,
-};
 
-const ASSIST_POSITION_WEIGHTS: Record<StarPosition, number> = {
-  TW: 0.02,
-  LV: 0.65,
-  LAV: 0.9,
-  IV: 0.22,
-  RV: 0.65,
-  RAV: 0.9,
-  ZDM: 0.85,
-  ZM: 1.8,
-  ZOM: 2.8,
-  LM: 2.35,
-  RM: 2.35,
-  LF: 1.85,
-  RF: 1.85,
-  MS: 1.55,
-  ST: 1.2,
-};
 
-const DEFENSIVE_FAULT_WEIGHTS: Record<StarPosition, number> = {
-  TW: 1.8,
-  LV: 1.45,
-  LAV: 1.35,
-  IV: 2.55,
-  RV: 1.45,
-  RAV: 1.35,
-  ZDM: 1.05,
-  ZM: 0.55,
-  ZOM: 0.24,
-  LM: 0.38,
-  RM: 0.38,
-  LF: 0.12,
-  RF: 0.12,
-  MS: 0.1,
-  ST: 0.08,
-};
 
 function selectWeightedPlayer(candidates: { player: StarXIPlayer; weight: number }[], random: () => number) {
   const totalWeight = candidates.reduce((total, candidate) => total + Math.max(0, candidate.weight), 0);
@@ -2762,12 +2126,6 @@ export function resolveCupPenalty(cup: CupState, starRating: number, direction: 
   return finishCupRound(nextCup, starRating, winner, now, true);
 }
 
-const MISSION_TEMPLATES: Omit<CoopMission, "claimed">[] = [
-  { id: "team-goals", title: "Druckphase", description: "Sammelt gemeinsam Tore in dieser Saison", kind: "goals", target: 2500, reward: 2500 },
-  { id: "team-clicks", title: "Doppelpass", description: "Klickt gemeinsam 250 Mal", kind: "clicks", target: 250, reward: 1800 },
-  { id: "team-tournament", title: "Turnierstarter", description: "Gewinnt zwei Turnierrunden", kind: "cupWins", target: 2, reward: 3000 },
-  { id: "team-cup", title: "Pokalhungrig", description: "Gewinnt eine Pokalrunde", kind: "cupWins", target: 1, reward: 4500 },
-];
 
 export function initialMissions() {
   return MISSION_TEMPLATES.map((mission) => ({ ...mission, claimed: false }));
@@ -3149,18 +2507,6 @@ export function pauseGameFeatureTimers(value: unknown, pausedMs: number, now = D
   return features;
 }
 
-const TRANSFER_INTERESTED_CLUBS = [
-  "Real Madreto",
-  "FC Barceloneta",
-  "Manchester Cité",
-  "Bayern Münchan",
-  "Liverpuhl FC",
-  "Paris Saint German",
-  "Inter Milano",
-  "Galácticos XI",
-  "Arsenal Londra",
-  "Atlético Madrido",
-] as const;
 
 const TRANSFER_FAILURE_REASONS = [
   "der Medizincheck nicht bestanden wurde",
@@ -3207,27 +2553,7 @@ const TRANSFER_FAILURE_REASONS = [
   "der Spieler beim Verhandlungstermin in einem Escape Room eingeschlossen war",
 ] as const;
 
-const GAZETTE_CHAMPION_HEADLINES = [
-  "DER POKAL GEHÖRT UNS",
-  "DIE NACHT GEHÖRT DEM CLUB",
-  "CHAMPIONS AUF DEM RASEN",
-  "EIN TURNIER, EIN THRON",
-  "DAS STADION BEBT NOCH IMMER",
-  "TROPHÄE GESICHERT, STIMME VERLOREN",
-  "DER BUS BRAUCHT EIN OFFENES DACH",
-  "KONFETTI BIS MORGEN FRÜH",
-] as const;
 
-const GAZETTE_EXIT_HEADLINES = [
-  "AUS, ABER NICHT LEISE",
-  "DER POKAL FÄHRT OHNE UNS",
-  "DRAMA BIS ZUM SCHLUSSPFIFF",
-  "HEUTE KEIN KONFETTI",
-  "DIE KABINE IST VERDÄCHTIG STILL",
-  "KNAPP DANEBEN IST AUCH VORBEI",
-  "DER TRAUM MACHT EINE PAUSE",
-  "ROMARIO SUCHT SCHON VERSTÄRKUNG",
-] as const;
 
 function transferRandomIndex(length: number, random: () => number) {
   if (length <= 1) return 0;
@@ -3576,7 +2902,6 @@ export function releaseMatchSquad(features: GameFeatures, now: number) {
   if(features.travel.journey) delete features.travel.journey.squadLock;
 }
 
-export type MatchChange = {playerId:string;slot:number};
 function normalizePendingSubstitutions(value: unknown): CupState['pendingSubstitutions'] {
  const v=asRecord(value);
  if(typeof v.id!=='string'||!Number.isFinite(v.requestedAt)||!Array.isArray(v.changes)||!v.changes.length||v.changes.length>5)return undefined;
