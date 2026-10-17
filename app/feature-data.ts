@@ -1,4 +1,4 @@
-import { advanceInteractive, invalidateInteractive, normalizeInteractive, resumeInteractive } from './interactive-match';
+import { advanceInteractive, normalizeInteractive, resumeInteractive } from './interactive-match';
 import type { InteractiveMatch } from './interactive-match';
 import { recordedActionRating, advanceMatchBroadcast, addBroadcastSubstitution, normalizeMatchBroadcast, chooseGoalPattern, createMatchBroadcast } from './match-broadcast';
 import type { MatchBroadcast, GoalPattern } from './match-broadcast';

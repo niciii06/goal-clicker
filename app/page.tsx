@@ -587,6 +587,8 @@ function getRank(totalGoals: number) {
 
 // Fast consecutive clicks build a combo. The multiplier never exceeds x3.
 const COMBO_WINDOW_MS = 450;
+// Time to get back to the ball after a full screen announcement closed.
+const COMBO_RESUME_GRACE_MS = 1500;
 const COMBO_LEVELS = [{ clicks: 0, multiplier: 1 }, { clicks: 15, multiplier: 2 }, { clicks: 40, multiplier: 3 }] as const;
 const VIBRATION_STORAGE_KEY = "goalClickerVibrationV1";
 
@@ -682,7 +684,7 @@ function App() {
   const stageRef = useRef<HTMLDivElement>(null);
   const lastClickRef = useRef(0);
   const streakRef = useRef(0);
-  const comboRef = useRef({ count: 0, last: 0 });
+  const comboRef = useRef({ count: 0, last: 0, paused: false });
   const comboTimerRef = useRef<number | null>(null);
   const [combo, setCombo] = useState({ count: 0, multiplier: 1 });
   const [comboBurst, setComboBurst] = useState<{ id: number; text: string } | null>(null);
@@ -1492,6 +1494,21 @@ function App() {
   }
 
   const vibrationSupported = hydrated && canVibrate();
+  // Full screen announcements (Fabrizio Romario, gazette) pause the combo instead of ending it.
+  const comboPaused = Boolean(transferAnnouncement || gazetteAnnouncement);
+  useEffect(() => {
+    const state = comboRef.current;
+    if (comboPaused) {
+      if (comboTimerRef.current) window.clearTimeout(comboTimerRef.current);
+      comboTimerRef.current = null;
+      state.paused = true;
+      return;
+    }
+    if (!state.paused) return;
+    state.paused = false;
+    state.last = Date.now() + COMBO_RESUME_GRACE_MS - COMBO_WINDOW_MS;
+    if (state.count > 0) scheduleComboEnd(COMBO_RESUME_GRACE_MS + 50);
+  }, [comboPaused]);
   useEffect(() => () => { if (comboTimerRef.current) window.clearTimeout(comboTimerRef.current); }, []);
   const latestClubGoalId = displayGame.features.cup.matchEvents.filter((event) => event.side === "home").at(-1)?.id ?? null;
   const liveMatch = displayGame.features.cup.active;
@@ -2410,8 +2427,19 @@ function App() {
     showToast(next ? "Vibration an" : "Vibration aus");
   }
 
+  function scheduleComboEnd(delay: number) {
+    if (comboTimerRef.current) window.clearTimeout(comboTimerRef.current);
+    comboTimerRef.current = window.setTimeout(() => {
+      const ended = getComboLevel(comboRef.current.count).multiplier;
+      comboRef.current = { count: 0, last: 0, paused: false };
+      setCombo({ count: 0, multiplier: 1 });
+      if (ended > 1) setComboBurst({ id: Date.now(), text: "Combo vorbei" });
+    }, delay);
+  }
+
   function registerCombo(now: number) {
     const state = comboRef.current;
+    if (state.paused) return getComboLevel(state.count).multiplier;
     const previous = getComboLevel(state.count);
     state.count = now - state.last <= COMBO_WINDOW_MS ? state.count + 1 : 1;
     state.last = now;
@@ -2423,13 +2451,7 @@ function App() {
       playTone(level.multiplier === 3 ? 988 : 784, 0.12, "triangle", 0.045);
       vibrate(level.multiplier === 3 ? [30, 25, 45] : 30);
     }
-    if (comboTimerRef.current) window.clearTimeout(comboTimerRef.current);
-    comboTimerRef.current = window.setTimeout(() => {
-      const ended = getComboLevel(comboRef.current.count).multiplier;
-      comboRef.current = { count: 0, last: 0 };
-      setCombo({ count: 0, multiplier: 1 });
-      if (ended > 1) setComboBurst({ id: Date.now(), text: "Combo vorbei" });
-    }, COMBO_WINDOW_MS + 50);
+    scheduleComboEnd(COMBO_WINDOW_MS + 50);
     return level.multiplier;
   }
 
@@ -2898,7 +2920,7 @@ function App() {
             <button type="button" className={`ball-button${pulse ? " hit" : ""}${combo.multiplier > 1 ? ` combo-${combo.multiplier}` : ""}`} onClick={handleBallClick} onKeyDown={handleBallKeyDown} aria-label={isCoopLive ? "Team-Ball anklicken" : "Fussball anklicken"}><span className="ball-aura" /><FootballGraphic /></button>
             <p className="click-label"><span>CLICK</span> den Ball {isCoopLive ? "fürs Team" : "für Tore"}</p>
             <div className="floating-layer">{effects.map((effect) => <span className={`floating-number${effect.critical ? " critical" : ""}${effect.combo > 1 ? ` combo-${effect.combo}` : ""}`} key={effect.id} style={{ left: effect.x, top: effect.y }}>{effect.critical ? `CRIT! +${formatNumber(effect.amount)}` : `+${formatNumber(effect.amount)}`}</span>)}</div>
-            <div className={`combo-meter level-${combo.multiplier}${combo.count > 1 ? " active" : ""}`} aria-live="polite"><span className="combo-label">{combo.multiplier > 1 ? `COMBO x${combo.multiplier}` : combo.count > 1 ? `${combo.count} Klicks` : "Schnell klicken für Combo"}</span><span className="combo-track"><i style={{ width: `${Math.round(getComboProgress(combo.count) * 100)}%` }} /></span><small>{combo.multiplier === 3 ? "Maximum erreicht" : `Nächste Stufe: x${combo.multiplier + 1}`}</small></div>
+            <div className={`combo-meter level-${combo.multiplier}${combo.count > 1 ? " active" : ""}`} aria-live="polite"><span className="combo-label">{comboPaused && combo.count > 1 ? `Combo pausiert${combo.multiplier > 1 ? ` · x${combo.multiplier}` : ""}` : combo.multiplier > 1 ? `COMBO x${combo.multiplier}` : combo.count > 1 ? `${combo.count} Klicks` : "Schnell klicken für Combo"}</span><span className="combo-track"><i style={{ width: `${Math.round(getComboProgress(combo.count) * 100)}%` }} /></span><small>{combo.multiplier === 3 ? "Maximum erreicht" : `Nächste Stufe: x${combo.multiplier + 1}`}</small></div>
             {comboBurst && <div className={`combo-burst${comboBurst.text === "Combo vorbei" ? " ended" : ""}`} key={comboBurst.id} aria-hidden="true">{comboBurst.text}</div>}
           </div>
           <div className="production-strip"><div className="production-item"><span className="production-icon">/s</span><div><small>PRO SEKUNDE</small><strong>{formatNumber(passivePower)}</strong></div></div><div className="production-divider" /><div className="production-item"><span className="production-icon">+1</span><div><small>PRO KLICK</small><strong>{formatNumber(clickPower)}</strong></div></div><div className="production-divider" /><div className="production-item"><span className="production-icon">#</span><div><small>KLICKS</small><strong>{formatNumber(displayGame.clicks)}</strong></div></div></div>
