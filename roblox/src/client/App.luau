@@ -308,8 +308,8 @@ function App.start()
 		BackgroundColor3 = C.background,
 		BackgroundTransparency = 0.04,
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 44),
-		Size = UDim2.new(1, -16, 1, -52),
+		Position = UDim2.new(0.5, 0, 0, 60),
+		Size = UDim2.new(1, -16, 1, -68),
 		Parent = gui,
 	}, {
 		UI.corner(20),
@@ -348,8 +348,8 @@ function App.start()
 	toggleButton = UI.new("TextButton", {
 		Name = "PanelToggle",
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 6),
-		Size = UDim2.fromOffset(150, 32),
+		Position = UDim2.new(0.5, 0, 0, 14),
+		Size = UDim2.fromOffset(150, 34),
 		BackgroundColor3 = C.text,
 		TextColor3 = C.white,
 		Font = Theme.fonts.bold,

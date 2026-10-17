@@ -83,6 +83,12 @@ function Store.acquire(storeName: string, key: string, force: boolean?): (any?, 
 		end
 		if not ok then
 			warn(("[Store] Laden fehlgeschlagen (%s/%s), Versuch %d: %s"):format(storeName, key, attempt, tostring(problem)))
+			if RunService:IsStudio() then
+				-- Studio without "Enable Studio Access to API Services": keep playing in memory.
+				warn("[Store] Studio ohne Speicherzugriff: Spielstände bleiben nur im Speicher.")
+				available = false
+				return Store.acquire(storeName, key, force)
+			end
 		end
 		task.wait(attempt * 2)
 	end

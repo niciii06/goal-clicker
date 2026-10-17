@@ -58,7 +58,14 @@ Danach den Place neu bauen (`rojo build -o build/GoalClicker.rbxl` im Ordner `ro
 
 ## Testen
 
-Die Spiellogik hat eigene Tests, die ohne Roblox laufen. Sie brauchen `luaurun`, einen kleinen Luau Runner auf Basis von `mlua`. Den Aufbau dazu beschreibt `tests/harness.luau`. `tools/check.sh` führt die Tests und den Typprüfer `luau-lsp` mit den Roblox Definitionen aus.
+`tools/check.sh` führt alle Prüfungen aus:
+
+1. **Logiktests** (`tests/*.spec.luau`): Wirtschaft, Kader, ganze Liga- und Turnierspiele, Minispiele, Prämien und Codes. Sie laufen mit `luaurun`, einem kleinen Luau Runner auf Basis von `mlua` (siehe `tests/harness.luau`).
+2. **Typprüfung** mit `luau-lsp` und den Roblox Definitionen.
+3. **Build** des Places mit Rojo.
+4. **Integrationstest** (`tests/integration/run.luau`) mit [Lune](https://lune-org.github.io). Er lädt den gebauten Place, startet Server und Client mit einer nachgebauten Roblox Umgebung und spielt über die Oberfläche: Klicks, 90 Packs, Beste Elf, Formation, ein Heim- und ein Auswärtsspiel mit Reise und 3D Ansicht, ein Turnierspiel, der Code SILVAN mit Walkout und Koop mit einem zweiten Spieler. Jeder Bildschirm wird dabei auf Fehler geprüft.
+
+Was der Integrationstest nicht prüfen kann: das echte Aussehen (Abstände, Schriftgrössen) und Roblox Dienste wie DataStore. Das bitte in Studio anschauen.
 
 ## Unterschiede zur Website
 
