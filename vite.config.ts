@@ -2,6 +2,7 @@ import vinext from "vinext";
 import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
 import { sites } from "./build/sites-vite-plugin";
+import { clientData } from "./build/client-data-plugin";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
@@ -54,6 +55,7 @@ export default defineConfig(async () => {
     plugins: [
       vinext(),
       sites(),
+      clientData(),
       {
         name: "goal-clicker-client-chunks",
         configEnvironment(name: string) {
@@ -62,12 +64,22 @@ export default defineConfig(async () => {
             build: {
               rolldownOptions: {
                 output: {
+                  // Size based splitting can place modules of one import cycle into different chunks;
+                  // keep the original module execution order so no chunk reads an uninitialised value.
+                  strictExecutionOrder: true,
                   codeSplitting: {
                     maxSize: 350_000,
                     groups: [
                       {
+                        // Loaded in the background after start (see build/client-data-plugin.ts).
+                        name: "routes",
+                        test: /[\\/]app[\\/](route-cache[\\/]|travel-route-cache\.ts)/,
+                        maxSize: 350_000,
+                      },
+                      {
                         name: "game",
-                        test: /[\\/]app[\\/]/,
+                        // Route geometry stays out of the start chunks; it is loaded after the game started.
+                        test: /[\\/]app[\\/](?!route-cache[\\/]|travel-route-cache\.ts)/,
                         maxSize: 350_000,
                       },
                     ],

@@ -9,6 +9,7 @@ import type { Journey, TravelFixture } from './travel-data';
 import { TravelPanel, TravelStatsPanel, durationLabel } from './travel-panel';
 import { LiveMatchViewer } from "./match-viewer";
 import { claimDailyReward } from "./daily-reward";
+import { loadRouteCache } from "./travel-route-cache-lazy";
 import { DailyRewardCard } from "./daily-reward-panel";
 import { answerPressConference, getPressReward } from "./press-conference";
 import { PressConferencePanel } from "./press-conference-panel";
@@ -1494,6 +1495,9 @@ function App() {
   }
 
   const vibrationSupported = hydrated && canVibrate();
+  // Travel previews use exact routes as soon as the background route data arrived.
+  const [, setRoutesLoaded] = useState(false);
+  useEffect(() => { let active = true; void loadRouteCache().then((loaded) => { if (active && loaded) setRoutesLoaded(true); }); return () => { active = false; }; }, []);
   // Full screen announcements (Fabrizio Romario, gazette) pause the combo instead of ending it.
   const comboPaused = Boolean(transferAnnouncement || gazetteAnnouncement);
   useEffect(() => {
