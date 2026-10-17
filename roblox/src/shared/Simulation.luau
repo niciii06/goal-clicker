@@ -405,8 +405,8 @@ function Simulation.refill(sim: any)
 end
 
 -- Commits all actions up to the current real time; fills the cup events, score and statistics.
-function Simulation.advance(cupIn: any, now: number, regularDurationMs: number): any
-	local cup = Util.deepCopy(cupIn)
+-- Mutates and returns the cup (the server owns the state, copying it every second is wasteful).
+function Simulation.advance(cup: any, now: number, regularDurationMs: number): any
 	local sim = cup.simulation
 	if sim.status ~= "running" or cup.matchPaused then
 		return cup
