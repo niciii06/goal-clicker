@@ -173,6 +173,8 @@ export type StarXIPlayer = {
   isCustom?: boolean;
   cardType?: "base" | "icon" | "legendary";
   packWeight?: number;
+  // Not part of FC 27: kept so existing saves stay valid, never drawn again.
+  retired?: boolean;
   originalAttributes?: (typeof FC27_INDIA_PROFILES)[number]["attributes"];
 };
 

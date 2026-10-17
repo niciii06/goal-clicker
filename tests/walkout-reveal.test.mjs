@@ -56,12 +56,14 @@ test("every Icon and current 86+ base card has a fixed appearance", async () => 
     readFile(new URL("../app/fc26-player-pool.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/fc27-ratings.ts", import.meta.url), "utf8"),
   ]);
-  const iconBlock = featureSource.match(/const FC26_ICON_DATA = \[([\s\S]*?)\] as const/)?.[1] ?? "";
+  const iconBlock = [/const FC27_ICON_DATA = \[([\s\S]*?)\] as const/, /const RETIRED_FC26_ICON_DATA = \[([\s\S]*?)\] as const/]
+    .map((pattern) => featureSource.match(pattern)?.[1] ?? "")
+    .join("\n");
   const appearanceBlock = walkoutSource.match(/const ICON_APPEARANCE_BY_PLAYER_ID[^=]*= \{([\s\S]*?)\n\};/)?.[1] ?? "";
   const iconIds = [...iconBlock.matchAll(/^  \["([^"]+)",/gm)].map((match) => `icon-${match[1]}`).sort();
   const appearanceIds = [...appearanceBlock.matchAll(/^  "(icon-[^"]+)":/gm)].map((match) => match[1]).sort();
 
-  assert.equal(iconIds.length, 129);
+  assert.equal(iconIds.length, 143);
   assert.deepEqual(appearanceIds, iconIds);
   assert.match(appearanceBlock, /"icon-ferenc-puskas": \[S1, "slick", BLACK/);
 

@@ -1,7 +1,7 @@
 import { createInteractiveMatch } from './interactive-match';
 import { goalLabel } from './match-goals';
 import { recordedActionRating } from './match-broadcast';
-import { addHistory, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, STAR_XI_PLAYERS, SCRAP_PLAYERS } from './feature-data';
+import { addHistory, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, STAR_XI_ACTIVE_PLAYERS, SCRAP_PLAYERS } from './feature-data';
 import type { CupState, GameFeatures, SeasonMatchHistoryEntry, StarXIPlayer } from './feature-data';
 
 export type PlayerCareerStats = { appearances: number; minutes: number; goals: number; assists: number; ratingTotal: number; ratedMatches: number; motm: number; subAppearances: number; subRatingTotal: number; subMinutes: number; recent: number[] };
@@ -245,12 +245,12 @@ export type AlbumGroup = { id: string; label: string; total: number; collected: 
 export function getAlbumGroups(career: CareerState): AlbumGroup[] {
   const owned = new Set(career.collectedIds), claimed = new Set(career.claimedAlbumRewards);
   const definitions = [
-    { id:'base',label:'Alle Basiskarten',players:STAR_XI_PLAYERS.filter(p=>!p.id.startsWith('scrap-')&&!p.isCustom&&p.cardType!=='icon'&&p.cardType!=='legendary'),reward:10000 },
+    { id:'base',label:'Alle Basiskarten',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>!p.id.startsWith('scrap-')&&!p.isCustom&&p.cardType!=='icon'&&p.cardType!=='legendary'),reward:10000 },
     { id:'scrap',label:'Alle Schrottkarten',players:SCRAP_PLAYERS,reward:500 },
-    { id:'icons',label:'Alle Icons',players:STAR_XI_PLAYERS.filter(p=>p.cardType==='icon'),reward:5000 },
-    { id:'custom',label:'Alle Custom-Karten',players:STAR_XI_PLAYERS.filter(p=>p.isCustom),reward:5000 },
-    { id:'legendary',label:'Alle legendären Karten',players:STAR_XI_PLAYERS.filter(p=>p.cardType==='legendary'),reward:5000 },
-    ...[...new Set(STAR_XI_PLAYERS.map(p=>p.countryCode).filter(Boolean))].sort().map(code=>({ id:`nation-${code}`,label:`Nation ${code}`,players:STAR_XI_PLAYERS.filter(p=>p.countryCode===code),reward:500 })),
+    { id:'icons',label:'Alle Icons',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.cardType==='icon'),reward:5000 },
+    { id:'custom',label:'Alle Custom-Karten',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.isCustom),reward:5000 },
+    { id:'legendary',label:'Alle legendären Karten',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.cardType==='legendary'),reward:5000 },
+    ...[...new Set(STAR_XI_ACTIVE_PLAYERS.map(p=>p.countryCode).filter(Boolean))].sort().map(code=>({ id:`nation-${code}`,label:`Nation ${code}`,players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.countryCode===code),reward:500 })),
   ];
   return definitions.filter(d=>d.players.length).map(d=>({id:d.id,label:d.label,total:d.players.length,collected:d.players.filter(p=>owned.has(p.id)).length,reward:d.reward,claimed:claimed.has(d.id)}));
 }

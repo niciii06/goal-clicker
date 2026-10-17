@@ -1,6 +1,6 @@
 import { evaluateOffside, goalkeeperSaveProbability } from './football-rules';
 import type { OffsideSnapshot } from './football-rules';
-import { getCupMatchMinute, getCupRegularDurationMs, getStarXIPlayer, STAR_XI_PLAYERS, STAR_FORMATIONS } from './feature-data';
+import { canStarXIPlayerPlayPosition, getCupMatchMinute, getCupRegularDurationMs, getStarXIPlayer, STAR_XI_ACTIVE_PLAYERS, STAR_FORMATIONS } from './feature-data';
 import type { CupState, StarPosition, StarXIPlayer } from './feature-data';
 
 export type GoalPattern = 'one-on-one'|'low-shot'|'long-range'|'header'|'cross'|'rebound'|'corner'|'free-kick'|'penalty';
@@ -29,8 +29,8 @@ export function createMatchBroadcast(cup:CupState):MatchBroadcast {
  const cached=rosterCache.get(seed+':'+cup.opponentRating);
  const used=new Set<string>();
  const opponentXI=cached?cached.players.map(p=>({...p})):formation.slots.map((slot,i)=>{
-  const candidates=STAR_XI_PLAYERS.filter(p=>!p.isCustom && p.positions.includes(slot.position)&&!used.has(p.id)).sort((a,b)=>Math.abs(a.rating-cup.opponentRating)-Math.abs(b.rating-cup.opponentRating)||a.id.localeCompare(b.id)).slice(0,12);
-  const player=candidates[Math.floor(broadcastSeed(seed+':player:'+i)*candidates.length)]??STAR_XI_PLAYERS.find(p=>p.positions.includes(slot.position)&&!used.has(p.id))!;
+  const candidates=STAR_XI_ACTIVE_PLAYERS.filter(p=>!p.isCustom && canStarXIPlayerPlayPosition(p,slot.position)&&!used.has(p.id)).sort((a,b)=>Math.abs(a.rating-cup.opponentRating)-Math.abs(b.rating-cup.opponentRating)||a.id.localeCompare(b.id)).slice(0,12);
+  const player=candidates[Math.floor(broadcastSeed(seed+':player:'+i)*candidates.length)]??STAR_XI_ACTIVE_PLAYERS.find(p=>canStarXIPlayerPlayPosition(p,slot.position)&&!used.has(p.id))!;
   used.add(player.id);
   return {id:`opponent-${i}`,sourceId:player.id,name:player.name,position:slot.position,number:i+1,rating:player.rating,slot:i};
  });

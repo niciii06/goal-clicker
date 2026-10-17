@@ -1,6 +1,7 @@
 import type { StarPosition } from "./fc26-player-pool";
 
-// Official EA SPORTS FC 27 launch positions captured on 28 August 2026.
+// Official EA SPORTS FC 27 positions. Launch positions were captured on 28 August 2026;
+// players EA added to the FC 27 ratings database later were captured on 17 October 2026.
 // The first entry is the primary position; following entries are EA alternate positions.
 export const FC27_POSITION_BY_SOURCE_ID: Readonly<Record<string, readonly StarPosition[]>> = {
   "20801": ["ST"],
@@ -79,6 +80,7 @@ export const FC27_POSITION_BY_SOURCE_ID: Readonly<Record<string, readonly StarPo
   "176550": ["TW"],
   "176580": ["ST", "ZOM"],
   "177003": ["ZM", "ZDM", "ZOM"],
+  "177413": ["ZDM", "ZM", "IV"],
   "177683": ["TW"],
   "178509": ["ST"],
   "180930": ["ST"],
@@ -87,6 +89,7 @@ export const FC27_POSITION_BY_SOURCE_ID: Readonly<Record<string, readonly StarPo
   "183569": ["ST", "ZOM"],
   "183711": ["ZDM", "ZM"],
   "183898": ["RF", "RM", "ZOM", "ST"],
+  "184941": ["ST", "ZOM", "ZM"],
   "185122": ["TW"],
   "186146": ["ST"],
   "186153": ["TW"],
@@ -131,6 +134,7 @@ export const FC27_POSITION_BY_SOURCE_ID: Readonly<Record<string, readonly StarPo
   "193283": ["ZDM", "ZM"],
   "193301": ["ST", "ZOM"],
   "193468": ["IV", "LV"],
+  "193474": ["ZDM", "ZM"],
   "193698": ["TW"],
   "193747": ["ZM", "ZDM"],
   "194765": ["ST", "ZOM", "ZM"],
@@ -147,6 +151,7 @@ export const FC27_POSITION_BY_SOURCE_ID: Readonly<Record<string, readonly StarPo
   "199439": ["ST"],
   "199482": ["TW"],
   "199503": ["ZDM", "ZM"],
+  "199564": ["ZDM", "ZM"],
   "199641": ["TW"],
   "199833": ["TW"],
   "200059": ["TW"],
@@ -166,6 +171,7 @@ export const FC27_POSITION_BY_SOURCE_ID: Readonly<Record<string, readonly StarPo
   "201269": ["TW"],
   "201389": ["LV", "LM"],
   "201862": ["IV"],
+  "202024": ["ZDM", "ZM"],
   "202126": ["ST"],
   "202335": ["IV"],
   "202371": ["RV", "RM"],
@@ -194,6 +200,7 @@ export const FC27_POSITION_BY_SOURCE_ID: Readonly<Record<string, readonly StarPo
   "205211": ["TW"],
   "205431": ["ST"],
   "205452": ["IV"],
+  "205686": ["ZOM", "ZM", "ZDM"],
   "205855": ["ST", "ZOM"],
   "205923": ["IV"],
   "205988": ["LV", "ZDM"],
@@ -220,12 +227,16 @@ export const FC27_POSITION_BY_SOURCE_ID: Readonly<Record<string, readonly StarPo
   "208418": ["LF", "LM", "ST"],
   "208448": ["ZOM", "ZM", "ZDM"],
   "208461": ["ZM", "ZDM"],
+  "208574": ["LV", "LM"],
   "208618": ["RV", "RM"],
   "208722": ["LM", "RM", "ST", "LF"],
   "208920": ["IV", "LV", "ZDM"],
   "209297": ["ZM", "ZDM", "ZOM"],
+  "209331": ["RM", "RF", "ZOM", "ST"],
+  "209499": ["ZDM", "ZM", "IV"],
   "209846": ["LV", "LM"],
   "209981": ["TW"],
+  "209989": ["ZDM", "ZM"],
   "210008": ["ZM", "ZDM"],
   "210021": ["ZOM", "ST", "ZM", "ZDM"],
   "210035": ["LM", "LV", "ZOM"],
@@ -243,6 +254,7 @@ export const FC27_POSITION_BY_SOURCE_ID: Readonly<Record<string, readonly StarPo
   "210736": ["LV", "LM"],
   "210881": ["RM", "LM", "ZOM", "RF"],
   "210896": ["ZM", "ZOM", "ZDM"],
+  "210897": ["IV"],
   "210930": ["ZOM", "ST", "ZM"],
   "210935": ["RF", "RM"],
   "211022": ["RM", "RF"],
@@ -419,6 +431,7 @@ export const FC27_POSITION_BY_SOURCE_ID: Readonly<Record<string, readonly StarPo
   "226456": ["ZM", "ZOM", "ZDM"],
   "226491": ["LV", "IV", "LM"],
   "226515": ["IV"],
+  "226537": ["ST", "ZOM", "ZM", "ZDM"],
   "226710": ["ST"],
   "226753": ["TW"],
   "226790": ["ZDM", "ZM"],
@@ -439,6 +452,7 @@ export const FC27_POSITION_BY_SOURCE_ID: Readonly<Record<string, readonly StarPo
   "228251": ["ZOM", "ZM"],
   "228383": ["TW"],
   "228413": ["TW"],
+  "228520": ["ST", "RM", "RF", "ZOM"],
   "228579": ["RV", "RM", "LV", "ZM"],
   "228595": ["ZM", "ZDM"],
   "228618": ["LV"],
@@ -484,6 +498,7 @@ export const FC27_POSITION_BY_SOURCE_ID: Readonly<Record<string, readonly StarPo
   "230977": ["RF", "RM", "LM", "LF"],
   "231102": ["RM", "ZOM", "RF", "ZM"],
   "231184": ["ST"],
+  "231227": ["ZM", "ZDM", "IV"],
   "231237": ["TW"],
   "231281": ["RV", "RM"],
   "231352": ["ST"],
@@ -669,6 +684,7 @@ export const FC27_POSITION_BY_SOURCE_ID: Readonly<Record<string, readonly StarPo
   "240740": ["LM", "LF"],
   "240751": ["TW"],
   "240753": ["ST", "ZOM"],
+  "240796": ["TW"],
   "240833": ["ST"],
   "240834": ["TW"],
   "240856": ["TW"],
@@ -789,6 +805,7 @@ export const FC27_POSITION_BY_SOURCE_ID: Readonly<Record<string, readonly StarPo
   "246350": ["ZOM", "LM", "ZM", "LF"],
   "246417": ["TW"],
   "246420": ["LF", "LM", "RF", "RM"],
+  "246430": ["ST"],
   "246459": ["ST", "LF", "LM", "ZOM"],
   "246606": ["LV", "LM"],
   "246610": ["TW"],
@@ -932,6 +949,7 @@ export const FC27_POSITION_BY_SOURCE_ID: Readonly<Record<string, readonly StarPo
   "256197": ["LV", "IV"],
   "256268": ["ST"],
   "256287": ["ST", "ZOM", "RM", "ZM"],
+  "256341": ["ZM", "RM", "RV", "ZOM"],
   "256407": ["TW"],
   "256420": ["LM", "LF"],
   "256441": ["ZDM", "ZM"],
@@ -1411,7 +1429,7 @@ export const FC27_POSITION_BY_SOURCE_ID: Readonly<Record<string, readonly StarPo
   "279841": ["RF", "RM"],
 };
 
-export const FC27_OFFICIAL_POSITION_COUNT = 1406;
+export const FC27_OFFICIAL_POSITION_COUNT = 1423;
 
 export function getFC27Positions(sourceId: string, fallbackPositions: readonly StarPosition[]) {
   return FC27_POSITION_BY_SOURCE_ID[sourceId] ?? fallbackPositions;

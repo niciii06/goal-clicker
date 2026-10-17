@@ -1,6 +1,8 @@
-// Official EA SPORTS FC 27 launch ratings captured on 24 August 2026.
+// Official EA SPORTS FC 27 ratings. Launch ratings were captured on 24 August 2026;
+// players EA added to the FC 27 ratings database later were captured on 17 October 2026.
 // Stable EA player IDs let the game keep its existing card IDs, aliases and saves.
-// Players absent from the FC 27 launch database deliberately keep their previous rating.
+// Players absent from the FC 27 database keep their previous rating for existing saves,
+// but are no longer drawn from packs (see FC27_UNAVAILABLE_SOURCE_IDS).
 export const FC27_RATING_BY_SOURCE_ID: Readonly<Record<string, number>> = {
   "20801": 84,
   "69967": 74,
@@ -78,6 +80,7 @@ export const FC27_RATING_BY_SOURCE_ID: Readonly<Record<string, number>> = {
   "176550": 74,
   "176580": 78,
   "177003": 85,
+  "177413": 76,
   "177683": 84,
   "178509": 77,
   "180930": 78,
@@ -86,6 +89,7 @@ export const FC27_RATING_BY_SOURCE_ID: Readonly<Record<string, number>> = {
   "183569": 72,
   "183711": 78,
   "183898": 82,
+  "184941": 75,
   "185122": 82,
   "186146": 80,
   "186153": 81,
@@ -130,6 +134,7 @@ export const FC27_RATING_BY_SOURCE_ID: Readonly<Record<string, number>> = {
   "193283": 71,
   "193301": 76,
   "193468": 71,
+  "193474": 79,
   "193698": 84,
   "193747": 81,
   "194765": 84,
@@ -146,6 +151,7 @@ export const FC27_RATING_BY_SOURCE_ID: Readonly<Record<string, number>> = {
   "199439": 76,
   "199482": 75,
   "199503": 85,
+  "199564": 75,
   "199641": 81,
   "199833": 76,
   "200059": 76,
@@ -165,6 +171,7 @@ export const FC27_RATING_BY_SOURCE_ID: Readonly<Record<string, number>> = {
   "201269": 78,
   "201389": 75,
   "201862": 73,
+  "202024": 81,
   "202126": 90,
   "202335": 77,
   "202371": 78,
@@ -193,6 +200,7 @@ export const FC27_RATING_BY_SOURCE_ID: Readonly<Record<string, number>> = {
   "205211": 77,
   "205431": 76,
   "205452": 83,
+  "205686": 73,
   "205855": 77,
   "205923": 74,
   "205988": 79,
@@ -219,12 +227,16 @@ export const FC27_RATING_BY_SOURCE_ID: Readonly<Record<string, number>> = {
   "208418": 82,
   "208448": 76,
   "208461": 80,
+  "208574": 77,
   "208618": 74,
   "208722": 82,
   "208920": 80,
   "209297": 77,
+  "209331": 87,
+  "209499": 82,
   "209846": 75,
   "209981": 82,
+  "209989": 78,
   "210008": 85,
   "210021": 78,
   "210035": 85,
@@ -242,6 +254,7 @@ export const FC27_RATING_BY_SOURCE_ID: Readonly<Record<string, number>> = {
   "210736": 77,
   "210881": 83,
   "210896": 75,
+  "210897": 75,
   "210930": 79,
   "210935": 82,
   "211022": 77,
@@ -418,6 +431,7 @@ export const FC27_RATING_BY_SOURCE_ID: Readonly<Record<string, number>> = {
   "226456": 81,
   "226491": 77,
   "226515": 78,
+  "226537": 76,
   "226710": 78,
   "226753": 78,
   "226790": 75,
@@ -438,6 +452,7 @@ export const FC27_RATING_BY_SOURCE_ID: Readonly<Record<string, number>> = {
   "228251": 78,
   "228383": 81,
   "228413": 79,
+  "228520": 73,
   "228579": 78,
   "228595": 77,
   "228618": 80,
@@ -483,6 +498,7 @@ export const FC27_RATING_BY_SOURCE_ID: Readonly<Record<string, number>> = {
   "230977": 75,
   "231102": 76,
   "231184": 78,
+  "231227": 74,
   "231237": 74,
   "231281": 84,
   "231352": 77,
@@ -668,6 +684,7 @@ export const FC27_RATING_BY_SOURCE_ID: Readonly<Record<string, number>> = {
   "240740": 78,
   "240751": 72,
   "240753": 80,
+  "240796": 74,
   "240833": 71,
   "240834": 76,
   "240856": 69,
@@ -788,6 +805,7 @@ export const FC27_RATING_BY_SOURCE_ID: Readonly<Record<string, number>> = {
   "246350": 80,
   "246417": 73,
   "246420": 84,
+  "246430": 81,
   "246459": 69,
   "246606": 77,
   "246610": 73,
@@ -931,6 +949,7 @@ export const FC27_RATING_BY_SOURCE_ID: Readonly<Record<string, number>> = {
   "256197": 84,
   "256268": 72,
   "256287": 72,
+  "256341": 72,
   "256407": 73,
   "256420": 77,
   "256441": 73,
@@ -1411,18 +1430,23 @@ export const FC27_RATING_BY_SOURCE_ID: Readonly<Record<string, number>> = {
 };
 
 export const FC27_UNAVAILABLE_SOURCE_IDS = [
-  "70651", "157481", "158625", "163587", "164835", "167959", "173030", "173426", "177413", "179813", "181291", "184392",
-  "184432", "184941", "189332", "189505", "189511", "189513", "189805", "189881", "190813", "191740", "192641", "193061",
-  "193082", "193198", "193352", "193474", "193476", "195365", "197445", "198717", "198951", "199564", "199813", "199845",
-  "199987", "201399", "202024", "202556", "202652", "204311", "204485", "204963", "205686", "205693", "207948", "208574",
-  "208596", "208670", "208830", "209331", "209499", "209658", "209889", "209989", "210243", "210372", "210897", "211300",
-  "212190", "212501", "216258", "216352", "219145", "220093", "222509", "225533", "226537", "226754", "227813", "228520",
-  "230182", "230204", "230258", "230312", "230318", "230320", "230347", "230384", "230430", "230481", "230498", "230938",
-  "231227", "231652", "233049", "233927", "235413", "235569", "236480", "239956", "240796", "245370", "246430", "256341",
-  "257635", "259465", "262417", "263397", "263673", "264299", "266789", "269511", "271571", "274212", "279786",
+  "70651", "157481", "158625", "163587", "164835", "167959", "173030", "173426", "179813", "181291", "184392", "184432",
+  "189332", "189505", "189511", "189513", "189805", "189881", "190813", "191740", "192641", "193061", "193082", "193198",
+  "193352", "193476", "195365", "197445", "198717", "198951", "199813", "199845", "199987", "201399", "202556", "202652",
+  "204311", "204485", "204963", "205693", "207948", "208596", "208670", "208830", "209658", "209889", "210243", "210372",
+  "211300", "212190", "212501", "216258", "216352", "219145", "220093", "222509", "225533", "226754", "227813", "230182",
+  "230204", "230258", "230312", "230318", "230320", "230347", "230384", "230430", "230481", "230498", "230938", "231652",
+  "233049", "233927", "235413", "235569", "236480", "239956", "245370", "257635", "259465", "262417", "263397", "263673",
+  "264299", "266789", "269511", "271571", "274212", "279786",
 ] as const;
 
-export const FC27_OFFICIAL_RATING_COUNT = 1406;
+export const FC27_OFFICIAL_RATING_COUNT = 1423;
+
+const FC27_UNAVAILABLE_SOURCE_ID_SET = new Set<string>(FC27_UNAVAILABLE_SOURCE_IDS);
+
+export function isFC27Unavailable(sourceId: string | undefined) {
+  return !!sourceId && FC27_UNAVAILABLE_SOURCE_ID_SET.has(sourceId);
+}
 
 export function getFC27Rating(sourceId: string, fallbackRating: number) {
   return FC27_RATING_BY_SOURCE_ID[sourceId] ?? fallbackRating;

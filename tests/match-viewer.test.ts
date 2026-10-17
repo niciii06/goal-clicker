@@ -42,7 +42,7 @@ test("visual match events come exclusively from recorded authoritative goal, car
 });
 
 import { baseActors, clubAttacksRight, getVisualFrame, type Replay } from '../app/match-viewer.tsx';
-import { STAR_FORMATIONS, STAR_XI_PLAYERS, setBestStarXI, getStarXISelection, advanceCupMatch, normalizeGameFeatures } from '../app/feature-data.ts';
+import { STAR_FORMATIONS, STAR_XI_PLAYERS, canStarXIPlayerPlayPosition, setBestStarXI, getStarXISelection, advanceCupMatch, normalizeGameFeatures } from '../app/feature-data.ts';
 import { recordCareerMatch } from '../app/career-data.ts';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
@@ -63,7 +63,7 @@ test('all formation slots render one unique actor with valid bounded coordinates
     f.starXI.formationId=formation.id;
     f.starXI.formationPositions=formation.slots.map(s=>s.position);
     f.starXI.lineupIds=formation.slots.map(slot=>{
-      const p=STAR_XI_PLAYERS.find(p=>p.positions.includes(slot.position)&&!used.has(p.id))!;
+      const p=STAR_XI_PLAYERS.find(p=>canStarXIPlayerPlayPosition(p,slot.position)&&!used.has(p.id))!;
       used.add(p.id);return p.id;
     });
     f.cup=beginSeasonCupMatch(f.cup,f.seasonMode,1_000_000,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions,f.starXI.lineupIds);

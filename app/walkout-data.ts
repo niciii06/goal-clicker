@@ -42,6 +42,7 @@ const COUNTRY: Record<string, { name: string; flag: string; kit: [string, string
   BE: { name: "Belgien", flag: "🇧🇪", kit: ["#e31b23", "#111111"] },
   BR: { name: "Brasilien", flag: "🇧🇷", kit: ["#ffdf00", "#009c3b"] },
   BG: { name: "Bulgarien", flag: "🇧🇬", kit: ["#ffffff", "#00966e"] },
+  CA: { name: "Kanada", flag: "🇨🇦", kit: ["#d52b1e", "#ffffff"] },
   CH: { name: "Schweiz", flag: "🇨🇭", kit: ["#d71920", "#ffffff"] },
   CM: { name: "Kamerun", flag: "🇨🇲", kit: ["#007a5e", "#ce1126"] },
   CO: { name: "Kolumbien", flag: "🇨🇴", kit: ["#fcd116", "#003893"] },
@@ -462,7 +463,7 @@ type IconAppearance = readonly [
   celebration: WalkoutCelebration,
 ];
 
-// Every FC26 Icon has a fixed, reference-checked prime-era appearance. Keeping
+// Every FC 26 and FC 27 Icon has a fixed prime-era appearance. Keeping
 // this map separate from the generated player pool prevents an Icon from
 // inheriting a random skin tone, haircut or body shape when the pool changes.
 const ICON_APPEARANCE_BY_PLAYER_ID: Record<string, IconAppearance> = {
@@ -595,6 +596,20 @@ const ICON_APPEARANCE_BY_PLAYER_ID: Record<string, IconAppearance> = {
   "icon-sissi": [S3, "curls", BLACK, "clean", "oval", .94, .86, "point"],
   "icon-juan-sebastian-veron": [S2, "bald", BLACK, "goatee", "angular", 1.03, 1.00, "calm"],
   "icon-gianluca-zambrotta": [S2, "medium", BROWN, "clean", "square", 1.01, .97, "fist"],
+  "icon-christine-sinclair": [S1, "pony", BROWN, "clean", "long", 1.01, .90, "arms"],
+  "icon-ellen-white": [S1, "pony", LIGHT_BROWN, "clean", "oval", 1.00, .90, "point"],
+  "icon-formiga": [S4, "crop", BLACK, "clean", "oval", .94, .86, "arms"],
+  "icon-hege-riise": [S1, "crop", BLOND, "clean", "oval", .97, .88, "fist"],
+  "icon-jean-pierre-papin": [S1, "medium", BROWN, "clean", "long", 1.02, .95, "arms"],
+  "icon-karl-heinz-rummenigge": [S1, "curls", BLOND, "clean", "oval", 1.05, .97, "fist"],
+  "icon-lucio": [S3, "bald", BLACK, "clean", "square", 1.08, 1.03, "fist"],
+  "icon-maicon": [S4, "bald", BLACK, "clean", "round", 1.06, 1.04, "arms"],
+  "icon-pepe": [S3, "bald", BLACK, "stubble", "square", 1.09, 1.03, "fist"],
+  "icon-raphael-varane": [S4, "buzz", BLACK, "clean", "long", 1.10, 1.00, "calm"],
+  "icon-sergio-aguero": [S2, "crop", BLACK, "stubble", "round", .99, 1.00, "arms"],
+  "icon-tobin-heath": [S1, "pony", BROWN, "clean", "oval", .97, .87, "point"],
+  "icon-yaya-toure": [S5, "bald", BLACK, "short", "long", 1.10, 1.08, "arms"],
+  "icon-yuki-nagasato": [S2, "pony", BLACK, "clean", "oval", .95, .86, "jump"],
 };
 
 function fromIconAppearance(player: StarXIPlayer, appearance: IconAppearance): WalkoutPresentation {

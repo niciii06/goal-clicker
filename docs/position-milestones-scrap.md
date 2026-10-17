@@ -27,3 +27,14 @@ The old 60 fictional cards are completely removed at the user's request. Save no
 Validation: 100,000 production draws yielded 50,167 / 34,892 / 12,958 / 1,983. Chi-square across individual players was 216.957 (217 degrees of freedom), under the test threshold of 300. Every player was sampled and deterministic quantile checks confirm all players are reachable. Tests cover complete source matching, original attributes, save normalization, positional eligibility, milestone upgrades, albums, season match lifecycle, API charging/duplicates and legacy removal. Random pulls no longer guarantee a full team after eleven purchases. Formations requiring positions absent from the official pool still require compatible players from elsewhere; no positions are invented.
 
 Interactive browser QA is unavailable; production build, server-rendered markup, game logic, saves and API handlers are checked.
+
+## FC 27 Datenbank und Icons: Update vom 17. Oktober 2026
+
+Quelle für Basiskarten: die offizielle EA SPORTS FC 27 Ratings-Datenbank auf https://www.ea.com/games/ea-sports-fc/ratings (alle 198 Seiten, 19'789 Spieler). Die bisherigen Launch-Werte stimmen für alle 1'394 noch gelisteten Spieler exakt mit Rating und Positionen überein. 17 Spieler, die EA nach dem Launch ergänzt hat (zum Beispiel Salah 87, Vlahović 81, Partey 78), haben jetzt ihre FC 27 Werte. Damit gibt es 1'423 offizielle FC 27 Einträge.
+
+90 Basis- und YB-Karten gibt es in FC 27 nicht mehr. Sie stehen in `FC27_UNAVAILABLE_SOURCE_IDS`, tragen `retired: true` und werden aus keinem Pack mehr gezogen (Shop, Schrott und Prämien). Wer sie besitzt, behält sie mit dem bisherigen Rating. Im Sammelalbum erscheinen sie nur noch bei Spielern, die sie bereits gesammelt haben, und zählen nicht mehr zu den Sammlungsprämien.
+
+Icons: alle 136 FC 27 Base Icons aus dem Ultimate Team Katalog (FUT.GG Spiegel der EA Spieldaten, abgerufen am 17. Oktober 2026), mit FC 27 Rating, Positionen und Nation. Bestehende Icon-IDs und Namen bleiben für Spielstände erhalten. 14 Icons sind neu, darunter Sinclair, Agüero, Yaya Touré und Varane, alle mit festem Walkout-Aussehen. Die 7 FC 26 Icons ohne FC 27 Karte (Yashin, Kluivert, Šuker, Zola, Luis Hernández, Larsson, Verón) sind wie oben aus den Packs genommen.
+
+FC 27 kennt keine Positionen LAV, RAV und MS mehr. Damit Fünferketten spielbar bleiben, decken LV und RV die Flügelverteidiger-Slots ab und ST den MS-Slot. Angezeigt werden weiterhin nur die offiziellen Positionen.
+Protokoll 12 verhindert, dass ältere Koop-Clients die neuen Icon-IDs aus gemeinsamen Spielständen entfernen.

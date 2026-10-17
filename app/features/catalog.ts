@@ -3,7 +3,7 @@ import type { CoopMission, StarFormationDefinition, StarFormationId, StarXIPlaye
 import type { StarPosition } from "../fc26-player-pool";
 import { FC27_INDIA_PROFILES } from "../scrap-pack";
 import { getFC27Positions } from "../fc27-positions";
-import { getFC27Rating } from "../fc27-ratings";
+import { getFC27Rating, isFC27Unavailable } from "../fc27-ratings";
 import { getFunnyPlayerName } from "../funny-player-names";
 
 export const STAR_POSITIONS: readonly StarPosition[] = ["TW", "LV", "LAV", "IV", "RV", "RAV", "ZDM", "ZM", "ZOM", "LM", "RM", "LF", "RF", "MS", "ST"];
@@ -239,6 +239,7 @@ export const YB_FC26_PLAYERS: StarXIPlayer[] = YB_FC26_PLAYER_SEEDS.map(([source
     rating,
     price: Math.round(Math.min(1500000000, 5000 * 1.28 ** (rating - 70))),
     accent: "#f4c400",
+    ...(isFC27Unavailable(sourceId) ? { retired: true } : {}),
   };
 });
 

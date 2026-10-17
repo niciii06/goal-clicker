@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { FC27_OFFICIAL_POSITION_COUNT, FC27_POSITION_BY_SOURCE_ID } from "../app/fc27-positions.ts";
 import { FC27_OFFICIAL_RATING_COUNT, FC27_RATING_BY_SOURCE_ID, FC27_UNAVAILABLE_SOURCE_IDS } from "../app/fc27-ratings.ts";
-import { activatePendingTransferLoans, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupMatchStrength, getCupPlayerMatchRating, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarXIEffectiveMatchRating, getStarXIPlayerMatchRating, getStarXISelection, getStarXIFragmentCompensation, getTournamentGoalBoostMultiplier, getTournamentOpponentSchedule, getTransferDeadlineEventDelay, getTransferEventDelay, getUnavailableStarXIPlayerIds, initialGameFeatures, initialSeasonMode, isTransferDeadlineDay, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, playSeasonModeMatch, recordSeasonModeMatch, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, startTournamentGoalBoost, STAR_PACKS, STAR_XI_BENCH_SIZE, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE, TOURNAMENTS, TOURNAMENT_COOLDOWN_MS, TOURNAMENT_OPPONENT_MULTIPLIER, TOURNAMENT_GOAL_BOOST_DURATION_MS, TRANSFER_DEADLINE_LOAN_CHANCE, TRANSFER_LOAN_CHANCE, TRANSFER_PAID_SALE_CHANCE, TRANSFER_SALE_CHANCE, YB_FC26_SOURCE_IDS } from "../app/feature-data.ts";
+import { activatePendingTransferLoans, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, canStarXIPlayerPlayPosition, completeTournamentRun, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupMatchStrength, getCupPlayerMatchRating, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarXIEffectiveMatchRating, getStarXIPlayerMatchRating, getStarXISelection, getStarXIFragmentCompensation, getTournamentGoalBoostMultiplier, getTournamentOpponentSchedule, getTransferDeadlineEventDelay, getTransferEventDelay, getUnavailableStarXIPlayerIds, initialGameFeatures, initialSeasonMode, isTransferDeadlineDay, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, playSeasonModeMatch, recordSeasonModeMatch, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, startTournamentGoalBoost, REWARD_PACKS, getRewardPackOdds, getStarXIPlayer, STAR_PACKS, STAR_XI_ACTIVE_PLAYERS, STAR_XI_BENCH_SIZE, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE, TOURNAMENTS, TOURNAMENT_COOLDOWN_MS, TOURNAMENT_OPPONENT_MULTIPLIER, TOURNAMENT_GOAL_BOOST_DURATION_MS, TRANSFER_DEADLINE_LOAN_CHANCE, TRANSFER_LOAN_CHANCE, TRANSFER_PAID_SALE_CHANCE, TRANSFER_SALE_CHANCE, YB_FC26_SOURCE_IDS } from "../app/feature-data.ts";
 import { getPackUnlockSeason, getSeasonPath } from "../app/season-progression.ts";
 import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../app/upgrade-purchase.ts";
 
@@ -143,8 +143,8 @@ test("FC27 ratings cover every current base card without changing stable player 
   const basePlayers = STAR_XI_PLAYERS.filter((player) => !player.isCustom && !player.cardType);
 
   assert.equal(officialIds.length, FC27_OFFICIAL_RATING_COUNT);
-  assert.equal(FC27_OFFICIAL_RATING_COUNT, 1406);
-  assert.equal(unavailableIds.size, 107);
+  assert.equal(FC27_OFFICIAL_RATING_COUNT, 1423);
+  assert.equal(unavailableIds.size, 90);
   assert.deepEqual(officialIds.filter((sourceId) => unavailableIds.has(sourceId)), []);
   assert.equal(new Set(basePlayers.map((player) => player.sourceId)).size, basePlayers.length);
   assert.deepEqual(
@@ -163,7 +163,7 @@ test("FC27 primary and alternate positions cover the same official base cards", 
   const allowedPositions = new Set(["TW", "LV", "LAV", "IV", "RV", "RAV", "ZDM", "ZM", "ZOM", "LM", "RM", "LF", "RF", "MS", "ST"]);
   const basePlayers = STAR_XI_PLAYERS.filter((player) => !player.isCustom && !player.cardType);
 
-  assert.equal(FC27_OFFICIAL_POSITION_COUNT, 1406);
+  assert.equal(FC27_OFFICIAL_POSITION_COUNT, 1423);
   assert.equal(positionIds.length, FC27_OFFICIAL_POSITION_COUNT);
   assert.deepEqual(positionIds, ratingIds);
   assert.deepEqual(positionIds.filter((sourceId) => unavailableIds.has(sourceId)), []);
@@ -184,6 +184,62 @@ test("FC27 primary and alternate positions cover the same official base cards", 
   assert.deepEqual(FC27_POSITION_BY_SOURCE_ID["234378"], ["ZDM", "ZM"]);
   assert.deepEqual(FC27_POSITION_BY_SOURCE_ID["231747"], ["ST", "LF"]);
   assert.deepEqual(FC27_POSITION_BY_SOURCE_ID["277643"], ["RF", "RM"]);
+});
+
+test("players EA added to FC 27 after launch carry their official rating and positions", () => {
+  assert.equal(FC27_RATING_BY_SOURCE_ID["209331"], 87);
+  assert.deepEqual(FC27_POSITION_BY_SOURCE_ID["209331"], ["RM", "RF", "ZOM", "ST"]);
+  assert.equal(FC27_RATING_BY_SOURCE_ID["246430"], 81);
+  assert.equal(FC27_RATING_BY_SOURCE_ID["209989"], 78);
+  const salah = STAR_XI_PLAYERS.find((player) => player.sourceId === "209331")!;
+  assert.equal(salah.rating, 87);
+  assert.equal(salah.retired, undefined);
+});
+
+test("cards missing from FC 27 stay valid for saves but never come from packs", () => {
+  const unavailableIds = new Set<string>(FC27_UNAVAILABLE_SOURCE_IDS);
+  const retired = STAR_XI_PLAYERS.filter((player) => player.retired);
+  assert.equal(retired.filter((player) => player.cardType === "icon").length, 7);
+  assert.equal(retired.filter((player) => player.cardType !== "icon").length, unavailableIds.size);
+  retired.filter((player) => player.cardType !== "icon").forEach((player) => assert.ok(unavailableIds.has(player.sourceId!)));
+  assert.equal(getStarXIPlayer("icon-lev-yashin")?.retired, true);
+  assert.equal(getStarXIPlayer("yb-225533")?.retired, true);
+  assert.equal(STAR_XI_ACTIVE_PLAYERS.length, STAR_XI_PLAYERS.length - retired.length);
+
+  // Every drawable card has an official FC 27 rating, apart from the fictional special and custom cards.
+  STAR_XI_ACTIVE_PLAYERS.filter((player) => player.sourceId && !player.id.startsWith("scrap-")).forEach((player) => {
+    assert.equal(player.rating, FC27_RATING_BY_SOURCE_ID[player.sourceId!] ?? player.rating);
+    assert.ok(player.sourceId! in FC27_RATING_BY_SOURCE_ID || player.countryCode === "IN", `${player.id} has no FC 27 rating`);
+  });
+
+  let seed = 7;
+  const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  for (const pack of STAR_PACKS) {
+    for (let pull = 0; pull < 2000; pull += 1) assert.equal(openStarPack(pack.id, [], random).player.retired, undefined);
+  }
+  for (const pack of REWARD_PACKS) {
+    getRewardPackOdds(pack.id as Parameters<typeof getRewardPackOdds>[0]).forEach((group) => assert.ok(group.players.every((player) => !player.retired)));
+  }
+});
+
+test("FC 27 full-backs cover wing-back slots and strikers cover centre-forward", () => {
+  const leftBack = STAR_XI_PLAYERS.find((player) => !player.retired && player.positions.length === 1 && player.positions[0] === "LV")!;
+  const rightBack = STAR_XI_PLAYERS.find((player) => !player.retired && player.positions.length === 1 && player.positions[0] === "RV")!;
+  const striker = STAR_XI_PLAYERS.find((player) => !player.retired && player.positions.length === 1 && player.positions[0] === "ST")!;
+  assert.ok(canStarXIPlayerPlayPosition(leftBack, "LAV"));
+  assert.ok(canStarXIPlayerPlayPosition(rightBack, "RAV"));
+  assert.ok(canStarXIPlayerPlayPosition(striker, "MS"));
+  assert.ok(!canStarXIPlayerPlayPosition(leftBack, "RAV"));
+  assert.ok(!canStarXIPlayerPlayPosition(striker, "LAV"));
+});
+
+test("all 136 FC 27 Icons are in the game with FC 27 ratings", () => {
+  const icons = STAR_XI_ACTIVE_PLAYERS.filter((player) => player.cardType === "icon");
+  assert.equal(icons.length, 136);
+  assert.ok(icons.every((player) => player.rating >= 88 && player.rating <= 95));
+  assert.equal(getStarXIPlayer("icon-ronaldo")?.rating, 94);
+  assert.equal(getStarXIPlayer("icon-yaya-toure")?.retired, undefined);
+  assert.equal(getStarXIPlayer("icon-christine-sinclair")?.countryCode, "CA");
 });
 
 test("late season targets keep growing instead of collapsing into ten second seasons", () => {
