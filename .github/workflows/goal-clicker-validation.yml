@@ -13,7 +13,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,3 +32,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - name: Run tests
         run: npm test
+      - name: Install Chromium for browser tests
+        run: npx playwright-core install --with-deps chromium
+      - name: Run browser smoke tests against the production build
+        run: npm run test:browser
