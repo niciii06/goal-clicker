@@ -38,3 +38,11 @@ Icons: alle 136 FC 27 Base Icons aus dem Ultimate Team Katalog (FUT.GG Spiegel d
 
 FC 27 kennt keine Positionen LAV, RAV und MS mehr. Damit Fünferketten spielbar bleiben, decken LV und RV die Flügelverteidiger-Slots ab und ST den MS-Slot. Angezeigt werden weiterhin nur die offiziellen Positionen.
 Protokoll 12 verhindert, dass ältere Koop-Clients die neuen Icon-IDs aus gemeinsamen Spielständen entfernen.
+
+## FC 27 Spielerinnen: Update vom 17. Oktober 2026
+
+Alle 1'220 Spielerinnen mit Rating 70 oder höher aus der offiziellen FC 27 Ratings-Datenbank sind jetzt Basiskarten (`app/fc27-women-pool.ts`, IDs `star-fc27w-<EA-ID>`). Rating und Positionen stehen wie bei den Männern in den gemeinsamen FC 27 Tabellen (jetzt 2'643 offizielle Einträge). Jede Karte trägt ihre Nation, die Namen folgen derselben Schreibweise mit geändertem Schlussbuchstaben.
+
+Die Spielerinnen laufen in denselben Packs, Prämien, Gegnerteams und Sammelalben wie alle anderen Basiskarten. In den Shop-Packs sind 939 von 1'929 Standardkarten (65 bis 79) Spielerinnen, 243 von 625 seltenen (80 bis 85), 35 von 89 Walkouts (86 bis 89) und 3 von 14 Top-Walkouts (90+).
+
+Die 38 Spielerinnen ab Rating 86 haben ein festes Walkout-Aussehen. Für alle anderen gibt es einen eigenen Rückfall-Look ohne Bart und mit passenden Frisuren. 33 neue Nationen haben Walkout-Farben und echte Flaggen bekommen, dabei auch Kanada für das neue Icon Christine Sinclair. Protokoll 13 schützt die neuen Karten vor älteren Koop-Clients.

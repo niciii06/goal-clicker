@@ -9,6 +9,7 @@ import type { Venue } from "./travel-geography";
 import { ASSIST_POSITION_WEIGHTS, DEFENSIVE_FAULT_WEIGHTS, GOAL_POSITION_WEIGHTS, MISSION_TEMPLATES, STAR_FORMATIONS, STAR_POSITIONS, STAR_XI_FORMATION_POSITIONS, TOURNAMENTS, TRANSFER_PLAYERS, YB_FC26_PLAYERS, getStarFormation, specialAttributes } from "./features/catalog";
 import { FC26_STAR_PROFILES } from "./fc26-player-pool";
 import { isFC27Unavailable } from "./fc27-ratings";
+import { FC27_WOMEN_PROFILES } from "./fc27-women-pool";
 import { FC27_INDIA_PROFILES, SCRAP_RATING_GROUPS, drawScrapPlayer } from "./scrap-pack";
 import { GAZETTE_CHAMPION_HEADLINES, GAZETTE_EXIT_HEADLINES, TRANSFER_INTERESTED_CLUBS } from "./features/news-data";
 import { HOME_VENUE, LEAGUE_LABELS, seasonGeography, venueForClubName } from "./travel-geography";
@@ -481,6 +482,18 @@ const EXISTING_STAR_XI_PLAYERS: StarXIPlayer[] = [
     price: Math.round(Math.min(1500000000, 5000 * 1.28 ** (profile.rating - 70))),
     accent: profile.accent,
     ...(isFC27Unavailable(profile.sourceId) ? { retired: true } : {}),
+  })),
+  ...FC27_WOMEN_PROFILES.map((profile) => ({
+    id: profile.id,
+    sourceId: profile.sourceId,
+    countryCode: profile.countryCode,
+    name: profile.name,
+    position: profile.positions[0],
+    positions: [...profile.positions],
+    rating: profile.rating,
+    price: Math.round(Math.min(1500000000, 5000 * 1.28 ** (profile.rating - 70))),
+    accent: profile.accent,
+    isWomen: true,
   })),
 ];
 

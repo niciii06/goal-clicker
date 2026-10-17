@@ -83,6 +83,39 @@ const COUNTRY: Record<string, { name: string; flag: string; kit: [string, string
   UY: { name: "Uruguay", flag: "🇺🇾", kit: ["#5bc0eb", "#111111"] },
   WA: { name: "Wales", flag: "🏴", kit: ["#d30731", "#ffffff"] },
   GH: { name: "Ghana", flag: "🇬🇭", kit: ["#ffffff", "#ce1126"] },
+  AL: { name: "Albanien", flag: "🇦🇱", kit: ["#e41e20", "#111111"] },
+  AT: { name: "Österreich", flag: "🇦🇹", kit: ["#ed2939", "#ffffff"] },
+  AU: { name: "Australien", flag: "🇦🇺", kit: ["#ffcd00", "#00843d"] },
+  AZ: { name: "Aserbaidschan", flag: "🇦🇿", kit: ["#ffffff", "#00b5e2"] },
+  BF: { name: "Burkina Faso", flag: "🇧🇫", kit: ["#009e49", "#ef2b2d"] },
+  CD: { name: "DR Kongo", flag: "🇨🇩", kit: ["#007fff", "#ce1021"] },
+  CL: { name: "Chile", flag: "🇨🇱", kit: ["#d52b1e", "#0039a6"] },
+  CN: { name: "China", flag: "🇨🇳", kit: ["#de2910", "#ffde00"] },
+  CR: { name: "Costa Rica", flag: "🇨🇷", kit: ["#ce1126", "#002b7f"] },
+  DZ: { name: "Algerien", flag: "🇩🇿", kit: ["#ffffff", "#006233"] },
+  FI: { name: "Finnland", flag: "🇫🇮", kit: ["#ffffff", "#002f6c"] },
+  GM: { name: "Gambia", flag: "🇬🇲", kit: ["#ce1126", "#0c1c8c"] },
+  GR: { name: "Griechenland", flag: "🇬🇷", kit: ["#ffffff", "#0d5eaf"] },
+  GT: { name: "Guatemala", flag: "🇬🇹", kit: ["#ffffff", "#4997d0"] },
+  HT: { name: "Haiti", flag: "🇭🇹", kit: ["#00209f", "#d21034"] },
+  IL: { name: "Israel", flag: "🇮🇱", kit: ["#ffffff", "#0038b8"] },
+  IS: { name: "Island", flag: "🇮🇸", kit: ["#02529c", "#ffffff"] },
+  JM: { name: "Jamaika", flag: "🇯🇲", kit: ["#fed100", "#009b3a"] },
+  KN: { name: "St. Kitts und Nevis", flag: "🇰🇳", kit: ["#009e49", "#ce1126"] },
+  ME: { name: "Montenegro", flag: "🇲🇪", kit: ["#c40308", "#d4af37"] },
+  ML: { name: "Mali", flag: "🇲🇱", kit: ["#14b53a", "#fcd116"] },
+  MW: { name: "Malawi", flag: "🇲🇼", kit: ["#ce1126", "#111111"] },
+  NZ: { name: "Neuseeland", flag: "🇳🇿", kit: ["#ffffff", "#111111"] },
+  PA: { name: "Panama", flag: "🇵🇦", kit: ["#da121a", "#ffffff"] },
+  PH: { name: "Philippinen", flag: "🇵🇭", kit: ["#0038a8", "#ce1126"] },
+  PY: { name: "Paraguay", flag: "🇵🇾", kit: ["#d52b1e", "#ffffff"] },
+  SK: { name: "Slowakei", flag: "🇸🇰", kit: ["#ffffff", "#0b4ea2"] },
+  SN: { name: "Senegal", flag: "🇸🇳", kit: ["#ffffff", "#00853f"] },
+  SR: { name: "Suriname", flag: "🇸🇷", kit: ["#377e3f", "#ffffff"] },
+  VE: { name: "Venezuela", flag: "🇻🇪", kit: ["#7b1e2b", "#ffffff"] },
+  XK: { name: "Kosovo", flag: "🇽🇰", kit: ["#244aa5", "#d0a650"] },
+  ZA: { name: "Südafrika", flag: "🇿🇦", kit: ["#ffb612", "#007a4d"] },
+  ZM: { name: "Sambia", flag: "🇿🇲", kit: ["#198a00", "#ef7d00"] },
 };
 
 const S1 = "#f3c6a5";
@@ -612,6 +645,49 @@ const ICON_APPEARANCE_BY_PLAYER_ID: Record<string, IconAppearance> = {
   "icon-yuki-nagasato": [S2, "pony", BLACK, "clean", "oval", .95, .86, "jump"],
 };
 
+// Fixed appearances for every FC 27 women's card rated 86+, so the top walkouts
+// never fall back to a rolled look. Lower-rated women use the women's fallback.
+const WOMEN_APPEARANCE_BY_SOURCE_ID: Record<string, IconAppearance> = {
+  "227203": [S1, "pony", BROWN, "clean", "oval", .97, .88, "point"],
+  "241667": [S1, "pony", BROWN, "clean", "oval", .92, .84, "arms"],
+  "246219": [S5, "locs", BLACK, "clean", "long", 1.02, .96, "arms"],
+  "262531": [S2, "pony", BLACK, "clean", "oval", .91, .85, "jump"],
+  "227102": [S1, "pony", BLOND, "clean", "long", .97, .88, "calm"],
+  "241846": [S1, "pony", BLOND, "clean", "oval", .94, .87, "fist"],
+  "279799": [S5, "braids", BLACK, "clean", "round", .90, .86, "jump"],
+  "237288": [S1, "pony", BROWN, "clean", "oval", .93, .86, "point"],
+  "248822": [S1, "pony", BLOND, "clean", "oval", .94, .86, "arms"],
+  "265898": [S5, "braids", BLACK, "clean", "round", .94, .88, "jump"],
+  "258980": [S1, "pony", BROWN, "clean", "long", .99, .89, "calm"],
+  "276359": [S5, "crop", BLACK, "clean", "round", .91, .90, "jump"],
+  "237289": [S1, "pony", BROWN, "clean", "oval", .94, .87, "fist"],
+  "236479": [S1, "crop", BROWN, "clean", "angular", .95, .88, "fist"],
+  "245830": [S2, "pony", BLACK, "clean", "oval", .89, .84, "calm"],
+  "264012": [S4, "braids", BLACK, "clean", "oval", .95, .87, "point"],
+  "269404": [S3, "pony", BLACK, "clean", "long", .96, .86, "arms"],
+  "258310": [S1, "crop", BLOND, "clean", "square", .99, .92, "fist"],
+  "233746": [S1, "pony", LIGHT_BROWN, "clean", "long", 1.00, .88, "calm"],
+  "259287": [S1, "pony", BLOND, "clean", "oval", .95, .87, "arms"],
+  "227361": [S5, "braids", BLACK, "clean", "long", .93, .86, "jump"],
+  "278219": [S5, "braids", BLACK, "clean", "round", .89, .86, "jump"],
+  "227190": [S1, "pony", BROWN, "clean", "angular", .98, .91, "fist"],
+  "232075": [S1, "pony", BROWN, "clean", "oval", .92, .85, "point"],
+  "253436": [S1, "pony", BROWN, "clean", "oval", .93, .85, "arms"],
+  "263009": [S1, "pony", BROWN, "clean", "oval", .98, .90, "fist"],
+  "257008": [S1, "pony", LIGHT_BROWN, "clean", "oval", .96, .87, "arms"],
+  "266928": [S4, "braids", BLACK, "clean", "long", .97, .86, "point"],
+  "226893": [S3, "curls", BLACK, "clean", "round", .87, .86, "jump"],
+  "233662": [S2, "pony", BLACK, "clean", "oval", .92, .86, "fist"],
+  "243404": [S1, "pony", BLOND, "clean", "oval", .92, .88, "fist"],
+  "265239": [S1, "crop", LIGHT_BROWN, "clean", "oval", .93, .86, "fist"],
+  "265674": [S2, "pony", BROWN, "clean", "oval", .89, .84, "arms"],
+  "231432": [S1, "pony", BROWN, "clean", "oval", .92, .85, "point"],
+  "245879": [S1, "pony", LIGHT_BROWN, "clean", "oval", .95, .86, "calm"],
+  "257001": [S1, "pony", BROWN, "clean", "oval", .94, .86, "arms"],
+  "227323": [S1, "pony", BLOND, "clean", "oval", .94, .86, "arms"],
+  "246272": [S5, "braids", BLACK, "clean", "oval", .98, .90, "point"],
+};
+
 function fromIconAppearance(player: StarXIPlayer, appearance: IconAppearance): WalkoutPresentation {
   const [skin, hair, hairColor, beard, face, height, build, celebration] = appearance;
   const countryCode = player.countryCode && COUNTRY[player.countryCode] ? player.countryCode : "CH";
@@ -652,8 +728,8 @@ function fallbackProfile(player: StarXIPlayer): WalkoutPresentation {
     }
   }
   const countries = Object.keys(COUNTRY);
-  const hairs: WalkoutHair[] = ["buzz", "crop", "curls", "fade", "medium", "waves"];
-  const beards: WalkoutBeard[] = ["clean", "stubble", "short"];
+  const hairs: WalkoutHair[] = player.isWomen ? ["pony", "medium", "braids", "curls", "crop", "slick"] : ["buzz", "crop", "curls", "fade", "medium", "waves"];
+  const beards: WalkoutBeard[] = player.isWomen ? ["clean"] : ["clean", "stubble", "short"];
   const faces: WalkoutFace[] = ["oval", "round", "angular", "long", "square"];
   return fromRaw([
     String(seed),
@@ -663,8 +739,8 @@ function fallbackProfile(player: StarXIPlayer): WalkoutPresentation {
     [BLACK, BROWN, LIGHT_BROWN, BLOND][seed % 4],
     beards[seed % beards.length],
     faces[seed % faces.length],
-    0.94 + (seed % 17) / 100,
-    0.86 + (seed % 21) / 100,
+    player.isWomen ? 0.89 + (seed % 11) / 100 : 0.94 + (seed % 17) / 100,
+    player.isWomen ? 0.84 + (seed % 9) / 100 : 0.86 + (seed % 21) / 100,
     ["arms", "calm", "fist", "jump", "point"][seed % 5] as WalkoutCelebration,
   ]);
 }
@@ -676,6 +752,8 @@ export function getWalkoutPresentation(player: StarXIPlayer) {
   if (specialBody) return fromSpecialBody(player, specialBody);
   const iconAppearance = ICON_APPEARANCE_BY_PLAYER_ID[player.id];
   if (iconAppearance) return fromIconAppearance(player, iconAppearance);
+  const womenAppearance = player.isWomen && player.sourceId ? WOMEN_APPEARANCE_BY_SOURCE_ID[player.sourceId] : undefined;
+  if (womenAppearance) return fromIconAppearance(player, womenAppearance);
   const raw = player.sourceId ? PROFILE_BY_SOURCE_ID.get(player.sourceId) : undefined;
   return raw ? fromRaw(raw) : fallbackProfile(player);
 }
@@ -684,3 +762,4 @@ export const AUTHENTIC_WALKOUT_PROFILE_COUNT = RAW_PROFILES.length;
 export const AUTHENTIC_WALKOUT_SOURCE_IDS = new Set(RAW_PROFILES.map((profile) => profile[0]));
 export const AUTHENTIC_ICON_PROFILE_COUNT = Object.keys(ICON_APPEARANCE_BY_PLAYER_ID).length;
 export const AUTHENTIC_ICON_PLAYER_IDS = new Set(Object.keys(ICON_APPEARANCE_BY_PLAYER_ID));
+export const AUTHENTIC_WOMEN_SOURCE_IDS = new Set(Object.keys(WOMEN_APPEARANCE_BY_SOURCE_ID));
