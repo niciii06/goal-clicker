@@ -27,8 +27,6 @@ Features.TRANSFER_SALE_CHANCE = 0.10
 Features.TRANSFER_PAID_SALE_CHANCE = 0.60
 Features.TRANSFER_DEADLINE_LOAN_CHANCE = 0.60
 
-local clamp = Util.clamp
-
 function Features.randomEventDelay(roll: number): number
 	return 60000 + math.floor(math.max(0, math.min(0.999999, roll)) * 120000)
 end

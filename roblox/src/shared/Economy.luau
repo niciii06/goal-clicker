@@ -115,7 +115,7 @@ end
 
 function Economy.baseClickPower(upgrades: { [string]: number }, stars: number, features: any): number
 	local flat = 1
-	for id, weight in CLICK_WEIGHTS do
+	for id: string, weight: number in CLICK_WEIGHTS :: any do
 		flat += Economy.level(upgrades, id) * weight
 	end
 	local clickBonus, _, incomeBonus = Economy.transferBonuses(transferOwned(features))
@@ -125,7 +125,7 @@ end
 
 function Economy.basePassivePower(upgrades: { [string]: number }, stars: number, features: any): number
 	local base = 0
-	for id, weight in PASSIVE_WEIGHTS do
+	for id: string, weight: number in PASSIVE_WEIGHTS :: any do
 		base += Economy.level(upgrades, id) * weight
 	end
 	local _, passiveBonus, incomeBonus = Economy.transferBonuses(transferOwned(features))

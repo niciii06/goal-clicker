@@ -427,7 +427,7 @@ local function definitions(): { any }
 	albumDefinitions = Util.filter(list, function(definition)
 		return #definition.players > 0
 	end)
-	return albumDefinitions :: { any }
+	return albumDefinitions :: any
 end
 
 function Career.albumGroups(career: any): { any }

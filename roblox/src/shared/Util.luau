@@ -299,7 +299,7 @@ end
 -- Short random id like Math.random().toString(36).slice(2, 7).
 function Util.randomId(random: (() -> number)?): string
 	local alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
-	local roll = random or math.random
+	local roll: () -> number = (random or math.random) :: any
 	local parts = {}
 	for _ = 1, 5 do
 		local index = math.floor(roll() * 36) + 1

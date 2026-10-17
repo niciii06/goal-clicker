@@ -1,4 +1,4 @@
---!strict
+--!nonstrict
 -- Four mini games with cooldowns. The server keeps the running game so results cannot be faked.
 local Util = require(script.Parent.Util)
 

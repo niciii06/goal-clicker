@@ -590,7 +590,7 @@ function StarXI.selection(ownedIds: { string }, lineupIds: { string }?): { Cards
 	local hasLineup = Util.some(lineup, function(id)
 		return id ~= ""
 	end)
-	local source = hasLineup and lineup or ownedIds
+	local source: { string } = if hasLineup then lineup else ownedIds
 	local selected = {}
 	for _, id in source do
 		local player = Cards.get(id)

@@ -1,4 +1,4 @@
---!strict
+--!nonstrict
 -- Every player action and the per second club tick. Runs on the server only; the client
 -- just sends intentions. A session is one club (a player's own club or a coop world).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -33,6 +33,8 @@ export type Session = {
 	streak: { count: number, last: number },
 	miniGame: any?,
 	memberName: (string?) -> string,
+	lastTick: number?,
+	coopView: any?,
 }
 
 local MAX_CAREER_SEASON = #Progression.seasonMilestones
@@ -56,10 +58,6 @@ local function notify(session: Session, kind: string, data: any?)
 	local notice = data and table.clone(data) or {}
 	notice.kind = kind
 	table.insert(session.notices, notice)
-end
-
-local function toast(session: Session, text: string)
-	notify(session, "toast", { text = text })
 end
 
 function Actions.currentSeason(seasons: number): number
