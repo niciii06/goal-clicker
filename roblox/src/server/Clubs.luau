@@ -126,7 +126,7 @@ local function refreshCoopView(world: any)
 			return item.role == role
 		end)
 		table.insert(members, {
-			role = role, label = ROLE_LABELS[role], name = member and member.name or nil, occupied = member ~= nil,
+			role = role, label = ROLE_LABELS[role], name = member and member.name or nil, userId = member and member.userId or nil, occupied = member ~= nil,
 			online = member ~= nil and online[member.userId] == true, goals = member and member.goals or 0, clicks = member and member.clicks or 0,
 		})
 	end
@@ -294,6 +294,18 @@ function Clubs.deleteCoop(viewer: Viewer): (boolean, string)
 		end
 	end
 	return true, "Gemeinsamer Spielstand zurückgesetzt."
+end
+
+function Clubs.resetOwn(viewer: Viewer): (boolean, string)
+	local now = Clubs.now()
+	local game = GameState.initial(now, rng)
+	game.sound = viewer.own.game.sound
+	viewer.own.game = game
+	viewer.own.miniGame = nil
+	viewer.own.notices = {}
+	viewer.cache = {}
+	Clubs.saveOwn(viewer, false)
+	return true, "Spielstand zurückgesetzt."
 end
 
 function Clubs.saveCoop(world: any, release: boolean)

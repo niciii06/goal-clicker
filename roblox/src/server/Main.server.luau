@@ -120,8 +120,12 @@ actionRemote.OnServerInvoke = function(player: Player, name: any, payload: any):
 		ok, message = Clubs.joinCoop(viewer, tostring(payload.code or ""))
 	elseif name == "leaveCoop" then
 		ok, message = Clubs.leaveCoop(viewer)
-	elseif name == "resetCoop" then
-		ok, message = Clubs.deleteCoop(viewer)
+	elseif name == "resetCoop" or name == "resetGame" then
+		if viewer.coopCode then
+			ok, message = Clubs.deleteCoop(viewer)
+		else
+			ok, message = Clubs.resetOwn(viewer)
+		end
 	elseif name == "saveClub" then
 		local session = Clubs.session(viewer)
 		ok, message = Actions.saveClub(session, payload, now, function(text)
