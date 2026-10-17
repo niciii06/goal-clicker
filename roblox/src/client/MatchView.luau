@@ -333,7 +333,7 @@ function MatchView.start3D(clubColor: Color3)
 			end
 			local position = toWorld(p.x, p.y, 1.35)
 			local torso = (model :: any).Torso :: Part
-			local facing = torso.Position + (position - torso.Position) * 2
+			local facing = torso.CFrame.Position + (position - torso.CFrame.Position) * 2
 			local look = (facing - position).Magnitude > 0.05 and CFrame.lookAt(position, Vector3.new(facing.X, position.Y, facing.Z)) or CFrame.new(position) * (torso.CFrame - torso.CFrame.Position)
 			torso.CFrame = look
 			;(model :: any).Head.CFrame = look * CFrame.new(0, 1.2, 0)

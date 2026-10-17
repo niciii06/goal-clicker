@@ -21,7 +21,7 @@ local UI = require(Client.UI)
 local C = Theme.colors
 local Home = {}
 
-Home.sections = { "core", "miniGame", "dailyRewards", "coop" }
+Home.sections = { "core", "miniGame", "dailyRewards", "coop", "seasonMode" }
 
 local shopTab = "all"
 local purchaseMode: any = 1
@@ -39,7 +39,7 @@ function Home.signature(): string
 	local core = State.core()
 	local daily = Daily.status(State.features("dailyRewards") or {}, "solo", State.now())
 	return table.concat({
-		tostring(core.seasons), tostring(core.testMode), daily.today, tostring(daily.available),
+		tostring(core.seasons), tostring(core.stars), tostring(#(core.achievements or {})), tostring((State.features("seasonMode") or {}).lastMatchAt), tostring(core.testMode), daily.today, tostring(daily.available),
 		HttpService:JSONEncode(miniGameState() or false), shopTab, tostring(purchaseMode),
 	}, "|")
 end
@@ -414,6 +414,53 @@ local function shop(): Frame
 	return UI.card(children, { gap = 8 })
 end
 
+local Progression = require(Shared.Data.Progression) :: any
+local Season = require(Shared.Season)
+
+local function feedCard(): Frame
+	local text = UI.label("", { size = 13 })
+	UI.bind(text, "Text", function()
+		local lines = {}
+		for _, item in Overlays.feed do
+			table.insert(lines, item.icon .. "  " .. item.text)
+		end
+		return table.concat(lines, "\n")
+	end)
+	return UI.card({ UI.eyebrow("Stadionfunk"), UI.title("Live aus dem Block", 18), text }, { gap = 6 })
+end
+
+local function seasonCard(): Frame
+	local core = State.core()
+	local seasonMode = State.features("seasonMode")
+	local currentSeason = math.min(15, math.max(1, (core.seasons or 0) + 1))
+	local milestone = Progression.seasonMilestones[currentSeason]
+	local children = {
+		UI.eyebrow(("Saisonmodus / %d von %d · ★ %d Vereinssterne"):format(currentSeason, #Progression.seasonMilestones, core.stars or 0)),
+		UI.title(milestone.title, 18),
+		UI.label(milestone.description .. " Jeder Vereinsstern gibt dauerhaft 2% auf alle Einnahmen.", { size = 12, color = C.muted }),
+		UI.label("Aktiv: " .. table.concat(milestone.rewards, " · "), { size = 12, color = C.green, font = Theme.fonts.bold }),
+		seasonMode and UI.label(("%s · %s"):format(Season.divisionLabel(seasonMode.division), seasonMode.lastResult), { size = 12 }) or nil,
+		UI.eyebrow("Alle Saison Freischaltungen"),
+	}
+	for _, item in Progression.seasonMilestones do
+		local done = item.season < currentSeason
+		local now = item.season == currentSeason
+		table.insert(children, UI.label(("%s %s · %s"):format(done and "✓" or now and "▶" or tostring(item.season), item.title, table.concat(item.rewards, " · ")), { size = 11, color = done and C.green or now and C.accent or C.muted, font = now and Theme.fonts.bold or Theme.fonts.regular }))
+	end
+	return UI.card(children, { gap = 4 })
+end
+
+local function achievementCard(): Frame
+	local core = State.core()
+	local unlocked = core.achievements or {}
+	local children = { UI.eyebrow(("Erfolge · %d / %d"):format(#unlocked, #Economy.ACHIEVEMENTS)), UI.title("Pokalschrank", 18) }
+	for _, achievement in Economy.ACHIEVEMENTS do
+		local has = table.find(unlocked, achievement.id) ~= nil
+		table.insert(children, UI.label(("%s %s · %s%s"):format(Theme.icons[achievement.icon] or "⭐", achievement.name, achievement.description, has and "  ✓" or ("  (" .. Util.formatNumber(achievement.threshold) .. ")")), { size = 12, color = has and C.text or C.faint, font = has and Theme.fonts.bold or Theme.fonts.regular }))
+	end
+	return UI.card(children, { gap = 4 })
+end
+
 local function coopBar(): Frame?
 	local coop = State.features("coop")
 	if not coop then
@@ -452,6 +499,9 @@ function Home.render(container: Frame, ctx: any)
 		miniGameHub().Parent = left
 	end
 	shop().Parent = right
+	feedCard().Parent = right
+	seasonCard().Parent = right
+	achievementCard().Parent = right
 	local columns = UI.box({ direction = Enum.FillDirection.Horizontal, gap = 12, wraps = true }, { left, right })
 	columns.Parent = container
 end

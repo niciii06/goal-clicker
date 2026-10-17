@@ -1,6 +1,6 @@
 // Exports the game data of the web version (app/) into Luau modules for the Roblox version.
 // Run from the repository root: npx tsx roblox/tools/export-data.ts
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   ASSIST_POSITION_WEIGHTS, DEFENSIVE_FAULT_WEIGHTS, GOAL_POSITION_WEIGHTS, MISSION_TEMPLATES,
@@ -168,5 +168,12 @@ write("Travel", "Home venue, all away venues with door to door plans, season clu
   leagueLabels: [...LEAGUE_LABELS],
   regionLabels: [...REGION_LABELS],
 });
+
+// The failure reasons are a private constant of app/feature-data.ts; read them from the source.
+const featureSource = readFileSync(join(process.cwd(), "app", "feature-data.ts"), "utf8");
+const failureBlock = featureSource.slice(featureSource.indexOf("const TRANSFER_FAILURE_REASONS = ["), featureSource.indexOf("] as const;", featureSource.indexOf("const TRANSFER_FAILURE_REASONS = [")));
+const failures = [...failureBlock.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+if (failures.length < 10) throw new Error("Transfer failure reasons not found");
+write("TransferFailures", "Reasons why a transfer collapses.", failures);
 
 console.log(`Exported ${players.length} players, ${venues.size} venues into ${OUT}`);

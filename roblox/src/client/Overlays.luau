@@ -18,6 +18,16 @@ local root: ScreenGui
 local toastStack: Frame
 local layer: Frame
 local queue: { () -> () } = {}
+
+-- "Stadionfunk": short live feed on the home screen.
+Overlays.feed = { { icon = "📡", text = "Die Fans sind da. Klaus der Torwart auch." } }
+
+function Overlays.pushFeed(icon: string, text: string)
+	table.insert(Overlays.feed, 1, { icon = icon, text = text })
+	while #Overlays.feed > 8 do
+		table.remove(Overlays.feed)
+	end
+end
 local showing = false
 local appCtx: any = nil
 
@@ -254,13 +264,13 @@ local function figure(look: any, parent: Instance): Frame
 		return UI.new("Frame", { Name = name, BackgroundColor3 = color, BorderSizePixel = 0, Size = size, Position = position, AnchorPoint = Vector2.new(0.5, 0), Parent = holder }, { UI.corner(radius or 6) })
 	end
 	local width = math.floor(54 * build)
-	shape("Head", UDim2.fromOffset(38, 42), UDim2.new(0.5, 0, 0, 14 / scale), skin, 19)
+	shape("Head", UDim2.fromOffset(38, 42), UDim2.new(0.5, 0, 0, math.floor(14 / scale)), skin, 19)
 	if look.hair ~= "bald" then
-		shape("Hair", UDim2.fromOffset(40, look.hair == "afro" and 22 or 12), UDim2.new(0.5, 0, 0, (look.hair == "afro" and 4 or 10) / scale), Theme.color(look.hairColor), 12)
+		shape("Hair", UDim2.fromOffset(40, look.hair == "afro" and 22 or 12), UDim2.new(0.5, 0, 0, math.floor((look.hair == "afro" and 4 or 10) / scale)), Theme.color(look.hairColor), 12)
 	end
 	shape("Shirt", UDim2.fromOffset(width, 70), UDim2.new(0.5, 0, 0, 58), Theme.color(look.kitPrimary), 12)
-	shape("ArmLeft", UDim2.fromOffset(14, 62), UDim2.new(0.5, -width / 2 - 8, 0, 62), skin, 7)
-	shape("ArmRight", UDim2.fromOffset(14, 62), UDim2.new(0.5, width / 2 + 8, 0, 62), skin, 7)
+	shape("ArmLeft", UDim2.fromOffset(14, 62), UDim2.new(0.5, -math.floor(width / 2) - 8, 0, 62), skin, 7)
+	shape("ArmRight", UDim2.fromOffset(14, 62), UDim2.new(0.5, math.floor(width / 2) + 8, 0, 62), skin, 7)
 	shape("Shorts", UDim2.fromOffset(width - 4, 30), UDim2.new(0.5, 0, 0, 126), Theme.color(look.kitSecondary), 6)
 	shape("LegLeft", UDim2.fromOffset(16, 58), UDim2.new(0.5, -11, 0, 154), skin, 6)
 	shape("LegRight", UDim2.fromOffset(16, 58), UDim2.new(0.5, 11, 0, 154), skin, 6)
@@ -281,7 +291,7 @@ function Overlays.playerCard(player: Cards.Player, compact: boolean?): Frame
 			}),
 		}, 10),
 		not compact and UI.row({
-			UI.pill(string.upper(player.tier == "standard" and "Basis" or player.tier), tierColor, C.white),
+			UI.pill(Util.upper(player.tier == "standard" and "Basis" or player.tier), tierColor, C.white),
 			player.isCustom and UI.pill("CUSTOM", C.purple, C.white) or nil,
 			player.cardType == "icon" and UI.pill("ICON", C.text, C.white) or nil,
 		}, 6) or nil,
@@ -321,7 +331,7 @@ function Overlays.reveal(reveal: any)
 			BackgroundColor3 = Theme.tierColor(tier), BackgroundTransparency = 0.75, AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.55), Size = UDim2.fromOffset(40, 40), Parent = stage,
 		}, { UI.corner(999) })
-		local headline = UI.label(("%s / %s"):format(reveal.source == "custom-draw" and "ZUFALLSZUG" or "PACK GEÖFFNET", string.upper(reveal.packName or "")), { size = 13, color = C.faint, font = Theme.fonts.bold, align = Enum.TextXAlignment.Center })
+		local headline = UI.label(("%s / %s"):format(reveal.source == "custom-draw" and "ZUFALLSZUG" or "PACK GEÖFFNET", Util.upper(reveal.packName or "")), { size = 13, color = C.faint, font = Theme.fonts.bold, align = Enum.TextXAlignment.Center })
 		headline.Position = UDim2.fromOffset(0, 70)
 		headline.Parent = stage
 		local center = UI.label("", { size = 64, font = Theme.fonts.black, color = C.white, align = Enum.TextXAlignment.Center })
@@ -430,8 +440,18 @@ function Overlays.handle(notice: any)
 	elseif kind == "matchEnd" then
 		Overlays.sound("whistle", 0.9)
 	elseif kind == "feed" then
-		-- The feed is shown on the home screen through the history; nothing to present.
-		return
+		Overlays.pushFeed(Theme.icons[notice.icon] or "⭐", notice.text)
+	end
+	if kind == "event" then
+		Overlays.pushFeed(notice.event.tone == "negative" and "📺" or "⭐", notice.event.message)
+	elseif kind == "transfer" then
+		Overlays.pushFeed("📡", notice.event.message)
+	elseif kind == "achievement" then
+		Overlays.pushFeed("🏆", notice.achievement.name .. " freigeschaltet. Die Kurve zeigt nach oben.")
+	elseif kind == "matchGoal" then
+		Overlays.pushFeed("👑", ("%s trifft in der %d. Minute."):format(notice.goal.scorer, notice.goal.minute))
+	elseif kind == "redCard" then
+		Overlays.pushFeed("🟥", notice.event.player .. " sieht Rot. Für die nächste Partie gesperrt.")
 	end
 end
 

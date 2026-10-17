@@ -308,8 +308,27 @@ function Util.randomId(random: (() -> number)?): string
 	return table.concat(parts)
 end
 
+local UPPER_MAP: { [string]: string } = { ["ä"] = "Ä", ["ö"] = "Ö", ["ü"] = "Ü", ["é"] = "É", ["è"] = "È", ["à"] = "À", ["á"] = "Á", ["í"] = "Í", ["ó"] = "Ó", ["ú"] = "Ú", ["ñ"] = "Ñ", ["ç"] = "Ç" }
+local LOWER_MAP: { [string]: string } = {}
+for lower, upper in UPPER_MAP do
+	LOWER_MAP[upper] = lower
+end
+
+-- Upper case that also converts German umlauts (string.upper only handles ASCII).
+function Util.upper(text: string): string
+	local result = string.upper(text)
+	for lower, upper in UPPER_MAP do
+		result = Util.replaceAll(result, lower, upper)
+	end
+	return result
+end
+
 function Util.lower(text: string): string
-	return string.lower(text)
+	local result = string.lower(text)
+	for upper, lower in LOWER_MAP do
+		result = Util.replaceAll(result, upper, lower)
+	end
+	return result
 end
 
 function Util.hexColor(hex: string): (number, number, number)

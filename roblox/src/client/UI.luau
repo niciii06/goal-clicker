@@ -3,6 +3,7 @@
 local TweenService = game:GetService("TweenService")
 
 local Theme = require(script.Parent.Theme)
+local Util = require(game:GetService("ReplicatedStorage").Shared.Util)
 
 local UI = {}
 
@@ -109,7 +110,7 @@ function UI.label(text: string, options: LabelOptions?): TextLabel
 end
 
 function UI.eyebrow(text: string, color: Color3?): TextLabel
-	return UI.label(string.upper(text), { size = 11, color = color or C.muted, font = Theme.fonts.bold })
+	return UI.label(Util.upper(text), { size = 11, color = color or C.muted, font = Theme.fonts.bold })
 end
 
 function UI.title(text: string, size: number?): TextLabel
@@ -243,7 +244,7 @@ function UI.columns(children: { any }, gap: number?, minWidth: number?): Frame
 	local frame = UI.box({ direction = Enum.FillDirection.Horizontal, gap = g, wraps = minWidth ~= nil })
 	for _, child in children do
 		if child:IsA("GuiObject") then
-			child.Size = UDim2.new(1 / count, -g * (count - 1) / count, child.Size.Y.Scale, child.Size.Y.Offset)
+			child.Size = UDim2.new(1 / count, -math.floor(g * (count - 1) / count), child.Size.Y.Scale, child.Size.Y.Offset)
 			if minWidth then
 				UI.new("UISizeConstraint", { MinSize = Vector2.new(minWidth, 0), Parent = child })
 			end

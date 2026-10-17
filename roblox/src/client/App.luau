@@ -114,8 +114,9 @@ local function buildTopBar(parent: Instance)
 	}, { UI.corner(16), UI.stroke(C.line), UI.padding(8, 14) })
 	UI.new("TextLabel", {
 		BackgroundTransparency = 1,
-		Size = UDim2.new(0.4, 0, 1, 0),
+		Size = UDim2.new(0.45, -10, 1, 0),
 		Font = Theme.fonts.black,
+		TextScaled = true,
 		TextSize = 22,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		RichText = true,
@@ -127,9 +128,9 @@ local function buildTopBar(parent: Instance)
 		BackgroundColor3 = C.text,
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -96, 0.5, 0),
-		Size = UDim2.new(0, 210, 1, 0),
+		Size = UDim2.new(0.55, -96, 1, 0),
 		Parent = bar,
-	}, { UI.corner(12), UI.padding(4, 12) })
+	}, { UI.corner(12), UI.padding(4, 12), UI.new("UISizeConstraint", { MaxSize = Vector2.new(230, math.huge) }) })
 	local caption = UI.new("TextLabel", {
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, 0, 0.35, 0),

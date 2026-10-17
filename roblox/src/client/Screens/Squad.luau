@@ -204,7 +204,7 @@ local function reserve(starXI: any, unavailable: { [string]: string }, cup: any)
 		assigned[id] = true
 	end
 	local positions = starXI.formationPositions
-	local query = string.lower(search)
+	local query = Util.lower(search)
 	local list = {}
 	for _, id in starXI.ownedIds do
 		local player = Cards.get(id)
@@ -215,7 +215,7 @@ local function reserve(starXI: any, unavailable: { [string]: string }, cup: any)
 				inRating = player.rating >= tonumber(low) :: number and player.rating <= tonumber(high) :: number
 			end
 			local inPosition = positionFilter == "all" or table.find(Cards.positionsOf(player), positionFilter) ~= nil
-			local text = string.lower(player.name .. " " .. table.concat(Cards.positionsOf(player), " ") .. " " .. player.rating)
+			local text = Util.lower(player.name .. " " .. table.concat(Cards.positionsOf(player), " ") .. " " .. player.rating)
 			if inRating and inPosition and (query == "" or string.find(text, query, 1, true)) then
 				table.insert(list, player)
 			end

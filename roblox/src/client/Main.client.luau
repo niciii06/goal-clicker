@@ -24,3 +24,10 @@ Net.clickResult.OnClientEvent:Connect(function(amount, critical, combo)
 end)
 
 App.start()
+-- Ask for the complete state once the listeners are connected (the first push may have been sent earlier).
+task.spawn(function()
+	while not State.ready do
+		Net.query("fullSync")
+		task.wait(2)
+	end
+end)

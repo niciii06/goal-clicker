@@ -42,10 +42,10 @@ end
 local function formSection(career: any, starXI: any): Frame
 	local ids = Util.unique(Util.concat(starXI.ownedIds, Util.keys(career.players)))
 	local players = {}
-	local query = string.lower(search)
+	local query = Util.lower(search)
 	for _, id in ids do
 		local player = Cards.get(id)
-		if player and (query == "" or string.find(string.lower(player.name), query, 1, true)) then
+		if player and (query == "" or string.find(Util.lower(player.name), query, 1, true)) then
 			table.insert(players, player)
 		end
 	end

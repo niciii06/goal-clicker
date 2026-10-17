@@ -103,9 +103,31 @@ end)
 local SOLO_ONLY = { createCoop = true, joinCoop = true, leaveCoop = true, savedWorlds = true }
 local COOP_FREE = { redeemCode = true, toggleSound = true, saveClub = true, resetCoop = true }
 
+-- At most 12 actions per second and player; clicks have their own limit in Actions.click.
+local actionTimes: { [Player]: { number } } = {}
+Players.PlayerRemoving:Connect(function(player)
+	actionTimes[player] = nil
+end)
+local function allowAction(player: Player): boolean
+	local now = os.clock()
+	local times = actionTimes[player] or {}
+	actionTimes[player] = times
+	while #times > 0 and times[1] < now - 1 do
+		table.remove(times, 1)
+	end
+	if #times >= 12 then
+		return false
+	end
+	table.insert(times, now)
+	return true
+end
+
 actionRemote.OnServerInvoke = function(player: Player, name: any, payload: any): (boolean, string)
 	if type(name) ~= "string" then
 		return false, ""
+	end
+	if not allowAction(player) then
+		return false, "Etwas langsamer, bitte."
 	end
 	local viewer = Clubs.viewer(player)
 	if not viewer then
@@ -193,7 +215,11 @@ queryRemote.OnServerInvoke = function(player: Player, name: any): any
 	if not viewer then
 		return nil
 	end
-	if name == "savedWorlds" then
+	if name == "fullSync" then
+		viewer.cache = {}
+		task.defer(flush, player)
+		return true
+	elseif name == "savedWorlds" then
 		return Clubs.savedWorlds(viewer)
 	elseif name == "ranking" then
 		local entries = {}

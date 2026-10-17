@@ -103,7 +103,7 @@ local function scoreboard(cup: any): Frame
 	local tournament = Cup.tournament(cup.tournamentId)
 	local competition = cup.mode == "season" and "Saisonspiel" or ("%s · Runde %d"):format(tournament and tournament.label or "Turnier", cup.round + 1)
 	return UI.box({ color = C.dark, padding = 14, gap = 4, radius = 16 }, {
-		UI.label(string.upper(competition) .. ((cup.fixture and cup.fixture.away) and " · AUSWÄRTS" or " · HEIM"), { size = 11, font = Theme.fonts.bold, color = C.faint, align = Enum.TextXAlignment.Center }),
+		UI.label(Util.upper(competition) .. ((cup.fixture and cup.fixture.away) and " · AUSWÄRTS" or " · HEIM"), { size = 11, font = Theme.fonts.bold, color = C.faint, align = Enum.TextXAlignment.Center }),
 		UI.columns({
 			UI.label((club.badge or "⚽") .. " " .. (club.name or "Dein Club"), { size = 15, font = Theme.fonts.bold, color = C.white, align = Enum.TextXAlignment.Right }),
 			score,

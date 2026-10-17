@@ -169,13 +169,13 @@ local function album(container: Frame, ctx: any)
 	end
 	UI.card(groupRows, { gap = 6 }).Parent = container
 
-	local query = string.lower(search)
+	local query = Util.lower(search)
 	local list = {}
 	for _, player in Cards.ALL do
 		local typeOk = typeFilter == "all" or (typeFilter == "custom" and player.isCustom) or (typeFilter == "icon" and player.cardType == "icon")
 			or (typeFilter == "legendary" and player.cardType == "legendary") or (typeFilter == "base" and not player.isCustom and player.cardType ~= "icon" and player.cardType ~= "legendary")
 		local ownOk = ownership == "all" or (ownership == "collected" and collected[player.id]) or (ownership == "missing" and not collected[player.id])
-		if typeOk and ownOk and (query == "" or string.find(string.lower(player.name .. " " .. (player.countryCode or "")), query, 1, true)) then
+		if typeOk and ownOk and (query == "" or string.find(Util.lower(player.name .. " " .. (player.countryCode or "")), query, 1, true)) then
 			table.insert(list, player)
 		end
 	end
