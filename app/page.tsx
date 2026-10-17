@@ -2,47 +2,39 @@
 
 export const dynamic = "force-dynamic";
 
-import { requestMatchEdit, confirmMatchDraft } from './match-commands';
-import type { MatchDraft } from './match-commands';
-import { fixtureFor, journeyView, settleTravel, consumeTravel, eligibilityError, travelTiming } from './travel-data';
-import type { Journey, TravelFixture } from './travel-data';
-import { TravelPanel, TravelStatsPanel, durationLabel } from './travel-panel';
-import { LiveMatchViewer } from "./match-viewer";
-import { claimDailyReward } from "./daily-reward";
-import { loadRouteCache } from "./travel-route-cache-lazy";
-import { DailyRewardCard } from "./daily-reward-panel";
-import { answerPressConference, getPressReward } from "./press-conference";
-import { PressConferencePanel } from "./press-conference-panel";
-import { claimAllAlbumRewards, claimAlbumReward, prepareCareerMatch, recordCareerMatch, getCareerCard, rivalryKey } from "./career-data";
-import { CareerPanel, AlbumPanel, MatchRatingsPanel, CareerPlayerBadge, PostMatchSummary } from "./career-panels";
-
-import { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AnimationEvent, CSSProperties, DragEvent, ErrorInfo, KeyboardEvent, MouseEvent, ReactNode } from "react";
+import type { AnimationEvent, CSSProperties, DragEvent, KeyboardEvent, MouseEvent } from "react";
+import type { AppMode, ClickEffect, CoopRole, CoopRoom, CoopSession, CrossbarGame, CrossbarHeight, DribbleGame, FeedEntry, GameState, IconName, LayoutCardId, MatchPrediction, MiniGameId, PenaltyDirection, PenaltyGame, PredictionGame, PurchaseMode, SeasonStandingsAnnouncement, SquadArea, SquadDragSource, SquadDropTarget, Tab, UpgradeDefinition } from "./game/types";
+import type { CoopMission, CupCardEvent, GameFeatures, PenaltyDirection as CupPenaltyDirection, RandomEvent, StarFormationId, StarPackId, StarPackReveal, TournamentGazetteIssue, TournamentId, TransferInsiderEvent } from "./feature-data";
+import type { Journey, TravelFixture } from "./travel-data";
+import type { MatchDraft } from "./match-commands";
+import { ACHIEVEMENTS, BACKUP_STORAGE_KEY, BALANCE_VERSION, COMBO_RESUME_GRACE_MS, COMBO_WINDOW_MS, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RECOVERY_STORAGE_KEY, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, STAR_RATING_FILTERS, STORAGE_KEY, VIBRATION_STORAGE_KEY } from "./game/constants";
 import { AR, BA, BE, BG, BR, CH, CI, CM, CO, CZ, DE, DK, EC, EG, ES, FR, GB_ENG, GB_NIR, GB_SCT, GB_WLS, GE, GH, GN, HR, HU, IE, IT, JP, KR, MA, MX, NG, NL, NO, PL, PT, RO, RS, RU, SE, SI, TR, UA, US, UY } from "country-flag-icons/react/3x2";
-import { queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, CLUB_BADGES, CLUB_COLORS, completeTournamentRun, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentGoalBoostMultiplier, getTournamentRewardPack, isRewardPack, openEarnedPack, getRewardPackOdds, getTransferBonuses, getUnavailableStarXIPlayerIds, initialGameFeatures, isTransferDeadlineDay, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, resumeCupMatch, shouldTriggerPackTroll, startSeasonPrestige, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_CUSTOM_PLAYERS, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_TOTAL_CARD_COUNT, SEASON_MODE_MATCHES_PER_SEASON, TOURNAMENTS } from "./feature-data";
-import type { CoopMission, CupCardEvent, GameFeatures, PenaltyDirection as CupPenaltyDirection, RandomEvent, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationId, StarPackId, StarPackReveal, TournamentGazetteIssue, TournamentId, TransferInsiderEvent } from "./feature-data";
-import { getStarCardTier, getWalkoutPresentation } from "./walkout-data";
-import { getFormationUnlockSeason, getPackUnlockSeason, getSeasonMilestone, getTournamentUnlockSeason, getUpgradeUnlockSeason, isSeasonContentUnlocked, MAX_CAREER_SEASON, SEASON_MILESTONES } from "./season-progression";
+import { AlbumPanel, CareerPanel, CareerPlayerBadge, MatchRatingsPanel, PostMatchSummary } from "./career-panels";
+import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_CUSTOM_PLAYERS, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_SQUAD_SIZE, STAR_XI_TOTAL_CARD_COUNT, TOURNAMENTS, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, applyPendingMatchChanges, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getRewardPackOdds, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXIRating, getStarXISelection, getTournament, getTournamentGoalBoostMultiplier, getTournamentRewardPack, getTransferBonuses, getUnavailableStarXIPlayerIds, initialGameFeatures, isRewardPack, isTransferDeadlineDay, normalizeGameFeatures, openEarnedPack, openStarPack, pauseGameFeatureTimers, queueMatchChanges, recordSeasonModeMatch, releaseMatchSquad, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige } from "./feature-data";
+import { DailyRewardCard } from "./daily-reward-panel";
+import { FootballGraphic, GameErrorBoundary, Icon, StarXIPositionBadges } from "./game/ui";
+import { LiveMatchViewer } from "./match-viewer";
+import { MAX_CAREER_SEASON, SEASON_MILESTONES, getFormationUnlockSeason, getPackUnlockSeason, getSeasonMilestone, getTournamentUnlockSeason, getUpgradeUnlockSeason, isSeasonContentUnlocked } from "./season-progression";
 import { MULTIPLAYER_PROTOCOL_VERSION } from "./multiplayer-protocol";
-import { compareStoredGameProgress, parseStoredGame, selectSafestStoredGame, shouldRejectRegressedSave } from "./save-safety";
-import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "./upgrade-purchase";
+import { PressConferencePanel } from "./press-conference-panel";
+import { TravelPanel, TravelStatsPanel, durationLabel } from "./travel-panel";
+import { advanceLocalGameWhileOpen, getMiniGameCooldownUntil, initialGame, normalizeAchievements, normalizeLayoutOrder, normalizeNickname, normalizeRuntimeGame, pauseMiniGameCooldowns, persistLocalGame, readStoredGame } from "./game/storage";
+import { answerPressConference, getPressReward } from "./press-conference";
+import { canVibrate, readVibrationSetting, setVibrationOn, vibrate, vibrationOn } from "./game/device";
+import { claimAlbumReward, claimAllAlbumRewards, getCareerCard, prepareCareerMatch, recordCareerMatch, rivalryKey } from "./career-data";
+import { claimDailyReward } from "./daily-reward";
+import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
+import { consumeTravel, eligibilityError, fixtureFor, journeyView, settleTravel, travelTiming } from "./travel-data";
+import { coopRoleLabel, isCoopRole, multiplayerUrl, notifyCoopOffline, occupiedCoopPlayers, readCoopResponse, upsertSavedRoom } from "./game/coop";
+import { createClickResult, getBasePassivePower, getBulkPurchase, getComboLevel, getComboProgress, getCost, getIncomeMultiplier, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades } from "./game/economy";
+import { directionLabel, formatCountdown, formatGoalDifference, formatHistoryTime, formatNumber, formatPackChance, getRandomCrossbarHeight, getRandomMatchPrediction, getRandomPenaltyDirection, heightLabel, predictionLabel, readableAccent } from "./game/format";
+import { getCurrentTime, getTravelTime, syncTravelClock } from "./game/clock";
+import { getStarCardTier, getWalkoutPresentation } from "./walkout-data";
+import { loadRouteCache } from "./travel-route-cache-lazy";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-type UpgradeKind = "click" | "auto" | "multiplier";
-type Tab = "all" | UpgradeKind;
-type PurchaseMode = 1 | 10 | 100 | "max";
-type MiniGameId = "penalty" | "dribble" | "crossbar" | "prediction";
-type PenaltyDirection = "links" | "mitte" | "rechts";
-type CrossbarHeight = "hoch" | "mitte" | "tief";
-type MatchPrediction = "heim" | "remis" | "auswärts";
-type IconName = "ball" | "boot" | "worker" | "striker" | "board" | "light" | "screen" | "crown" | "number" | "flame" | "stadium" | "diamond" | "rookie" | "starter" | "scorer" | "star" | "rocket" | "sound" | "mute" | "broadcast";
-type AppMode = "single" | "coop";
-type CoopRole = "host" | "guest" | "player3" | "player4";
+
 type FeatureTab = "fabrizio" | "cup" | "club" | "missions" | "history" | "career" | "album" | "squad" | "packs" | "home";
-type LayoutCardId = "hero" | "feature" | "shop" | "side";
-type SquadArea = "lineup" | "bench" | "reserve";
-type SquadDragSource = { playerId: string; area: SquadArea; index: number | null };
-type SquadDropTarget = { area: "lineup" | "bench"; index: number };
-type SeasonStandingsAnnouncement = { entry: SeasonMatchHistoryEntry; table: SeasonTableRow[] };
 
 const WALKOUT_COUNTRY_FLAGS: Record<string, typeof FR> = {
   AR, BA, BE, BG, BR, CH, CI, CM, CO, CZ, DE, DK, EC, EG, EN: GB_ENG, ES, FR,
@@ -59,138 +51,21 @@ function formatStarXIPositions(player: Parameters<typeof getStarXIPositions>[0],
   return player.benchOnly ? `${player.symbol} Nur Bank` : player.id === "star-goat-nicu" ? "Alle Positionen" : getStarXIPositions(player).join(compact ? "/" : " / ");
 }
 
-type StarXIPositionBadgeVariant = "reveal" | "walkout" | "rare" | "compact";
 
-function StarXIPositionBadges({ player, variant = "reveal" }: { player: Parameters<typeof getStarXIPositions>[0]; variant?: StarXIPositionBadgeVariant }) {
-  if(player.benchOnly)return <span className="starxi-position-badge">{player.symbol} Nur Bank</span>;
-  const positions = player.id === "star-goat-nicu" ? ["Alle Positionen"] : getStarXIPositions(player);
-  return <span className={`starxi-position-badges starxi-position-badges-${variant}`} aria-label={`Positionen: ${positions.join(", ")}`}>
-    {positions.map((position) => <span key={position}>{position === "Alle Positionen" ? "ALLE POSITIONEN" : position}</span>)}
-  </span>;
-}
 
-const COOP_ROLES: readonly CoopRole[] = ["host", "guest", "player3", "player4"];
 
-function isCoopRole(value: unknown): value is CoopRole {
-  return typeof value === "string" && COOP_ROLES.includes(value as CoopRole);
-}
 
-function coopRoleLabel(role: CoopRole) {
-  if (role === "host") return "HOST";
-  if (role === "guest") return "SPIELER 2";
-  if (role === "player3") return "SPIELER 3";
-  return "SPIELER 4";
-}
 
-function occupiedCoopPlayers(room: CoopRoom) {
-  return room.players.filter((player) => player.occupied);
-}
 
-type CoopRoom = {
-  code: string;
-  roomName: string;
-  status: "waiting" | "live";
-  hostName: string;
-  guestName: string | null;
-  hostOnline: boolean;
-  guestOnline: boolean;
-  playerCount: number;
-  maxPlayers: number;
-  players: Array<{
-    role: CoopRole;
-    name: string | null;
-    online: boolean;
-    occupied: boolean;
-    goals: number;
-    clicks: number;
-  }>;
-  viewerRole?: CoopRole;
-  canDelete?: boolean;
-  sharedCoins: number;
-  hostGoals: number;
-  guestGoals: number;
-  hostClicks: number;
-  guestClicks: number;
-  sharedUpgradeLevel: number;
-  revision: number;
-  testMode: boolean;
-  game: GameState;
-};
-type CoopSession = { code: string; role: CoopRole; playerId: string; room: CoopRoom };
-type CoopApiResponse = { room?: CoopRoom; rooms?: CoopRoom[]; role?: CoopRole; deleted?: boolean; error?: string; errorCode?: string; packReveal?: StarPackReveal; dailyReward?: { amount: number; dayIndex: number; streak: number; pack: boolean }; press?: { reward: number; mood: number; fanMood: number } };
 
-type UpgradeDefinition = {
-  id: string;
-  icon: IconName;
-  name: string;
-  description: string;
-  baseCost: number;
-  scale: number;
-  kind: UpgradeKind;
-};
 
-type GameState = {
-  goals: number;
-  totalGoals: number;
-  seasonGoals: number;
-  clicks: number;
-  upgrades: Record<string, number>;
-  achievements: string[];
-  stars: number;
-  seasons: number;
-  balanceVersion: number;
-  sound: boolean;
-  lastSaved: number;
-  miniGameCooldowns: MiniGameCooldowns;
-  minigameWins: number;
-  features: GameFeatures;
-};
 
-type FeedEntry = { id: number; icon: IconName; text: string };
-type ClickEffect = { id: number; x: number; y: number; amount: number; critical: boolean; combo: number };
-type PenaltyGame = { shots: number; goals: number; message: string; finished: boolean; reward: number };
-type DribbleGame = { sequence: PenaltyDirection[]; step: number; attempts: number; misses: number; message: string; finished: boolean; reward: number };
-type CrossbarGame = { shots: number; hits: number; message: string; finished: boolean; reward: number };
-type PredictionGame = { round: number; wins: number; message: string; finished: boolean; reward: number };
-type MiniGameCooldowns = Record<MiniGameId, number>;
 
-const STORAGE_KEY = "goalClickerSiteSaveV3";
-const BACKUP_STORAGE_KEY = "goalClickerSiteSaveBackupV3";
-const RECOVERY_STORAGE_KEY = "goalClickerSiteSaveRecoveryV3";
-const PLAYER_ID_KEY = "goalClickerPlayerIdV3";
-const PLAYER_NAME_KEY = "goalClickerPlayerName";
-const COOP_ROOM_KEY = "goalClickerActiveCoopRoomV3";
-const LEGACY_STORAGE_KEYS = ["goalClickerSiteSaveV2", "goalClickerSiteSave", "goalClickerSave"];
-const LEGACY_PLAYER_ID_KEYS = ["goalClickerPlayerIdV2", "goalClickerPlayerId"];
-const LAYOUT_STORAGE_KEY = "goalClickerLayoutV3";
-const BALANCE_VERSION = 4;
-const MAX_MULTIPLIER_LEVEL = 8;
-const MAX_SEASON_STARS = 20;
-const PURCHASE_MODES: PurchaseMode[] = [1, 10, 100, "max"];
-const PENALTY_DIRECTIONS: PenaltyDirection[] = ["links", "mitte", "rechts"];
-const CROSSBAR_HEIGHTS: CrossbarHeight[] = ["hoch", "mitte", "tief"];
-const MATCH_PREDICTIONS: MatchPrediction[] = ["heim", "remis", "auswärts"];
-const MINI_GAME_IDS: MiniGameId[] = ["penalty", "dribble", "crossbar", "prediction"];
-const MINI_GAME_COOLDOWN_SECONDS: Record<MiniGameId, number> = { penalty: 60, dribble: 75, crossbar: 90, prediction: 120 };
-const MINI_GAME_NAMES: Record<MiniGameId, string> = { penalty: "Penalty Challenge", dribble: "Dribble Run", crossbar: "Latten Challenge", prediction: "Matchday Tipp" };
-const LAYOUT_CARD_IDS: LayoutCardId[] = ["hero", "feature", "shop", "side"];
-const DEFAULT_LAYOUT_ORDER: LayoutCardId[] = ["hero", "shop", "feature", "side"];
 const SQUAD_DRAG_MIME = "application/x-goal-clicker-player";
 const STAR_WALKOUT_ANIMATION_MS = 9500;
 const STAR_TOP_WALKOUT_ANIMATION_MS = 11500;
 const STAR_WALKOUT_READY_MS = 7500;
 const STAR_TOP_WALKOUT_READY_MS = 10900;
-const STAR_RARE_REVEAL_DURATION_MS = 2600;
-const PACK_TROLL_INTRO_MS = 2800;
-const RESERVE_PAGE_SIZE = 48;
-const STAR_RATING_FILTERS = [
-  { id: "all", label: "Alle" },
-  { id: "67-78", label: "67–78" },
-  { id: "79-85", label: "79–85" },
-  { id: "86-89", label: "86–89" },
-  { id: "90-94", label: "90–94" },
-  { id: "95-100", label: "95–100" },
-] as const;
 
 function getStarRevealReadyDelay(reveal: StarPackReveal) {
   const tier = getStarCardTier(reveal.player);
@@ -199,172 +74,33 @@ function getStarRevealReadyDelay(reveal: StarPackReveal) {
   if (tier === "walkout" || tier === "icon" || tier === "legendary") return trollDelay + (reveal.player.rating >= 90 ? STAR_TOP_WALKOUT_READY_MS : STAR_WALKOUT_READY_MS);
   return 0;
 }
-const GOAL_CONFETTI = Array.from({ length: 46 }, (_, index) => ({ left: `${(index * 37) % 101}%`, delay: `${(index % 12) * 45}ms`, duration: `${2300 + (index % 7) * 180}ms`, color: ["#0071e3", "#34c759", "#ffcc00", "#ff375f", "#af52de", "#ffffff"][index % 6] }));
-const GOLD_CONFETTI = ["#ffe28d", "#f6c94c", "#fff4bd", "#d49b19"];
-const SILVER_CONFETTI = ["#ffffff", "#dfe5ec", "#aeb7c2", "#f5f7fa"];
 
-function normalizeLayoutOrder(value: unknown) {
-  const saved = Array.isArray(value) ? value.filter((id): id is LayoutCardId => typeof id === "string" && LAYOUT_CARD_IDS.includes(id as LayoutCardId)) : [];
-  return [...new Set(saved), ...DEFAULT_LAYOUT_ORDER.filter((id) => !saved.includes(id))];
-}
 
-function upsertSavedRoom(rooms: CoopRoom[], room: CoopRoom) {
-  const existing = rooms.find((item) => item.code === room.code);
-  const freshest = existing && existing.revision > room.revision ? existing : room;
-  return [freshest, ...rooms.filter((item) => item.code !== room.code)].slice(0, 12);
-}
 
 function mergeCoopSessionRoom(current: CoopSession | null, room: CoopRoom, role?: CoopRole) {
   if (!current || current.code !== room.code || room.revision < current.room.revision) return current;
   return { ...current, room, role: role ?? current.role };
 }
-function initialMiniGameCooldowns(): MiniGameCooldowns {
-  return { penalty: 0, dribble: 0, crossbar: 0, prediction: 0 };
-}
 
-function normalizeMiniGameCooldowns(cooldowns: Partial<MiniGameCooldowns> | undefined): MiniGameCooldowns {
-  const normalized = initialMiniGameCooldowns();
-  for (const id of MINI_GAME_IDS) normalized[id] = Math.max(0, Number(cooldowns?.[id]) || 0);
-  return normalized;
-}
 
-function readStoredGame() {
-  const safest = selectSafestStoredGame([
-    { key: STORAGE_KEY, raw: localStorage.getItem(STORAGE_KEY) },
-    { key: BACKUP_STORAGE_KEY, raw: localStorage.getItem(BACKUP_STORAGE_KEY) },
-    { key: RECOVERY_STORAGE_KEY, raw: localStorage.getItem(RECOVERY_STORAGE_KEY) },
-    ...LEGACY_STORAGE_KEYS.map((key) => ({ key, raw: localStorage.getItem(key) })),
-  ]);
-  return { saved: safest?.saved as Partial<GameState> | undefined, recovered: Boolean(safest && safest.key !== STORAGE_KEY) };
-}
 
-function persistLocalGame(state: GameState) {
-  try {
-    const currentRaw = localStorage.getItem(STORAGE_KEY);
-    const current = parseStoredGame(currentRaw);
-    // A stale tab cannot restore an already consumed reward receipt.
-    if(current?.features){const saved=normalizeGameFeatures(current.features);for(const receipt of saved.earnedPacks){const next=state.features.earnedPacks.find(p=>p.id===receipt.id);if(next&&receipt.opening&&!next.opening)next.opening=receipt.opening;else if(!next)state.features.earnedPacks.push(receipt);}state.features.completedTournamentRuns=[...new Set([...state.features.completedTournamentRuns,...saved.completedTournamentRuns])];}
-    const nextRaw = JSON.stringify(state);
-    const next = parseStoredGame(nextRaw);
-    if (shouldRejectRegressedSave(current, next)) {
-      if (currentRaw) localStorage.setItem(BACKUP_STORAGE_KEY, currentRaw);
-      return;
-    }
-    const backupRaw = localStorage.getItem(BACKUP_STORAGE_KEY);
-    const backup = parseStoredGame(backupRaw);
-    if (currentRaw && current && (!backup || compareStoredGameProgress(current, backup) >= 0)) {
-      if (backupRaw && backup) localStorage.setItem(RECOVERY_STORAGE_KEY, backupRaw);
-      localStorage.setItem(BACKUP_STORAGE_KEY, currentRaw);
-    }
-    localStorage.setItem(STORAGE_KEY, nextRaw);
-  } catch {
-    // A full browser storage must never crash the game or replace a valid save.
-  }
-}
 
-function pauseMiniGameCooldowns(cooldowns: Partial<MiniGameCooldowns> | undefined, pausedMs: number, pausedAt: number) {
-  const shifted = normalizeMiniGameCooldowns(cooldowns);
-  for (const id of MINI_GAME_IDS) if (shifted[id] > pausedAt) shifted[id] += pausedMs;
-  return shifted;
-}
 
-function advanceLocalGameWhileOpen(state: GameState, elapsedMs: number, now = Date.now()): GameState {
-  const durationMs = Math.max(0, elapsedMs);
-  if (!durationMs) return { ...state, lastSaved: now };
-  const passiveReward = getGoalBoostedPassiveReward(getBasePassivePower(state.upgrades, state.stars, state.features), state.features, now - durationMs, now);
-  return {
-    ...state,
-    goals: state.goals + passiveReward,
-    seasonGoals: state.seasonGoals + passiveReward,
-    totalGoals: state.totalGoals + passiveReward,
-    lastSaved: now,
-  };
-}
 
-function getMiniGameCooldownUntil(id: MiniGameId) {
-  return Date.now() + MINI_GAME_COOLDOWN_SECONDS[id] * 1000;
-}
 
-function formatCountdown(until: number, now: number) {
-  const seconds = Math.max(0, Math.ceil((until - now) / 1000));
-  const minutes = String(Math.floor(seconds / 60)).padStart(2, "0");
-  const remainder = String(seconds % 60).padStart(2, "0");
-  return `${minutes}:${remainder}`;
-}
 
-function formatPackChance(chance: number) {
-  const percentage = chance * 100;
-  const precision = percentage < 0.01 ? 3 : percentage < 0.1 ? 2 : percentage < 1 ? 1 : 0;
-  return `${percentage.toLocaleString("de-CH", { minimumFractionDigits: precision, maximumFractionDigits: precision })}%`;
-}
 
-let travelClock: {server:number;monotonic:number}|null=null;
-function syncTravelClock(serverNow:unknown) { if(typeof serverNow==='number'&&Number.isFinite(serverNow)) travelClock={server:serverNow,monotonic:performance.now()}; }
-function getTravelTime() { return travelClock?travelClock.server+performance.now()-travelClock.monotonic:Date.now(); }
-let sessionClock:{wall:number;monotonic:number}|null=null;
-function getCurrentTime() {
-  if(typeof window==='undefined')return Date.now();
-  sessionClock??={wall:Date.now(),monotonic:performance.now()};
-  return sessionClock.wall+performance.now()-sessionClock.monotonic;
-}
 
-// A lost response for these actions may hide a purchase that the server already applied.
-const NETWORK_RETRY_UNSAFE_COOP_ACTIONS = new Set(["buy", "star-pack", "star-custom-draw", "star-custom-buy"]);
 
-function notifyCoopOffline(code: string | undefined, playerId: string | undefined) {
-  if (!code || !playerId || typeof navigator === "undefined") return;
-  const body = JSON.stringify({ action: "presence-offline", code, playerId, protocol: MULTIPLAYER_PROTOCOL_VERSION });
-  const blob = new Blob([body], { type: "application/json" });
-  if (navigator.sendBeacon?.("/api/multiplayer", blob)) return;
-  void fetch("/api/multiplayer", { method: "POST", headers: { "content-type": "application/json" }, body, keepalive: true }).catch(() => undefined);
-}
 
-function multiplayerUrl(params: Record<string, string>) {
-  const search = new URLSearchParams({ ...params, protocol: String(MULTIPLAYER_PROTOCOL_VERSION) });
-  return `/api/multiplayer?${search.toString()}`;
-}
 
-async function readCoopResponse(response: Response) {
-  const data = (await response.json()) as CoopApiResponse;
-  if (response.status === 426 && typeof window !== "undefined") {
-    const reloadUrl = new URL(window.location.href);
-    reloadUrl.searchParams.set("goal-clicker-update", String(Date.now()));
-    window.location.replace(reloadUrl.toString());
-  }
-  return data;
-}
 
-function getRandomItem<T>(items: readonly T[]) {
-  const random = new Uint32Array(1);
-  globalThis.crypto.getRandomValues(random);
-  return items[random[0] % items.length];
-}
 
-function getRandomPenaltyDirection(): PenaltyDirection {
-  return getRandomItem(PENALTY_DIRECTIONS);
-}
 
-function getRandomCrossbarHeight(): CrossbarHeight {
-  return getRandomItem(CROSSBAR_HEIGHTS);
-}
 
-function getRandomMatchPrediction(): MatchPrediction {
-  return getRandomItem(MATCH_PREDICTIONS);
-}
 
-function directionLabel(direction: PenaltyDirection) {
-  return direction[0].toUpperCase() + direction.slice(1);
-}
 
-function heightLabel(height: CrossbarHeight) {
-  return height[0].toUpperCase() + height.slice(1);
-}
 
-function predictionLabel(prediction: MatchPrediction) {
-  if (prediction === "heim") return "Heimsieg";
-  if (prediction === "auswärts") return "Auswärtssieg";
-  return "Remis";
-}
 
 const UPGRADES: UpgradeDefinition[] = [
   { id: "boots", icon: "boot", name: "Schnellere Stiefel", description: "+1 Tor pro Klick", baseCost: 25, scale: 1.22, kind: "click" },
@@ -390,158 +126,26 @@ const UPGRADES: UpgradeDefinition[] = [
   { id: "legacy", icon: "diamond", name: "Vereins-Dynastie", description: "+5% auf alle Einnahmen", baseCost: 6000000000, scale: 1.68, kind: "multiplier" },
 ];
 
-const ACHIEVEMENTS: { id: string; icon: IconName; name: string; description: string; threshold: number }[] = [
-  { id: "first", icon: "ball", name: "Ankick", description: "Das erste Tor", threshold: 1 },
-  { id: "hundred", icon: "number", name: "Hunderterclub", description: "100 Tore insgesamt", threshold: 100 },
-  { id: "thousand", icon: "flame", name: "Heisser Fuss", description: "1.000 Tore insgesamt", threshold: 1000 },
-  { id: "tenK", icon: "stadium", name: "Volles Stadion", description: "10.000 Tore insgesamt", threshold: 10000 },
-  { id: "hundredK", icon: "starter", name: "Profi-Vertrag", description: "100.000 Tore insgesamt", threshold: 100000 },
-  { id: "million", icon: "diamond", name: "Millionenstürmer", description: "1 Million Tore insgesamt", threshold: 1000000 },
-  { id: "tenMillion", icon: "scorer", name: "Goldene Generation", description: "10 Millionen Tore insgesamt", threshold: 10000000 },
-  { id: "hundredMillion", icon: "star", name: "Weltpokalsieger", description: "100 Millionen Tore insgesamt", threshold: 100000000 },
-  { id: "billion", icon: "crown", name: "Milliardenclub", description: "1 Milliarde Tore insgesamt", threshold: 1000000000 },
-  { id: "tenBillion", icon: "rocket", name: "Globales Phänomen", description: "10 Milliarden Tore insgesamt", threshold: 10000000000 },
-  { id: "hundredBillion", icon: "diamond", name: "Unantastbar", description: "100 Milliarden Tore insgesamt", threshold: 100000000000 },
-  { id: "trillion", icon: "crown", name: "Fussballgott", description: "1 Billion Tore insgesamt", threshold: 1000000000000 },
-  { id: "dynasty", icon: "stadium", name: "Eigene Dynastie", description: "1 Billiarde Tore insgesamt", threshold: 1000000000000000 },
-];
 
-function normalizeAchievements(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  const knownIds = new Set(ACHIEVEMENTS.map((achievement) => achievement.id));
-  return [...new Set(value.filter((id): id is string => typeof id === "string" && knownIds.has(id)))];
-}
 
-const RANKS: { icon: IconName; name: string; minimum: number }[] = [
-  { icon: "rookie", name: "Kreisliga Knipser", minimum: 0 },
-  { icon: "starter", name: "Stammspieler", minimum: 100 },
-  { icon: "scorer", name: "Torschützenkönig", minimum: 1000 },
-  { icon: "star", name: "Weltstar", minimum: 10000 },
-  { icon: "stadium", name: "Profi-Legende", minimum: 100000 },
-  { icon: "crown", name: "Fussballgott", minimum: 1000000 },
-  { icon: "diamond", name: "Weltpokalsieger", minimum: 10000000 },
-  { icon: "rocket", name: "Globaler Superstar", minimum: 100000000 },
-  { icon: "crown", name: "Milliarden-Ikone", minimum: 1000000000 },
-  { icon: "star", name: "Unaufhaltsam", minimum: 10000000000 },
-  { icon: "diamond", name: "Hall of Fame", minimum: 100000000000 },
-  { icon: "rocket", name: "Ewige Nummer 1", minimum: 1000000000000 },
-];
 
-function initialGame(): GameState {
-  return { goals: 0, totalGoals: 0, seasonGoals: 0, clicks: 0, upgrades: {}, achievements: [], stars: 0, seasons: 0, balanceVersion: BALANCE_VERSION, sound: true, lastSaved: Date.now(), miniGameCooldowns: initialMiniGameCooldowns(), minigameWins: 0, features: initialGameFeatures() };
-}
 
-function normalizeRuntimeGame(value: unknown, soundFallback = true): GameState {
-  const source = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-  const nonNegative = (raw: unknown) => {
-    const number = Number(raw);
-    return Number.isFinite(number) ? Math.max(0, number) : 0;
-  };
-  return {
-    goals: nonNegative(source.goals),
-    totalGoals: nonNegative(source.totalGoals),
-    seasonGoals: nonNegative(source.seasonGoals),
-    clicks: Math.floor(nonNegative(source.clicks)),
-    upgrades: normalizeUpgrades(source.upgrades),
-    achievements: normalizeAchievements(source.achievements),
-    stars: Math.min(MAX_SEASON_STARS, Math.floor(nonNegative(source.stars))),
-    seasons: Math.floor(nonNegative(source.seasons)),
-    balanceVersion: BALANCE_VERSION,
-    sound: typeof source.sound === "boolean" ? source.sound : soundFallback,
-    lastSaved: Number.isFinite(Number(source.lastSaved)) ? Number(source.lastSaved) : Date.now(),
-    miniGameCooldowns: normalizeMiniGameCooldowns(source.miniGameCooldowns as Partial<MiniGameCooldowns> | undefined),
-    minigameWins: Math.floor(nonNegative(source.minigameWins)),
-    features: normalizeGameFeatures(source.features),
-  };
-}
 
-function formatNumber(value: number) {
-  if (!Number.isFinite(value)) return "MAX";
-  if (value <= 0) return "0";
-  if (value < 1000) return Math.floor(value).toLocaleString("de-CH");
-  const units = ["K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc", "Ud"];
-  const exponent = Math.min(units.length - 1, Math.floor(Math.log10(value) / 3) - 1);
-  if (Math.floor(Math.log10(value) / 3) - 1 >= units.length) return value.toExponential(2).replace("e+", "e");
-  const divisor = 1000 ** (exponent + 1);
-  const scaled = value / divisor;
-  return `${scaled.toFixed(scaled < 10 ? 1 : 0)}${units[exponent]}`;
-}
 
 function formatStableInteger(value: number) {
   return Math.max(0, Math.floor(Number(value) || 0)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "'");
 }
 
-function formatGoalDifference(team: Pick<SeasonTableRow, "goalsFor" | "goalsAgainst">) {
-  const difference = team.goalsFor - team.goalsAgainst;
-  if (difference === 0) return "0";
-  return `${difference > 0 ? "+" : "−"}${Math.abs(difference)}`;
-}
 
-function formatHistoryTime(timestamp: number) {
-  return new Date(timestamp).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
-}
 
-function iconPaths(name: IconName): ReactNode {
-  const stroke = { stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  switch (name) {
-    case "ball": return <><circle cx="12" cy="12" r="8.5" {...stroke} /><path d="m12 8 2.4 1.7-.9 2.8H10.5l-.9-2.8L12 8Zm0 0L10.7 5.7m3.7 4 3.1-.9m-4.1 3.7 1.7 2.8m-4.6-2.8-1.7 2.8m.8-5.7-3-.9" {...stroke} /></>;
-    case "boot": return <path d="M5 15.5c2 .8 3.7 1.4 5.1 1.9 2.5.8 4.3.7 5.8 0l2.1-1c.8-.4 1.7 0 1.9.8l.2.9c.2.8-.3 1.6-1.1 1.8-3.7 1-7.3.8-10.7-.4l-3.4-1.2c-.7-.3-1.1-1-.8-1.7l.2-.5c.1-.4.4-.6.7-.6Z M9.4 5.2 13 7l.8 4.2-3.5 2.8-4-1.8 1.8-4.7 1.3-2.3Z" {...stroke} />;
-    case "worker": return <><circle cx="12" cy="7.5" r="2.8" {...stroke} /><path d="M6.5 19c.3-3.2 2.2-5 5.5-5s5.2 1.8 5.5 5M4.5 11.5h15" {...stroke} /></>;
-    case "striker": return <path d="M13.4 2.9 5.7 13h5.2L10.2 21l8.1-11.1h-5.3l.4-7Z" {...stroke} />;
-    case "board": return <><rect x="4" y="4" width="16" height="14" rx="1.5" {...stroke} /><path d="M8 8h8M8 12h5M8 16h8M9 18v3m6-3v3" {...stroke} /></>;
-    case "light": return <><path d="M9 18h6M9.8 21h4.4M8 14.5c-1.2-1-2-2.5-2-4.2a6 6 0 1 1 12 0c0 1.7-.8 3.2-2 4.2-.7.6-1 1.1-1 1.8H9c0-.7-.3-1.2-1-1.8Z" {...stroke} /><path d="M12 2v2M4.9 4.9l1.4 1.4M19.1 4.9l-1.4 1.4" {...stroke} /></>;
-    case "screen": return <><rect x="3" y="5" width="18" height="12" rx="2" {...stroke} /><path d="M8 21h8M12 17v4M7 9h10M7 12h5" {...stroke} /></>;
-    case "crown": return <path d="m4 7 4 3 4-6 4 6 4-3-2 12H6L4 7Z M6 22h12" {...stroke} />;
-    case "number": return <><circle cx="12" cy="12" r="8.5" {...stroke} /><path d="M10 9.5c.7-.7 2.6-.7 3.1.3.5 1-.2 1.8-1.3 2.3-1.1.5-2 1.2-2 2.4 0 1.2 1 1.8 2.2 1.8.9 0 1.6-.3 2.1-.9" {...stroke} /></>;
-    case "flame": return <path d="M12.1 21c3.6 0 6-2.1 6-5.2 0-2.1-1.1-3.7-2.8-5.1.2 1.7-.6 2.6-1.5 3.2.2-3.6-1.8-6.1-4.7-8.2.2 2.8-.4 4.7-1.8 6.2-1.1 1.2-1.8 2.4-1.8 4 0 3 2.5 5.1 6.6 5.1Z" {...stroke} />;
-    case "stadium": return <><path d="M3 20V8l9-4 9 4v12M3 20h18M7 20v-7h10v7M9 13V9m3 4V8m3 5V9" {...stroke} /></>;
-    case "diamond": return <path d="m12 3 7 6-7 12L5 9l7-6Z M5 9h14M9 9l3 12 3-12" {...stroke} />;
-    case "rookie": return <><path d="M5 21v-9l7-3 7 3v9M8 21v-5h8v5M3 21h18" {...stroke} /><path d="M9 9V5h6v4" {...stroke} /></>;
-    case "starter": return <><circle cx="12" cy="12" r="8.5" {...stroke} /><path d="M12 7v5l3 2" {...stroke} /></>;
-    case "scorer": return <><circle cx="12" cy="12" r="8.5" {...stroke} /><path d="m12 6 1.8 3.7 4.2.6-3 2.9.7 4.1-3.7-1.9-3.7 1.9.7-4.1-3-2.9 4.2-.6L12 6Z" {...stroke} /></>;
-    case "star": return <path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6-5.4-2.8-5.4 2.8 1-6-4.4-4.3 6.1-.9L12 3Z" {...stroke} />;
-    case "rocket": return <><path d="M14.5 5.2c2.2-.8 4-.7 4.5-.2.5.5.6 2.3-.2 4.5-.9 2.5-2.6 4.8-4.6 6.8l-3.5-3.5c2-2 3.3-4.9 3.8-7.6Z" {...stroke} /><path d="m10.7 12.8-3.5 1.1-1.1 3.5 3.5-1.1 1.1-3.5ZM7.2 7.5 5 5.3M8.3 18.1l-2.4 2.4M5 12H2.5" {...stroke} /><circle cx="15.7" cy="8.3" r="1.2" {...stroke} /></>;
-    case "sound": return <><path d="M4 10v4h3l4 3V7L7 10H4Z" {...stroke} /><path d="M15 9.5c1.4 1.3 1.4 3.7 0 5M17.5 7.3c2.5 2.4 2.5 7 0 9.4" {...stroke} /></>;
-    case "mute": return <><path d="M4 10v4h3l4 3V7L7 10H4Z" {...stroke} /><path d="m16 10 4 4m0-4-4 4" {...stroke} /></>;
-    case "broadcast": return <><circle cx="12" cy="12" r="2" {...stroke} /><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2" {...stroke} /></>;
-    default: return <circle cx="12" cy="12" r="8" {...stroke} />;
-  }
-}
 
-function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
-  return <svg className="svg-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">{iconPaths(name)}</svg>;
-}
 
-function FootballGraphic() {
-  return <svg viewBox="0 0 100 100" className="hero-football" aria-hidden="true"><circle cx="50" cy="50" r="43" fill="#f3f5ef"/><path d="M50 30 63 39l-5 15H42l-5-15 13-9Z" fill="#101918"/><path d="m50 30-6-12M63 39l16-5M58 54l9 15M42 54l-9 15M37 39 21 34" stroke="#101918" strokeWidth="4" strokeLinecap="round"/><circle cx="50" cy="50" r="43" fill="none" stroke="#b6c2b9" strokeWidth="2"/></svg>;
-}
 
-function getLevel(upgrades: Record<string, number>, id: string) {
-  return upgrades[id] ?? 0;
-}
 
-function normalizeNickname(value: string) {
-  return value.trim().replace(/\s+/g, " ").slice(0, 18);
-}
 
-function getCostAtLevel(definition: UpgradeDefinition, level: number) {
-  return getUpgradeCostAtLevel(definition, level, MAX_MULTIPLIER_LEVEL);
-}
 
-function getCost(definition: UpgradeDefinition, upgrades: Record<string, number>) {
-  return getCostAtLevel(definition, getLevel(upgrades, definition.id));
-}
 
-function getBulkPurchase(definition: UpgradeDefinition, upgrades: Record<string, number>, goals: number, mode: PurchaseMode, unlimitedMoney = false) {
-  return calculateBulkUpgradePurchase(definition, getLevel(upgrades, definition.id), goals, mode, {
-    unlimitedMoney,
-    maxMultiplierLevel: MAX_MULTIPLIER_LEVEL,
-  });
-}
 
-function getIncomeMultiplier(upgrades: Record<string, number>, stars: number) {
-  return (1 + Math.min(MAX_SEASON_STARS, Math.max(0, stars)) * 0.02) * 1.05 ** Math.min(MAX_MULTIPLIER_LEVEL, getLevel(upgrades, "legacy"));
-}
 
 function getBaseClickPower(upgrades: Record<string, number>, stars = 0, features?: GameFeatures) {
   const flat = 1 + getLevel(upgrades, "boots") + getLevel(upgrades, "technique") * 3 + getLevel(upgrades, "instinct") * 5 + getLevel(upgrades, "striker") * 10 + getLevel(upgrades, "longshot") * 25 + getLevel(upgrades, "freekick") * 50 + getLevel(upgrades, "worldclass") * 100 + getLevel(upgrades, "ballondor") * 250 + getLevel(upgrades, "captain") * 500;
@@ -553,89 +157,19 @@ function getClickPower(upgrades: Record<string, number>, stars = 0, features?: G
   return getBaseClickPower(upgrades, stars, features) * getGoalBoostMultiplier(features, now);
 }
 
-function getBasePassivePower(upgrades: Record<string, number>, stars = 0, features?: GameFeatures) {
-  const base = getLevel(upgrades, "ballboy") + getLevel(upgrades, "coach") * 15 + getLevel(upgrades, "academy") * 60 + getLevel(upgrades, "floodlight") * 300 + getLevel(upgrades, "scout") * 1200 + getLevel(upgrades, "var") * 10000 + getLevel(upgrades, "stadium") * 50000 + getLevel(upgrades, "broadcast") * 250000 + getLevel(upgrades, "sponsor") * 1200000 + getLevel(upgrades, "superclub") * 6000000;
-  const transfer = getTransferBonuses(features?.transferMarket.ownedIds ?? []);
-  return (base + transfer.passiveBonus) * getIncomeMultiplier(upgrades, stars) * (1 + transfer.incomeBonus);
-}
 
-function getPassivePower(upgrades: Record<string, number>, stars = 0, features?: GameFeatures, now = Date.now()) {
-  return getBasePassivePower(upgrades, stars, features) * getGoalBoostMultiplier(features, now);
-}
 
-function getUpgradeEffect(upgrade: UpgradeDefinition, level: number) {
-  const effectiveLevel = Math.min(level, MAX_MULTIPLIER_LEVEL);
-  if (upgrade.id === "golden") return `Stufe ${effectiveLevel}: x${(1.1 ** effectiveLevel).toFixed(2)} Klickpower`;
-  if (upgrade.id === "legacy") return `Stufe ${effectiveLevel}: x${(1.05 ** effectiveLevel).toFixed(2)} alle Einnahmen`;
-  return `${upgrade.description} · Stufe ${level}`;
-}
 
-function normalizeUpgrades(value: unknown) {
-  const upgrades = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-  const normalized: Record<string, number> = {};
-  for (const [id, value] of Object.entries(upgrades)) {
-    const level = Math.max(0, Math.floor(Number(value) || 0));
-    normalized[id] = id === "golden" || id === "legacy" ? Math.min(MAX_MULTIPLIER_LEVEL, level) : level;
-  }
-  return normalized;
-}
 
-function getRank(totalGoals: number) {
-  let current = RANKS[0];
-  for (const rank of RANKS) if (totalGoals >= rank.minimum) current = rank;
-  return current;
-}
 
-// Fast consecutive clicks build a combo. The multiplier never exceeds x3.
-const COMBO_WINDOW_MS = 450;
-// Time to get back to the ball after a full screen announcement closed.
-const COMBO_RESUME_GRACE_MS = 1500;
-const COMBO_LEVELS = [{ clicks: 0, multiplier: 1 }, { clicks: 15, multiplier: 2 }, { clicks: 40, multiplier: 3 }] as const;
-const VIBRATION_STORAGE_KEY = "goalClickerVibrationV1";
 
-function getComboLevel(count: number) {
-  let level: (typeof COMBO_LEVELS)[number] = COMBO_LEVELS[0];
-  for (const item of COMBO_LEVELS) if (count >= item.clicks) level = item;
-  return level;
-}
 
-function getComboProgress(count: number) {
-  const level = getComboLevel(count), next = COMBO_LEVELS.find((item) => item.clicks > count);
-  return next ? (count - level.clicks) / (next.clicks - level.clicks) : 1;
-}
 
-/** Light card accents (silver) are darkened for text on the white card; darker accents stay as they are. */
-function readableAccent(hex: string) {
-  const value = /^#([0-9a-f]{6})$/i.exec(hex)?.[1];
-  if (!value) return hex;
-  const n = parseInt(value, 16), rgb = [n >> 16, (n >> 8) & 255, n & 255];
-  const luminance = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
-  return luminance > 0.6 ? `rgb(${rgb.map((c) => Math.round(c * 0.55)).join(",")})` : hex;
-}
 
-function canVibrate() {
-  return typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
-}
 
-function readVibrationSetting() {
-  try { return typeof window === "undefined" || localStorage.getItem(VIBRATION_STORAGE_KEY) !== "off"; } catch { return true; }
-}
 
-let vibrationOn = readVibrationSetting();
 
-function vibrate(pattern: number | number[]) {
-  if (!vibrationOn || !canVibrate()) return;
-  try { navigator.vibrate(pattern); } catch { /* Some browsers block vibration without a user gesture. */ }
-}
 
-function createClickResult(clickPower: number, lastClick: number, currentStreak: number) {
-  const now = Date.now();
-  const streak = now - lastClick < 1200 ? currentStreak + 1 : 1;
-  const streakBonus = streak >= 5 ? 1 + Math.min(0.1, streak * 0.01) : 1;
-  const critical = Math.random() < 0.02;
-  const amount = Math.max(1, Math.floor(clickPower * streakBonus * (critical ? 2 : 1)));
-  return { now, streak, critical, amount, effectId: now + Math.random() };
-}
 
 function App() {
   const packPurchaseRef = useRef(false);
@@ -2433,7 +1967,7 @@ function App() {
 
   function toggleVibration() {
     const next = !vibrationOn;
-    vibrationOn = next;
+    setVibrationOn(next);
     setVibrationEnabled(next);
     try { localStorage.setItem(VIBRATION_STORAGE_KEY, next ? "on" : "off"); } catch { /* Storage can be unavailable. */ }
     if (next) vibrate(40);
@@ -3224,34 +2758,5 @@ function App() {
   );
 }
 
-class GameErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; message: string }> {
-  state = { hasError: false, message: "" };
-
-  static getDerivedStateFromError(error: unknown) {
-    return { hasError: true, message: error instanceof Error ? error.message : "Unbekannter Startfehler" };
-  }
-
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("Goal Clicker konnte den Spielstand nicht darstellen.", error, info);
-  }
-
-  private reload = () => window.location.reload();
-
-  private returnToSingleplayer = () => {
-    localStorage.removeItem(COOP_ROOM_KEY);
-    window.location.reload();
-  };
-
-  private repair = () => {
-    if (!window.confirm("Wirklich alle lokalen Goal-Clicker-Daten löschen und komplett neu starten?")) return;
-    for (const key of Object.keys(localStorage)) if (key.startsWith("goalClicker")) localStorage.removeItem(key);
-    window.location.reload();
-  };
-
-  render() {
-    if (!this.state.hasError) return this.props.children;
-    return <main className="game-recovery"><section><span className="eyebrow">GOAL CLICKER / WIEDERHERSTELLUNG</span><h1>Das Spiel konnte nicht gestartet werden.</h1><p>Dein gespeicherter Spielstand bleibt erhalten. Lade zuerst nochmals oder wechsle zum Singleplayer. Löschen passiert nur noch nach deiner ausdrücklichen Bestätigung.</p><small className="game-recovery-code">Fehler: {this.state.message}</small><div><button type="button" className="mode-secondary" onClick={this.reload}>Nochmals laden</button><button type="button" className="mode-secondary" onClick={this.returnToSingleplayer}>Zum Singleplayer</button><button type="button" className="mode-primary" onClick={this.repair}>Komplett neu starten</button></div></section></main>;
-  }
-}
 
 export default function Home() { return <GameErrorBoundary><App /></GameErrorBoundary>; }
