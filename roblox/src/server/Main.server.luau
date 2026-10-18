@@ -185,7 +185,7 @@ actionRemote.OnServerInvoke = function(player: Player, name: any, payload: any):
 		if viewer.coopCode and not Clubs.isCoopLive(viewer) then
 			return false, "Warte, bis der zweite Spieler beigetreten ist."
 		end
-		ok, message = Actions.claimDaily(session, Clubs.coopRole(viewer) or "solo", now)
+		ok, message = Actions.claimDaily(session, Clubs.coopRole(viewer) or "solo", now, viewer.restricted)
 	elseif name == "claimMission" and not viewer.coopCode then
 		return false, "Missionen gibt es in Koop-Welten."
 	else

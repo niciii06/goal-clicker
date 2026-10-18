@@ -202,6 +202,9 @@ return {
 		expectEqual(#vip.game.features.earnedPacks, #plain.game.features.earnedPacks + 1, "extra pack")
 		local last = vip.game.features.earnedPacks[#vip.game.features.earnedPacks]
 		expectEqual(last.packId, Monetization.VIP_DAILY_PACK, "small reward pack")
+		local restricted = newSession({ vip = true })
+		Actions.claimDaily(restricted, "solo", NOW, true)
+		expectEqual(#restricted.game.features.earnedPacks, #plain.game.features.earnedPacks, "no VIP pack where paid random items are restricted")
 	end },
 	{ name = "VIP clubs may use the extra colours", run = function()
 		local plain, vip = newSession(), newSession({ vip = true })

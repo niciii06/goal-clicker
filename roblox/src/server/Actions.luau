@@ -551,7 +551,8 @@ end
 ------------------------------------------------------------------------------------------
 -- Rewards, press, album, missions, prestige, club
 
-function Actions.claimDaily(session: Session, key: string, now: number): (boolean, string)
+-- restricted: paid random items are restricted for the claiming player (no VIP pack then).
+function Actions.claimDaily(session: Session, key: string, now: number, restricted: boolean?): (boolean, string)
 	local game, f = session.game, features(session)
 	local claim = Daily.claim(f.dailyRewards, key, Economy.basePassivePower(game.upgrades, game.stars, f), Economy.baseClickPower(game.upgrades, game.stars, f), now)
 	if not claim then
@@ -570,7 +571,7 @@ function Actions.claimDaily(session: Session, key: string, now: number): (boolea
 		addPack(claim.pack)
 	end
 	-- VIP: one extra small reward pack with every daily claim.
-	local vipPack = hasPass(session, "vip") and { id = ("vip-%s-%s"):format(key, Daily.day(now)), packId = Monetization.VIP_DAILY_PACK, earnedAt = now } or nil
+	local vipPack = hasPass(session, "vip") and not restricted and { id = ("vip-%s-%s"):format(key, Daily.day(now)), packId = Monetization.VIP_DAILY_PACK, earnedAt = now } or nil
 	if vipPack then
 		addPack(vipPack)
 	end
