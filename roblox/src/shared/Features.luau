@@ -18,6 +18,9 @@ local Catalog = require(script.Parent.Data.Catalog) :: any
 
 local Features = {}
 
+Features.DEFAULT_CLUB_NAME = "FC Goal"
+-- Earlier default name; clubs that still carry it get the new default on load.
+Features.OLD_DEFAULT_CLUB_NAME = "FC Arbeitszeitbetrug"
 Features.CLUB_BADGES = { "⚽", "🦅", "🔥", "🦁", "⭐", "🛡️" }
 Features.CLUB_COLORS = { "#0071e3", "#1d1d1f", "#e85d04", "#16845b", "#8b5cf6", "#d12c54" }
 Features.TRANSFER_EVENT_MIN_DELAY_MS = 480000
@@ -40,7 +43,7 @@ function Features.deadlineEventDelay(roll: number): number
 end
 
 function Features.initial(now: number, random: () -> number): any
-	local club = { name = "FC Arbeitszeitbetrug", badge = "⚽", color = "#0071e3" }
+	local club = { name = Features.DEFAULT_CLUB_NAME, badge = "⚽", color = "#0071e3" }
 	local missions = Util.map(Catalog.missions, function(mission: any)
 		local copy = table.clone(mission)
 		copy.claimed = false

@@ -218,6 +218,17 @@ return {
 		expectEqual(normalized.shopCredits.finishTravel, 0, "travel credits")
 		expectEqual(normalized.shopCredits.miniGameReady, 0, "mini game credits")
 	end },
+	{ name = "clubs start as FC Goal and the old default name is replaced", run = function()
+		local fresh = GameState.initial(NOW, rng)
+		expectEqual(fresh.features.club.name, "FC Goal", "new default")
+		local old = GameState.initial(NOW, rng)
+		old.features.club.name = "FC Arbeitszeitbetrug"
+		local normalized = GameState.normalize(old, NOW, rng)
+		expectEqual(normalized.features.club.name, "FC Goal", "renamed on load")
+		local own = GameState.initial(NOW, rng)
+		own.features.club.name = "FC Eigenname"
+		expectEqual(GameState.normalize(own, NOW, rng).features.club.name, "FC Eigenname", "own names stay")
+	end },
 	{ name = "items without a Roblox ID are not offered", run = function()
 		for _, pass in Monetization.PASSES do
 			expectEqual(Monetization.enabled(pass), pass.id ~= 0, pass.key)

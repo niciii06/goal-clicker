@@ -3,6 +3,7 @@
 local Economy = require(script.Parent.Economy)
 local Features = require(script.Parent.Features)
 local MiniGames = require(script.Parent.MiniGames)
+local Season = require(script.Parent.Season)
 local Util = require(script.Parent.Util)
 
 local GameState = {}
@@ -50,6 +51,11 @@ function GameState.normalize(saved: any, now: number, random: () -> number): any
 	fillDefaults(saved, fresh)
 	saved.goals = math.max(0, tonumber(saved.goals) or 0)
 	saved.totalGoals = math.max(0, tonumber(saved.totalGoals) or 0)
+	local club = saved.features.club
+	if club and club.name == Features.OLD_DEFAULT_CLUB_NAME then
+		club.name = Features.DEFAULT_CLUB_NAME
+		Season.renameClub(saved.features.seasonMode, club.name)
+	end
 	saved.stars = math.min(Economy.MAX_SEASON_STARS, math.max(0, math.floor(tonumber(saved.stars) or 0)))
 	for id, level in saved.upgrades do
 		local upgrade = Economy.upgrade(id)

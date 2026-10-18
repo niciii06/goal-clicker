@@ -643,7 +643,7 @@ function Actions.saveClub(session: Session, payload: any, now: number, filterNam
 	local raw = string.sub(string.gsub(tostring(payload.name or ""), "%s+", " "), 1, 22)
 	raw = (string.gsub(raw, "^%s+", ""))
 	raw = (string.gsub(raw, "%s+$", ""))
-	local name = raw ~= "" and raw or "FC Goal"
+	local name = raw ~= "" and raw or Features.DEFAULT_CLUB_NAME
 	if filterName then
 		name = filterName(name)
 	end
