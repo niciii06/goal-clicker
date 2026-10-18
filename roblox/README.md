@@ -14,7 +14,7 @@ Die Roblox Version von Goal Clicker. Die Website in `app/` bleibt unverändert u
 * **Karriere:** Form, Meilensteinkarten, Saisonauszeichnungen, Rivalitäten und Derbys, Matcharchiv, Reisestatistik und Sammelalbum.
 * **Club Welt:** Fabrizio Romario (Leihen, Verkäufe, Deadline Day), Zufallsereignisse, VAR, Pressekonferenzen, tägliche Prämie, vier Minispiele, Codes (zum Beispiel `SILVAN`), Missionen und Verlauf.
 * **Koop:** Gemeinsame Welten für bis zu vier Spieler auf demselben Server.
-* **Roblox Extras:** Speichern über DataStore mit Sperre gegen doppeltes Laden, globale Rangliste, leaderstats (Tore, Pokale) und ein begehbares 3D Stadion mit klickbarem Riesenball.
+* **Roblox Extras:** Speichern über DataStore mit Sperre gegen doppeltes Laden, globale Rangliste und leaderstats (Tore, Pokale). Es gibt keinen Avatar und keine begehbare Welt: Man spielt nur über die Oberfläche wie auf der Website. Das 3D Stadion erscheint nur in der 3D Ansicht eines Live Spiels.
 
 Alles Wichtige rechnet der Server. Der Client schickt nur Absichten (klicken, kaufen, aufstellen). Gewinne, Packs und Spielergebnisse lassen sich so nicht fälschen.
 

@@ -2,6 +2,7 @@
 -- The app shell: top bar with the goal counter, mode switch, navigation and the active screen.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
 
 local Net = require(script.Parent.Net)
@@ -37,6 +38,7 @@ local App = {}
 
 local player = Players.LocalPlayer
 local gui: ScreenGui
+local backdrop: Frame
 local panel: Frame
 local content: ScrollingFrame
 local navFrame: Frame
@@ -95,13 +97,15 @@ end
 function ctx.hidePanel(hidden: boolean)
 	panelHidden = hidden
 	panel.Visible = not hidden
+	-- The stadium is only visible behind the 3D match view; otherwise the game is pure UI.
+	backdrop.Visible = not hidden
 	App.renderToggle()
 end
 
 local toggleButton: TextButton
 
 function App.renderToggle()
-	toggleButton.Text = panelHidden and "☰  Menü" or "🏟️  Stadion"
+	toggleButton.Visible = panelHidden
 end
 
 local function buildTopBar(parent: Instance)
@@ -303,10 +307,16 @@ function App.start()
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		Parent = player:WaitForChild("PlayerGui"),
 	})
+	backdrop = UI.new("Frame", {
+		Name = "Backdrop",
+		BackgroundColor3 = C.background,
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 1),
+		Parent = gui,
+	})
 	panel = UI.new("Frame", {
 		Name = "Panel",
 		BackgroundColor3 = C.background,
-		BackgroundTransparency = 0.04,
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 60),
 		Size = UDim2.new(1, -16, 1, -68),
@@ -354,12 +364,20 @@ function App.start()
 		TextColor3 = C.white,
 		Font = Theme.fonts.bold,
 		TextSize = 14,
-		Text = "🏟️  Stadion",
+		Text = "☰  Menü",
+		Visible = false,
 		Parent = gui,
 		Activated = function()
 			ctx.hidePanel(not panelHidden)
 		end,
 	}, { UI.corner(999) })
+
+	-- No avatar UI: the game is played entirely through this interface, like the website.
+	for _, coreGui in { Enum.CoreGuiType.Backpack, Enum.CoreGuiType.Health, Enum.CoreGuiType.EmotesMenu, Enum.CoreGuiType.PlayerList } do
+		pcall(function()
+			StarterGui:SetCoreGuiEnabled(coreGui, false)
+		end)
+	end
 
 	Overlays.mount(gui, ctx)
 	Net.setToast(function(text, success)

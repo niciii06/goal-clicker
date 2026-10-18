@@ -16,6 +16,9 @@
     "Lighting": {
       "$properties": { "ClockTime": 15.5, "Brightness": 2.5, "GlobalShadows": true, "Technology": "ShadowMap" }
     },
+    "Players": {
+      "$properties": { "CharacterAutoLoads": false }
+    },
     "SoundService": {
       "$properties": { "RespectFilteringEnabled": true }
     }
