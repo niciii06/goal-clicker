@@ -14,7 +14,7 @@
       }
     },
     "Lighting": {
-      "$properties": { "ClockTime": 15.5, "Brightness": 2.5, "GlobalShadows": true }
+      "$properties": { "ClockTime": 15.5, "Brightness": 2.5, "GlobalShadows": true, "Technology": "ShadowMap" }
     },
     "SoundService": {
       "$properties": { "RespectFilteringEnabled": true }
