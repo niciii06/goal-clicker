@@ -7,6 +7,7 @@ local TextService = game:GetService("TextService")
 
 local Actions = require(script.Parent.Actions)
 local Clubs = require(script.Parent.Clubs)
+local Shop = require(script.Parent.Shop)
 local Store = require(script.Parent.Store)
 local Stadium = require(script.Parent.Stadium)
 
@@ -83,6 +84,11 @@ local function onPlayerAdded(player: Player)
 		player:Kick(problem or "Spielstand nicht verfügbar.")
 		return
 	end
+	-- Game passes and the paid random item policy (web calls, each protected by pcall).
+	local okShop, shopProblem = pcall(Shop.loadPlayer, player)
+	if not okShop then
+		warn("[Shop] Pässe konnten nicht geladen werden:", shopProblem)
+	end
 	if not Store.isPersistent() then
 		noticeRemote:FireClient(player, { { kind = "toast", text = "Studio Testmodus: Spielstände werden nicht gespeichert." } })
 	end
@@ -108,7 +114,17 @@ end
 
 Players.PlayerRemoving:Connect(function(player)
 	Clubs.remove(player)
+	Shop.removePlayer(player)
 end)
+
+Shop.start({
+	flush = function(player: Player?)
+		flush(player)
+	end,
+	toast = function(player: Player, text: string)
+		noticeRemote:FireClient(player, { { kind = "toast", text = text } })
+	end,
+})
 
 -- Coop rules: shared actions need at least two members, like the web version.
 local SOLO_ONLY = { createCoop = true, joinCoop = true, leaveCoop = true, savedWorlds = true }
@@ -239,7 +255,7 @@ queryRemote.OnServerInvoke = function(player: Player, name: any): any
 			local ok, username = pcall(function()
 				return Players:GetNameFromUserIdAsync(userId :: number)
 			end)
-			table.insert(entries, { rank = index, name = ok and username or ("Spieler " .. entry.key), goals = entry.value })
+			table.insert(entries, { rank = index, name = ok and username or ("Spieler " .. entry.key), goals = entry.value, vip = userId ~= nil and Shop.isVip(userId) })
 		end
 		return entries
 	end

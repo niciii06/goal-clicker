@@ -1,5 +1,6 @@
 --!nonstrict
--- Club sessions on this server: each player's own club and shared coop worlds (up to 4 players).
+-- Club sessions on this server: each player's own club and shared coop worlds (4 players,
+-- 6 when the host owns the "Grosser Koop Club" pass).
 -- A player always has an own club; while they play in a coop world their actions go there.
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -7,6 +8,7 @@ local Shared = ReplicatedStorage.Shared
 
 local Actions = require(script.Parent.Actions)
 local GameState = require(Shared.GameState)
+local Monetization = require(Shared.Monetization)
 local Store = require(script.Parent.Store)
 local Sync = require(script.Parent.Sync)
 local Util = require(Shared.Util)
@@ -15,8 +17,8 @@ local Clubs = {}
 
 local PLAYER_STORE = "GoalClickerPlayersV1"
 local COOP_STORE = "GoalClickerCoopV1"
-local ROLES = { "host", "guest", "player3", "player4" }
-local ROLE_LABELS = { host = "HOST", guest = "SPIELER 2", player3 = "SPIELER 3", player4 = "SPIELER 4" }
+local ROLES = { "host", "guest", "player3", "player4", "player5", "player6" }
+local ROLE_LABELS = { host = "HOST", guest = "SPIELER 2", player3 = "SPIELER 3", player4 = "SPIELER 4", player5 = "SPIELER 5", player6 = "SPIELER 6" }
 
 export type Viewer = {
 	player: Player,
@@ -25,6 +27,11 @@ export type Viewer = {
 	coopCode: string?,
 	cache: { [string]: string },
 	loadedAt: number,
+	-- Game passes of this player (checked on join and after purchases in game).
+	passes: { [string]: boolean },
+	-- Paid random items are restricted for this player (PolicyService).
+	restricted: boolean?,
+	unsavedReceipts: { [string]: boolean }?,
 }
 
 local viewers: { [Player]: Viewer } = {}
@@ -56,6 +63,9 @@ function Clubs.load(player: Player): (Viewer?, string?)
 	end
 	local now = Clubs.now()
 	local profile = (saved and saved.profile) or { coopCodes = {} }
+	profile.coopCodes = profile.coopCodes or {}
+	-- Processed Robux receipts (PurchaseIds), so a receipt never acts twice.
+	profile.receipts = type(profile.receipts) == "table" and profile.receipts or {}
 	local game = GameState.normalize(saved and saved.game, now, rng)
 	if saved and saved.game and saved.game.lastSaved then
 		-- The club pauses while nobody plays, like the web version does when the tab is hidden.
@@ -67,18 +77,20 @@ function Clubs.load(player: Player): (Viewer?, string?)
 		return player.DisplayName
 	end
 	session.lastTick = now
-	local viewer: Viewer = { player = player, own = session, profile = profile, coopCode = nil, cache = {}, loadedAt = now }
+	local viewer: Viewer = { player = player, own = session, profile = profile, coopCode = nil, cache = {}, loadedAt = now, passes = {} }
+	session.passes = viewer.passes
 	viewers[player] = viewer
 	return viewer, nil
 end
 
-function Clubs.saveOwn(viewer: Viewer, release: boolean?)
+function Clubs.saveOwn(viewer: Viewer, release: boolean?): boolean
 	local game = viewer.own.game
 	game.lastSaved = Clubs.now()
 	local ok = Store.save(PLAYER_STORE, tostring(viewer.player.UserId), { game = Sync.forSave(game), profile = viewer.profile }, release)
 	if ok then
 		Store.setRanking("GoalClickerTotalGoalsV1", tostring(viewer.player.UserId), game.totalGoals)
 	end
+	return ok
 end
 
 function Clubs.viewer(player: Player): Viewer?
@@ -115,24 +127,54 @@ local function onlineMembers(world: any): { Player }
 	return list
 end
 
+-- Seats of a world: 6 once its host owns the "Grosser Koop Club" pass.
+local function capacity(world: any): number
+	local host = Util.find(world.members, function(item)
+		return item.role == "host"
+	end)
+	if host and host.passes and host.passes.bigCoop then
+		world.bigCoop = true
+	end
+	return Monetization.coopCapacity(world.bigCoop)
+end
+
+-- In a coop world the passes of every member count for the whole world.
+local function worldPasses(world: any): { [string]: boolean }
+	local passes = {}
+	for _, member in world.members do
+		for key, owned in member.passes or {} do
+			if owned then
+				passes[key] = true
+			end
+		end
+	end
+	return passes
+end
+
 local function refreshCoopView(world: any)
 	local online = {}
 	for _, player in onlineMembers(world) do
 		online[player.UserId] = true
 	end
+	local seats = capacity(world)
+	world.session.passes = worldPasses(world)
 	local members = {}
-	for _, role in ROLES do
+	for index, role in ROLES do
+		if index > seats then
+			break
+		end
 		local member = Util.find(world.members, function(item)
 			return item.role == role
 		end)
 		table.insert(members, {
 			role = role, label = ROLE_LABELS[role], name = member and member.name or nil, userId = member and member.userId or nil, occupied = member ~= nil,
 			online = member ~= nil and online[member.userId] == true, goals = member and member.goals or 0, clicks = member and member.clicks or 0,
+			vip = member ~= nil and member.passes ~= nil and member.passes.vip == true,
 		})
 	end
 	world.session.coopView = {
 		code = world.code, roomName = world.roomName, status = #world.members >= 2 and "live" or "waiting",
-		playerCount = #world.members, maxPlayers = #ROLES, players = members,
+		playerCount = #world.members, maxPlayers = seats, players = members,
 	}
 end
 
@@ -184,8 +226,9 @@ function Clubs.createCoop(viewer: Viewer, roomName: string): (boolean, string)
 	local world = {
 		code = code,
 		roomName = (roomName ~= "" and string.sub(roomName, 1, 28)) or "Meine Welt",
-		members = { { userId = viewer.player.UserId, name = viewer.player.DisplayName, role = "host", goals = 0, clicks = 0 } },
+		members = { { userId = viewer.player.UserId, name = viewer.player.DisplayName, role = "host", goals = 0, clicks = 0, passes = table.clone(viewer.passes) } },
 		game = GameState.initial(now, rng),
+		bigCoop = viewer.passes.bigCoop == true,
 	}
 	coopWorlds[code] = world
 	coopSession(world)
@@ -210,7 +253,7 @@ local function loadWorld(code: string): (any?, string?)
 		return nil, "Diese Koop-Welt gibt es nicht."
 	end
 	local now = Clubs.now()
-	local world = { code = code, roomName = saved.roomName or "Meine Welt", members = saved.members or {}, game = GameState.normalize(saved.game, now, rng) }
+	local world = { code = code, roomName = saved.roomName or "Meine Welt", members = saved.members or {}, game = GameState.normalize(saved.game, now, rng), bigCoop = saved.bigCoop == true }
 	if saved.game and saved.game.lastSaved then
 		GameState.pauseTimers(world.game, now - saved.game.lastSaved, now)
 	end
@@ -236,7 +279,7 @@ function Clubs.joinCoop(viewer: Viewer, rawCode: string): (boolean, string)
 	end
 	local member = memberOf(world, viewer.player.UserId)
 	if not member then
-		if #world.members >= #ROLES then
+		if #world.members >= capacity(world) then
 			Clubs.releaseIfEmpty(world)
 			return false, "Diese Koop-Welt ist voll."
 		end
@@ -244,13 +287,14 @@ function Clubs.joinCoop(viewer: Viewer, rawCode: string): (boolean, string)
 		for _, item in world.members do
 			taken[item.role] = true
 		end
-		local role = Util.find(ROLES, function(candidate)
+		local role = Util.find(Util.slice(ROLES, 1, capacity(world)), function(candidate)
 			return not taken[candidate]
 		end)
 		member = { userId = viewer.player.UserId, name = viewer.player.DisplayName, role = role, goals = 0, clicks = 0 }
 		table.insert(world.members, member)
 	end
 	member.name = viewer.player.DisplayName
+	member.passes = table.clone(viewer.passes)
 	viewer.coopCode = code
 	rememberCode(viewer, code)
 	viewer.cache = {}
@@ -308,9 +352,35 @@ function Clubs.resetOwn(viewer: Viewer): (boolean, string)
 	return true, "Spielstand zurückgesetzt."
 end
 
-function Clubs.saveCoop(world: any, release: boolean)
+function Clubs.saveCoop(world: any, release: boolean): boolean
 	world.game.lastSaved = Clubs.now()
-	Store.save(COOP_STORE, world.code, { roomName = world.roomName, members = world.members, game = Sync.forSave(world.game) }, release)
+	return Store.save(COOP_STORE, world.code, { roomName = world.roomName, members = world.members, bigCoop = world.bigCoop, game = Sync.forSave(world.game) }, release)
+end
+
+-- Saves everything a purchase touched: the world the buyer plays in (if any) and the
+-- buyer's own record, which holds the processed receipts.
+function Clubs.savePurchase(viewer: Viewer): boolean
+	local world = viewer.coopCode and coopWorlds[viewer.coopCode]
+	if world and not Clubs.saveCoop(world, false) then
+		return false
+	end
+	return Clubs.saveOwn(viewer, false)
+end
+
+-- New pass ownership of a player: own club, member records and the worlds they belong to.
+function Clubs.setPasses(viewer: Viewer, passes: { [string]: boolean })
+	table.clear(viewer.passes)
+	for key, owned in passes do
+		viewer.passes[key] = owned
+	end
+	viewer.own.passes = viewer.passes
+	for _, world in coopWorlds do
+		local member = memberOf(world, viewer.player.UserId)
+		if member then
+			member.passes = table.clone(viewer.passes)
+			refreshCoopView(world)
+		end
+	end
 end
 
 function Clubs.releaseIfEmpty(world: any)
@@ -342,7 +412,7 @@ function Clubs.savedWorlds(viewer: Viewer): { any }
 		local world = coopWorlds[code]
 		local data = world or Store.peek(COOP_STORE, code)
 		if data then
-			table.insert(list, { code = code, roomName = data.roomName or "Meine Welt", players = #(data.members or {}), open = world ~= nil })
+			table.insert(list, { code = code, roomName = data.roomName or "Meine Welt", players = #(data.members or {}), maxPlayers = Monetization.coopCapacity(data.bigCoop), open = world ~= nil })
 		end
 	end
 	return list
@@ -371,6 +441,15 @@ function Clubs.tickAll(now: number)
 			warn("[Clubs] Tick fehlgeschlagen:", problem)
 		end
 	end
+	-- Auto Klicker: one click per second in the club the player is playing in right now.
+	for _, viewer in viewers do
+		if not viewer.coopCode then
+			Actions.autoClick(viewer.own, now)
+		end
+	end
+	for _, world in coopWorlds do
+		Actions.autoClick(world.session, now)
+	end
 	for _, world in coopWorlds do
 		refreshCoopView(world)
 	end
@@ -389,6 +468,7 @@ function Clubs.flush(sendState: (Player, any) -> (), sendNotices: (Player, { any
 	for player, viewer in viewers do
 		local session = Clubs.session(viewer)
 		local sections = Sync.sections(session, now)
+		sections.shop = { owned = viewer.passes, active = session.passes or {}, restricted = viewer.restricted == true }
 		sections.serverNow = now
 		local changed = Sync.diff(viewer.cache, sections, encode, force == player)
 		if changed then

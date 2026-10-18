@@ -133,7 +133,8 @@ function Economy.basePassivePower(upgrades: { [string]: number }, stars: number,
 end
 
 -- Goal boost after a won tournament.
-Economy.GOAL_BOOST_MULTIPLIERS = { stadium = 1.5, champions = 2, world = 3 }
+-- "shop" is the Goalboost bought in the Robux shop (see Monetization.luau).
+Economy.GOAL_BOOST_MULTIPLIERS = { stadium = 1.5, champions = 2, world = 3, shop = 2 }
 Economy.GOAL_BOOST_DURATION_MS = 180000
 
 function Economy.goalBoostMultiplier(features: any, now: number): number

@@ -106,20 +106,24 @@ function Store.save(storeName: string, key: string, data: any, release: boolean?
 		return true
 	end
 	for attempt = 1, 3 do
+		local written = false
 		local ok, problem = pcall(function()
 			store:UpdateAsync(key, function(record)
 				record = record or {}
 				if record.lock and record.lock.jobId ~= jobId() and os.time() - (record.lock.time or 0) < LOCK_TIMEOUT_SECONDS then
 					-- Another server took over (for example after a crash here); never overwrite it.
+					written = false
 					return nil
 				end
 				record.data = data
 				record.lock = (not release) and { jobId = jobId(), time = os.time() } or nil
+				written = true
 				return record
 			end)
 		end)
 		if ok then
-			return true
+			-- false when another server holds the lock: nothing was written (purchases rely on this).
+			return written
 		end
 		warn(("[Store] Speichern fehlgeschlagen (%s/%s), Versuch %d: %s"):format(storeName, key, attempt, tostring(problem)))
 		if RunService:IsStudio() then

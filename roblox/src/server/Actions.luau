@@ -14,6 +14,7 @@ local GameState = require(Shared.GameState)
 local History = require(Shared.History)
 local MatchRatings = require(Shared.MatchRatings)
 local MiniGames = require(Shared.MiniGames)
+local Monetization = require(Shared.Monetization)
 local Packs = require(Shared.Packs)
 local Press = require(Shared.Press)
 local Season = require(Shared.Season)
@@ -21,6 +22,7 @@ local StarXI = require(Shared.StarXI)
 local Travel = require(Shared.Travel)
 local Util = require(Shared.Util)
 local Progression = require(Shared.Data.Progression) :: any
+local Purchases = require(script.Parent.Purchases)
 
 local Actions = {}
 
@@ -35,6 +37,8 @@ export type Session = {
 	memberName: (string?) -> string,
 	lastTick: number?,
 	coopView: any?,
+	-- Game passes active in this club (own passes, in coop the passes of all members).
+	passes: { [string]: boolean }?,
 }
 
 local MAX_CAREER_SEASON = #Progression.seasonMilestones
@@ -48,6 +52,7 @@ function Actions.newSession(game: any): Session
 		combo = { count = 0, last = 0 },
 		streak = { count = 0, last = 0 },
 		miniGame = nil,
+		passes = {},
 		memberName = function(name)
 			return name or "Du"
 		end,
@@ -80,6 +85,15 @@ function Actions.passivePower(game: any, now: number): number
 	return Economy.passivePower(game.upgrades, game.stars, game.features, now)
 end
 
+-- Doppelte Tore pass: x2 on goals from clicks and production.
+function Actions.goalMultiplier(session: Session): number
+	return Monetization.goalMultiplier(session.passes)
+end
+
+local function hasPass(session: Session, key: string): boolean
+	return session.passes ~= nil and session.passes[key] == true
+end
+
 local function ratingOf(session: Session): (Cards.Player) -> number
 	local f = features(session)
 	return function(player)
@@ -104,13 +118,24 @@ function Actions.click(session: Session, now: number, random: () -> number): (nu
 	combo.count = (now - combo.last <= Economy.COMBO_WINDOW_MS) and combo.count + 1 or 1
 	combo.last = now
 	local level = Economy.comboLevel(combo.count)
-	local power = Actions.clickPower(session.game, now) * level.multiplier
+	local power = Actions.clickPower(session.game, now) * level.multiplier * Actions.goalMultiplier(session)
 	local amount, streak, critical = Economy.clickResult(power, now, session.streak.last, session.streak.count, random)
 	session.streak.count = streak
 	session.streak.last = now
 	GameState.addGoals(session.game, amount)
 	session.game.clicks += 1
 	return amount, critical, level.multiplier
+end
+
+-- Auto Klicker pass: one plain click per second (no combo, streak or critical hits). It does
+-- not count as a click for missions so the pass never completes goals by itself.
+function Actions.autoClick(session: Session, now: number): number?
+	if not hasPass(session, "autoClicker") then
+		return nil
+	end
+	local amount = math.max(1, math.floor(Actions.clickPower(session.game, now) * Actions.goalMultiplier(session)))
+	GameState.addGoals(session.game, amount)
+	return amount
 end
 
 ------------------------------------------------------------------------------------------
@@ -390,7 +415,8 @@ function Actions.startMatch(session: Session, payload: any, now: number, random:
 	if fixture.away then
 		if not journey or journey.fixture.id ~= fixture.id then
 			Features.lockSquad(f, fixture.id, now)
-			f.travel.journey = Travel.createJourney(fixture, now, random, Features.eventPlayers(f), f.travel.stats.recentEvents, f.squadLock and Util.deepCopy(f.squadLock))
+			local speed = hasPass(session, "fastTravel") and 2 or 1
+			f.travel.journey = Travel.createJourney(fixture, now, random, Features.eventPlayers(f), f.travel.stats.recentEvents, f.squadLock and Util.deepCopy(f.squadLock), speed)
 			local venue = Travel.venue(fixture.venueId)
 			History.add(f, "Reise nach " .. venue.city, ("%s · %s · %s km"):format(fixture.opponent, Travel.transportLabel(f.travel.journey.transport), Util.formatInteger(venue.km)), "neutral", now)
 			return true, "Reise gestartet."
@@ -533,14 +559,25 @@ function Actions.claimDaily(session: Session, key: string, now: number): (boolea
 	end
 	f.dailyRewards = claim.state
 	GameState.addGoals(game, claim.amount)
-	if claim.pack and not Util.some(f.earnedPacks, function(pack)
-		return pack.id == claim.pack.id
-	end) then
-		table.insert(f.earnedPacks, claim.pack)
+	local function addPack(pack: any)
+		if not Util.some(f.earnedPacks, function(item)
+			return item.id == pack.id
+		end) then
+			table.insert(f.earnedPacks, pack)
+		end
 	end
-	History.add(f, "Tägliche Prämie · Tag " .. claim.dayIndex, ("%s holt +%s Tore%s. Serie: %d %s."):format(session.memberName(nil), Util.formatNumber(claim.amount), claim.pack and " und ein Prämienpack" or "", claim.streak, claim.streak == 1 and "Tag" or "Tage"), "positive", now)
+	if claim.pack then
+		addPack(claim.pack)
+	end
+	-- VIP: one extra small reward pack with every daily claim.
+	local vipPack = hasPass(session, "vip") and { id = ("vip-%s-%s"):format(key, Daily.day(now)), packId = Monetization.VIP_DAILY_PACK, earnedAt = now } or nil
+	if vipPack then
+		addPack(vipPack)
+	end
+	local packText = (claim.pack and vipPack) and " und zwei Prämienpacks" or (claim.pack or vipPack) and " und ein Prämienpack" or ""
+	History.add(f, "Tägliche Prämie · Tag " .. claim.dayIndex, ("%s holt +%s Tore%s. Serie: %d %s."):format(session.memberName(nil), Util.formatNumber(claim.amount), packText, claim.streak, claim.streak == 1 and "Tag" or "Tage"), "positive", now)
 	notify(session, "sound", { name = "reward" })
-	return true, ("Tag %d: +%s Tore%s"):format(claim.dayIndex, Util.formatNumber(claim.amount), claim.pack and " und ein Prämienpack" or "")
+	return true, ("Tag %d: +%s Tore%s"):format(claim.dayIndex, Util.formatNumber(claim.amount), packText)
 end
 
 function Actions.answerPress(session: Session, payload: any, now: number): (boolean, string)
@@ -611,7 +648,7 @@ function Actions.saveClub(session: Session, payload: any, now: number, filterNam
 		name = filterName(name)
 	end
 	local badge = table.find(Features.CLUB_BADGES, payload.badge) and payload.badge or Features.CLUB_BADGES[1]
-	local color = table.find(Features.CLUB_COLORS, payload.color) and payload.color or Features.CLUB_COLORS[1]
+	local color = Monetization.allowedColor(payload.color, Features.CLUB_COLORS, hasPass(session, "vip")) and payload.color or Features.CLUB_COLORS[1]
 	f.club = { name = name, badge = badge, color = color }
 	Season.renameClub(f.seasonMode, name)
 	History.add(f, "Clubprofil aktualisiert", ("%s %s ist bereit für die nächste Runde."):format(badge, name), "neutral", now)
@@ -743,6 +780,9 @@ local HANDLERS: { [string]: (Session, any, number, () -> number) -> (boolean, st
 	redeemCode = function(s, p, n)
 		return Actions.redeemCode(s, p, n)
 	end,
+	useShopCredit = function(s, p, n)
+		return Purchases.useCredit(s, tostring(p.key), n)
+	end,
 	toggleSound = function(s)
 		s.game.sound = not s.game.sound
 		return true, s.game.sound and "Sound an" or "Sound aus"
@@ -764,7 +804,7 @@ function Actions.tick(session: Session, now: number, elapsedMs: number, random: 
 	local game, f = session.game, features(session)
 	local base = Economy.basePassivePower(game.upgrades, game.stars, f)
 	if base > 0 and elapsedMs > 0 then
-		GameState.addGoals(game, Economy.boostedPassiveReward(base, f, now - elapsedMs, now))
+		GameState.addGoals(game, Economy.boostedPassiveReward(base * Actions.goalMultiplier(session), f, now - elapsedMs, now))
 	end
 	Travel.settle(f.travel, now)
 	if f.cup.active then

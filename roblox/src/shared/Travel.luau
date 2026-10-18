@@ -116,8 +116,10 @@ function Travel.segmentAt(venue: any, elapsedGameSeconds: number): any?
 	return nil
 end
 
-function Travel.createJourney(fixture: any, now: number, random: () -> number, eventPlayers: { any }, recentEvents: { string }, squadLock: any): any
+-- speed > 1 shortens the journey (Schnellreise pass); the stages keep their proportions.
+function Travel.createJourney(fixture: any, now: number, random: () -> number, eventPlayers: { any }, recentEvents: { string }, squadLock: any, speed: number?): any
 	local venue = Travel.venue(fixture.venueId)
+	local pace = math.max(1, speed or 1)
 	local baseMs = Travel.durationMs(venue)
 	local transport = Travel.transportOf(venue)
 	local events = {}
@@ -152,12 +154,13 @@ function Travel.createJourney(fixture: any, now: number, random: () -> number, e
 			if #pool > 0 then
 				local event = pool[math.min(#pool, math.floor(random() * #pool) + 1)]
 				local player = #eventPlayers > 0 and eventPlayers[math.min(#eventPlayers, math.floor(random() * #eventPlayers) + 1)] or nil
-				table.insert(events, { id = event.id, playerId = player and player.id, text = Util.replaceAll(event.text, "{player}", player and player.name or "Die Mannschaft"), at = at })
+				table.insert(events, { id = event.id, playerId = player and player.id, text = Util.replaceAll(event.text, "{player}", player and player.name or "Die Mannschaft"), at = Util.round(at / pace) })
 			end
 		end
 	end
+	local durationMs = Util.round(baseMs / pace)
 	return {
-		squadLock = squadLock, id = fixture.id, fixture = fixture, startedAt = now, baseMs = baseMs, endsAt = now + baseMs,
+		squadLock = squadLock, id = fixture.id, fixture = fixture, startedAt = now, baseMs = durationMs, endsAt = now + durationMs, speed = pace,
 		transport = transport, km = venue.km, events = events, consumed = false, counted = false,
 	}
 end
@@ -167,7 +170,7 @@ function Travel.view(journey: any, now: number): any
 	local elapsed = math.max(0, now - journey.startedAt)
 	local total = math.max(1, journey.endsAt - journey.startedAt)
 	return {
-		stage = venue and Travel.segmentAt(venue, elapsed / 1000) or nil,
+		stage = venue and Travel.segmentAt(venue, elapsed * (journey.speed or 1) / 1000) or nil,
 		arrived = now >= journey.endsAt,
 		progress = math.max(0, math.min(1, elapsed / total)),
 		remaining = math.max(0, journey.endsAt - now),

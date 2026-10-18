@@ -13,8 +13,10 @@ Die Roblox Version von Goal Clicker. Die Website in `app/` bleibt unverändert u
 * **Reisen:** Auswärtsspiele mit Teambus, Zug oder Flugzeug. Die Reisepläne kommen aus dem Webcode.
 * **Karriere:** Form, Meilensteinkarten, Saisonauszeichnungen, Rivalitäten und Derbys, Matcharchiv, Reisestatistik und Sammelalbum.
 * **Club Welt:** Fabrizio Romario (Leihen, Verkäufe, Deadline Day), Zufallsereignisse, VAR, Pressekonferenzen, tägliche Prämie, vier Minispiele, Codes (zum Beispiel `SILVAN`), Missionen und Verlauf.
-* **Koop:** Gemeinsame Welten für bis zu vier Spieler. Freunde lädt man direkt über die Roblox Einladung ein, sie landen dann automatisch auf dem gleichen Server und in der Welt. Der Code geht weiterhin als Alternative.
+* **Koop:** Gemeinsame Welten für bis zu vier Spieler (sechs mit dem Pass „Grosser Koop Club“). Freunde lädt man direkt über die Roblox Einladung ein, sie landen dann automatisch auf dem gleichen Server und in der Welt. Der Code geht weiterhin als Alternative.
 * **Roblox Extras:** Speichern über DataStore mit Sperre gegen doppeltes Laden, globale Rangliste und leaderstats (Tore, Pokale). Es gibt keinen Avatar und keine begehbare Welt: Man spielt nur über die Oberfläche wie auf der Website. Das 3D Stadion erscheint nur in der 3D Ansicht eines Live Spiels.
+
+* **Robux Shop:** Pässe und Produkte für Robux, ohne dass das Spiel für Spieler ohne Robux unfair wird. Details unten.
 
 Alles Wichtige rechnet der Server. Der Client schickt nur Absichten (klicken, kaufen, aufstellen). Gewinne, Packs und Spielergebnisse lassen sich so nicht fälschen.
 
@@ -46,6 +48,25 @@ Alles Wichtige rechnet der Server. Der Client schickt nur Absichten (klicken, ka
 3. In den Game Settings einen Namen, eine Beschreibung und ein Icon setzen und die Altersfreigabe (Experience Questionnaire) ausfüllen.
 4. Unter **Permissions** das Spiel auf **Public** stellen.
 
+## Robux Shop
+
+Alle IDs stehen in **einer** Datei: `src/shared/Monetization.luau`. Solange eine ID `0` ist, wird der Kaufknopf ausgeblendet. Ist keine einzige ID gesetzt, erscheint auch der Tab „Shop“ nicht.
+
+**Pässe (einmal kaufen):** Doppelte Tore (x2 auf Klicks und Produktion), Auto Klicker (ein Klick pro Sekunde, zählt nicht für Klick-Missionen), Schnellreise (halbe Reisezeit), VIP (goldener Name in Koop und Rangliste, sechs zusätzliche Trikotfarben, täglich ein Kleines Prämienpack zur Tagesprämie), Grosser Koop Club (selbst erstellte Welten mit 6 statt 4 Plätzen).
+
+**Produkte (beliebig oft):** Kleines, Grosses und Riesiges Tore Paket (10 Minuten, 1 Stunde, 8 Stunden Produktion, mindestens 1.000, 10.000, 100.000 Tore), Goalboost (2x für 15 Minuten), 500 Fragmente, Reise sofort beenden, Minigames sofort bereit. Passt „Reise sofort beenden“ oder „Minigames sofort bereit“ gerade nicht (keine Reise, alles bereit), bleibt eine Gutschrift im Shop, die man später einlöst.
+
+**Regeln:**
+
+* Packs, Karten und Icons gibt es nie direkt gegen Robux, nur gegen Tore.
+* In Koop Welten gilt ein Pass eines Mitglieds für die ganze Welt. Produkte wirken auf die Welt, in der der Käufer gerade spielt.
+* Gekaufte Tore landen nur im Guthaben. Sie zählen nicht für `totalGoals` (Rang, Erfolge, Rangliste, leaderstats).
+* Wo Roblox bezahlte Zufallsinhalte einschränkt (`PolicyService.ArePaidRandomItemsRestricted`), blendet der Shop Tore Pakete, Fragmente und VIP aus, weil diese indirekt zu Packs führen.
+
+**Technik:** `src/server/Shop.luau` prüft Pässe beim Beitritt mit `UserOwnsGamePassAsync` (pcall, Cache) und reagiert auf `PromptGamePassPurchaseFinished`. `src/server/Purchases.luau` verarbeitet `ProcessReceipt`: Die `PurchaseId` wird im Spielstand des Käufers gespeichert (die letzten 100), `PurchaseGranted` gibt es erst, wenn der Spielstand mit der Wirkung gespeichert ist, sonst `NotProcessedYet`. Ein Beleg wirkt nie zweimal. Der Client öffnet nur die Roblox Kaufdialoge.
+
+**In Studio testen:** Mit echten IDs sind Käufe in Studio kostenlos und simuliert. Ohne IDs gibt es im Testmodus einen Zugang nur für den Server: `game.ServerStorage.GoalClickerShopTest:Invoke("product", userId, "goalsSmall")` oder `Invoke("pass", userId, "vip")`. Er existiert nur in Studio.
+
 ## Spieldaten aktualisieren
 
 Wenn sich Spieler, Packs, Turniere oder Texte auf der Website ändern, im Hauptordner des Repositories ausführen:
@@ -58,12 +79,12 @@ Danach den Place neu bauen (`rojo build -o build/GoalClicker.rbxl` im Ordner `ro
 
 ## Testen
 
-`tools/check.sh` führt alle Prüfungen aus:
+`tools/check.sh` führt alle Prüfungen aus. Die Werkzeuge stehen in `rokit.toml` (`rokit install`), die Roblox Typen für `luau-lsp` gibt man mit `LUAU_DEFINITIONS` an (zum Beispiel `globalTypes.None.d.luau` aus dem luau-lsp Repository).
 
-1. **Logiktests** (`tests/*.spec.luau`): Wirtschaft, Kader, ganze Liga- und Turnierspiele, Minispiele, Prämien und Codes. Sie laufen mit `luaurun`, einem kleinen Luau Runner auf Basis von `mlua` (siehe `tests/harness.luau`).
+1. **Logiktests** (`tests/*.spec.luau`): Wirtschaft, Kader, ganze Liga- und Turnierspiele, Minispiele, Prämien, Codes und der Robux Shop (Belege nur einmal, Mindestwerte der Tore Pakete, Pass Wirkungen). Sie laufen mit `luaurun` oder, wenn das fehlt, mit Lune über `tests/run-unit.luau`.
 2. **Typprüfung** mit `luau-lsp` und den Roblox Definitionen.
 3. **Build** des Places mit Rojo.
-4. **Integrationstest** (`tests/integration/run.luau`) mit [Lune](https://lune-org.github.io). Er lädt den gebauten Place, startet Server und Client mit einer nachgebauten Roblox Umgebung und spielt über die Oberfläche: Klicks, 90 Packs, Beste Elf, Formation, ein Heim- und ein Auswärtsspiel mit Reise und 3D Ansicht, ein Turnierspiel, der Code SILVAN mit Walkout und Koop mit einem zweiten Spieler. Jeder Bildschirm wird dabei auf Fehler geprüft.
+4. **Integrationstest** (`tests/integration/run.luau`) mit [Lune](https://lune-org.github.io). Er lädt den gebauten Place, startet Server und Client mit einer nachgebauten Roblox Umgebung und spielt über die Oberfläche: Klicks, 90 Packs, Beste Elf, Formation, ein Heim- und ein Auswärtsspiel mit Reise und 3D Ansicht, ein Turnierspiel, der Code SILVAN mit Walkout, der Shop mit einem Passkauf und doppelten Belegen und Koop mit einem zweiten Spieler. Jeder Bildschirm wird dabei auf Fehler geprüft.
 
 Was der Integrationstest nicht prüfen kann: das echte Aussehen (Abstände, Schriftgrössen) und Roblox Dienste wie DataStore. Das bitte in Studio anschauen.
 

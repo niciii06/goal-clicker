@@ -15,6 +15,7 @@ local Client = script.Parent.Parent
 local Invite = require(Client.Invite)
 local Net = require(Client.Net)
 local Overlays = require(Client.Overlays)
+local Robux = require(Client.Robux)
 local State = require(Client.State)
 local Theme = require(Client.Theme)
 local UI = require(Client.UI)
@@ -22,7 +23,7 @@ local UI = require(Client.UI)
 local C = Theme.colors
 local Home = {}
 
-Home.sections = { "core", "miniGame", "dailyRewards", "coop", "seasonMode" }
+Home.sections = { "core", "miniGame", "dailyRewards", "coop", "seasonMode", "shop" }
 
 local shopTab = "all"
 local purchaseMode: any = 1
@@ -42,6 +43,7 @@ function Home.signature(): string
 	return table.concat({
 		tostring(core.seasons), tostring(core.stars), tostring(#(core.achievements or {})), tostring((State.features("seasonMode") or {}).lastMatchAt), tostring(core.testMode), daily.today, tostring(daily.available),
 		HttpService:JSONEncode(miniGameState() or false), shopTab, tostring(purchaseMode),
+		HttpService:JSONEncode(core.shopCredits or false), tostring((State.features("shop") or {}).restricted),
 	}, "|")
 end
 
@@ -291,6 +293,13 @@ local function miniGameHub(): Frame
 			local untilAt = (State.core().miniGameCooldowns or {})[id] or 0
 			return untilAt > State.now() and ("Bereit in " .. Util.formatCountdown(untilAt, State.now())) or info.info
 		end)
+		-- Only while this game cools down: the paid shortcut (or a stored credit).
+		local ready = Robux.productButton("miniGameReady", "Sofort bereit", { height = 30, size = 12 })
+		if ready then
+			UI.bind(ready, "Visible", function()
+				return ((State.core().miniGameCooldowns or {})[id] or 0) > State.now()
+			end)
+		end
 		local card = UI.box({ color = C.cardAlt, padding = 12, gap = 4, radius = 12 }, {
 			UI.label(info.icon .. "  MINIGAME / 0" .. index, { size = 11, font = Theme.fonts.bold, color = C.muted }),
 			UI.label(MiniGames.NAMES[id], { size = 16, font = Theme.fonts.black }),
@@ -298,6 +307,7 @@ local function miniGameHub(): Frame
 			UI.button("Starten", { height = 32, size = 13, onClick = function()
 				Net.action("startMiniGame", { id = id })
 			end }),
+			ready,
 		})
 		table.insert(cards, card)
 	end
@@ -470,13 +480,13 @@ local function coopBar(): Frame?
 	local names = {}
 	for _, member in coop.players do
 		if member.occupied then
-			table.insert(names, (member.online and "🟢 " or "⚪ ") .. member.name)
+			table.insert(names, (member.online and "🟢 " or "⚪ ") .. Robux.name(member.name, member.vip))
 		end
 	end
 	return UI.card({
 		UI.eyebrow("Koop / " .. coop.roomName),
 		UI.row({ UI.label(coop.code, { size = 24, font = Theme.fonts.black, inline = true }), UI.pill(("%d / %d SPIELER"):format(coop.playerCount, coop.maxPlayers), C.accent, C.white), UI.pill(coop.status == "live" and "LIVE" or "WARTET", coop.status == "live" and C.green or C.gold, C.white) }, 8),
-		UI.label(table.concat(names, " · "), { size = 13, color = C.muted }),
+		UI.label(table.concat(names, " · "), { size = 13, color = C.muted, rich = true }),
 		coop.playerCount < coop.maxPlayers and UI.button("👥  Roblox Freunde einladen", { style = "primary", height = 38, size = 14, onClick = function()
 			local ok, problem = Invite.friends(coop.code, coop.roomName)
 			if not ok and problem then
@@ -498,6 +508,10 @@ function Home.render(container: Frame, ctx: any)
 	heroCard(ctx).Parent = left
 	ballStage().Parent = left
 	productionStrip().Parent = left
+	local boost = Robux.productButton("goalBoost", "⚡ Goalboost: 2x Tore für 15 Min", { height = 38, size = 14 })
+	if boost then
+		boost.Parent = left
+	end
 	dailyCard(ctx).Parent = left
 	local game = miniGameState()
 	if game then

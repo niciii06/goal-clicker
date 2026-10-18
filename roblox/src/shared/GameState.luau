@@ -25,6 +25,8 @@ function GameState.initial(now: number, random: () -> number): any
 		miniGameCooldowns = MiniGames.initialCooldowns(),
 		minigameWins = 0,
 		redeemedCodes = {},
+		-- Paid products that could not act yet (no journey running, no mini game cooling down).
+		shopCredits = { finishTravel = 0, miniGameReady = 0 },
 		features = Features.initial(now, random),
 	}
 end

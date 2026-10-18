@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.Shared
 local Economy = require(Shared.Economy)
+local Monetization = require(Shared.Monetization)
 
 local Sync = {}
 
@@ -60,14 +61,15 @@ end
 function Sync.sections(session: any, now: number): { [string]: any }
 	local game = session.game
 	local features = game.features
+	local multiplier = Monetization.goalMultiplier(session.passes)
 	local sections: { [string]: any } = {
 		core = {
 			goals = game.goals, totalGoals = game.totalGoals, seasonGoals = game.seasonGoals, clicks = game.clicks,
 			upgrades = game.upgrades, achievements = game.achievements, stars = game.stars, seasons = game.seasons,
 			sound = game.sound, miniGameCooldowns = game.miniGameCooldowns, minigameWins = game.minigameWins,
-			redeemedCodes = game.redeemedCodes, testMode = session.testMode,
-			clickPower = Economy.clickPower(game.upgrades, game.stars, features, now),
-			passivePower = Economy.passivePower(game.upgrades, game.stars, features, now),
+			redeemedCodes = game.redeemedCodes, testMode = session.testMode, shopCredits = game.shopCredits,
+			clickPower = Economy.clickPower(game.upgrades, game.stars, features, now) * multiplier,
+			passivePower = Economy.passivePower(game.upgrades, game.stars, features, now) * multiplier,
 		},
 		miniGame = session.miniGame or false,
 		coop = session.coopView or false,

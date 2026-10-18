@@ -365,6 +365,23 @@ function dataStoreService:GetOrderedDataStore()
 	error("DataStore not available in tests")
 end
 
+-- Robux shop: prompts are recorded, receipts are handed to ProcessReceipt by the test.
+local marketplaceService = { PromptGamePassPurchaseFinished = Signal.new("PromptGamePassPurchaseFinished"), prompts = {} }
+function marketplaceService:UserOwnsGamePassAsync(_userId, _passId)
+	return false
+end
+function marketplaceService:PromptGamePassPurchase(_player, id)
+	table.insert(self.prompts, id)
+end
+function marketplaceService:PromptProductPurchase(_player, id)
+	table.insert(self.prompts, id)
+end
+
+local policyService = {}
+function policyService:GetPolicyInfoForPlayerAsync()
+	return { ArePaidRandomItemsRestricted = false }
+end
+
 local workspaceReal = place:GetService("Workspace")
 local camera = { ViewportSize = roblox.Vector2.new(1280, 720), CFrame = roblox.CFrame.new(), CameraType = roblox.Enum.CameraType.Custom }
 function camera:GetPropertyChangedSignal()
@@ -375,6 +392,14 @@ local workspaceProxy = wrap(workspaceReal, { CurrentCamera = camera })
 local playersService = { PlayerAdded = Signal.new("PlayerAdded"), PlayerRemoving = Signal.new("PlayerRemoving"), list = {} }
 function playersService:GetPlayers()
 	return table.clone(self.list)
+end
+function playersService:GetPlayerByUserId(id)
+	for _, item in self.list do
+		if item.UserId == id then
+			return item
+		end
+	end
+	return nil
 end
 function playersService:GetNameFromUserIdAsync(id)
 	return "Spieler" .. tostring(id)
@@ -388,6 +413,8 @@ local services = {
 	HttpService = httpService,
 	TextService = textService,
 	DataStoreService = dataStoreService,
+	MarketplaceService = marketplaceService,
+	PolicyService = policyService,
 	Players = playersService,
 	Workspace = workspaceProxy,
 }
@@ -491,6 +518,15 @@ end
 
 ------------------------------------------------------------------------------------------
 -- Boot server and client
+
+-- Test IDs so the shop appears (the real IDs are still 0 in Monetization.luau).
+local Monetization = makeEnv(nil).require(wrap(place:GetService("ReplicatedStorage").Shared.Monetization))
+for index, pass in Monetization.PASSES do
+	pass.id = 1000 + index
+end
+for index, product in Monetization.PRODUCTS do
+	product.id = 2000 + index
+end
 
 local serverMain = place:GetService("ServerScriptService").Server.Main
 runScript(serverMain)
@@ -801,6 +837,54 @@ if reports < 3 then
 end
 if viewer.own.game.features.cup.mode ~= "tournament" then
 	fail("The tournament match did not run")
+end
+
+-- Robux shop: prompts, a pass bought in game and receipts that must only act once.
+press("Shop")
+local shopText = checkScreen("Shop")
+for _, expected in { "Doppelte Tore", "Riesiges Tore Paket", "R$ 249", "Reise sofort beenden" } do
+	if not string.find(shopText, expected, 1, true) then
+		fail("Shop misses " .. expected)
+	end
+end
+pressWithin("Doppelte Tore", "R$ 249")
+if marketplaceService.prompts[1] ~= Monetization.pass("doubleGoals").id then
+	fail("Shop did not prompt the Doppelte Tore pass: " .. tostring(marketplaceService.prompts[1]))
+end
+local powerBefore = Clubs.session(viewer).game.goals
+marketplaceService.PromptGamePassPurchaseFinished:Fire(player, Monetization.pass("doubleGoals").id, true)
+step(1)
+if not viewer.passes.doubleGoals then
+	fail("Pass bought in game was not applied")
+end
+if not string.find(checkScreen("Shop nach Pass"), "✓ Gekauft", 1, true) then
+	fail("Owned pass not shown")
+end
+local fragmentsBefore = viewer.own.game.features.starXI.fragments
+local fragments = Monetization.product("fragments")
+for _ = 1, 2 do
+	local decision = marketplaceService.ProcessReceipt({ PlayerId = player.UserId, ProductId = fragments.id, PurchaseId = "integration-1" })
+	if decision ~= roblox.Enum.ProductPurchaseDecision.PurchaseGranted then
+		fail("Receipt not granted: " .. tostring(decision))
+	end
+end
+if viewer.own.game.features.starXI.fragments ~= fragmentsBefore + 500 then
+	fail("Fragments receipt acted twice or not at all")
+end
+local totalBefore = viewer.own.game.totalGoals
+marketplaceService.ProcessReceipt({ PlayerId = player.UserId, ProductId = Monetization.product("goalsSmall").id, PurchaseId = "integration-2" })
+if viewer.own.game.totalGoals ~= totalBefore then
+	fail("Goal pack changed the ranking goals")
+end
+if viewer.own.game.goals < powerBefore then
+	fail("Goal pack did not add goals")
+end
+marketplaceService.ProcessReceipt({ PlayerId = player.UserId, ProductId = Monetization.product("goalBoost").id, PurchaseId = "integration-3" })
+step(1)
+press("Home")
+local boostedHome = checkScreen("Home mit Goalboost")
+if not string.find(boostedHome, "GOALBOOST", 1, true) then
+	fail("Goalboost from the shop not shown")
 end
 
 -- Coop: a second player joins the world on the same server.

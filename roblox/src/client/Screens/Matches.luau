@@ -19,6 +19,7 @@ local Economy = require(Shared.Economy)
 local Client = script.Parent.Parent
 local MatchView = require(Client.MatchView)
 local Net = require(Client.Net)
+local Robux = require(Client.Robux)
 local State = require(Client.State)
 local Theme = require(Client.Theme)
 local UI = require(Client.UI)
@@ -26,7 +27,7 @@ local UI = require(Client.UI)
 local C = Theme.colors
 local Matches = {}
 
-Matches.sections = { "cup", "seasonMode", "travel", "press", "starXI", "career", "core", "club" }
+Matches.sections = { "cup", "seasonMode", "travel", "press", "starXI", "career", "core", "club", "shop" }
 
 local selectedTournament = "stadium"
 local editing = false
@@ -56,6 +57,7 @@ function Matches.signature(): string
 		tostring(f.press and #f.press.answered), tostring(core.seasons), tostring(core.testMode),
 		f.starXI and table.concat(f.starXI.lineupIds, ",") or "", tostring(editing), tostring(draftSlot), draft and table.concat(draft.lineup, ",") .. draft.strategy or "",
 		selectedTournament, tostring(f.club and f.club.name),
+		tostring((core.shopCredits or {}).finishTravel), tostring((State.features("shop") or {}).restricted),
 	}, "|")
 end
 
@@ -484,7 +486,7 @@ local function journeyPanel(): Frame?
 		events,
 		arrived and UI.button("Match starten", { style = "success", onClick = function()
 			Net.action("startMatch", { mode = journey.fixture.mode, tournamentId = journey.fixture.tournamentId })
-		end }) or nil,
+		end }) or Robux.productButton("finishTravel", "⚡ Reise sofort beenden", { height = 36, size = 13 }),
 	}, { stroke = true, strokeColor = C.accent })
 end
 

@@ -4,6 +4,7 @@ local Client = script.Parent.Parent
 local Invite = require(Client.Invite)
 local Net = require(Client.Net)
 local Overlays = require(Client.Overlays)
+local Robux = require(Client.Robux)
 local State = require(Client.State)
 local Theme = require(Client.Theme)
 local UI = require(Client.UI)
@@ -27,7 +28,7 @@ function Coop.render(container: Frame, ctx: any)
 	end)
 	UI.card({
 		UI.eyebrow("Koop Multiplayer"),
-		UI.title("Ein gemeinsamer Club für bis zu vier Spieler.", 22),
+		UI.title(Robux.ownsPass("bigCoop") and "Ein gemeinsamer Club für bis zu sechs Spieler." or "Ein gemeinsamer Club für bis zu vier Spieler.", 22),
 		UI.label("Alle teilen Tore, Kader, Saison und Turniere. Erstelle eine Welt und lade deine Roblox Freunde ein. Wer die Einladung annimmt, landet direkt auf deinem Server und in deiner Welt. Gespielt wird ab zwei Mitgliedern.", { size = 13, color = C.muted }),
 	}, { gap = 8 }).Parent = container
 	UI.card({
@@ -62,7 +63,7 @@ function Coop.render(container: Frame, ctx: any)
 	local list: { Instance? } = { UI.eyebrow("Deine Welten") }
 	if saved then
 		for _, world in saved do
-			table.insert(list, UI.button(("%s · %s · %d / 4 Spieler%s"):format(world.roomName, world.code, world.players, world.open and " · auf diesem Server offen" or ""), { style = "ghost", height = 42, size = 13, onClick = function()
+			table.insert(list, UI.button(("%s · %s · %d / %d Spieler%s"):format(world.roomName, world.code, world.players, world.maxPlayers or 4, world.open and " · auf diesem Server offen" or ""), { style = "ghost", height = 42, size = 13, onClick = function()
 				Net.action("joinCoop", { code = world.code })
 			end }))
 		end

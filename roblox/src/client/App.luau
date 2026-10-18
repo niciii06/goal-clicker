@@ -21,6 +21,7 @@ local SCREEN_MODULES = {
 	career = require(Screens.Career),
 	packs = require(Screens.Packs),
 	club = require(Screens.Club),
+	shop = require(Screens.Shop),
 	coop = require(Screens.Coop),
 }
 
@@ -31,6 +32,7 @@ local TABS = {
 	{ id = "career", label = "Karriere" },
 	{ id = "packs", label = "Packs & Album" },
 	{ id = "club", label = "Club & Mehr" },
+	{ id = "shop", label = "Shop" },
 }
 
 local C = Theme.colors
@@ -209,6 +211,10 @@ function App.renderNav()
 		return
 	end
 	for _, tab in TABS do
+		local screen = SCREEN_MODULES[tab.id]
+		if screen.visible and not screen.visible() then
+			continue
+		end
 		local label = tab.label
 		if tab.id == "matches" and State.features("cup") and State.features("cup").active then
 			label = "Spiele · LIVE"

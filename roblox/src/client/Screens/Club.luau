@@ -5,10 +5,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.Shared
 local Cards = require(Shared.Cards)
 local Features = require(Shared.Features)
+local Monetization = require(Shared.Monetization)
 local Util = require(Shared.Util)
 
 local Client = script.Parent.Parent
 local Net = require(Client.Net)
+local Robux = require(Client.Robux)
 local State = require(Client.State)
 local Theme = require(Client.Theme)
 local UI = require(Client.UI)
@@ -16,7 +18,7 @@ local UI = require(Client.UI)
 local C = Theme.colors
 local Club = {}
 
-Club.sections = { "club", "transferSaga", "missions", "history", "core", "coop", "cup", "gazetteIssues" }
+Club.sections = { "club", "transferSaga", "missions", "history", "core", "coop", "cup", "gazetteIssues", "shop" }
 
 local draft: any = nil
 local codeInput = ""
@@ -45,7 +47,7 @@ function Club.signature(ctx: any): string
 	return table.concat({
 		tab, tostring(club.name), tostring(club.badge), tostring(club.color), tostring(#(saga.archive or {})), tostring(#(saga.loans or {})),
 		tostring(saga.deadlineDayEndsAt), last and last.id or "-", tostring(claimed), missionProgress, tostring(ranking ~= nil), tostring(confirmReset),
-		tostring(State.features("coop") ~= nil), tostring(#(State.core().redeemedCodes or {})),
+		tostring(State.features("coop") ~= nil), tostring(#(State.core().redeemedCodes or {})), tostring(Robux.passActive("vip")),
 	}, "|")
 end
 
@@ -70,6 +72,18 @@ local function profile(): Frame
 			currentCtx.refresh()
 		end }))
 	end
+	-- VIP clubs get extra jersey colours.
+	local vipColors = nil
+	if Robux.passActive("vip") then
+		local buttons = {}
+		for _, color in Monetization.VIP_CLUB_COLORS do
+			table.insert(buttons, UI.button(draft.color == color and "✓" or "", { color = Theme.color(color), height = 40, onClick = function()
+				draft.color = color
+				currentCtx.refresh()
+			end }))
+		end
+		vipColors = UI.box({ gap = 6 }, { UI.eyebrow("👑 VIP Trikotfarben", C.gold), UI.columns(buttons, 6) })
+	end
 	return UI.card({
 		UI.eyebrow("Clubprofil"),
 		UI.title(("%s %s"):format(club.badge, club.name), 24),
@@ -77,6 +91,7 @@ local function profile(): Frame
 		nameBox,
 		UI.columns(badges, 6),
 		UI.columns(colors, 6),
+		vipColors,
 		UI.button("Clubprofil speichern", { style = "primary", onClick = function()
 			draft.name = nameBox.Text
 			local ok = Net.action("saveClub", draft)
@@ -200,7 +215,7 @@ local function rankingCard(): Frame
 	}
 	if ranking then
 		for _, entry in ranking do
-			table.insert(children, UI.label(("%d. %s · %s Tore"):format(entry.rank, entry.name, Util.formatNumber(entry.goals)), { size = 14, font = entry.rank <= 3 and Theme.fonts.bold or Theme.fonts.regular }))
+			table.insert(children, UI.label(("%d. %s · %s Tore"):format(entry.rank, Robux.name(entry.name, entry.vip), Util.formatNumber(entry.goals)), { size = 14, font = entry.rank <= 3 and Theme.fonts.bold or Theme.fonts.regular, rich = true }))
 		end
 		if #ranking == 0 then
 			table.insert(children, UI.label("Die Rangliste ist in Studio ohne Speicherzugriff leer.", { size = 13, color = C.muted }))
