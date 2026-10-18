@@ -42,20 +42,26 @@ function Shop.loadPlayer(player: Player)
 	if not viewer then
 		return
 	end
-	local passes = owned[player.UserId] or {}
+	local found = {}
 	for _, pass in Monetization.PASSES do
-		if not passes[pass.key] and userOwns(player.UserId, pass) then
-			passes[pass.key] = true
+		if userOwns(player.UserId, pass) then
+			found[pass.key] = true
 		end
 	end
-	owned[player.UserId] = passes
 	local okPolicy, policy = pcall(function()
 		return PolicyService:GetPolicyInfoForPlayerAsync(player)
 	end)
 	viewer.restricted = okPolicy and type(policy) == "table" and policy.ArePaidRandomItemsRestricted == true or false
-	if Clubs.viewer(player) == viewer then
-		Clubs.setPasses(viewer, passes)
+	if Clubs.viewer(player) ~= viewer then
+		return
 	end
+	-- The checks above yield: merge, so a pass bought in the meantime is kept.
+	local passes = owned[player.UserId] or {}
+	for key in found do
+		passes[key] = true
+	end
+	owned[player.UserId] = passes
+	Clubs.setPasses(viewer, passes)
 end
 
 function Shop.removePlayer(player: Player)
@@ -131,6 +137,21 @@ local function studioTestHook()
 		local player = Players:GetPlayerByUserId(userId)
 		if not player then
 			return "Spieler nicht gefunden"
+		end
+		if kind == "state" then
+			-- Snapshot for checks, since the command bar loads its own copies of the modules.
+			local viewer = Clubs.viewer(player)
+			local session = viewer and Clubs.session(viewer)
+			if not session then
+				return "Kein Club geladen"
+			end
+			local game = session.game
+			return {
+				goals = game.goals, totalGoals = game.totalGoals, fragments = game.features.starXI.fragments,
+				goalBoost = game.features.goalBoost, credits = game.shopCredits, passes = session.passes,
+				receipts = #viewer.profile.receipts, cooldowns = game.miniGameCooldowns, journey = game.features.travel.journey,
+				now = Clubs.now(), color = game.features.club.color, earnedPacks = #game.features.earnedPacks,
+			}
 		end
 		if kind == "pass" then
 			local pass = Monetization.pass(key)

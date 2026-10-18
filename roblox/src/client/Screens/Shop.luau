@@ -45,13 +45,19 @@ local function steadyProduction(): number
 end
 
 local function itemRow(icon: string, name: string, description: string, detail: GuiObject?, action: GuiObject?, highlight: boolean?): Frame
-	local text = UI.box({ gap = 2, width = action and UDim.new(1, -128) or UDim.new(1, 0) }, {
-		UI.label(icon .. "  " .. name, { size = 15, font = Theme.fonts.black }),
-		UI.label(description, { size = 12, color = C.muted }),
-		detail,
-	})
+	local title = UI.label(icon .. "  " .. name, { size = 15, font = Theme.fonts.black })
+	local info = UI.label(description, { size = 12, color = C.muted })
+	-- Fixed order: the parts are created in different orders by the callers.
+	title.LayoutOrder, info.LayoutOrder = 1, 2
+	if detail then
+		detail.LayoutOrder = 3
+	end
+	local text = UI.box({ gap = 2, width = action and UDim.new(1, -128) or UDim.new(1, 0) }, { title, info, detail })
+	text.LayoutOrder = 2
 	if action then
+		-- Button on the left like the upgrade rows on the home screen.
 		action.Size = UDim2.fromOffset(120, 38)
+		action.LayoutOrder = 1
 	end
 	return UI.box({ color = C.cardAlt, padding = 12, radius = 12, stroke = highlight, strokeColor = C.gold }, {
 		UI.row({ text, action }, 8),
@@ -106,7 +112,9 @@ local function creditsCard(): Frame?
 	if #rows == 0 then
 		return nil
 	end
-	table.insert(rows, 1, UI.eyebrow("Deine Gutschriften"))
+	local heading = UI.eyebrow("Deine Gutschriften")
+	heading.LayoutOrder = -1
+	table.insert(rows, 1, heading)
 	return UI.card(rows, { gap = 8 })
 end
 

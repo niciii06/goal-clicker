@@ -73,16 +73,15 @@ local function profile(): Frame
 		end }))
 	end
 	-- VIP clubs get extra jersey colours.
-	local vipColors = nil
+	local vipButtons = nil
 	if Robux.passActive("vip") then
-		local buttons = {}
+		vipButtons = {}
 		for _, color in Monetization.VIP_CLUB_COLORS do
-			table.insert(buttons, UI.button(draft.color == color and "✓" or "", { color = Theme.color(color), height = 40, onClick = function()
+			table.insert(vipButtons, UI.button(draft.color == color and "✓" or "", { color = Theme.color(color), height = 40, onClick = function()
 				draft.color = color
 				currentCtx.refresh()
 			end }))
 		end
-		vipColors = UI.box({ gap = 6 }, { UI.eyebrow("👑 VIP Trikotfarben", C.gold), UI.columns(buttons, 6) })
 	end
 	return UI.card({
 		UI.eyebrow("Clubprofil"),
@@ -91,7 +90,8 @@ local function profile(): Frame
 		nameBox,
 		UI.columns(badges, 6),
 		UI.columns(colors, 6),
-		vipColors,
+		-- Built here so the layout order puts it below the normal colours.
+		vipButtons and UI.box({ gap = 6 }, { UI.eyebrow("👑 VIP Trikotfarben", C.gold), UI.columns(vipButtons, 6) }) or nil,
 		UI.button("Clubprofil speichern", { style = "primary", onClick = function()
 			draft.name = nameBox.Text
 			local ok = Net.action("saveClub", draft)
