@@ -56,12 +56,14 @@ test("every Icon and current 86+ base card has a fixed appearance", async () => 
     readFile(new URL("../app/fc26-player-pool.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/fc27-ratings.ts", import.meta.url), "utf8"),
   ]);
-  const iconBlock = featureSource.match(/const FC26_ICON_DATA = \[([\s\S]*?)\] as const/)?.[1] ?? "";
+  const iconBlock = [/const FC27_ICON_DATA = \[([\s\S]*?)\] as const/, /const RETIRED_FC26_ICON_DATA = \[([\s\S]*?)\] as const/]
+    .map((pattern) => featureSource.match(pattern)?.[1] ?? "")
+    .join("\n");
   const appearanceBlock = walkoutSource.match(/const ICON_APPEARANCE_BY_PLAYER_ID[^=]*= \{([\s\S]*?)\n\};/)?.[1] ?? "";
   const iconIds = [...iconBlock.matchAll(/^  \["([^"]+)",/gm)].map((match) => `icon-${match[1]}`).sort();
   const appearanceIds = [...appearanceBlock.matchAll(/^  "(icon-[^"]+)":/gm)].map((match) => match[1]).sort();
 
-  assert.equal(iconIds.length, 129);
+  assert.equal(iconIds.length, 143);
   assert.deepEqual(appearanceIds, iconIds);
   assert.match(appearanceBlock, /"icon-ferenc-puskas": \[S1, "slick", BLACK/);
 
@@ -75,6 +77,15 @@ test("every Icon and current 86+ base card has a fixed appearance", async () => 
   const fixedBaseProfiles = new Set([...rawProfileBlock.matchAll(/^  \["([^"]+)",/gm)].map((match) => match[1]));
   assert.equal(baseWalkouts.length, 65);
   assert.deepEqual(baseWalkouts.filter((sourceId) => !fixedBaseProfiles.has(sourceId)), []);
+
+  const womenSource = await readFile(new URL("../app/fc27-women-pool.ts", import.meta.url), "utf8");
+  const womenWalkouts = [...womenSource.matchAll(/^  \["(\d+)",/gm)]
+    .map((match) => match[1])
+    .filter((sourceId) => (officialRatings.get(sourceId) ?? 0) >= 86);
+  const womenAppearanceBlock = walkoutSource.match(/const WOMEN_APPEARANCE_BY_SOURCE_ID[^=]*= \{([\s\S]*?)\n\};/)?.[1] ?? "";
+  const womenAppearanceIds = [...womenAppearanceBlock.matchAll(/^  "(\d+)":/gm)].map((match) => match[1]);
+  assert.equal(womenWalkouts.length, 38);
+  assert.deepEqual(womenAppearanceIds.sort(), womenWalkouts.sort());
 
   const physicalBlock = walkoutSource.match(/const FC26_PHYSICAL_BY_SOURCE_ID[^=]*= \{([\s\S]*?)\n\};/)?.[1] ?? "";
   const physicalIds = new Set([...physicalBlock.matchAll(/^  "([^"]+)":/gm)].map((match) => match[1]));
@@ -182,7 +193,7 @@ test("Nedu Mann Yesss is a Bosnian legendary 100-rated ZM and ZDM pack player", 
   assert.match(neduProfile, /face: "round"/);
   assert.match(neduProfile, /height: 1\.03/);
   assert.match(neduProfile, /build: 1\.1/);
-  assert.match(pageSource, /AR, BA, BE/);
+  assert.match(pageSource, /import \{[^}]*\bBA\b[^}]*\} from "country-flag-icons\/react\/3x2"/);
 });
 
 test("Di Santo is a Dutch 100-rated ST whose walkout borrows only the body", async () => {
@@ -202,4 +213,24 @@ test("Di Santo is a Dutch 100-rated ST whose walkout borrows only the body", asy
   assert.match(diSantoProfile, /build: 1\.02/);
   assert.doesNotMatch(diSantoProfile, /kitPrimary|kitSecondary|boots/);
   assert.match(walkoutSource, /function fromSpecialBody\(player: StarXIPlayer, body: WalkoutBodyProfile\)/);
+});
+
+test("every nation on a card has a walkout country and a real flag", async () => {
+  const [walkoutSource, pageSource, womenSource, featureSource] = await Promise.all([
+    readFile(new URL("../app/walkout-data.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/fc27-women-pool.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
+  ]);
+  const countryBlock = walkoutSource.match(/const COUNTRY[^=]*= \{([\s\S]*?)\n\};/)?.[1] ?? "";
+  const countries = new Set([...countryBlock.matchAll(/^  ([A-Z]{2}): \{/gm)].map((match) => match[1]));
+  const flagBlock = pageSource.match(/const WALKOUT_COUNTRY_FLAGS[^=]*= \{([\s\S]*?)\n\};/)?.[1] ?? "";
+  const flags = new Set([...flagBlock.matchAll(/\b([A-Z]{2})\b(?=[:,])/g)].map((match) => match[1]));
+  const womenCodes = [...womenSource.matchAll(/^  \["\d+", "[^"]+", "([A-Z]{2})"\],$/gm)].map((match) => match[1]);
+  const iconCodes = [...featureSource.matchAll(/^  \["[^"]+", "[^"]+", \d+, "([A-Z]{2})",/gm)].map((match) => match[1]);
+  assert.equal(womenCodes.length, 1220);
+  for (const code of new Set([...womenCodes, ...iconCodes])) {
+    assert.ok(countries.has(code), `walkout country missing for ${code}`);
+    assert.ok(flags.has(code), `flag missing for ${code}`);
+  }
 });

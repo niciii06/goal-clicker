@@ -8,6 +8,8 @@ import type { TravelState } from "./travel-data";
 import type { Venue } from "./travel-geography";
 import { ASSIST_POSITION_WEIGHTS, DEFENSIVE_FAULT_WEIGHTS, GOAL_POSITION_WEIGHTS, MISSION_TEMPLATES, STAR_FORMATIONS, STAR_POSITIONS, STAR_XI_FORMATION_POSITIONS, TOURNAMENTS, TRANSFER_PLAYERS, YB_FC26_PLAYERS, getStarFormation, specialAttributes } from "./features/catalog";
 import { FC26_STAR_PROFILES } from "./fc26-player-pool";
+import { isFC27Unavailable } from "./fc27-ratings";
+import { FC27_WOMEN_PROFILES } from "./fc27-women-pool";
 import { FC27_INDIA_PROFILES, SCRAP_RATING_GROUPS, drawScrapPlayer } from "./scrap-pack";
 import { GAZETTE_CHAMPION_HEADLINES, GAZETTE_EXIT_HEADLINES, TRANSFER_INTERESTED_CLUBS } from "./features/news-data";
 import { HOME_VENUE, LEAGUE_LABELS, seasonGeography, venueForClubName } from "./travel-geography";
@@ -294,154 +296,181 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
 
 
 
-const FC26_ICON_DATA = [
+// All 136 FC 27 Base Icons (Ultimate Team icon catalogue, captured 17 October 2026).
+// Existing card IDs and spelling jokes stay stable for saves; ratings and positions are FC 27.
+const FC27_ICON_DATA = [
   ["pele", "Peléo", 95, "BR", ["ZOM", "ST"]],
   ["diego-maradona", "Diego Maradono", 95, "AR", ["ZOM", "ST"]],
   ["ronaldo", "Ronaldo Nazárioh", 94, "BR", ["ST"]],
   ["zinedine-zidane", "Zinedine Zidané", 94, "FR", ["ZOM", "ZM"]],
-  ["johan-cruyff", "Johan Cruyffo", 93, "NL", ["ZOM", "ST", "MS"]],
+  ["johan-cruyff", "Johan Cruyffo", 93, "NL", ["ZOM", "ST"]],
   ["mia-hamm", "Mia Hamms", 93, "US", ["ST", "ZOM", "RF"]],
-  ["ronaldinho", "Ronaldinho Gaúchoz", 93, "BR", ["LF", "ZOM"]],
+  ["ronaldinho", "Ronaldinho Gaúchoz", 93, "BR", ["LF", "LM", "ZOM"]],
+  ["franz-beckenbauer", "Franz Beckenbauar", 93, "DE", ["IV", "ZDM", "ZM"]],
+  ["garrincha", "Garrincho", 93, "BR", ["RF", "RM"]],
+  ["paolo-maldini", "Paolo Maldiny", 93, "IT", ["IV", "LV"]],
   ["nadine-angerer", "Nadine Angererr", 92, "DE", ["TW"]],
-  ["franz-beckenbauer", "Franz Beckenbauar", 92, "DE", ["IV", "ZDM", "ZM"]],
-  ["bobby-charlton", "Bobby Charltono", 92, "EN", ["ZOM", "ZM"]],
-  ["garrincha", "Garrincho", 92, "BR", ["RF", "RM"]],
-  ["andres-iniesta", "Andrés Iniestá", 92, "ES", ["ZM", "ZOM", "LF"]],
-  ["paolo-maldini", "Paolo Maldiny", 92, "IT", ["IV", "LV"]],
+  ["bobby-charlton", "Bobby Charltono", 92, "EN", ["ZOM", "ZM", "LM", "LF"]],
+  ["andres-iniesta", "Andrés Iniestá", 92, "ES", ["ZM", "LM", "ZOM", "LF"]],
   ["gerd-muller", "Gerd Müllar", 92, "DE", ["ST"]],
   ["birgit-prinz", "Birgit Prinzz", 92, "DE", ["ST"]],
-  ["ferenc-puskas", "Ferenc Puskáz", 92, "HU", ["ST", "ZOM"]],
-  ["lev-yashin", "Lev Yashim", 92, "RU", ["TW"]],
-  ["alex-morgan", "Alex Morgann", 91, "US", ["ST", "LF"]],
+  ["ferenc-puskas", "Ferenc Puskáz", 92, "HU", ["ST"]],
+  ["gianluigi-buffon", "Gianluigi Buffono", 92, "IT", ["TW"]],
+  ["christine-sinclair", "Christine Sinclaire", 92, "CA", ["ST", "ZOM"]],
+  ["alex-morgan", "Alex Morgann", 91, "US", ["ST"]],
   ["roberto-baggio", "Roberto Baggiö", 91, "IT", ["ZOM", "ST"]],
   ["franco-baresi", "Franco Baresio", 91, "IT", ["IV"]],
-  ["gianluigi-buffon", "Gianluigi Buffono", 91, "IT", ["TW"]],
-  ["cafu", "Cafúu", 91, "BR", ["RV", "RAV"]],
+  ["cafu", "Cafúu", 91, "BR", ["RV", "RM"]],
   ["carlos-alberto", "Carlos Albertó", 91, "BR", ["RV", "IV"]],
   ["eusebio", "Eusébioh", 91, "PT", ["ST"]],
-  ["thierry-henry", "Thierry Henryk", 91, "FR", ["ST", "LF"]],
-  ["zlatan-ibrahimovic", "Zlatan Ibrahimovik", 91, "SE", ["ST", "MS"]],
+  ["thierry-henry", "Thierry Henryk", 91, "FR", ["ST", "LM", "LF"]],
+  ["zlatan-ibrahimovic", "Zlatan Ibrahimovik", 91, "SE", ["ST"]],
   ["oliver-kahn", "Oliver Kahnn", 91, "DE", ["TW"]],
   ["homare-sawa", "Homare Sawaa", 91, "JP", ["ZM", "ZOM"]],
   ["marco-van-basten", "Marco van Bastem", 91, "NL", ["ST"]],
   ["xavi", "Xaví", 91, "ES", ["ZM", "ZDM", "ZOM"]],
   ["zico", "Zicóo", 91, "BR", ["ZOM", "ZM"]],
+  ["ruud-gullit", "Ruud Gullito", 91, "NL", ["ZOM", "IV", "ZDM", "ZM", "ST"]],
   ["camille-abily", "Camille Abilyy", 90, "FR", ["ZM", "ZOM"]],
   ["dennis-bergkamp", "Dennis Bergkampp", 90, "NL", ["ST", "ZOM"]],
-  ["george-best", "George Besto", 90, "NI", ["RF", "ZOM", "LF"]],
+  ["george-best", "George Besto", 90, "NI", ["RF", "RM", "LM", "ZOM", "LF"]],
   ["iker-casillas", "Iker Casillaz", 90, "ES", ["TW"]],
   ["alessandro-del-piero", "Alessandro Del Pierro", 90, "IT", ["ZOM", "ST"]],
   ["julie-foudy", "Julie Foudyy", 90, "US", ["ZM", "ZDM"]],
-  ["ruud-gullit", "Ruud Gullito", 90, "NL", ["ZOM", "ZM", "ST"]],
   ["toni-kroos", "Toni Krooz", 90, "DE", ["ZM", "ZDM", "ZOM"]],
   ["lothar-matthaus", "Lothar Matthäuz", 90, "DE", ["ZM", "IV", "ZDM"]],
-  ["aya-miyama", "Aya Miyamaa", 90, "JP", ["LM", "ZM", "LF"]],
+  ["aya-miyama", "Aya Miyamaa", 90, "JP", ["LM", "ZM", "ZOM", "LF"]],
   ["bobby-moore", "Bobby Mooré", 90, "EN", ["IV"]],
   ["andrea-pirlo", "Andrea Pirloz", 90, "IT", ["ZM", "ZDM"]],
-  ["raul", "Raúlo", 90, "ES", ["ST", "MS"]],
+  ["raul", "Raúlo", 90, "ES", ["ST", "ZOM"]],
   ["rivaldo", "Rivaldoo", 90, "BR", ["LF", "LM", "ZOM"]],
   ["rivellino", "Rivellinó", 90, "BR", ["ZOM", "LM", "LF"]],
-  ["roberto-carlos", "Roberto Carloso", 90, "BR", ["LV", "LAV"]],
+  ["roberto-carlos", "Roberto Carloso", 90, "BR", ["LV", "LM"]],
   ["lotta-schelin", "Lotta Schelinn", 90, "SE", ["ST", "LM", "LF"]],
   ["caroline-seger", "Caroline Segerz", 90, "SE", ["ZM", "ZDM"]],
+  ["kenny-dalglish", "Kenny Dalglisho", 90, "SC", ["ST", "ZOM"]],
+  ["luis-figo", "Luís Figoz", 90, "PT", ["RF", "RM", "ZOM"]],
+  ["kaka", "Kakáh", 90, "BR", ["ZOM"]],
+  ["wayne-rooney", "Wayne Roonie", 90, "EN", ["ST", "ZOM"]],
+  ["formiga", "Formigah", 90, "BR", ["ZDM", "ZM"]],
+  ["hege-riise", "Hege Riisé", 90, "NO", ["ZM", "ZDM", "ZOM"]],
+  ["karl-heinz-rummenigge", "Karl-Heinz Rummeniggé", 90, "DE", ["ST", "LM", "LF"]],
+  ["tobin-heath", "Tobin Heathh", 90, "US", ["RF", "RM", "LM", "LF"]],
   ["gabriel-batistuta", "Gabriel Batistutá", 89, "AR", ["ST"]],
-  ["emilio-butragueno", "Emilio Butragueñó", 89, "ES", ["ST", "MS"]],
+  ["emilio-butragueno", "Emilio Butragueñó", 89, "ES", ["ST"]],
   ["fabio-cannavaro", "Fabio Cannavarro", 89, "IT", ["IV"]],
-  ["eric-cantona", "Eric Cantoná", 89, "FR", ["ST", "ZOM"]],
+  ["eric-cantona", "Eric Cantoná", 89, "FR", ["ST"]],
   ["didier-drogba", "Didier Drogbo", 89, "CI", ["ST"]],
-  ["kenny-dalglish", "Kenny Dalglisho", 89, "SC", ["ST", "MS"]],
   ["samuel-etoo", "Samuel Etoh", 89, "CM", ["ST"]],
-  ["luis-figo", "Luís Figoz", 89, "PT", ["RF", "RM", "ZOM"]],
   ["philipp-lahm", "Philipp Lahmo", 89, "DE", ["RV", "LV", "ZDM"]],
   ["hugo-sanchez", "Hugo Sánchezz", 89, "MX", ["ST"]],
   ["jairzinho", "Jairzinhoh", 89, "BR", ["RF", "RM", "ST"]],
-  ["kaka", "Kakáh", 91, "BR", ["ZOM"]],
   ["gary-lineker", "Gary Linekerr", 89, "EN", ["ST"]],
-  ["marcelo", "Marcelo Vieiro", 89, "BR", ["LV", "LAV", "LM"]],
+  ["marcelo", "Marcelo Vieiro", 89, "BR", ["LV"]],
   ["alessandro-nesta", "Alessandro Nestae", 89, "IT", ["IV"]],
   ["ruud-van-nistelrooy", "Ruud van Nistelrooij", 89, "NL", ["ST"]],
   ["carles-puyol", "Carles Puyolo", 89, "ES", ["IV", "RV"]],
   ["peter-schmeichel", "Peter Schmeichell", 89, "DK", ["TW"]],
   ["alan-shearer", "Alan Shearerr", 89, "EN", ["ST"]],
-  ["kelly-smith", "Kelly Smithh", 89, "EN", ["ST"]],
+  ["kelly-smith", "Kelly Smithh", 89, "EN", ["ST", "ZOM"]],
   ["socrates", "Sócrateso", 89, "BR", ["ZOM", "ZM"]],
-  ["steffi-jones", "Steffi Joness", 89, "DE", ["IV", "ZDM", "LV"]],
+  ["steffi-jones", "Steffi Joness", 89, "DE", ["IV"]],
   ["hristo-stoichkov", "Hristo Stoichkoff", 89, "BG", ["ST", "RF", "LF"]],
-  ["francesco-totti", "Francesco Tottis", 88, "IT", ["ST", "ZOM", "MS"]],
-  ["javier-zanetti", "Javier Zanettí", 89, "AR", ["RV", "LV", "ZM"]],
-  ["gareth-bale", "Gareth Baleo", 88, "WA", ["RF", "ST", "LF"]],
+  ["francesco-totti", "Francesco Tottis", 89, "IT", ["ST", "ZOM"]],
+  ["javier-zanetti", "Javier Zanettí", 89, "AR", ["RV", "LV", "ZDM", "RM", "ZM", "LM"]],
+  ["marcel-desailly", "Marcel Desaillyy", 89, "FR", ["IV", "ZDM"]],
+  ["rio-ferdinand", "Rio Ferdinando", 89, "EN", ["IV"]],
+  ["steven-gerrard", "Steven Gerrardt", 89, "EN", ["ZM", "ZDM", "ZOM"]],
+  ["ronald-koeman", "Ronald Koemann", 89, "NL", ["IV", "ZDM"]],
+  ["pavel-nedved", "Pavel Nedvědy", 89, "CZ", ["LM", "ZOM", "LF"]],
+  ["paul-scholes", "Paul Scholess", 89, "EN", ["ZM", "ZDM", "ZOM"]],
+  ["andriy-shevchenko", "Andriy Shevchenkó", 89, "UA", ["ST", "RF"]],
+  ["lilian-thuram", "Lilian Thuramm", 89, "FR", ["RV", "IV"]],
+  ["frank-lampard", "Frank Lampardo", 89, "EN", ["ZM", "ZDM", "ZOM"]],
+  ["roy-keane", "Roy Keané", 89, "IE", ["ZM", "ZDM"]],
+  ["jean-pierre-papin", "Jean-Pierre Papinn", 89, "FR", ["ST"]],
+  ["lucio", "Lúcioo", 89, "BR", ["IV"]],
+  ["pepe", "Pepeh", 89, "PT", ["IV"]],
+  ["sergio-aguero", "Sergio Agüerro", 89, "AR", ["ST"]],
+  ["gareth-bale", "Gareth Baleo", 88, "WA", ["RF", "RM", "LM", "ST", "LF"]],
   ["david-beckham", "David Beckhamn", 88, "EN", ["RM", "ZM", "RF"]],
-  ["laurent-blanc", "Laurent Blanco", 88, "FR", ["IV", "ZDM"]],
+  ["laurent-blanc", "Laurent Blanco", 88, "FR", ["IV", "ZDM", "ZM", "ZOM"]],
   ["petr-cech", "Petr Čeck", 88, "CZ", ["TW"]],
-  ["giorgio-chiellini", "Giorgio Chiellino", 88, "IT", ["IV", "LV"]],
-  ["marcel-desailly", "Marcel Desaillyy", 88, "FR", ["IV", "ZDM"]],
-  ["rio-ferdinand", "Rio Ferdinando", 88, "EN", ["IV"]],
-  ["steven-gerrard", "Steven Gerrardt", 89, "EN", ["ZM", "ZDM"]],
-  ["gheorghe-hagi", "Gheorghe Hagí", 88, "RO", ["ZOM", "ZM", "LM"]],
+  ["giorgio-chiellini", "Giorgio Chiellino", 88, "IT", ["IV"]],
+  ["gheorghe-hagi", "Gheorghe Hagí", 88, "RO", ["ZOM", "ZM", "LM", "LF"]],
   ["fernando-hierro", "Fernando Hierroo", 88, "ES", ["IV", "ZDM"]],
   ["geoff-hurst", "Geoff Hursto", 88, "EN", ["ST"]],
-  ["mario-kempes", "Mario Kempesz", 88, "AR", ["ST", "ZOM"]],
+  ["mario-kempes", "Mario Kempesz", 88, "AR", ["ST", "LM", "ZOM", "LF"]],
   ["miroslav-klose", "Miroslav Klosek", 88, "DE", ["ST"]],
-  ["ronald-koeman", "Ronald Koemann", 88, "NL", ["IV", "ZDM"]],
-  ["michael-laudrup", "Michael Laudrupp", 88, "DK", ["ZOM", "LF"]],
-  ["pavel-nedved", "Pavel Nedvědy", 88, "CZ", ["LM", "ZOM", "LF"]],
+  ["michael-laudrup", "Michael Laudrupp", 88, "DK", ["ZOM", "LM", "LF"]],
   ["michael-owen", "Michael Owenn", 88, "EN", ["ST"]],
   ["marinette-pichon", "Marinette Pichonn", 88, "FR", ["ST"]],
   ["franck-ribery", "Franck Ribéryy", 88, "FR", ["LM", "LF"]],
   ["juan-roman-riquelme", "Juan Román Riquelmé", 88, "AR", ["ZOM"]],
-  ["wayne-rooney", "Wayne Roonie", 88, "EN", ["ST", "ZOM"]],
-  ["paul-scholes", "Paul Scholess", 88, "EN", ["ZM", "ZOM"]],
-  ["bastian-schweinsteiger", "Bastian Schweinsteigar", 88, "DE", ["ZM", "LM", "ZDM"]],
-  ["andriy-shevchenko", "Andriy Shevchenkó", 88, "UA", ["ST", "RF"]],
-  ["lilian-thuram", "Lilian Thuramm", 88, "FR", ["RV", "IV"]],
+  ["bastian-schweinsteiger", "Bastian Schweinsteigar", 88, "DE", ["ZM", "ZDM", "RM", "LM"]],
   ["edwin-van-der-sar", "Edwin van der Sarr", 88, "NL", ["TW"]],
-  ["robin-van-persie", "Robin van Persié", 88, "NL", ["ST", "RF"]],
+  ["robin-van-persie", "Robin van Persié", 88, "NL", ["ST"]],
   ["patrick-vieira", "Patrick Vieirá", 88, "FR", ["ZM", "ZDM"]],
-  ["john-barnes", "John Barness", 87, "EN", ["LF", "LM", "ZOM"]],
-  ["dunga", "Dungáo", 87, "BR", ["ZDM", "ZM"]],
-  ["patrick-kluivert", "Patrick Kluiverto", 87, "NL", ["ST"]],
-  ["frank-lampard", "Frank Lampardo", 87, "EN", ["ZM", "ZOM"]],
-  ["claude-makelele", "Claude Makélélè", 87, "FR", ["ZDM", "ZM", "RM"]],
-  ["emmanuel-petit", "Emmanuel Petitt", 87, "FR", ["ZDM", "LV", "ZM"]],
-  ["robert-pires", "Robert Pirèz", 87, "FR", ["LM", "ZOM", "LF"]],
-  ["frank-rijkaard", "Frank Rijkaardo", 87, "NL", ["ZDM", "IV", "ZM"]],
-  ["ian-rush", "Ian Rushh", 87, "WA", ["ST"]],
-  ["davor-suker", "Davor Šukerr", 87, "HR", ["ST"]],
-  ["fernando-torres", "Fernando Torrez", 87, "ES", ["ST"]],
-  ["nemanja-vidic", "Nemanja Vidič", 87, "RS", ["IV"]],
-  ["ian-wright", "Ian Wrightt", 87, "EN", ["ST"]],
-  ["xabi-alonso", "Xabi Alonseo", 87, "ES", ["ZDM", "ZM"]],
-  ["cha-bum-kun", "Cha Bum-Kuno", 88, "KR", ["ST", "RF"]],
-  ["gianfranco-zola", "Gianfranco Zolaa", 87, "IT", ["ZOM", "ST"]],
-  ["ashley-cole", "Ashley Colee", 86, "EN", ["LV"]],
-  ["sol-campbell", "Sol Campbelll", 86, "EN", ["IV"]],
-  ["hernan-crespo", "Hernán Crespó", 86, "AR", ["ST"]],
-  ["michael-essien", "Michael Essieno", 86, "GH", ["ZDM", "ZM"]],
-  ["gennaro-gattuso", "Gennaro Gattusso", 86, "IT", ["ZDM", "ZM"]],
-  ["luis-hernandez", "Luis Hernándezz", 86, "MX", ["ST"]],
-  ["roy-keane", "Roy Keané", 86, "IE", ["ZM", "ZDM"]],
-  ["henrik-larsson", "Henrik Larssonn", 86, "SE", ["ST"]],
-  ["sissi", "Sissí do Brasil", 86, "BR", ["ZOM"]],
-  ["juan-sebastian-veron", "Juan Sebastián Verónn", 86, "AR", ["ZM", "ZOM"]],
-  ["gianluca-zambrotta", "Gianluca Zambrottá", 86, "IT", ["RV", "LV"]],
+  ["john-barnes", "John Barness", 88, "EN", ["LF", "LM", "ZOM"]],
+  ["dunga", "Dungáo", 88, "BR", ["ZDM", "ZM"]],
+  ["claude-makelele", "Claude Makélélè", 88, "FR", ["ZDM", "RM", "ZM"]],
+  ["emmanuel-petit", "Emmanuel Petitt", 88, "FR", ["ZDM", "LV", "ZM"]],
+  ["robert-pires", "Robert Pirèz", 88, "FR", ["LM", "RM", "ZOM", "RF", "LF"]],
+  ["frank-rijkaard", "Frank Rijkaardo", 88, "NL", ["ZDM", "IV", "ZM"]],
+  ["ian-rush", "Ian Rushh", 88, "WA", ["ST"]],
+  ["fernando-torres", "Fernando Torrez", 88, "ES", ["ST"]],
+  ["nemanja-vidic", "Nemanja Vidič", 88, "RS", ["IV"]],
+  ["ian-wright", "Ian Wrightt", 88, "EN", ["ST"]],
+  ["xabi-alonso", "Xabi Alonseo", 88, "ES", ["ZDM", "ZM"]],
+  ["cha-bum-kun", "Cha Bum-Kuno", 88, "KR", ["ST", "RM", "RF"]],
+  ["ashley-cole", "Ashley Colee", 88, "EN", ["LV"]],
+  ["sol-campbell", "Sol Campbelll", 88, "EN", ["IV"]],
+  ["hernan-crespo", "Hernán Crespó", 88, "AR", ["ST"]],
+  ["michael-essien", "Michael Essieno", 88, "GH", ["ZDM", "ZM"]],
+  ["gennaro-gattuso", "Gennaro Gattusso", 88, "IT", ["ZDM", "ZM"]],
+  ["sissi", "Sissí do Brasil", 88, "BR", ["ZOM"]],
+  ["gianluca-zambrotta", "Gianluca Zambrottá", 88, "IT", ["RV", "LV", "RM", "LM"]],
+  ["ellen-white", "Ellen Whitey", 88, "EN", ["ST"]],
+  ["maicon", "Maiconn", 88, "BR", ["RV", "RM"]],
+  ["raphael-varane", "Raphaël Varanne", 88, "FR", ["IV"]],
+  ["yaya-toure", "Yaya Tourée", 88, "CI", ["ZM", "ZDM", "ZOM"]],
+  ["yuki-nagasato", "Yuki Nagasatoh", 88, "JP", ["ZOM", "RM", "RF", "ST"]],
 ] as const satisfies readonly IconSeed[];
 
-const FC26_ICON_PLAYERS: StarXIPlayer[] = FC26_ICON_DATA.map(([id, name, rating, countryCode, positions]) => ({
-  id: `icon-${id}`,
-  countryCode,
-  name: getFunnyPlayerName(name, `icon-${id}`, { position: positions[0], rating }),
-  position: positions[0],
-  positions: [...positions],
-  rating,
-  price: Math.round(Math.min(1500000000, 650000000 * 1.12 ** (rating - 86))),
-  accent: "#d6dde8",
-  cardType: "icon",
-  packWeight: 0.015,
-}));
+// FC 26 Icons that are not part of FC 27. Owned cards stay valid; packs no longer contain them.
+const RETIRED_FC26_ICON_DATA = [
+  ["lev-yashin", "Lev Yashim", 92, "RU", ["TW"]],
+  ["patrick-kluivert", "Patrick Kluiverto", 87, "NL", ["ST"]],
+  ["davor-suker", "Davor Šukerr", 87, "HR", ["ST"]],
+  ["gianfranco-zola", "Gianfranco Zolaa", 87, "IT", ["ZOM", "ST"]],
+  ["luis-hernandez", "Luis Hernándezz", 86, "MX", ["ST"]],
+  ["henrik-larsson", "Henrik Larssonn", 86, "SE", ["ST"]],
+  ["juan-sebastian-veron", "Juan Sebastián Verónn", 86, "AR", ["ZM", "ZOM"]],
+] as const satisfies readonly IconSeed[];
+
+function toIconPlayer([id, name, rating, countryCode, positions]: IconSeed, retired = false): StarXIPlayer {
+  return {
+    id: `icon-${id}`,
+    countryCode,
+    name: getFunnyPlayerName(name, `icon-${id}`, { position: positions[0], rating }),
+    position: positions[0],
+    positions: [...positions],
+    rating,
+    price: Math.round(Math.min(1500000000, 650000000 * 1.12 ** (rating - 86))),
+    accent: "#d6dde8",
+    cardType: "icon",
+    packWeight: 0.015,
+    ...(retired ? { retired: true } : {}),
+  };
+}
+
+const FC27_ICON_PLAYERS: StarXIPlayer[] = FC27_ICON_DATA.map((seed) => toIconPlayer(seed));
+const RETIRED_FC26_ICON_PLAYERS: StarXIPlayer[] = RETIRED_FC26_ICON_DATA.map((seed) => toIconPlayer(seed, true));
 
 const EXISTING_STAR_XI_PLAYERS: StarXIPlayer[] = [
   ...SPECIAL_STAR_XI_PLAYERS,
-  ...FC26_ICON_PLAYERS,
+  ...FC27_ICON_PLAYERS,
+  ...RETIRED_FC26_ICON_PLAYERS,
   ...YB_FC26_PLAYERS,
   ...FC26_STAR_PROFILES.map((profile) => ({
     id: profile.id,
@@ -452,6 +481,19 @@ const EXISTING_STAR_XI_PLAYERS: StarXIPlayer[] = [
     rating: profile.rating,
     price: Math.round(Math.min(1500000000, 5000 * 1.28 ** (profile.rating - 70))),
     accent: profile.accent,
+    ...(isFC27Unavailable(profile.sourceId) ? { retired: true } : {}),
+  })),
+  ...FC27_WOMEN_PROFILES.map((profile) => ({
+    id: profile.id,
+    sourceId: profile.sourceId,
+    countryCode: profile.countryCode,
+    name: profile.name,
+    position: profile.positions[0],
+    positions: [...profile.positions],
+    rating: profile.rating,
+    price: Math.round(Math.min(1500000000, 5000 * 1.28 ** (profile.rating - 70))),
+    accent: profile.accent,
+    isWomen: true,
   })),
 ];
 
@@ -463,10 +505,13 @@ export const SCRAP_PLAYERS: StarXIPlayer[] = FC27_INDIA_PROFILES.map(profile => 
 const SCRAP_PLAYER_IDS = new Set(SCRAP_PLAYERS.map(p => p.id));
 export const STAR_XI_PLAYERS: StarXIPlayer[] = [...EXISTING_STAR_XI_PLAYERS.filter(p => !SCRAP_PLAYER_IDS.has(p.id)), ...SCRAP_PLAYERS];
 
-export const STAR_XI_BASE_CARD_COUNT = FC26_STAR_PROFILES.length + YB_FC26_PLAYERS.length + SCRAP_PLAYERS.filter(p => !EXISTING_STAR_XI_PLAYERS.some(old => old.id === p.id)).length;
-export const STAR_XI_ICON_CARD_COUNT = FC26_ICON_PLAYERS.length;
+// Cards that can still be drawn: every card except those missing from FC 27.
+export const STAR_XI_ACTIVE_PLAYERS: StarXIPlayer[] = STAR_XI_PLAYERS.filter(p => !p.retired);
+
+export const STAR_XI_BASE_CARD_COUNT = STAR_XI_ACTIVE_PLAYERS.filter(p => !p.isCustom && p.cardType !== "icon" && p.cardType !== "legendary").length;
+export const STAR_XI_ICON_CARD_COUNT = FC27_ICON_PLAYERS.length;
 export const STAR_XI_SPECIAL_CARD_COUNT = SPECIAL_STAR_XI_PLAYERS.length;
-export const STAR_XI_TOTAL_CARD_COUNT = STAR_XI_PLAYERS.length;
+export const STAR_XI_TOTAL_CARD_COUNT = STAR_XI_ACTIVE_PLAYERS.length;
 
 const STAR_XI_PLAYER_BY_ID = new Map(STAR_XI_PLAYERS.map((player) => [player.id, player]));
 
@@ -494,12 +539,12 @@ export const REWARD_PACKS:readonly StarPackDefinition[] = ['Kleines Prämienpack
 export function getTournamentRewardPack(id:TournamentId) {return REWARD_PACKS[id==='stadium'?1:id==='champions'?3:5];}
 export function isRewardPack(id:string):id is RewardPackId {return REWARD_PACKS.some(p=>p.id===id);}
 const rewardPoolCache=new Map<RewardPackId,ReturnType<typeof calculateRewardPackOdds>>();
-export function getRewardPackOdds(id:RewardPackId,players:readonly StarXIPlayer[]=STAR_XI_PLAYERS) {
- if(players===STAR_XI_PLAYERS){const cached=rewardPoolCache.get(id);if(cached)return cached;const groups=calculateRewardPackOdds(id,players);rewardPoolCache.set(id,groups);return groups;}return calculateRewardPackOdds(id,players);
+export function getRewardPackOdds(id:RewardPackId,players:readonly StarXIPlayer[]=STAR_XI_ACTIVE_PLAYERS) {
+ if(players===STAR_XI_ACTIVE_PLAYERS){const cached=rewardPoolCache.get(id);if(cached)return cached;const groups=calculateRewardPackOdds(id,players);rewardPoolCache.set(id,groups);return groups;}return calculateRewardPackOdds(id,players);
 }
-function calculateRewardPackOdds(id:RewardPackId,players:readonly StarXIPlayer[]=STAR_XI_PLAYERS) {
+function calculateRewardPackOdds(id:RewardPackId,players:readonly StarXIPlayer[]=STAR_XI_ACTIVE_PLAYERS) {
  const pack=REWARD_PACKS.find(p=>p.id===id)!;
- const base=players.filter(p=>!p.isCustom&&p.cardType!=='icon'&&p.cardType!=='legendary');
+ const base=players.filter(p=>!p.retired&&!p.isCustom&&p.cardType!=='icon'&&p.cardType!=='legendary');
  const groups=pack.odds.map(o=>({...o,players:base.filter(p=>p.rating>=o.minRating&&p.rating<=o.maxRating)})).filter(o=>o.players.length&&o.chance>0);
  const total=groups.reduce((sum,o)=>sum+o.chance,0);if(!total)throw new Error('Keine gültigen Prämienkarten verfügbar.');
  return groups.map(o=>({...o,chance:o.chance/total}));
@@ -530,7 +575,7 @@ const STAR_RATING_POOLS = new Map<string, StarXIPlayer[]>();
 for (const pack of STAR_PACKS) {
   for (const odds of pack.odds) {
     const key = `${odds.minRating}-${odds.maxRating}`;
-    if (!STAR_RATING_POOLS.has(key)) STAR_RATING_POOLS.set(key, EXISTING_STAR_XI_PLAYERS.filter((player) => player.rating >= odds.minRating && player.rating <= odds.maxRating));
+    if (!STAR_RATING_POOLS.has(key)) STAR_RATING_POOLS.set(key, EXISTING_STAR_XI_PLAYERS.filter((player) => !player.retired && player.rating >= odds.minRating && player.rating <= odds.maxRating));
   }
 }
 
@@ -846,8 +891,15 @@ export function getStarXIPositions(player: StarXIPlayer) {
   return player.benchOnly ? [] : player.positions.length ? player.positions : player.position ? [player.position] : [];
 }
 
+// FC 27 has no wing-back or centre-forward positions, so full-backs cover the
+// wing-back slots of back-five formations and strikers cover centre-forward.
+const FC27_SLOT_EQUIVALENTS: Partial<Record<StarPosition, StarPosition>> = { LAV: "LV", RAV: "RV", MS: "ST" };
+
 export function canStarXIPlayerPlayPosition(player: StarXIPlayer | undefined, position: StarPosition) {
-  return Boolean(player && !player.benchOnly && getStarXIPositions(player).includes(position));
+  if (!player || player.benchOnly) return false;
+  const positions = getStarXIPositions(player);
+  const equivalent = FC27_SLOT_EQUIVALENTS[position];
+  return positions.includes(position) || (!!equivalent && positions.includes(equivalent));
 }
 
 export function canStarXIPlayerFillSlot(playerId: string, lineupIndex: number, formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS) {
@@ -1478,7 +1530,7 @@ export function openStarPack(packId: StarPackId, ownedIds: string[], random = Ma
     cursor += entry.chance;
     return roll <= cursor;
   }) ?? pack.odds[pack.odds.length - 1];
-  const candidates = STAR_RATING_POOLS.get(`${odds.minRating}-${odds.maxRating}`) ?? STAR_XI_PLAYERS;
+  const candidates = STAR_RATING_POOLS.get(`${odds.minRating}-${odds.maxRating}`) ?? STAR_XI_ACTIVE_PLAYERS;
   const ownedIdSet = new Set(ownedIds);
   const ownedCandidates = candidates.filter((player) => ownedIdSet.has(player.id));
   const unownedCandidates = candidates.filter((player) => !ownedIdSet.has(player.id));
@@ -1497,7 +1549,7 @@ export function openStarPack(packId: StarPackId, ownedIds: string[], random = Ma
   const player = selectionPool.find((candidate) => {
     weightedRoll -= Math.max(0.0001, candidate.packWeight ?? 1);
     return weightedRoll <= 0;
-  }) ?? selectionPool[selectionPool.length - 1] ?? STAR_XI_PLAYERS[0];
+  }) ?? selectionPool[selectionPool.length - 1] ?? STAR_XI_ACTIVE_PLAYERS[0];
   const duplicate = ownedIdSet.has(player.id);
   return { packId: pack.id, packName: pack.label, player, duplicate, fragmentCompensation: duplicate ? getStarXIFragmentCompensation(player) : 0 };
 }
