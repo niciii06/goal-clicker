@@ -51,3 +51,4 @@ next-env.d.ts
 
 # Generated TypeScript cache
 *.tsbuildinfo
+roblox/build/GoalClicker-release-candidate.rbxl
