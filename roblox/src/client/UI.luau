@@ -158,19 +158,34 @@ function UI.button(text: string, options: ButtonOptions?): TextButton
 		UI.corner(10),
 		UI.padding(4, 10),
 		(o.style == "ghost" or o.style == "secondary") and UI.stroke(C.line) or nil,
+		-- Light from above: full colour at the top, a little darker at the bottom.
+		UI.new("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new(Color3.new(1, 1, 1), (o.style == "ghost" or o.style == "secondary") and Color3.fromRGB(236, 238, 242) or Color3.fromRGB(205, 205, 205)),
+		}),
 	})
 	if o.onClick and not o.disabled then
+		local scale = UI.new("UIScale", { Parent = button })
+		local hovered = false
+		local function settle()
+			TweenService:Create(scale, TweenInfo.new(0.12), { Scale = hovered and 1.03 or 1 }):Play()
+		end
+		button.MouseEnter:Connect(function()
+			hovered = true
+			settle()
+		end)
+		button.MouseLeave:Connect(function()
+			hovered = false
+			settle()
+		end)
 		local busy = false
 		button.Activated:Connect(function()
 			if busy then
 				return
 			end
 			busy = true
-			local scale = UI.new("UIScale", { Scale = 0.96, Parent = button })
-			TweenService:Create(scale, TweenInfo.new(0.12), { Scale = 1 }):Play()
-			task.delay(0.15, function()
-				scale:Destroy()
-			end)
+			scale.Scale = 0.95
+			settle()
 			local ok, problem = pcall(o.onClick :: () -> ())
 			if not ok then
 				warn("[UI] Button failed:", problem)

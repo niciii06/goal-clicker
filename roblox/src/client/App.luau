@@ -131,12 +131,18 @@ local function buildTopBar(parent: Instance)
 		Parent = bar,
 	})
 	local goals = UI.new("Frame", {
-		BackgroundColor3 = C.text,
+		BackgroundColor3 = C.white,
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -96, 0.5, 0),
 		Size = UDim2.new(0.55, -96, 1, 0),
 		Parent = bar,
-	}, { UI.corner(12), UI.padding(4, 12), UI.new("UISizeConstraint", { MaxSize = Vector2.new(230, math.huge) }) })
+	}, {
+		UI.corner(12),
+		UI.padding(4, 12),
+		UI.new("UISizeConstraint", { MaxSize = Vector2.new(230, math.huge) }),
+		-- Dark to club blue: the goal counter is the one element that should glow.
+		UI.new("UIGradient", { Rotation = 20, Color = ColorSequence.new(C.text, C.accentDark) }),
+	})
 	local caption = UI.new("TextLabel", {
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, 0, 0.35, 0),
@@ -319,6 +325,8 @@ function App.start()
 		BorderSizePixel = 0,
 		Size = UDim2.fromScale(1, 1),
 		Parent = gui,
+	}, {
+		UI.new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(232, 240, 252), Color3.new(1, 1, 1)) }),
 	})
 	panel = UI.new("Frame", {
 		Name = "Panel",
@@ -330,6 +338,7 @@ function App.start()
 	}, {
 		UI.corner(20),
 		UI.new("UISizeConstraint", { MaxSize = Vector2.new(1180, math.huge) }),
+		UI.new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(232, 240, 252), Color3.new(1, 1, 1)) }),
 		UI.padding(10),
 		UI.list(Enum.FillDirection.Vertical, 8),
 	})

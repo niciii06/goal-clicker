@@ -37,11 +37,12 @@ Theme.tone = {
 	neutral = Theme.colors.muted,
 }
 
+-- Builder Sans for text, Fredoka One for titles and numbers (the playful game look).
 Theme.fonts = {
-	regular = Enum.Font.Gotham,
-	medium = Enum.Font.GothamMedium,
-	bold = Enum.Font.GothamBold,
-	black = Enum.Font.GothamBlack,
+	regular = Enum.Font.BuilderSans,
+	medium = Enum.Font.BuilderSansMedium,
+	bold = Enum.Font.BuilderSansBold,
+	black = Enum.Font.FredokaOne,
 	mono = Enum.Font.RobotoMono,
 }
 
