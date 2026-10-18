@@ -13321,7 +13321,7 @@ return {
 			},
 			{
 				id = "geo-1-4",
-				name = "FC Feierabendbier",
+				name = "FC Feierabend",
 				venueId = "chaos-ground-4",
 			},
 			{
