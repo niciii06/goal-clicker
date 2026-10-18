@@ -44,23 +44,33 @@ local function steadyProduction(): number
 	return (State.core().passivePower or 0) / math.max(1, boost)
 end
 
-local function itemRow(icon: string, name: string, description: string, detail: GuiObject?, action: GuiObject?, highlight: boolean?): Frame
-	local title = UI.label(icon .. "  " .. name, { size = 15, font = Theme.fonts.black })
+local PICTURE_SIZE = 64
+
+local function itemRow(icon: string, name: string, description: string, detail: GuiObject?, action: GuiObject?, highlight: boolean?, image: string?): Frame
+	-- With a picture the emoji would only repeat it.
+	local title = UI.label(image and name or (icon .. "  " .. name), { size = 15, font = Theme.fonts.black })
 	local info = UI.label(description, { size = 12, color = C.muted })
 	-- Fixed order: the parts are created in different orders by the callers.
 	title.LayoutOrder, info.LayoutOrder = 1, 2
 	if detail then
 		detail.LayoutOrder = 3
 	end
-	local text = UI.box({ gap = 2, width = action and UDim.new(1, -128) or UDim.new(1, 0) }, { title, info, detail })
-	text.LayoutOrder = 2
+	local picture = image and UI.new("ImageLabel", {
+		Image = image,
+		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(PICTURE_SIZE, PICTURE_SIZE),
+		LayoutOrder = 2,
+	}, { UI.corner(10) }) or nil
+	local used = (action and 128 or 0) + (picture and PICTURE_SIZE + 8 or 0)
+	local text = UI.box({ gap = 2, width = UDim.new(1, -used) }, { title, info, detail })
+	text.LayoutOrder = 3
 	if action then
 		-- Button on the left like the upgrade rows on the home screen.
 		action.Size = UDim2.fromOffset(120, 38)
 		action.LayoutOrder = 1
 	end
 	return UI.box({ color = C.cardAlt, padding = 12, radius = 12, stroke = highlight, strokeColor = C.gold }, {
-		UI.row({ text, action }, 8),
+		UI.row({ text, picture, action }, 8),
 	})
 end
 
@@ -78,7 +88,7 @@ local function passRow(pass: Monetization.Pass): Frame
 		end })
 	end
 	local detail = (active and not owned) and UI.label("Ein Mitspieler hat diesen Pass. Er gilt in dieser Koop Welt für alle.", { size = 11, color = C.accent }) or nil
-	return itemRow(pass.icon, pass.name, pass.description, detail, action, owned)
+	return itemRow(pass.icon, pass.name, pass.description, detail, action, owned, pass.image)
 end
 
 local function productRow(product: Monetization.Product): Frame
@@ -95,7 +105,7 @@ local function productRow(product: Monetization.Product): Frame
 	local action = UI.button(Robux.price(product.price), { style = "gold", size = 14, onClick = function()
 		Robux.promptProduct(product.key)
 	end })
-	return itemRow(product.icon, product.name, product.description, detail, action)
+	return itemRow(product.icon, product.name, product.description, detail, action, nil, product.image)
 end
 
 local function creditsCard(): Frame?
@@ -106,7 +116,7 @@ local function creditsCard(): Frame?
 		if count > 0 and product then
 			table.insert(rows, itemRow(product.icon, ("%s · %dx"):format(product.name, count), "Schon bezahlt. Einlösen, sobald es passt.", nil, UI.button("Einlösen", { style = "success", size = 14, onClick = function()
 				Net.action("useShopCredit", { key = key })
-			end })))
+			end }), nil, product.image))
 		end
 	end
 	if #rows == 0 then

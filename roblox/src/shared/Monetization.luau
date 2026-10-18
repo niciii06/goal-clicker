@@ -5,7 +5,7 @@
 
 local Monetization = {}
 
-export type Pass = { key: string, id: number, name: string, description: string, price: number, icon: string }
+export type Pass = { key: string, id: number, name: string, description: string, price: number, icon: string, image: string? }
 export type Product = {
 	key: string,
 	id: number,
@@ -13,6 +13,8 @@ export type Product = {
 	description: string,
 	price: number,
 	icon: string,
+	-- Shop picture (uploaded asset); the emoji icon is the fallback.
+	image: string?,
 	minutes: number?,
 	minimum: number?,
 	amount: number?,
@@ -20,22 +22,22 @@ export type Product = {
 
 -- Game passes (bought once, kept forever). IDs from create.roblox.com, experience 10771714906.
 Monetization.PASSES = {
-	{ key = "doubleGoals", id = 2040705303, price = 249, icon = "⚡", name = "Doppelte Tore", description = "Alle Tore aus Klicks und Produktion x2. Gilt in Koop Welten für alle Mitspieler." },
-	{ key = "autoClicker", id = 2037753775, price = 149, icon = "🤖", name = "Auto Klicker", description = "Ein automatischer Klick pro Sekunde, solange du im Spiel bist." },
-	{ key = "fastTravel", id = 2040633328, price = 99, icon = "✈️", name = "Schnellreise", description = "Auswärtsreisen dauern nur noch halb so lang." },
-	{ key = "vip", id = 2036313888, price = 249, icon = "👑", name = "VIP", description = "Goldener Name in Koop und Rangliste, zusätzliche Trikotfarben und bei der täglichen Prämie jeden Tag ein Kleines Prämienpack dazu." },
-	{ key = "bigCoop", id = 2040255333, price = 199, icon = "👥", name = "Grosser Koop Club", description = "Deine selbst erstellten Koop Welten haben 6 statt 4 Plätze." },
+	{ key = "doubleGoals", id = 2040705303, price = 249, icon = "⚡", image = "rbxassetid://75092121570043", name = "Doppelte Tore", description = "Alle Tore aus Klicks und Produktion x2. Gilt in Koop Welten für alle Mitspieler." },
+	{ key = "autoClicker", id = 2037753775, price = 149, icon = "🤖", image = "rbxassetid://88047248392913", name = "Auto Klicker", description = "Ein automatischer Klick pro Sekunde, solange du im Spiel bist." },
+	{ key = "fastTravel", id = 2040633328, price = 99, icon = "✈️", image = "rbxassetid://115513319250790", name = "Schnellreise", description = "Auswärtsreisen dauern nur noch halb so lang." },
+	{ key = "vip", id = 2036313888, price = 249, icon = "👑", image = "rbxassetid://116276803736971", name = "VIP", description = "Goldener Name in Koop und Rangliste, zusätzliche Trikotfarben und bei der täglichen Prämie jeden Tag ein Kleines Prämienpack dazu." },
+	{ key = "bigCoop", id = 2040255333, price = 199, icon = "👥", image = "rbxassetid://72722814603336", name = "Grosser Koop Club", description = "Deine selbst erstellten Koop Welten haben 6 statt 4 Plätze." },
 } :: { Pass }
 
 -- Developer products (can be bought again and again).
 Monetization.PRODUCTS = {
-	{ key = "goalsSmall", id = 3719537716, price = 25, icon = "⚽", name = "Kleines Tore Paket", description = "10 Minuten deiner aktuellen Produktion sofort, mindestens 1.000 Tore.", minutes = 10, minimum = 1000 },
-	{ key = "goalsLarge", id = 3719538043, price = 99, icon = "🥅", name = "Grosses Tore Paket", description = "1 Stunde deiner aktuellen Produktion sofort, mindestens 10.000 Tore.", minutes = 60, minimum = 10000 },
-	{ key = "goalsHuge", id = 3719538141, price = 399, icon = "🏟️", name = "Riesiges Tore Paket", description = "8 Stunden deiner aktuellen Produktion sofort, mindestens 100.000 Tore.", minutes = 480, minimum = 100000 },
-	{ key = "goalBoost", id = 3719538236, price = 49, icon = "⚡", name = "Goalboost", description = "2x Tore für 15 Minuten Spielzeit." },
-	{ key = "fragments", id = 3719538316, price = 79, icon = "💎", name = "Fragmente", description = "500 Fragmente für den Spezialkarten Zug.", amount = 500 },
-	{ key = "finishTravel", id = 3719538417, price = 15, icon = "🚌", name = "Reise sofort beenden", description = "Die laufende Auswärtsreise ist sofort am Ziel." },
-	{ key = "miniGameReady", id = 3719538507, price = 15, icon = "🎮", name = "Minigames sofort bereit", description = "Setzt die Abklingzeit aller Minigames zurück." },
+	{ key = "goalsSmall", id = 3719537716, price = 25, icon = "⚽", image = "rbxassetid://133307054483332", name = "Kleines Tore Paket", description = "10 Minuten deiner aktuellen Produktion sofort, mindestens 1.000 Tore.", minutes = 10, minimum = 1000 },
+	{ key = "goalsLarge", id = 3719538043, price = 99, icon = "🥅", image = "rbxassetid://93883583897812", name = "Grosses Tore Paket", description = "1 Stunde deiner aktuellen Produktion sofort, mindestens 10.000 Tore.", minutes = 60, minimum = 10000 },
+	{ key = "goalsHuge", id = 3719538141, price = 399, icon = "🏟️", image = "rbxassetid://108255875413299", name = "Riesiges Tore Paket", description = "8 Stunden deiner aktuellen Produktion sofort, mindestens 100.000 Tore.", minutes = 480, minimum = 100000 },
+	{ key = "goalBoost", id = 3719538236, price = 49, icon = "⚡", image = "rbxassetid://97232719096752", name = "Goalboost", description = "2x Tore für 15 Minuten Spielzeit." },
+	{ key = "fragments", id = 3719538316, price = 79, icon = "💎", image = "rbxassetid://97065734855065", name = "Fragmente", description = "500 Fragmente für den Spezialkarten Zug.", amount = 500 },
+	{ key = "finishTravel", id = 3719538417, price = 15, icon = "🚌", image = "rbxassetid://86507424513254", name = "Reise sofort beenden", description = "Die laufende Auswärtsreise ist sofort am Ziel." },
+	{ key = "miniGameReady", id = 3719538507, price = 15, icon = "🎮", image = "rbxassetid://133445315859998", name = "Minigames sofort bereit", description = "Setzt die Abklingzeit aller Minigames zurück." },
 } :: { Product }
 
 -- Shop goal boost: same mechanic as the tournament boost.
