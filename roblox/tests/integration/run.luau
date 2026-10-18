@@ -556,6 +556,40 @@ local function press(text, optional)
 	return false
 end
 
+-- Presses a button inside the card that also shows the marker text (for screens with
+-- several buttons of the same label, for example season and tournament travel).
+local function pressWithin(marker, text)
+	for _, button in buttons() do
+		if button.Text == text then
+			local card = button.Parent
+			-- Walk up to the smallest container that holds the marker; it must not hold
+			-- another button with the same label, otherwise it is the shared screen.
+			while card and card ~= gui() do
+				local hasMarker, sameButtons = false, 0
+				for _, item in card:GetDescendants() do
+					if item:IsA("TextLabel") and string.find(item.Text, marker, 1, true) then
+						hasMarker = true
+					elseif item:IsA("TextButton") and item.Text == text then
+						sameButtons += 1
+					end
+				end
+				if sameButtons > 1 then
+					break
+				end
+				if hasMarker then
+					wrap(button).Activated:Fire()
+					task.wait()
+					task.wait()
+					return true
+				end
+				card = card.Parent
+			end
+		end
+	end
+	fail("Button not found: " .. text .. " in " .. marker)
+	return false
+end
+
 local function screenText()
 	local parts = {}
 	local root = gui()
@@ -691,7 +725,7 @@ checkScreen("Minigame")
 
 -- Second matchday is away: travel first, then play in 3D.
 press("Spiele")
-press("Reise antreten")
+pressWithin("SAISONMODUS", "Reise antreten")
 step(2)
 local journey = viewer.own.game.features.travel.journey
 if not journey then

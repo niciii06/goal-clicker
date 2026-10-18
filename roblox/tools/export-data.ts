@@ -70,6 +70,8 @@ const players = STAR_XI_PLAYERS.map((player) => {
     cardType: player.cardType,
     packWeight: player.packWeight,
     scrap: scrapIds.has(player.id) || undefined,
+    retired: player.retired || undefined,
+    isWomen: player.isWomen || undefined,
     tier: getStarCardTier(player),
     attributes: Object.keys(attributes).length ? attributes : undefined,
     look: {

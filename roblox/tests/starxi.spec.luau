@@ -6,9 +6,21 @@ local Util = require(Shared.Util)
 
 return {
 	{ name = "card pool loads", run = function()
-		expectEqual(#Cards.ALL, 1870, "card count")
+		expectEqual(#Cards.ALL, 3104, "card count")
+		expectEqual(#Cards.ACTIVE, 3007, "active card count")
 		expectTrue(Cards.get("star-di-certo") ~= nil, "di certo")
 		expectEqual(#Cards.FORMATIONS, 29, "formations")
+	end },
+	{ name = "fc 27 slot equivalents", run = function()
+		local fullBack = Util.find(Cards.ALL, function(player)
+			return #player.positions == 1 and player.positions[1] == "LV"
+		end)
+		local striker = Util.find(Cards.ALL, function(player)
+			return #player.positions == 1 and player.positions[1] == "ST"
+		end)
+		expectTrue(Cards.canPlay(fullBack, "LAV"), "LV covers LAV")
+		expectTrue(not Cards.canPlay(fullBack, "RAV"), "LV does not cover RAV")
+		expectTrue(Cards.canPlay(striker, "MS"), "ST covers MS")
 	end },
 	{ name = "best eleven fills all slots", run = function()
 		local owned = {}

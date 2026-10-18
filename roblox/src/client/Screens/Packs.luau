@@ -127,6 +127,10 @@ local function album(container: Frame, ctx: any)
 	for _, id in starXI.ownedIds do
 		collected[id] = true
 	end
+	-- Cards missing from FC 27 only stay in the album for players who already collected them.
+	local albumPlayers = Util.filter(Cards.ALL, function(player)
+		return not player.retired or collected[player.id] == true
+	end)
 	local groups = CareerLogic.albumGroups({ collectedIds = Util.keys(collected), claimedAlbumRewards = career.claimedAlbumRewards })
 	local count = Util.count(collected)
 	local claimable, reward = 0, 0
@@ -138,8 +142,8 @@ local function album(container: Frame, ctx: any)
 	end
 	local groupRows: { Instance? } = {
 		UI.eyebrow("Sammelalbum / Jede Karte zählt"),
-		UI.title(("%s / %s Karten"):format(Util.formatInteger(count), Util.formatInteger(#Cards.ALL)), 22),
-		UI.progress(count / #Cards.ALL, C.accent),
+		UI.title(("%s / %s Karten"):format(Util.formatInteger(count), Util.formatInteger(#albumPlayers)), 22),
+		UI.progress(count / #albumPlayers, C.accent),
 		UI.label("Einmal gesammelt, immer im Album. Verkäufe und Leihen entfernen keine Karte.", { size = 13, color = C.muted }),
 		claimable > 0 and UI.button(("Alle %d Prämien abholen (+%s Fragmente)"):format(claimable, Util.formatNumber(reward)), { style = "success", onClick = function()
 			Net.action("claimAlbum", { id = "all" })
@@ -171,7 +175,7 @@ local function album(container: Frame, ctx: any)
 
 	local query = Util.lower(search)
 	local list = {}
-	for _, player in Cards.ALL do
+	for _, player in albumPlayers do
 		local typeOk = typeFilter == "all" or (typeFilter == "custom" and player.isCustom) or (typeFilter == "icon" and player.cardType == "icon")
 			or (typeFilter == "legendary" and player.cardType == "legendary") or (typeFilter == "base" and not player.isCustom and player.cardType ~= "icon" and player.cardType ~= "legendary")
 		local ownOk = ownership == "all" or (ownership == "collected" and collected[player.id]) or (ownership == "missing" and not collected[player.id])
@@ -196,6 +200,7 @@ local function album(container: Frame, ctx: any)
 			UI.label(has and tostring(player.rating) or "?", { size = 16, font = Theme.fonts.black, color = has and Theme.readable(player.accent) or C.faint }),
 			UI.label(has and player.name or "Noch nicht gesammelt", { size = 11, font = Theme.fonts.bold, color = has and C.text or C.faint }),
 			UI.label(Overlays.flag(player.countryCode) .. " " .. Cards.positionLabel(player, true), { size = 10, color = C.muted }),
+			player.retired and UI.label("Nicht in FC 27", { size = 9, color = C.faint }) or nil,
 		})
 		tile.Parent = grid
 	end

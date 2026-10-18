@@ -267,6 +267,10 @@ local function figure(look: any, parent: Instance): Frame
 	shape("Head", UDim2.fromOffset(38, 42), UDim2.new(0.5, 0, 0, math.floor(14 / scale)), skin, 19)
 	if look.hair ~= "bald" then
 		shape("Hair", UDim2.fromOffset(40, look.hair == "afro" and 22 or 12), UDim2.new(0.5, 0, 0, math.floor((look.hair == "afro" and 4 or 10) / scale)), Theme.color(look.hairColor), 12)
+		if look.hair == "pony" or look.hair == "braids" then
+			-- Ponytail or braid hanging down behind the head.
+			shape("HairBack", UDim2.fromOffset(10, 34), UDim2.new(0.5, 22, 0, math.floor(22 / scale)), Theme.color(look.hairColor), 5)
+		end
 	end
 	shape("Shirt", UDim2.fromOffset(width, 70), UDim2.new(0.5, 0, 0, 58), Theme.color(look.kitPrimary), 12)
 	shape("ArmLeft", UDim2.fromOffset(14, 62), UDim2.new(0.5, -math.floor(width / 2) - 8, 0, 62), skin, 7)

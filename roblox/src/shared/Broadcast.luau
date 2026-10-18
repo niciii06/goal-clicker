@@ -41,8 +41,8 @@ function Broadcast.create(cup: any): any
 		local used = {}
 		opponentXI = {}
 		for index, slot in formation.slots do
-			local candidates = Util.filter(Cards.ALL, function(player)
-				return not player.isCustom and table.find(player.positions, slot.position) ~= nil and not used[player.id]
+			local candidates = Util.filter(Cards.ACTIVE, function(player)
+				return not player.isCustom and Cards.canPlay(player, slot.position) and not used[player.id]
 			end)
 			table.sort(candidates, function(a, b)
 				local da, db = math.abs(a.rating - cup.opponentRating), math.abs(b.rating - cup.opponentRating)
@@ -54,8 +54,8 @@ function Broadcast.create(cup: any): any
 			candidates = Util.slice(candidates, 1, 12)
 			local player = candidates[math.floor(Util.seed(seed .. ":player:" .. (index - 1)) * #candidates) + 1]
 			if not player then
-				player = Util.find(Cards.ALL, function(candidate)
-					return table.find(candidate.positions, slot.position) ~= nil and not used[candidate.id]
+				player = Util.find(Cards.ACTIVE, function(candidate)
+					return Cards.canPlay(candidate, slot.position) and not used[candidate.id]
 				end) :: any
 			end
 			used[player.id] = true

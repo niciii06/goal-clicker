@@ -46,7 +46,7 @@ local function ratingPool(minimum: number, maximum: number): { Cards.Player }
 	local key = minimum .. "-" .. maximum
 	if not ratingPools[key] then
 		ratingPools[key] = Util.filter(Cards.ALL, function(player)
-			return string.sub(player.id, 1, 6) ~= "scrap-" and player.rating >= minimum and player.rating <= maximum
+			return string.sub(player.id, 1, 6) ~= "scrap-" and not player.retired and player.rating >= minimum and player.rating <= maximum
 		end)
 	end
 	return ratingPools[key]
@@ -59,7 +59,7 @@ function Packs.rewardOdds(id: string): { any }
 	end
 	local pack = Packs.get(id)
 	local base = Util.filter(Cards.ALL, function(player)
-		return not player.isCustom and player.cardType ~= "icon" and player.cardType ~= "legendary"
+		return not player.retired and not player.isCustom and player.cardType ~= "icon" and player.cardType ~= "legendary"
 	end)
 	local groups = {}
 	local total = 0
@@ -140,7 +140,7 @@ function Packs.open(packId: string, ownedIds: { string }, random: () -> number):
 	end
 	local candidates = ratingPool(odds.minRating, odds.maxRating)
 	if #candidates == 0 then
-		candidates = Cards.ALL
+		candidates = Cards.ACTIVE
 	end
 	local owned = {}
 	for _, id in ownedIds do
@@ -171,7 +171,7 @@ function Packs.open(packId: string, ownedIds: { string }, random: () -> number):
 		return math.max(0.0001, player.packWeight or 1)
 	end)
 	local weighted = Util.bounded(random) * totalWeight
-	local chosen = selection[#selection] or Cards.ALL[1]
+	local chosen = selection[#selection] or Cards.ACTIVE[1]
 	for _, player in selection do
 		weighted -= math.max(0.0001, player.packWeight or 1)
 		if weighted <= 0 then

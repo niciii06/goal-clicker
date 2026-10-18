@@ -5,7 +5,7 @@ Die Roblox Version von Goal Clicker. Die Website in `app/` bleibt unverändert u
 ## Was drin ist
 
 * **Klicken und Upgrades:** Ball mit Combo (bis x3), kritischen Treffern und Serienbonus. Dazu 21 Upgrades mit Kaufmodus x1, x10, x100 und MAX sowie Ränge und Erfolge.
-* **Star XI:** 1870 Karten, 29 Formationen, Startelf, Bank (12), Reserve mit Filtern und automatische „Beste Elf“.
+* **Star XI:** 3104 Karten (davon 3007 aus Packs ziehbar, alle FC 27 Icons und Spielerinnen), 29 Formationen, Startelf, Bank (12), Reserve mit Filtern und automatische „Beste Elf“.
 * **Packs:** Schrott, Scout, Elite und Legenden Pack mit denselben Wahrscheinlichkeiten wie im Web. Dazu Prämienpacks, Fragmente, Spezialkarten-Zug und Walkout Animationen.
 * **Saisonmodus:** 15 Ligen, Tabelle, Auf- und Abstieg, Hall of Fame und Prestige.
 * **Turniere:** Stadionpokal, Champions Cup und Weltmeisterschaft mit Verlängerung, Elfmeterschiessen, Goal Gazette und Goalboost.
@@ -74,3 +74,4 @@ Was der Integrationstest nicht prüfen kann: das echte Aussehen (Abstände, Schr
 * Der AZB Testmodus ist wie auf der Website deaktiviert.
 * Der Goalboost nach einem Turniersieg ist hier wirklich aktiv. Auf der Website wird er angekündigt, aber nicht gestartet.
 * Spielernamen kommen unverändert aus den Webdaten. Vor einer öffentlichen Veröffentlichung solltest du prüfen, ob echte Namen von Spielern und Clubs im Spiel bleiben sollen.
+* Karten, die es in FC 27 nicht mehr gibt, bleiben in bestehenden Spielständen gültig, kommen aber nicht mehr aus Packs. Im Album erscheinen sie nur, wenn man sie schon gesammelt hat.

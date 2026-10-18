@@ -401,26 +401,26 @@ local function definitions(): { any }
 		return albumDefinitions
 	end
 	local list = {
-		{ id = "base", label = "Alle Basiskarten", reward = 10000, players = Util.filter(Cards.ALL, function(p)
+		{ id = "base", label = "Alle Basiskarten", reward = 10000, players = Util.filter(Cards.ACTIVE, function(p)
 			return string.sub(p.id, 1, 6) ~= "scrap-" and not p.isCustom and p.cardType ~= "icon" and p.cardType ~= "legendary"
 		end) },
 		{ id = "scrap", label = "Alle Schrottkarten", reward = 500, players = Cards.SCRAP },
-		{ id = "icons", label = "Alle Icons", reward = 5000, players = Util.filter(Cards.ALL, function(p)
+		{ id = "icons", label = "Alle Icons", reward = 5000, players = Util.filter(Cards.ACTIVE, function(p)
 			return p.cardType == "icon"
 		end) },
 		{ id = "custom", label = "Alle Custom-Karten", reward = 5000, players = Cards.CUSTOM },
-		{ id = "legendary", label = "Alle legendären Karten", reward = 5000, players = Util.filter(Cards.ALL, function(p)
+		{ id = "legendary", label = "Alle legendären Karten", reward = 5000, players = Util.filter(Cards.ACTIVE, function(p)
 			return p.cardType == "legendary"
 		end) },
 	}
 	local codes = {}
-	for _, player in Cards.ALL do
+	for _, player in Cards.ACTIVE do
 		if player.countryCode then
 			codes[player.countryCode] = true
 		end
 	end
 	for _, code in Util.keys(codes) do
-		table.insert(list, { id = "nation-" .. code, label = "Nation " .. code, reward = 500, players = Util.filter(Cards.ALL, function(p)
+		table.insert(list, { id = "nation-" .. code, label = "Nation " .. code, reward = 500, players = Util.filter(Cards.ACTIVE, function(p)
 			return p.countryCode == code
 		end) })
 	end

@@ -20,6 +20,8 @@ export type Player = {
 	cardType: string?,
 	packWeight: number?,
 	scrap: boolean?,
+	retired: boolean?,
+	isWomen: boolean?,
 	tier: string,
 	attributes: { [string]: number }?,
 	look: any,
@@ -40,6 +42,11 @@ local byId: { [string]: Player } = {}
 for _, player in Cards.ALL do
 	byId[player.id] = player
 end
+
+-- Cards that can still be drawn: retired cards (not part of FC 27) stay valid in saves only.
+Cards.ACTIVE = Util.filter(Cards.ALL, function(player)
+	return player.retired ~= true
+end)
 
 Cards.CUSTOM = Util.filter(Cards.ALL, function(player)
 	return player.isCustom == true
@@ -68,11 +75,17 @@ function Cards.positionsOf(player: Player): { string }
 	return {}
 end
 
+-- FC 27 has no wing-back or centre-forward positions, so full-backs cover the
+-- wing-back slots of back-five formations and strikers cover centre-forward.
+local SLOT_EQUIVALENTS: { [string]: string } = { LAV = "LV", RAV = "RV", MS = "ST" }
+
 function Cards.canPlay(player: Player?, position: string): boolean
 	if not player or player.benchOnly then
 		return false
 	end
-	return table.find(Cards.positionsOf(player), position) ~= nil
+	local positions = Cards.positionsOf(player)
+	local equivalent = SLOT_EQUIVALENTS[position]
+	return table.find(positions, position) ~= nil or (equivalent ~= nil and table.find(positions, equivalent) ~= nil)
 end
 
 local formationById: { [string]: any } = {}
