@@ -1,7 +1,10 @@
 --!nonstrict
 -- Coop lobby: create a shared world, join with a code or reopen a saved world.
 local Client = script.Parent.Parent
+local Invite = require(Client.Invite)
 local Net = require(Client.Net)
+local Overlays = require(Client.Overlays)
+local State = require(Client.State)
 local Theme = require(Client.Theme)
 local UI = require(Client.UI)
 
@@ -25,17 +28,32 @@ function Coop.render(container: Frame, ctx: any)
 	UI.card({
 		UI.eyebrow("Koop Multiplayer"),
 		UI.title("Ein gemeinsamer Club für bis zu vier Spieler.", 22),
-		UI.label("Alle teilen Tore, Kader, Saison und Turniere. Deine Freunde müssen auf demselben Roblox Server sein: Tretet über die Freundesliste dem gleichen Spiel bei. Gespielt wird ab zwei Mitgliedern.", { size = 13, color = C.muted }),
+		UI.label("Alle teilen Tore, Kader, Saison und Turniere. Erstelle eine Welt und lade deine Roblox Freunde ein. Wer die Einladung annimmt, landet direkt auf deinem Server und in deiner Welt. Gespielt wird ab zwei Mitgliedern.", { size = 13, color = C.muted }),
 	}, { gap = 8 }).Parent = container
 	UI.card({
 		UI.eyebrow("Neue Welt"),
 		nameBox,
-		UI.button("Welt erstellen", { style = "primary", onClick = function()
-			Net.action("createCoop", { roomName = roomName })
+		UI.button("Welt erstellen und Freunde einladen", { style = "primary", onClick = function()
+			local ok = Net.action("createCoop", { roomName = roomName })
+			local coop = nil
+			-- The new world arrives with the next state update.
+			for _ = 1, 30 do
+				coop = ok and State.features("coop")
+				if coop or not ok then
+					break
+				end
+				task.wait(0.1)
+			end
+			if coop then
+				local shown, problem = Invite.friends(coop.code, coop.roomName)
+				if not shown and problem then
+					Overlays.toast(problem, false)
+				end
+			end
 		end }),
 	}, { gap = 8 }).Parent = container
 	UI.card({
-		UI.eyebrow("Beitreten"),
+		UI.eyebrow("Mit Code beitreten (ohne Einladung)"),
 		codeBox,
 		UI.button("Mit Code beitreten", { style = "dark", onClick = function()
 			Net.action("joinCoop", { code = code })

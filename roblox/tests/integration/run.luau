@@ -814,15 +814,17 @@ if not code then
 else
 	local secondReal = roblox.Instance.new("Player")
 	secondReal.Name = "Friend"
-	local second = wrap(secondReal, { UserId = 777, DisplayName = "Friend" })
+	-- The friend arrives through a Roblox invite that carries the world code.
+	local second = wrap(secondReal, { UserId = 777, DisplayName = "Friend", GetJoinData = function()
+		return { LaunchData = code }
+	end })
 	table.insert(playersService.list, second)
 	playersService.PlayerAdded:Fire(second)
-	local friend = Clubs.viewer(second)
-	local ok, message = Clubs.joinCoop(friend, code)
-	if not ok then
-		fail("Friend could not join: " .. tostring(message))
-	end
 	step(2)
+	local friend = Clubs.viewer(second)
+	if not friend or friend.coopCode ~= code then
+		fail("Invited friend did not land in the coop world")
+	end
 	for _ = 1, 10 do
 		press("⚽")
 	end
@@ -835,6 +837,9 @@ else
 	local coopHome = checkScreen("Koop Home")
 	if not string.find(coopHome, code, 1, true) then
 		fail("Coop bar missing on home")
+	end
+	if not string.find(coopHome, "Roblox Freunde einladen", 1, true) then
+		fail("Invite button missing on home")
 	end
 	press("Singleplayer")
 	step(1)

@@ -13,7 +13,7 @@ Die Roblox Version von Goal Clicker. Die Website in `app/` bleibt unverändert u
 * **Reisen:** Auswärtsspiele mit Teambus, Zug oder Flugzeug. Die Reisepläne kommen aus dem Webcode.
 * **Karriere:** Form, Meilensteinkarten, Saisonauszeichnungen, Rivalitäten und Derbys, Matcharchiv, Reisestatistik und Sammelalbum.
 * **Club Welt:** Fabrizio Romario (Leihen, Verkäufe, Deadline Day), Zufallsereignisse, VAR, Pressekonferenzen, tägliche Prämie, vier Minispiele, Codes (zum Beispiel `SILVAN`), Missionen und Verlauf.
-* **Koop:** Gemeinsame Welten für bis zu vier Spieler auf demselben Server.
+* **Koop:** Gemeinsame Welten für bis zu vier Spieler. Freunde lädt man direkt über die Roblox Einladung ein, sie landen dann automatisch auf dem gleichen Server und in der Welt. Der Code geht weiterhin als Alternative.
 * **Roblox Extras:** Speichern über DataStore mit Sperre gegen doppeltes Laden, globale Rangliste und leaderstats (Tore, Pokale). Es gibt keinen Avatar und keine begehbare Welt: Man spielt nur über die Oberfläche wie auf der Website. Das 3D Stadion erscheint nur in der 3D Ansicht eines Live Spiels.
 
 Alles Wichtige rechnet der Server. Der Client schickt nur Absichten (klicken, kaufen, aufstellen). Gewinne, Packs und Spielergebnisse lassen sich so nicht fälschen.
@@ -70,7 +70,7 @@ Was der Integrationstest nicht prüfen kann: das echte Aussehen (Abstände, Schr
 ## Unterschiede zur Website
 
 * Spielstände werden pro Roblox Konto gespeichert und nicht im Browser.
-* Koop Mitspieler müssen auf demselben Roblox Server sein. Über die Freundesliste tritt man dem Server eines Freundes bei.
+* Koop Mitspieler müssen auf demselben Roblox Server sein. Die Roblox Einladung erledigt das automatisch. Wer mit Code beitreten will, muss vorher dem Server des Freundes beitreten.
 * Der AZB Testmodus ist wie auf der Website deaktiviert.
 * Der Goalboost nach einem Turniersieg ist hier wirklich aktiv. Auf der Website wird er angekündigt, aber nicht gestartet.
 * Spielernamen kommen unverändert aus den Webdaten. Vor einer öffentlichen Veröffentlichung solltest du prüfen, ob echte Namen von Spielern und Clubs im Spiel bleiben sollen.

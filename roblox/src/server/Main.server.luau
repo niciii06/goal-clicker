@@ -86,6 +86,17 @@ local function onPlayerAdded(player: Player)
 	if not Store.isPersistent() then
 		noticeRemote:FireClient(player, { { kind = "toast", text = "Studio Testmodus: Spielstände werden nicht gespeichert." } })
 	end
+	-- Joined through a friend's invite: the launch data holds the coop world code.
+	local okJoinData, joinData = pcall(function()
+		return player:GetJoinData()
+	end)
+	local launchData = okJoinData and type(joinData) == "table" and joinData.LaunchData
+	if type(launchData) == "string" and string.match(launchData, "^%w%w%w%w%w%w$") then
+		local ok, message = Clubs.joinCoop(viewer, launchData)
+		if message ~= "" then
+			noticeRemote:FireClient(player, { { kind = "toast", text = ok and message or ("Einladung: " .. message) } })
+		end
+	end
 	updateLeaderstats(player)
 	flush(player)
 end

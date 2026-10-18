@@ -12,6 +12,7 @@ local MiniGames = require(Shared.MiniGames)
 local Util = require(Shared.Util)
 
 local Client = script.Parent.Parent
+local Invite = require(Client.Invite)
 local Net = require(Client.Net)
 local Overlays = require(Client.Overlays)
 local State = require(Client.State)
@@ -476,6 +477,12 @@ local function coopBar(): Frame?
 		UI.eyebrow("Koop / " .. coop.roomName),
 		UI.row({ UI.label(coop.code, { size = 24, font = Theme.fonts.black, inline = true }), UI.pill(("%d / %d SPIELER"):format(coop.playerCount, coop.maxPlayers), C.accent, C.white), UI.pill(coop.status == "live" and "LIVE" or "WARTET", coop.status == "live" and C.green or C.gold, C.white) }, 8),
 		UI.label(table.concat(names, " · "), { size = 13, color = C.muted }),
+		coop.playerCount < coop.maxPlayers and UI.button("👥  Roblox Freunde einladen", { style = "primary", height = 38, size = 14, onClick = function()
+			local ok, problem = Invite.friends(coop.code, coop.roomName)
+			if not ok and problem then
+				Overlays.toast(problem, false)
+			end
+		end }) or nil,
 	}, { color = C.cardAlt })
 end
 
