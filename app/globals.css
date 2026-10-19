@@ -1611,3 +1611,14 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 .player-stats-summary dt { color: var(--muted); font-size: 10px; font-weight: 750; letter-spacing: .04em; text-align: left; }
 .player-stats-summary dd { margin: 2px 0 0; color: var(--text); font-size: 24px; font-weight: 780; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
 .player-stats-summary small { color: var(--muted); font-size: 10px; line-height: 1.4; }
+
+/* Yellow card accumulation and suspensions. */
+.discipline-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; margin: 2px 4px 0 0; padding: 2px 7px; border-radius: 980px; font-size: 9px; font-weight: 750; line-height: 1.3; white-space: normal; overflow-wrap: anywhere; }
+.discipline-tag::before { content: ""; flex: 0 0 auto; width: 6px; height: 8px; border-radius: 1.5px; background: #f5c400; }
+.discipline-tag.banned { color: #8a1c1c; background: #fde8e8; }
+.discipline-tag.banned::before { background: #d92d20; }
+.discipline-tag.warning { color: #6b4e00; background: #fff4c2; }
+.discipline-tag.info { color: #5b6472; background: #f1f3f6; }
+.starxi-pitch-slot .discipline-tag { margin: 2px auto 0; font-size: 8px; padding: 1px 5px; }
+.discipline-warning { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0; padding: 11px 13px; border: 1px solid #f3d36b; border-radius: 13px; background: #fffaf0; color: #5b4300; font-size: 12px; line-height: 1.45; }
+.discipline-warning strong { display: block; color: #3d2e00; }

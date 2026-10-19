@@ -1,6 +1,7 @@
 import { getStarFormation, getStarXIPlayer, canStarXIPlayerFillSlot, STAR_XI_MAX_SUBSTITUTIONS, resumeCupMatch } from './feature-data';
 import type { GameFeatures } from './feature-data';
 import { advanceInteractive, invalidateInteractive } from './interactive-match';
+import { competitionOfCup, getBannedPlayerIds } from './discipline';
 import { addBroadcastSubstitution } from './match-broadcast';
 // The selectable match tactics were removed: a draft carries only lineup and formation.
 export type MatchDraft={lineup:string[];formation:string};
@@ -10,6 +11,7 @@ export function validateMatchDraft(f:GameFeatures,d:MatchDraft):string {
  const form=getStarFormation(d.formation);if(d.formation!==f.starXI.formationId)return 'Die Formation bleibt während der Partie bestehen; passende Positionen können getauscht werden.';
  if(form.id!==d.formation||d.lineup.length!==11)return 'Aufstellung ungültig.';
  const ids=d.lineup.filter(Boolean);if(new Set(ids).size!==ids.length)return 'Ein Spieler ist mehrfach aufgestellt.';
+ const banned=new Set(getBannedPlayerIds(f,competitionOfCup(c)));if(d.lineup.some(id=>banned.has(id)&&!f.starXI.lineupIds.includes(id)))return 'Ein gesperrter Spieler darf nicht eingewechselt werden.';
  let changes=0;
  for(let i=0;i<11;i++){
   const id=d.lineup[i],old=f.starXI.lineupIds[i];

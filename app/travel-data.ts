@@ -1,3 +1,4 @@
+import { competitionFor, squadBanError } from './discipline';
 import { getSeasonModeNextOpponent, getTournament, getTournamentOpponentSchedule, getStarXISelection, getOpenTransferSquadVacancies, getStarXIRating, getEligibleEventPlayers, TOURNAMENTS, lockMatchSquad } from './feature-data';
 import type { GameFeatures, TournamentId } from './feature-data';
 import { HOME_VENUE, REGION_LABELS, distanceKm, seasonGeography, tournamentVenue, classifyDestination, VENUES, currentVenue } from './travel-geography';
@@ -127,6 +128,7 @@ export function eligibilityError(features:GameFeatures,mode:'season'|'tournament
  if(getOpenTransferSquadVacancies(features).length)return 'Schliesse zuerst die Kaderlücke.';
  if(getStarXISelection(features.starXI.ownedIds,features.starXI.lineupIds).length<11)return 'Vervollständige zuerst die Startelf.';
  if(features.cup.suspendedPlayerIds.some(id=>features.starXI.lineupIds.includes(id)||features.starXI.benchIds.includes(id)))return 'Ersetze zuerst die gesperrten Spieler.';
+ const banned=squadBanError(features,competitionFor(mode,tournamentId));if(banned)return banned;
  if([...features.starXI.lineupIds,...features.starXI.benchIds].some(id=>Number(features.cup.injuredPlayerIds[id])>0))return 'Ersetze zuerst die verletzten Spieler.';
  if(features.squadLock&&[...features.starXI.lineupIds,...features.starXI.benchIds].some(id=>id&&!features.squadLock!.playerIds.includes(id)))return 'Dieser Spieler gehört nicht zum Reisekader.';
  if(mode==='tournament'&&getStarXIRating(features.starXI.ownedIds,features.starXI.lineupIds)<getTournament(tournamentId)!.minimumRating)return 'Die Teamstärke reicht für dieses Turnier noch nicht.';

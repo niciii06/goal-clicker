@@ -8,6 +8,7 @@ import type { GameFeatures, StarXIPlayer } from './feature-data';
 import { CAREER_MILESTONES, getPlayerMilestones, MILESTONE_METRIC_LABELS, emptyPlayerStats, getAlbumGroups, getCareerCard, getPlayerForm } from './career-data';
 import type { AwardWinner, PlayerMatchReport } from './career-data';
 import { leagueForTier } from './season-progression';
+import { getBans, suspensionLabel, yellowCardStatus } from './discipline';
 
 const name = (id: string) => getStarXIPlayer(id)?.name ?? 'Unbekannter Spieler';
 const signed = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}`;
@@ -15,11 +16,23 @@ const nationName = (code: string) => { try { return new Intl.DisplayNames(['de-C
 
 export function CareerPlayerBadge({ features, player, compact = false }: { features: GameFeatures; player: StarXIPlayer; compact?: boolean }) {
   const form = getPlayerForm(features.career, player.id), card = getCareerCard(features.career, player);
-  if (compact) return form.matches || card.milestone ? <span className={`career-pitch-badge ${card.milestone ? 'special' : ''}`} title={`${card.milestone?.label ?? 'Basiskarte'} · ${form.label} · Form ${signed(form.bonus)} OVR`} style={{ '--career-accent': card.milestone?.accent ?? '#edf3fa' } as CSSProperties}>{card.milestone ? '★ ' : ''}{form.matches ? signed(form.bonus) : ''}</span> : null;
+  if (compact) return <>{form.matches || card.milestone ? <span className={`career-pitch-badge ${card.milestone ? 'special' : ''}`} title={`${card.milestone?.label ?? 'Basiskarte'} · ${form.label} · Form ${signed(form.bonus)} OVR`} style={{ '--career-accent': card.milestone?.accent ?? '#edf3fa' } as CSSProperties}>{card.milestone ? '★ ' : ''}{form.matches ? signed(form.bonus) : ''}</span> : null}<DisciplineTags features={features} playerId={player.id} compact /></>;
   return <span className="career-player-badges">
     {card.milestone && <span className="career-special-tag" style={{ '--career-accent': card.milestone.accent } as CSSProperties}>★ {card.milestone.label} · OVR {card.rating}</span>}
     {form.matches > 0 && <span className={`career-form-tag ${form.bonus >= .5 ? 'up' : form.bonus <= -.5 ? 'down' : ''}`}>{form.label} · {signed(form.bonus)}</span>}
+    <DisciplineTags features={features} playerId={player.id} />
   </span>;
+}
+
+/** Suspensions and yellow card warnings, for example "Gesperrt – 1 Spiel (3 Gelbe Karten)" or "2/3 Gelbe Karten". */
+export function DisciplineTags({ features, playerId, compact = false }: { features: GameFeatures; playerId: string; compact?: boolean }) {
+  const bans = getBans(features, playerId), yellows = yellowCardStatus(features, playerId);
+  if (compact) {
+    if (bans.length) return <span className="discipline-tag banned" title={bans.map(suspensionLabel).join(' · ')}>GESPERRT</span>;
+    const warning = yellows.find(y => y.count === y.limit - 1);
+    return warning ? <span className="discipline-tag warning" title={`${warning.count}/${warning.limit} Gelbe Karten · ${warning.label}`}>{warning.count}/{warning.limit}</span> : null;
+  }
+  return <>{bans.map(ban => <span key={ban.id} className="discipline-tag banned">{suspensionLabel(ban)}</span>)}{yellows.map(y => <span key={y.competition} className={`discipline-tag ${y.count === y.limit - 1 ? 'warning' : 'info'}`}>{y.count}/{y.limit} Gelbe Karten · {y.label}</span>)}</>;
 }
 
 function PlayerReportRow({ report, motm }: { report: PlayerMatchReport; motm: boolean }) {

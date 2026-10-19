@@ -1,3 +1,5 @@
+import { competitionOfCup, emptyDiscipline, getBannedPlayerIds, nextCompetition, normalizeDiscipline } from './discipline';
+import type { DisciplineState } from './discipline';
 import type { CareerState } from "./career-data";
 import type { ClubProfile, CoopMission, CupCardEvent, CupGoalEvent, CupInjuryEvent, CupMatchMode, CupMatchPhase, CupPenaltyEvent, CupState, CupStrategyId, CupSubstitutionImpact, EarnedPack, GoalBoostState, IconSeed, MatchChange, MatchHistoryEntry, MissionProgressSource, PenaltyDirection, RandomEvent, RewardPackId, SeasonFixture, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationId, StarPackDefinition, StarPackId, StarPackOpening, StarPackReveal, StarXIEvaluationContext, StarXIPlayer, StarXIState, TournamentCompletionSummary, TournamentDefinition, TournamentGazetteIssue, TournamentId, TransferInsiderEvent, TransferInsiderOutcome, TransferMarketState, TransferSagaState, TransferSquadVacancy } from "./features/types";
 import type { DailyRewardState } from "./daily-reward";
@@ -94,6 +96,8 @@ export type GameFeatures = {
   starPackReveal: StarPackReveal | null;
   /** IDs of executed fragment purchases; guards against double clicks and network retries. */
   purchaseReceipts: string[];
+  /** Yellow card accumulation and suspensions per competition. */
+  discipline: DisciplineState;
   transferSaga: TransferSagaState;
   gazetteIssues: TournamentGazetteIssue[];
   dailyRewards: DailyRewardState;
@@ -2250,6 +2254,7 @@ export function initialGameFeatures(now = Date.now()): GameFeatures {
     randomEvent: null,
     starPackReveal: null,
     purchaseReceipts: [],
+    discipline: emptyDiscipline(),
     transferSaga: { loans: [], vacancies: [], archive: [], latestEvent: null, lastFailedReason: "", nextAt: now + getTransferEventDelay(), deadlineDayStartedAt: 0, deadlineDayEndsAt: 0 },
     gazetteIssues: [],
     dailyRewards: {},
@@ -2583,6 +2588,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     randomEvent,
     starPackReveal,
     purchaseReceipts: Array.isArray(source.purchaseReceipts) ? [...new Set(source.purchaseReceipts.filter((id): id is string => typeof id === "string").map((id) => id.slice(0, 80)))].slice(-PURCHASE_RECEIPT_LIMIT) : [],
+    discipline: normalizeDiscipline(source.discipline),
     transferSaga,
     gazetteIssues,
     dailyRewards: normalizeDailyRewards(source.dailyRewards),
@@ -2744,6 +2750,12 @@ export function getLoanedStarXIPlayerIds(features: GameFeatures) {
 export function getUnavailableStarXIPlayerIds(features: GameFeatures) {
   const injuredIds = Object.entries(features.cup.injuredPlayerIds ?? {}).filter(([, matches]) => Number(matches) > 0).map(([playerId]) => playerId);
   return [...new Set([...features.cup.suspendedPlayerIds, ...injuredIds, ...getLoanedStarXIPlayerIds(features), ...(features.squadLock?features.starXI.ownedIds.filter(id=>!features.squadLock!.playerIds.includes(id)):[])])];
+}
+
+/** Players the automatic best eleven must leave out: unavailable ones plus players banned
+ * after yellow cards for the competition the squad prepares for next. */
+export function getBestXIUnavailablePlayerIds(features: GameFeatures) {
+  return [...new Set([...getUnavailableStarXIPlayerIds(features), ...getBannedPlayerIds(features, nextCompetition(features))])];
 }
 
 export function getOpenTransferSquadVacancies(features: GameFeatures) {
@@ -3020,7 +3032,7 @@ export function matchChangeError(features:GameFeatures,changes:readonly MatchCha
  for(const x of changes){
   const outgoing=features.starXI.lineupIds[x.slot],incoming=getStarXIPlayer(x.playerId);
   if(!Number.isInteger(x.slot)||x.slot<0||x.slot>=11||!outgoing||c.sentOffPlayerIds.includes(outgoing))return 'Ein des Feldes verwiesener Spieler kann nicht ersetzt werden.';
-  if(!incoming||incoming.benchOnly||!features.starXI.benchIds.includes(x.playerId)||c.playerExitedAt[x.playerId]||c.sentOffPlayerIds.includes(x.playerId)||getUnavailableStarXIPlayerIds(features).includes(x.playerId))return 'Dieser Bankspieler ist nicht spielberechtigt.';
+  if(!incoming||incoming.benchOnly||!features.starXI.benchIds.includes(x.playerId)||c.playerExitedAt[x.playerId]||c.sentOffPlayerIds.includes(x.playerId)||getUnavailableStarXIPlayerIds(features).includes(x.playerId)||getBannedPlayerIds(features,competitionOfCup(c)).includes(x.playerId))return 'Dieser Bankspieler ist nicht spielberechtigt.';
   if(!canStarXIPlayerFillSlot(x.playerId,x.slot,features.starXI.formationPositions))return 'Die Position passt nicht.';
  }
  return '';

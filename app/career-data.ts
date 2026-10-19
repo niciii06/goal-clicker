@@ -1,7 +1,8 @@
 import { createInteractiveMatch } from './interactive-match';
 import { goalLabel } from './match-goals';
 import { recordedActionRating } from './match-broadcast';
-import { addHistory, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, STAR_XI_ACTIVE_PLAYERS, SCRAP_PLAYERS } from './feature-data';
+import { addHistory, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, removeStarXIPlayersFromSquad, STAR_XI_ACTIVE_PLAYERS, SCRAP_PLAYERS } from './feature-data';
+import { getBannedPlayerIds, nextCompetition, processMatchDiscipline, suspensionLabel } from './discipline';
 import type { CupState, GameFeatures, SeasonMatchHistoryEntry, StarXIPlayer } from './feature-data';
 
 export type PlayerCareerStats = { appearances: number; minutes: number; goals: number; assists: number; ratingTotal: number; ratedMatches: number; motm: number; subAppearances: number; subRatingTotal: number; subMinutes: number; recent: number[] };
@@ -185,6 +186,12 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
   const c = features.cup, career = features.career;
   if (c.active || !c.matchStartedAt) return features;
   const id = c.careerMatchId || `career-${c.matchStartedAt}-${c.mode}-${c.opponent}`;
+  // Discipline keeps its own receipt list, so it is applied exactly once per match as well.
+  const bans = processMatchDiscipline(features, id, now, { seasonCompleted: Boolean(seasonEntry?.completedSeason) });
+  for (const ban of bans) addHistory(features, { title: `Gelbsperre: ${getStarXIPlayer(ban.playerId)?.name ?? 'Spieler'}`, detail: suspensionLabel(ban), tone: 'negative' });
+  // Like after a red card, a player banned for the next match leaves the matchday squad.
+  const bannedNext = getBannedPlayerIds(features, nextCompetition(features));
+  if (bannedNext.length) features.starXI = removeStarXIPlayersFromSquad(features.starXI, bannedNext);
   if (career.processedMatchIds.includes(id)) return features;
   const minute = c.phase === "extra-time" || c.phase === "penalties" ? 120 : 90;
   const players = Object.keys(c.playerEnteredAt).map(playerId => getMatchRatingBreakdown(c,playerId,minute)).filter((p): p is PlayerMatchReport => Boolean(p));

@@ -5,9 +5,10 @@ import { requestMatchEdit, confirmMatchDraft } from '../../match-commands';
 import type { MatchDraft } from '../../match-commands';
 import { fixtureFor, travelGate, consumeTravel, eligibilityError, settleTravel } from '../../travel-data';
 import { claimAllAlbumRewards, claimAlbumReward, prepareCareerMatch, recordCareerMatch } from "../../career-data";
+import { competitionFor, squadBanError } from "../../discipline";
 import { getDb } from "../../../db";
 import type { RoomRow, RoomUpdate } from "../../../db";
-import { SPECIAL_CARD_PACK, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getTransferBonuses, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
+import { SPECIAL_CARD_PACK, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getTransferBonuses, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
 import type { GameFeatures, PenaltyDirection, StarFormationId, StarPackReveal } from "../../feature-data";
 import { isSupportedMultiplayerProtocol, MULTIPLAYER_UPDATE_MESSAGE } from "../../multiplayer-protocol";
 import { getFormationUnlockLeague, getPackUnlockLeague, getReachedLeague, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked, MAX_CAREER_SEASON } from "../../season-progression";
@@ -887,7 +888,7 @@ export async function POST(request: Request) {
 
     if (action === "star-best-lineup") {
       if (game.features.cup.active) return jsonError("Während eines Pokalspiels kann die Startelf nicht automatisch geändert werden.", 409);
-      game.features.starXI = setBestStarXI(game.features.starXI, getUnavailableStarXIPlayerIds(game.features), { career: game.features.career, cup: game.features.cup });
+      game.features.starXI = setBestStarXI(game.features.starXI, getBestXIUnavailablePlayerIds(game.features), { career: game.features.career, cup: game.features.cup });
       const selectedCount = game.features.starXI.lineupIds.filter(Boolean).length;
       if (!selectedCount) return jsonError("Du hast noch keine passenden Spieler im Kader.", 409);
       addHistory(game.features, { title: "Beste Startelf aufgestellt", detail: `${selectedCount} von ${STAR_XI_SQUAD_SIZE} Positionen mit den stärksten passenden Spielern besetzt.`, tone: "positive" });
@@ -973,6 +974,8 @@ export async function POST(request: Request) {
 
     if (action === "cup-start") {
       if (payload.mode === "season" || typeof payload.tournamentId !== "string") {
+        const leagueBanError = squadBanError(game.features, competitionFor("season", "stadium"));
+        if (leagueBanError) return jsonError(leagueBanError, 409);
         const seasonStartError = startSeasonCupMatch(game, Date.now());
         if (seasonStartError) return jsonError(seasonStartError, 409);
         return persistGameResponse(db, room, game, timestamp, playerId, role);
@@ -995,6 +998,8 @@ export async function POST(request: Request) {
       if (getStarXISelection(game.features.starXI.ownedIds, game.features.starXI.lineupIds).length < STAR_XI_SQUAD_SIZE) return jsonError("Für den Pokal brauchst du 11 passende Spieler in der Startelf.", 409);
       const suspendedOnSquad = game.features.cup.suspendedPlayerIds.some((playerId) => game.features.starXI.lineupIds.includes(playerId) || game.features.starXI.benchIds.includes(playerId));
       if (suspendedOnSquad) return jsonError("Ein Spieler mit Roter Karte muss vor dem Anpfiff ersetzt werden und darf nicht auf der Bank sitzen.", 409);
+      const tournamentBanError = squadBanError(game.features, competitionFor("tournament", tournament.id));
+      if (tournamentBanError) return jsonError(tournamentBanError, 409);
       const tournamentUnlockLeague = getTournamentUnlockLeague(tournament.id);
       if (!isLeagueContentUnlocked(tournamentUnlockLeague, reachedLeagueOf(game), testMode)) return jsonError(`${tournament.label} wird ab Liga ${tournamentUnlockLeague} freigeschaltet.`, 409);
       const starRating = getStarXIRating(game.features.starXI.ownedIds, game.features.starXI.lineupIds);
