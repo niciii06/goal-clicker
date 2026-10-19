@@ -188,7 +188,7 @@ export function shouldTriggerPackTroll(player: StarXIPlayer, random: () => numbe
 
 const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
   { id: "star-pfuschi", name: "Pfuschi", isCustom: true, benchOnly: true,
-    position: null, positions: [], rating: 1, price: 1000, accent: "#64748b",
+    position: null, positions: [], rating: 67, price: 1000, accent: "#64748b",
     cardType: "legendary", symbol: "☠️", packWeight: .04, originalAttributes: specialAttributes(1) },
   { id: "star-di-certo", name: "Di Certo", isCustom: true, position: "ZM",
     positions: ["ZM", "ZDM"], rating: 100, price: 5000000000, accent: "#c69214",

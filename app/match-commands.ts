@@ -1,13 +1,14 @@
-import { getStarFormation, getStarXIPlayer, canStarXIPlayerFillSlot, STAR_XI_MAX_SUBSTITUTIONS, CUP_STRATEGIES, resumeCupMatch } from './feature-data';
-import type { GameFeatures, CupStrategyId } from './feature-data';
+import { getStarFormation, getStarXIPlayer, canStarXIPlayerFillSlot, STAR_XI_MAX_SUBSTITUTIONS, resumeCupMatch } from './feature-data';
+import type { GameFeatures } from './feature-data';
 import { advanceInteractive, invalidateInteractive } from './interactive-match';
 import { addBroadcastSubstitution } from './match-broadcast';
-export type MatchDraft={lineup:string[];formation:string;strategy:CupStrategyId};
-export function draftMatch(f:GameFeatures):MatchDraft{return {lineup:[...f.starXI.lineupIds],formation:f.starXI.formationId,strategy:f.cup.strategyId};}
+// The selectable match tactics were removed: a draft carries only lineup and formation.
+export type MatchDraft={lineup:string[];formation:string};
+export function draftMatch(f:GameFeatures):MatchDraft{return {lineup:[...f.starXI.lineupIds],formation:f.starXI.formationId};}
 export function validateMatchDraft(f:GameFeatures,d:MatchDraft):string {
  const c=f.cup;if(!c.active||c.phase==='penalties')return 'Gerade sind keine Änderungen möglich.';
  const form=getStarFormation(d.formation);if(d.formation!==f.starXI.formationId)return 'Die Formation bleibt während der Partie bestehen; passende Positionen können getauscht werden.';
- if(form.id!==d.formation||d.lineup.length!==11||!CUP_STRATEGIES.some(s=>s.id===d.strategy))return 'Aufstellung oder Taktik ungültig.';
+ if(form.id!==d.formation||d.lineup.length!==11)return 'Aufstellung ungültig.';
  const ids=d.lineup.filter(Boolean);if(new Set(ids).size!==ids.length)return 'Ein Spieler ist mehrfach aufgestellt.';
  let changes=0;
  for(let i=0;i<11;i++){
@@ -37,7 +38,7 @@ export function confirmMatchDraft(f:GameFeatures,d:MatchDraft,now:number):{featu
  incoming.forEach((id,i)=>{const out=outgoing[i];c.broadcast=addBroadcastSubstitution(c,out,id,minute);c.playerExitedAt[out]=minute;c.playerEnteredAt[id]=minute;c.allTimeAppearances[id]=(c.allTimeAppearances[id]??0)+1;});
  next.starXI.lineupIds=[...d.lineup];next.starXI.formationId=form.id;next.starXI.formationPositions=form.slots.map(s=>s.position);
  next.starXI.benchIds=next.starXI.benchIds.map(id=>{const index=incoming.indexOf(id);return index>=0?outgoing[index]:id;});
- c.substitutionsUsed+=incoming.length;c.strategyId=d.strategy;c.lastInjury=null;
+ c.substitutionsUsed+=incoming.length;c.lastInjury=null;
  d.lineup.forEach((id,i)=>{c.playerMatchPositions[id]=form.slots[i].position;if(c.broadcast)c.broadcast.slots[id]=i;});
  if(c.broadcast)c.broadcast.clubFormation=form.id;
  if(c.simulation){

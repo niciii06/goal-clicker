@@ -37,15 +37,15 @@ export function createInteractiveMatch(cup:CupState,ids:readonly string[],format
 function choose<T>(c:SimCheckpoint,items:T[],weight:(p:T)=>number){const weights=items.map(p=>Math.max(.01,weight(p)));let n=random(c)*weights.reduce((a,b)=>a+b,0);return items[weights.findIndex(w=>(n-=w)<=0)]??items[items.length-1];}
 function movePlayers(c:SimCheckpoint,duration:number,strategy:CupStrategyId,opponentStrategy:CupStrategyId,actor:SimPlayer,target?:SimPlayer) {
  const old=c.players.map(p=>({...p}));
- for(const p of c.players){if(!p.active)continue;const right=(p.side==='club'?c.direction:-c.direction),own=p.side===c.possession,tactic=p.side==='club'?strategy:opponentStrategy;
-  let x=p.anchor.x+(own?right*(tactic==='angriff'?12:7):right*-7)+(c.ball.x-52.5)*.27,y=p.anchor.y+(c.ball.y-34)*.24;
+ for(const p of c.players){if(!p.active)continue;const right=(p.side==='club'?c.direction:-c.direction),own=p.side===c.possession;
+  let x=p.anchor.x+(own?right*8:right*-7)+(c.ball.x-52.5)*.27,y=p.anchor.y+(c.ball.y-34)*.24;
   if(p.role==='TW'){x=right>0?3+clamp(c.ball.x/25,0,3):102-clamp((105-c.ball.x)/25,0,3);y=34+(c.ball.y-34)*.12;}
   else if(p.id===actor.id||p.id===target?.id){x=p.x;y=p.y;}
   else if(!own&&dist(p,c.ball)<16){x=(x+c.ball.x)/2;y=(y+c.ball.y)/2;}
   for(const q of old){if(!q.active||q.id===p.id)continue;const d=dist(p,q);if(d>0&&d<4){x+=(p.x-q.x)/d*(4-d);y+=(p.y-q.y)/d*(4-d);}}
   const d=Math.hypot(x-p.x,y-p.y),step=Math.min(d,duration*(.17+p.pace*.002)*(p.role==='TW'?.5:1));
   if(d){p.x=clamp(p.x+(x-p.x)/d*step,1.5,103.5);p.y=clamp(p.y+(y-p.y)/d*step,1.5,66.5);}
-  p.fitness=clamp(p.fitness-duration/60*(p.role==='TW'?.13:tactic==='angriff'?.52:.39)*clamp(1+(70-p.stamina)/200,.85,1.35),15,100);
+  p.fitness=clamp(p.fitness-duration/60*(p.role==='TW'?.13:.42)*clamp(1+(70-p.stamina)/200,.85,1.35),15,100);
  }
 }
 function prepare(sim:InteractiveMatch,start:SimCheckpoint):SimAction {
@@ -54,7 +54,6 @@ function prepare(sim:InteractiveMatch,start:SimCheckpoint):SimAction {
  if(!actor)throw new Error('Kein aktiver Ballbesitzer');
  c.owner=actor.id;c.possession=actor.side;
  const right=(actor.side==='club'?c.direction:-c.direction),progress=right>0?actor.x:105-actor.x,goal={x:right>0?105:0,y:34};
- const tactic=actor.side==='club'?sim.strategy:sim.opponentStrategy;
  const rivals=active.filter(p=>p.side!==actor.side),mates=active.filter(p=>p.side===actor.side&&p.id!==actor.id);
  const pressure=rivals.reduce((n,p)=>n+Math.max(0,1-dist(p,actor)/14),0);
  let kind:SimAction['kind']='pass',outcome:SimAction['outcome']='success',target:SimPlayer|undefined,to=point(actor),assist:string|undefined,celebration=false;
@@ -67,7 +66,7 @@ function prepare(sim:InteractiveMatch,start:SimCheckpoint):SimAction {
   else {target=mates.filter(p=>p.role!=='TW').sort((a,b)=>dist(a,actor)-dist(b,actor))[0];to=target?point(target):point(actor);}
   c.restart=false;
  }
- else if(actor.role!=='TW'&&progress>68&&roll<clamp((progress-65)/60+(tactic==='angriff'?.08:0)+c.chain*.009,.06,.6)) {
+ else if(actor.role!=='TW'&&progress>68&&roll<clamp((progress-65)/60+.03+c.chain*.009,.06,.6)) {
   kind='shot';duration=12;const keeper=rivals.find(p=>p.role==='TW');
   const distance=dist(actor,goal),angle=clamp(1-Math.abs(actor.y-34)/35,.15,1),quality=clamp((.52-distance*.009)*angle*(.5+actor.shooting/100)*(1-pressure*.12)*(.75+actor.fitness/400)*(1+(actor.rating-(keeper?.keeping??70))*.009),.018,.55);
   const shot=random(c);outcome=shot<quality?'goal':shot<quality+.38?'save':shot<quality+.62?'blocked':'wide';
@@ -77,7 +76,7 @@ function prepare(sim:InteractiveMatch,start:SimCheckpoint):SimAction {
  } else if(actor.role!=='TW'&&pressure>.5&&roll<.13){kind='tackle';outcome='lost';target=choose(c,rivals,p=>p.defending/(3+dist(p,actor)));to=point(actor);}
  else if(actor.role!=='TW'&&roll<.35){kind='carry';to={x:clamp(actor.x+right*(5+random(c)*10),3,102),y:clamp(actor.y+(random(c)-.5)*12,3,65)};outcome=random(c)<clamp(.04+pressure*.09+(70-actor.control)*.002,.015,.3)?'lost':'success';if(outcome==='lost')target=choose(c,rivals,p=>p.defending/(4+dist(p,to)));}
  else {
-  target=choose(c,mates,p=>{const forward=(p.x-actor.x)*right;const d=dist(p,actor),near=rivals.reduce((n,q)=>n+Math.max(0,1-dist(p,q)/12),0);return (p.role==='TW'?.12:1)*Math.exp(clamp(forward*(tactic==='konter'?.055:tactic==='angriff'?.045:.018),-2,2))*(1+Math.abs(p.y-actor.y)*.015)/(1+d*.018+near);});
+  target=choose(c,mates,p=>{const forward=(p.x-actor.x)*right;const d=dist(p,actor),near=rivals.reduce((n,q)=>n+Math.max(0,1-dist(p,q)/12),0);return (p.role==='TW'?.12:1)*Math.exp(clamp(forward*.035,-2,2))*(1+Math.abs(p.y-actor.y)*.015)/(1+d*.018+near);});
   if(!target){kind='carry';to={x:clamp(actor.x+right*8,3,102),y:actor.y};}else{
    to=point(target);if(progress>72&&Math.abs(actor.y-34)>15&&(target.x-actor.x)*right>-8){kind='cross';}
    const defensiveSkill=rivals.reduce((n,p)=>n+p.defending,0)/Math.max(1,rivals.length);

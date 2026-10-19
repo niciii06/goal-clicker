@@ -87,6 +87,6 @@ test('map, controls, event area, arrival and manual-start button render in Germa
  const stats=renderToStaticMarkup(createElement(TravelStatsPanel,{travel,now:travel.journey.endsAt}));assert.match(stats,/Auswärtsreisen/);
 });
 test('flight geometry follows great circle and ends at the correct stadium',()=>{
- const route=routePoints(HOME_VENUE,VENUES.tokyo,true);assert.equal(route.length,65);assert.ok(distanceKm(route[0],HOME_VENUE)<.0001);assert.ok(distanceKm(route.at(-1)!,VENUES.tokyo)<.0001);
+ const route=routePoints(HOME_VENUE,VENUES.tokyo,true);assert.ok(route.length>=65);assert.ok(route.slice(1).every((p,i)=>distanceKm(route[i],p)<=45));assert.ok(distanceKm(route[0],HOME_VENUE)<.0001);assert.ok(distanceKm(route.at(-1)!,VENUES.tokyo)<.0001);
  assert.ok(route.every(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)));assert.equal(REGION_LABELS.length,15);
 });

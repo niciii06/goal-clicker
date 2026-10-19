@@ -176,7 +176,7 @@ test('a live interactive match draws the 2D pitch with stands and the match tabs
     await page.waitForTimeout(1500);
     // A blank canvas compresses to a few hundred bytes; pitch, players and stands need far more.
     assert.ok((await canvas.screenshot()).length > 15000, 'canvas looks empty');
-    for (const tab of ['Live Ticker', 'Statistik', '2D', 'Wechsel / Taktik']) {
+    for (const tab of ['Live Ticker', 'Statistik', '2D', 'Wechsel']) {
       await page.getByRole('button', { name: tab, exact: true }).first().click();
       await page.waitForTimeout(500);
       assert.deepEqual((await layoutProblems(page)).filter((p) => !p.startsWith('overlap')), [], `${viewport.name} / ${tab}`);

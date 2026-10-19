@@ -53,8 +53,8 @@ test('atomic multiple substitutions, cancellation and tactical invalidation',()=
  f=requestMatchEdit(f,f.cup.matchStartedAt+14000);f.cup=advanceInteractive(f.cup,f.cup.matchStartedAt+18000);assert.ok(f.cup.matchPaused);assert.equal(f.cup.simulation!.status,'editing');
  const d=draftMatch(f),out:string[]=[];
  for(let slot=0;slot<11&&out.length<2;slot++){const incoming=f.starXI.benchIds.find(id=>id&&!d.lineup.includes(id)&&getStarXIPlayer(id)?.positions.includes(f.starXI.formationPositions[slot]));if(incoming){out.push(d.lineup[slot]);d.lineup[slot]=incoming;}}
- assert.equal(out.length,2);d.strategy='angriff';const bad={...d,lineup:[...d.lineup]};bad.lineup[1]=bad.lineup[0];const snapshot=JSON.stringify(f);assert.ok(confirmMatchDraft(f,bad,f.cup.lastTickAt+9000).error);assert.equal(JSON.stringify(f),snapshot);
- const result=confirmMatchDraft(f,d,f.cup.lastTickAt+9000);assert.equal(result.error,'');assert.equal(result.features.cup.substitutionsUsed,2);assert.equal(result.features.cup.strategyId,'angriff');assert.ok(result.features.cup.simulation!.generation>0);
+ assert.equal(out.length,2);assert.equal('strategy' in d,false);const bad={...d,lineup:[...d.lineup]};bad.lineup[1]=bad.lineup[0];const snapshot=JSON.stringify(f);assert.ok(confirmMatchDraft(f,bad,f.cup.lastTickAt+9000).error);assert.equal(JSON.stringify(f),snapshot);
+ const result=confirmMatchDraft(f,d,f.cup.lastTickAt+9000);assert.equal(result.error,'');assert.equal(result.features.cup.substitutionsUsed,2);assert.equal(result.features.cup.strategyId,f.cup.strategyId);assert.ok(result.features.cup.simulation!.generation>0);
  f=result.features;const minute=Math.ceil(f.cup.simulation!.time/60);complete(f);for(const a of f.cup.simulation!.recent)assert.ok(!out.includes(a.actor));for(const e of f.cup.matchEvents.filter(e=>e.minute>minute))assert.ok(!out.includes(e.scorerId!));assert.equal(f.cup.broadcast!.events.filter(e=>e.kind==='substitution').length,2);
 });
 test('completion/retries and career finalization are idempotent',()=>{
@@ -104,7 +104,7 @@ test('committed action history survives normalization for continuous delayed pla
 });
 test('live match controls contain no quick simulation control',()=>{
  const f=fixture(902),html=renderToStaticMarkup(createElement(LiveMatchViewer,{features:f,now:f.cup.matchStartedAt,clubName:'Test',clubColor:'#17875f'}));
- assert.ok(!html.includes('Schnell simulieren'));assert.ok(html.includes('Live Ticker'));assert.ok(html.includes('Wechsel / Taktik'));
+ assert.ok(!html.includes('Schnell simulieren'));assert.ok(html.includes('Live Ticker'));assert.ok(html.includes('>Wechsel<'));assert.ok(!html.includes('Taktik'));assert.ok(!html.includes('Offensivpressing'));
  const legacy=JSON.parse(JSON.stringify(f));legacy.cup.simulation.quick=true;assert.equal('quick' in normalizeGameFeatures(legacy).cup.simulation!,false);
 });
 

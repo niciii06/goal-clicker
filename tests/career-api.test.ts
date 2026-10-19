@@ -110,7 +110,7 @@ test('API interactive edits validate atomically and normal completion is persist
  assert.equal((await action('cup-tick')).status,200);current=JSON.parse(row.sharedFeaturesJson);assert.ok(current.cup.matchPaused);
  const d=draftMatch(current),bad={...d,lineup:[...d.lineup]};bad.lineup[1]=bad.lineup[0];assert.equal((await action('cup-batch',{draft:bad})).status,409);assert.equal(JSON.parse(row.sharedFeaturesJson).cup.substitutionsUsed,0);
  let count=0;for(let slot=0;slot<11&&count<2;slot++){const id=current.starXI.benchIds.find(id=>id&&!d.lineup.includes(id)&&getStarXIPlayer(id)?.positions.includes(current.starXI.formationPositions[slot]));if(id){d.lineup[slot]=id;count++;}}
- d.strategy='angriff';assert.equal(count,2);const confirmed=await action('cup-batch',{draft:d});assert.equal(confirmed.status,200,JSON.stringify(confirmed.data));assert.equal(confirmed.data.room.game.features.cup.substitutionsUsed,2);assert.equal(confirmed.data.room.game.features.cup.strategyId,'angriff');
+ (d as typeof d&{strategy?:string}).strategy='angriff';assert.equal(count,2);const confirmed=await action('cup-batch',{draft:d});assert.equal(confirmed.status,200,JSON.stringify(confirmed.data));assert.equal(confirmed.data.room.game.features.cup.substitutionsUsed,2);assert.equal(confirmed.data.room.game.features.cup.strategyId,current.cup.strategyId,'a legacy strategy field is ignored');
  assert.equal((await action('star-lineup',{lineupIndex:0,starPlayerId:d.lineup[0]})).status,409);
  const removed=await action('cup-quick');assert.notEqual(removed.status,200);assert.ok(JSON.parse(row.sharedFeaturesJson).cup.active);
  let finished=await action('cup-tick');

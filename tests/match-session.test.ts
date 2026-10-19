@@ -15,7 +15,7 @@ test('every new cup fixture is away; only highest cup final uses neutral Wembley
  f.seasonMode.matchday=0;assert.equal(fixtureFor(f,'season').away,false);
 });
 test('Pfuschi is positionless, bench-only, excluded from ratings/automatic XI and cannot substitute',()=>{
- const f=ready(),p=getStarXIPlayer('star-pfuschi')!;assert.equal(p.position,null);assert.deepEqual(getStarXIPositions(p),[]);assert.equal(p.rating,1);
+ const f=ready(),p=getStarXIPlayer('star-pfuschi')!;assert.equal(p.position,null);assert.deepEqual(getStarXIPositions(p),[]);assert.equal(p.rating,67);
  assert.ok(Object.values(p.originalAttributes!.stats).every(s=>s.value===1));
  for(let i=0;i<11;i++)assert.equal(canStarXIPlayerFillSlot(p.id,i),false);
  f.starXI=setStarXIBenchPlayer(f.starXI,0,p.id);assert.equal(f.starXI.benchIds[0],p.id);

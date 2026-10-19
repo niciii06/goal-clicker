@@ -133,10 +133,12 @@ export function distanceKm(a: GeoPoint, b: GeoPoint) {
 }
 export function routePoints(a: GeoPoint, b: GeoPoint, flight: boolean): GeoPoint[] {
  if (!flight) return [a,b];
- const rad=Math.PI/180, d=distanceKm(a,b)/6371;
+ const rad=Math.PI/180, km=distanceKm(a,b), d=km/6371;
  if (d<1e-6) return [a,b];
- return Array.from({length:65},(_,i)=>{
-  const t=i/64, x=Math.sin((1-t)*d)/Math.sin(d), y=Math.sin(t*d)/Math.sin(d);
+ // Geodesic great circle with one waypoint at least every ~40 km, so long flights curve smoothly.
+ const steps=Math.max(64,Math.min(512,Math.ceil(km/40)));
+ return Array.from({length:steps+1},(_,i)=>{
+  const t=i/steps, x=Math.sin((1-t)*d)/Math.sin(d), y=Math.sin(t*d)/Math.sin(d);
   const vx=x*Math.cos(a.lat*rad)*Math.cos(a.lon*rad)+y*Math.cos(b.lat*rad)*Math.cos(b.lon*rad);
   const vy=x*Math.cos(a.lat*rad)*Math.sin(a.lon*rad)+y*Math.cos(b.lat*rad)*Math.sin(b.lon*rad);
   const vz=x*Math.sin(a.lat*rad)+y*Math.sin(b.lat*rad);

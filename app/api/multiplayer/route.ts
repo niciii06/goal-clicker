@@ -843,7 +843,7 @@ export async function POST(request: Request) {
 
     if (action === "star-lineup") {
       if(game.features.squadLock && !game.features.squadLock.playerIds.includes(String(payload.starPlayerId))) return jsonError('Dieser Spieler gehört nicht zum Reisekader.',409);
-      if(game.features.cup.active&&game.features.cup.simulation)return jsonError('Nutze Wechsel / Taktik in der Matchansicht.',409);
+      if(game.features.cup.active&&game.features.cup.simulation)return jsonError('Nutze Wechsel in der Matchansicht.',409);
       const lineupIndex = Number(payload.lineupIndex);
       const starPlayerId = typeof payload.starPlayerId === "string" ? payload.starPlayerId : "";
       const starPlayer = getStarXIPlayer(starPlayerId);
@@ -1010,8 +1010,9 @@ export async function POST(request: Request) {
     }
     if(action==='cup-batch'){
       const d=payload.draft as MatchDraft;
-      if(!d||!Array.isArray(d.lineup)||!d.lineup.every(id=>typeof id==='string')||typeof d.formation!=='string'||typeof d.strategy!=='string')return jsonError('Aufstellung ungültig.',409);
-      const result=confirmMatchDraft(game.features,d,Date.now());if(result.error)return jsonError(result.error,409);
+      if(!d||!Array.isArray(d.lineup)||!d.lineup.every(id=>typeof id==='string')||typeof d.formation!=='string')return jsonError('Aufstellung ungültig.',409);
+      // Older clients may still send a strategy field; it no longer affects the match.
+      const result=confirmMatchDraft(game.features,{lineup:d.lineup,formation:d.formation},Date.now());if(result.error)return jsonError(result.error,409);
       game.features=result.features;return persistGameResponse(db,room,game,timestamp,playerId,role);
     }
     if (action === "cup-play") return jsonError('Die auswählbaren Taktiken wurden entfernt.',410);
