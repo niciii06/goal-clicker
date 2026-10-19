@@ -13,13 +13,13 @@ Site project: `appgprj_6a70b280862c8191b97f48b9b21cefb9`.
 - All newly generated player fixtures in the three Cups are away fixtures and require travel.
 - Only the final of the highest-ranked Cup uses neutral Wembley (51.5560, -0.2795).
 - Existing league scheduling and active/historical fixture snapshots are preserved.
-- Pfuschi (`star-pfuschi`): rating 1, all existing attributes 1, no position; bench eligible only. Excluded from starting XI, automatic pickers, substitutions, active actors and match rating.
+- Pfuschi (`star-pfuschi`): rating 67 (since the gameplay update of 2026-10-19), all existing attributes 1, no position; bench eligible only. Excluded from starting XI, automatic pickers, substitutions, active actors and match rating.
 - Di Certo (`star-di-certo`): rating 100, primary ZM, secondary ZDM; uses the normal active-player system and existing special-card draw.
 - Opponent red cards persist by roster ID. Remaining actors rebalance into defensive lines; emergency goalkeeper coverage and further dismissals are supported. No replacement actor is added.
 - Goal overlay: exactly 4000 ms after the visual shot lead; clock/engine freeze and automatic kickoff by the conceding team.
 - Halftime: exactly 10000 ms at minute 45; automatic restart, with substitutions available.
 - Maximum five substitutions across three in-play windows; a batch consumes one window. Halftime uses no in-play window. Ineligible players, re-entry and replacement of a dismissed player are rejected.
-- The three manual tactical selectors and their strength/fitness modifiers are removed. Legacy `strategyId` values still normalize safely; obsolete `cup-play` actions return HTTP 410.
+- The three manual tactical selectors are removed from the live editor and the match engine; teams always play at their full ability. Legacy `strategyId` values still normalize safely; obsolete `cup-play` actions return HTTP 410.
 
 ## Travel and timers
 
@@ -50,3 +50,15 @@ This task updates GitHub release code and repository-based Sites knowledge. It d
 Before a later application deployment, reconcile both source histories and validate the integrated result; updating GitHub main does not automatically publish a Sites version.
 
 Real time interactive browser verification was bypassed due to the headless CLI environment; verification is established via the 480 generated canvas frames and DOM component test suites.
+
+## Gameplay, travel and stadium update (2026-10-19)
+
+Details: [docs/gameplay-travel-stadium-update.md](gameplay-travel-stadium-update.md).
+
+- Match engine (`app/match-ai.ts`, `app/interactive-match.ts`): role based team shape, supporting runs, presser and cover, goal side marking; carriers weigh shots (geometric xG), passes (lanes, receiver pressure, offside) and dribbles; set pieces, fouls, cards to the offender, second yellow is red. Ball and players are continuous between plays.
+- Half time: opaque card over the whole stadium canvas; kick-off positions are prepared underneath.
+- Stadiums (`app/stadium-profiles.ts`): six categories from the fixture venue, known capacities where published, estimates marked as such; home ground grows with the league.
+- Discipline (`app/discipline.ts`): 3 league yellows or 2 yellows per tournament run give a one match ban in that competition.
+- Unlocks: former Saison N requirements are Liga 16-N, evaluated from the best league reached (permanent).
+- Spezialkarten-Pack in the pack shop: 25'000 fragments, receipts prevent double purchases.
+- Travel map: zoom never ends Follow, Follow keeps the zoom, only panning ends following; dense great circle flights with take-off and landing profile. The accelerated travel time is unchanged (real time / 60, no three minute ceiling exists).

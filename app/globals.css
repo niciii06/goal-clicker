@@ -1589,7 +1589,7 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 .club-passport .club-passport-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0 4px; font-size: 11px; color: var(--muted); }
 .club-passport .club-passport-stats span { padding: 10px; border: 1px solid var(--line-soft); border-radius: 13px; background: var(--surface-soft); min-width: 0; }
 .club-passport .club-passport-stats b { display: block; color: #0071e3; font-size: 20px; font-weight: 760; letter-spacing: -.05em; }
-@media (max-width: 520px) { .club-passport .club-passport-stats { grid-template-columns: 1fr; } }
+@media (max-width: 300px) { .club-passport .club-passport-stats { grid-template-columns: 1fr; } }
 .club-passport > small { display: block; margin-top: 6px; color: #526178; font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
 
 /* Special card pack: paid with fragments, styled like the other packs. */
@@ -1619,14 +1619,14 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 .discipline-tag.banned::before { background: #d92d20; }
 .discipline-tag.warning { color: #6b4e00; background: #fff4c2; }
 .discipline-tag.info { color: #5b6472; background: #f1f3f6; }
-.starxi-pitch-slot .discipline-tag { margin: 2px auto 0; font-size: 8px; padding: 1px 5px; }
+.starxi-pitch-slot .discipline-tag { margin: 2px auto 0; font-size: 8px; padding: 1px 5px; white-space: nowrap; }
 .discipline-warning { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0; padding: 11px 13px; border: 1px solid #f3d36b; border-radius: 13px; background: #fffaf0; color: #5b4300; font-size: 12px; line-height: 1.45; }
 .discipline-warning strong { display: block; color: #3d2e00; }
 
 /* Half time: an opaque card over the whole stadium canvas while the teams change ends. */
-.gc-halftime-cover { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; padding: 12px; overflow: auto; background: radial-gradient(circle at 50% 30%, #17362a 0%, #0b1c15 70%); color: #fff; animation: gc-halftime-in .32s ease-out both; }
+.gc-halftime-cover { position: absolute; inset: 0; z-index: 20; display: flex; padding: 12px; overflow: auto; background: radial-gradient(circle at 50% 30%, #17362a 0%, #0b1c15 70%); color: #fff; animation: gc-halftime-in .32s ease-out both; }
 .gc-halftime-cover.leaving { animation: gc-halftime-out .45s ease-in both; pointer-events: none; }
-.gc-halftime-card { width: min(520px, 100%); display: grid; gap: 10px; justify-items: center; text-align: center; }
+.gc-halftime-card { width: min(520px, 100%); margin: auto; display: grid; gap: 10px; justify-items: center; text-align: center; }
 .gc-halftime-kicker { padding: 5px 12px; border-radius: 980px; background: rgba(255,255,255,.12); font-size: 11px; font-weight: 850; letter-spacing: .14em; }
 .gc-halftime-score { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 12px; width: 100%; }
 .gc-halftime-score strong { font-size: clamp(13px, 2.4vw, 18px); font-weight: 760; overflow-wrap: anywhere; }
@@ -1642,7 +1642,7 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 .gc-halftime-actions button.primary { border-color: #fff; background: #fff; color: #10301f; }
 @keyframes gc-halftime-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes gc-halftime-out { from { opacity: 1; } to { opacity: 0; } }
-@media (max-width: 600px) { .gc-halftime-cover { padding: 8px; } .gc-halftime-card { gap: 6px; } .gc-halftime-cover .gc-match-statistics { font-size: 9.5px; } .gc-halftime-cover .gc-match-statistics tr:nth-child(n+5) { display: none; } }
+@media (max-width: 600px) { .gc-halftime-cover { padding: 8px; } .gc-halftime-card { gap: 6px; } .gc-halftime-cover .gc-match-statistics, .gc-halftime-card p { display: none; } .gc-halftime-score b { font-size: 34px; } }
 @media (prefers-reduced-motion: reduce) { .gc-halftime-cover, .gc-halftime-cover.leaving { animation: none; } }
 /* Matches saved before the interactive engine: their half time card covers the whole stadium as well. */
 .gc-timed-overlay.halftime { inset: 0; border-radius: 0; border-width: 0; background: #0b1c15; z-index: 20; }

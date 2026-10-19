@@ -28,7 +28,7 @@ export function CareerPlayerBadge({ features, player, compact = false }: { featu
 export function DisciplineTags({ features, playerId, compact = false }: { features: GameFeatures; playerId: string; compact?: boolean }) {
   const bans = getBans(features, playerId), yellows = yellowCardStatus(features, playerId);
   if (compact) {
-    if (bans.length) return <span className="discipline-tag banned" title={bans.map(suspensionLabel).join(' · ')}>GESPERRT</span>;
+    if (bans.length) return <span className="discipline-tag banned" title={bans.map(suspensionLabel).join(' · ')}>SPERRE</span>;
     const warning = yellows.find(y => y.count === y.limit - 1);
     return warning ? <span className="discipline-tag warning" title={`${warning.count}/${warning.limit} Gelbe Karten · ${warning.label}`}>{warning.count}/{warning.limit}</span> : null;
   }
