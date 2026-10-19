@@ -1591,3 +1591,23 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 .club-passport .club-passport-stats b { display: block; color: #0071e3; font-size: 20px; font-weight: 760; letter-spacing: -.05em; }
 @media (max-width: 520px) { .club-passport .club-passport-stats { grid-template-columns: 1fr; } }
 .club-passport > small { display: block; margin-top: 6px; color: #526178; font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
+
+/* Special card pack: paid with fragments, styled like the other packs. */
+.star-pack-card.special-card-pack { border-top-color: #b8862b; background: linear-gradient(160deg, #fffaf0, #fff 62%); }
+.star-pack-card.special-card-pack .star-pack-icon { color: #3a2b04; background: linear-gradient(135deg, #f6d77c, #d6a33a); }
+.star-pack-card.special-card-pack .star-pack-price { color: #6b4c05; background: #fff1c7; }
+.special-pack-balance { display: block; margin-top: 9px; color: var(--muted); font-size: 9.5px; line-height: 1.4; }
+.special-pack-balance b { color: var(--text); }
+
+/* Player statistics next to the milestones. */
+.player-stats-summary { margin: 4px 0 12px; padding: 12px; border: 1px solid var(--line-soft); border-radius: 14px; background: #fff; }
+.player-stats-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.player-stats-heading strong { color: var(--text); font-size: 13px; font-weight: 760; }
+.player-stats-heading div { display: flex; gap: 4px; }
+.player-stats-heading button { min-height: 32px; padding: 5px 10px; border: 1px solid var(--line-soft); border-radius: 980px; background: var(--surface-soft); color: var(--text); font-size: 11px; font-weight: 650; cursor: pointer; }
+.player-stats-heading button[aria-pressed="true"] { border-color: #0071e3; background: #0071e3; color: #fff; }
+.player-stats-summary dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 10px 0 6px; }
+.player-stats-summary dl div { min-width: 0; padding: 9px 10px; border-radius: 12px; background: var(--surface-soft); text-align: right; }
+.player-stats-summary dt { color: var(--muted); font-size: 10px; font-weight: 750; letter-spacing: .04em; text-align: left; }
+.player-stats-summary dd { margin: 2px 0 0; color: var(--text); font-size: 24px; font-weight: 780; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
+.player-stats-summary small { color: var(--muted); font-size: 10px; line-height: 1.4; }

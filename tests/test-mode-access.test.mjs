@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { isSeasonContentUnlocked } from "../app/season-progression.ts";
+import { getReachedLeague, isLeagueContentUnlocked } from "../app/season-progression.ts";
 
 test("AZB bypasses season locks without changing normal progression", () => {
-  assert.equal(isSeasonContentUnlocked(20, 0, true), true);
-  assert.equal(isSeasonContentUnlocked(20, 0, false), false);
-  assert.equal(isSeasonContentUnlocked(1, 0, false), true);
+  // Liga 1 is the top league; a fresh save starts in Liga 15.
+  assert.equal(isLeagueContentUnlocked(1, getReachedLeague(0), true), true);
+  assert.equal(isLeagueContentUnlocked(1, getReachedLeague(0), false), false);
+  assert.equal(isLeagueContentUnlocked(15, getReachedLeague(0), false), true);
 });
 
 test("AZB upgrade purchases bypass overflowed prices in client and multiplayer", async () => {
@@ -36,12 +37,13 @@ test("client and multiplayer server apply AZB to every season gated category", a
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(pageSource, /isSeasonContentUnlocked\(unlockSeason, displayGame\.seasons, hasFullTestAccess\)/);
-  assert.match(pageSource, /isSeasonContentUnlocked\(getFormationUnlockSeason\(formation\.id\), displayGame\.seasons, hasFullTestAccess\)/);
+  assert.match(pageSource, /isLeagueContentUnlocked\(unlockLeague, reachedLeague, hasFullTestAccess\)/);
+  assert.match(pageSource, /isLeagueContentUnlocked\(getFormationUnlockLeague\(formation\.id\), reachedLeague, hasFullTestAccess\)/);
+  assert.doesNotMatch(pageSource, /isSeasonContentUnlocked|Ab Saison|in Saison \$\{unlock/);
 
-  for (const unlockVariable of ["upgradeUnlockSeason", "formationUnlockSeason", "packUnlockSeason", "tournamentUnlockSeason"]) {
-    const gameVariable = unlockVariable === "upgradeUnlockSeason" ? "(?:game|purchaseGame)" : "game";
-    assert.match(apiSource, new RegExp(`isSeasonContentUnlocked\\(${unlockVariable}, ${gameVariable}\\.seasons, testMode\\)`));
+  for (const unlockVariable of ["upgradeUnlockLeague", "formationUnlockLeague", "packUnlockLeague", "tournamentUnlockLeague"]) {
+    const gameVariable = unlockVariable === "upgradeUnlockLeague" ? "(?:game|purchaseGame)" : "game";
+    assert.match(apiSource, new RegExp(`isLeagueContentUnlocked\\(${unlockVariable}, reachedLeagueOf\\(${gameVariable}\\), testMode\\)`));
   }
 });
 

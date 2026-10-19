@@ -92,6 +92,8 @@ export type GameFeatures = {
   history: MatchHistoryEntry[];
   randomEvent: RandomEvent | null;
   starPackReveal: StarPackReveal | null;
+  /** IDs of executed fragment purchases; guards against double clicks and network retries. */
+  purchaseReceipts: string[];
   transferSaga: TransferSagaState;
   gazetteIssues: TournamentGazetteIssue[];
   dailyRewards: DailyRewardState;
@@ -881,6 +883,53 @@ export function drawRandomStarXICustomCard(state: StarXIState, random = Math.ran
     fragmentCompensation,
     source: "custom-draw" as const,
   };
+}
+
+/** The special card pack replaces the former standalone fragment draw. It uses the same
+ * price, card pool and duplicate compensation; only fragments can pay for it. */
+export const SPECIAL_CARD_PACK = {
+  id: "special" as const,
+  label: "Spezialkarten-Pack",
+  price: STAR_XI_RANDOM_CUSTOM_CARD_COST,
+  currency: "fragments" as const,
+  description: "Eine zufällige Spezialkarte. Doppelte Karten geben automatisch Fragmente zurück.",
+};
+export const PURCHASE_RECEIPT_LIMIT = 50;
+
+export function getSpecialCardPackOdds(ownedIds: readonly string[] = []) {
+  const total = STAR_XI_CUSTOM_PLAYERS.length;
+  const missing = STAR_XI_CUSTOM_PLAYERS.filter((player) => !ownedIds.includes(player.id)).length;
+  return { total, missing, perCard: total ? 1 / total : 0, newCard: total ? missing / total : 0 };
+}
+
+export type SpecialPackPurchase = { ok: true; reveal: StarPackReveal } | { ok: false; error: string; duplicateRequest?: boolean };
+
+/** Authoritative purchase: one receipt per purchase ID, so a repeated click or a network retry
+ * of the same request can never charge fragments or award a card twice. */
+export function purchaseSpecialCardPack(features: GameFeatures, purchaseId: string, options: { openedBy?: string; now?: number; random?: () => number; unlimited?: boolean } = {}): SpecialPackPurchase {
+  const id = typeof purchaseId === "string" ? purchaseId.slice(0, 80) : "";
+  if (!id) return { ok: false, error: "Ungültiger Kauf." };
+  if (features.purchaseReceipts.includes(id)) return { ok: false, error: "Dieser Kauf wurde bereits ausgeführt.", duplicateRequest: true };
+  if (features.cup.active) return { ok: false, error: "Während eines Spiels können keine Packs geöffnet werden." };
+  const cost = SPECIAL_CARD_PACK.price;
+  if (!options.unlimited && features.starXI.fragments < cost) return { ok: false, error: `${SPECIAL_CARD_PACK.label} kostet ${cost.toLocaleString("de-CH")} Fragmente.` };
+  const state = options.unlimited ? { ...features.starXI, fragments: Math.max(features.starXI.fragments, cost) } : features.starXI;
+  const opening = drawRandomStarXICustomCard(state, options.random);
+  if (!opening.drawn || !opening.player) return { ok: false, error: "Das Spezialkarten-Pack konnte nicht geöffnet werden." };
+  const now = options.now ?? Date.now();
+  const reveal: StarPackReveal = { packId: opening.packId, packName: SPECIAL_CARD_PACK.label, player: opening.player, duplicate: opening.duplicate, fragmentCompensation: opening.fragmentCompensation, source: opening.source, openedAt: now, openedBy: options.openedBy ?? "Du", troll: shouldTriggerPackTroll(opening.player) };
+  features.starXI = { ...opening.state, lockedPlayerIds: features.starXI.lockedPlayerIds };
+  features.starPackReveal = reveal;
+  features.purchaseReceipts = [...features.purchaseReceipts, id].slice(-PURCHASE_RECEIPT_LIMIT);
+  addHistory(features, opening.duplicate
+    ? { title: `Doppelter Spezialspieler: ${opening.player.name}`, detail: `+${opening.fragmentCompensation.toLocaleString("de-CH")} Fragmente zurück.`, tone: "neutral" }
+    : { title: `${opening.player.name} aus dem Spezialkarten-Pack`, detail: `${formatStarXIPositionList(opening.player)} · Rating ${opening.player.rating}`, tone: "positive" }, now);
+  return { ok: true, reveal };
+}
+
+function formatStarXIPositionList(player: StarXIPlayer) {
+  const positions = getStarXIPositions(player);
+  return positions.length ? positions.join(" / ") : "Nur Bank";
 }
 
 function uniqueKnownStarIds(ids: unknown) {
@@ -2200,6 +2249,7 @@ export function initialGameFeatures(now = Date.now()): GameFeatures {
     history: [],
     randomEvent: null,
     starPackReveal: null,
+    purchaseReceipts: [],
     transferSaga: { loans: [], vacancies: [], archive: [], latestEvent: null, lastFailedReason: "", nextAt: now + getTransferEventDelay(), deadlineDayStartedAt: 0, deadlineDayEndsAt: 0 },
     gazetteIssues: [],
     dailyRewards: {},
@@ -2532,6 +2582,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     history,
     randomEvent,
     starPackReveal,
+    purchaseReceipts: Array.isArray(source.purchaseReceipts) ? [...new Set(source.purchaseReceipts.filter((id): id is string => typeof id === "string").map((id) => id.slice(0, 80)))].slice(-PURCHASE_RECEIPT_LIMIT) : [],
     transferSaga,
     gazetteIssues,
     dailyRewards: normalizeDailyRewards(source.dailyRewards),

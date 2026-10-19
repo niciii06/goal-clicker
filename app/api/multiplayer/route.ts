@@ -7,10 +7,10 @@ import { fixtureFor, travelGate, consumeTravel, eligibilityError, settleTravel }
 import { claimAllAlbumRewards, claimAlbumReward, prepareCareerMatch, recordCareerMatch } from "../../career-data";
 import { getDb } from "../../../db";
 import type { RoomRow, RoomUpdate } from "../../../db";
-import { queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getTransferBonuses, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE } from "../../feature-data";
+import { SPECIAL_CARD_PACK, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getTransferBonuses, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
 import type { GameFeatures, PenaltyDirection, StarFormationId, StarPackReveal } from "../../feature-data";
 import { isSupportedMultiplayerProtocol, MULTIPLAYER_UPDATE_MESSAGE } from "../../multiplayer-protocol";
-import { getFormationUnlockSeason, getPackUnlockSeason, getTournamentUnlockSeason, getUpgradeUnlockSeason, isSeasonContentUnlocked, MAX_CAREER_SEASON } from "../../season-progression";
+import { getFormationUnlockLeague, getPackUnlockLeague, getReachedLeague, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked, MAX_CAREER_SEASON } from "../../season-progression";
 import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../../upgrade-purchase";
 import { MAX_MULTIPLAYER_BODY_BYTES, readJsonBody, RequestBodyTooLargeError } from "../request-body";
 import { claimDailyReward } from "../../daily-reward";
@@ -230,6 +230,11 @@ function readGame(row: RoomRow): CoopGameState {
   game.features = normalizeGameFeatures(storedFeatures);
   unlockAchievements(game);
   return game;
+}
+
+/** Best league the shared world ever reached; unlocks never depend on the season counter alone. */
+function reachedLeagueOf(game: CoopGameState) {
+  return getReachedLeague(game.seasons, game.features.seasonMode.highestDivision);
 }
 
 function unlockAchievements(game: CoopGameState) {
@@ -533,6 +538,7 @@ export async function POST(request: Request) {
       starPlayerId?: unknown;
       formationId?: unknown;
       strategy?: unknown;
+      purchaseId?: unknown;
       draft?: unknown;
       direction?: unknown;
       expectedPenaltyStep?: unknown;
@@ -779,8 +785,8 @@ export async function POST(request: Request) {
       let purchaseRoom = room;
       for (let attempt = 0; attempt < 8; attempt += 1) {
         const purchaseGame = readGame(purchaseRoom);
-        const upgradeUnlockSeason = getUpgradeUnlockSeason(upgradeId);
-        if (getLevel(purchaseGame.upgrades, upgradeId) === 0 && !isSeasonContentUnlocked(upgradeUnlockSeason, purchaseGame.seasons, testMode)) return jsonError(`Dieses Upgrade wird in Saison ${upgradeUnlockSeason} freigeschaltet.`, 409);
+        const upgradeUnlockLeague = getUpgradeUnlockLeague(upgradeId);
+        if (getLevel(purchaseGame.upgrades, upgradeId) === 0 && !isLeagueContentUnlocked(upgradeUnlockLeague, reachedLeagueOf(purchaseGame), testMode)) return jsonError(`Dieses Upgrade wird ab Liga ${upgradeUnlockLeague} freigeschaltet.`, 409);
         const purchase = getBulkPurchase(upgradeId, purchaseGame, requestedCount, testMode);
         if (purchase.count === 0) {
           const price = getCostAtLevel(upgradeId, getLevel(purchaseGame.upgrades, upgradeId));
@@ -825,8 +831,8 @@ export async function POST(request: Request) {
       const formationId = typeof payload.formationId === "string" ? payload.formationId as StarFormationId : "433";
       if (game.features.cup.active) return jsonError("Während eines laufenden Spiels kann die Formation nicht geändert werden.", 409);
       if (!STAR_FORMATIONS.some((formation) => formation.id === formationId)) return jsonError("Diese Formation ist ungültig.", 409);
-      const formationUnlockSeason = getFormationUnlockSeason(formationId);
-      if (!isSeasonContentUnlocked(formationUnlockSeason, game.seasons, testMode)) return jsonError(`Diese Formation wird in Saison ${formationUnlockSeason} freigeschaltet.`, 409);
+      const formationUnlockLeague = getFormationUnlockLeague(formationId);
+      if (!isLeagueContentUnlocked(formationUnlockLeague, reachedLeagueOf(game), testMode)) return jsonError(`Diese Formation wird ab Liga ${formationUnlockLeague} freigeschaltet.`, 409);
       const formation = getStarFormation(formationId);
       game.features.starXI = setStarXIFormation(game.features.starXI, formationId, getUnavailableStarXIPlayerIds(game.features));
       addHistory(game.features, { title: "Formation angepasst", detail: `Die Startelf spielt jetzt im ${formation.label}.`, tone: "neutral" });
@@ -914,8 +920,8 @@ export async function POST(request: Request) {
       const packId = typeof payload.packId === "string" ? payload.packId : "";
       const pack = getStarPack(packId);
       if (!pack || isRewardPack(pack.id)) return jsonError("Dieses Pack gibt es nicht im Shop.");
-      const packUnlockSeason = getPackUnlockSeason(pack.id);
-      if (!isSeasonContentUnlocked(packUnlockSeason, game.seasons, testMode)) return jsonError(`Dieses Pack wird in Saison ${packUnlockSeason} freigeschaltet.`, 409);
+      const packUnlockLeague = getPackUnlockLeague(pack.id);
+      if (!isLeagueContentUnlocked(packUnlockLeague, reachedLeagueOf(game), testMode)) return jsonError(`Dieses Pack wird ab Liga ${packUnlockLeague} freigeschaltet.`, 409);
       if (game.features.cup.active) return jsonError("Während eines Pokalspiels keine Packs öffnen.", 409);
       if (!testMode && game.goals < pack.price) return jsonError(`${pack.label} kostet ${pack.price.toLocaleString("de-CH")} Tore.`);
       const opening = openStarPack(pack.id, game.features.starXI.ownedIds, Math.random, game.features.starXI.formationPositions);
@@ -934,18 +940,20 @@ export async function POST(request: Request) {
       return persistGameResponse(db, room, game, timestamp, playerId, role, {}, { packReveal: reveal });
     }
 
+    if (action === "special-pack") {
+      const purchaseId = typeof payload.purchaseId === "string" ? payload.purchaseId : "";
+      const unlockLeague = getPackUnlockLeague(SPECIAL_CARD_PACK.id);
+      if (!isLeagueContentUnlocked(unlockLeague, reachedLeagueOf(game), testMode)) return jsonError(`Dieses Pack wird ab Liga ${unlockLeague} freigeschaltet.`, 409);
+      const result = purchaseSpecialCardPack(game.features, purchaseId, { openedBy: roomPlayerName(room, role), unlimited: testMode });
+      if (!result.ok) return result.duplicateRequest ? Response.json({ error: result.error, errorCode: "DUPLICATE_PURCHASE", serverNow: Date.now(), room: shapeRoom(room, playerId), role }, { status: 409 }) : jsonError(result.error, 409);
+      return persistGameResponse(db, room, game, timestamp, playerId, role, {}, { packReveal: result.reveal });
+    }
+
     if (action === "star-custom-draw" || action === "star-custom-buy") {
-      const cost = STAR_XI_RANDOM_CUSTOM_CARD_COST;
-      if (game.features.cup.active) return jsonError("Während eines Pokalspiels können keine Karten freigeschaltet werden.", 409);
-      if (!testMode && game.features.starXI.fragments < cost) return jsonError(`Ein Spezialkarten-Zug kostet ${cost.toLocaleString("de-CH")} Fragmente.`, 409);
-      if (testMode) game.features.starXI.fragments = Math.max(game.features.starXI.fragments, cost);
-      const opening = drawRandomStarXICustomCard(game.features.starXI);
-      if (!opening.drawn || !opening.player) return jsonError("Der Spezialkarten-Zug konnte nicht ausgeführt werden.", 409);
-      const reveal: StarPackReveal = { packId: opening.packId, packName: opening.packName, player: opening.player, duplicate: opening.duplicate, fragmentCompensation: opening.fragmentCompensation, source: opening.source, openedAt: Date.now(), openedBy: roomPlayerName(room, role), troll: shouldTriggerPackTroll(opening.player) };
-      game.features.starXI = opening.state;
-      game.features.starPackReveal = reveal;
-      addHistory(game.features, { title: opening.duplicate ? `Doppelter Spezialspieler: ${opening.player.name}` : `${opening.player.name} als Spezialkarte gezogen`, detail: opening.duplicate ? `+${opening.fragmentCompensation.toLocaleString("de-CH")} Fragmente zurück.` : `${getStarXIPositions(opening.player).join(" / ")} · Rating ${opening.player.rating}`, tone: opening.duplicate ? "neutral" : "positive" });
-      return persistGameResponse(db, room, game, timestamp, playerId, role, {}, { packReveal: reveal });
+      // Clients from before the special card pack: same pack logic with a server issued receipt.
+      const result = purchaseSpecialCardPack(game.features, `legacy-${crypto.randomUUID()}`, { openedBy: roomPlayerName(room, role), unlimited: testMode });
+      if (!result.ok) return jsonError(result.error, 409);
+      return persistGameResponse(db, room, game, timestamp, playerId, role, {}, { packReveal: result.reveal });
     }
 
     if (action === "travel-start") {
@@ -955,7 +963,7 @@ export async function POST(request: Request) {
       const now = Date.now();
       const error = eligibilityError(game.features, mode, t.id, now);
       if (error) return jsonError(error, 409);
-      if (mode === "tournament" && !isSeasonContentUnlocked(getTournamentUnlockSeason(t.id), game.seasons, testMode)) return jsonError("Das Turnier ist noch gesperrt.", 409);
+      if (mode === "tournament" && !isLeagueContentUnlocked(getTournamentUnlockLeague(t.id), reachedLeagueOf(game), testMode)) return jsonError(`Das Turnier ist ab Liga ${getTournamentUnlockLeague(t.id)} verfügbar.`, 409);
       const fixture = fixtureFor(game.features, mode, t.id);
       if (!fixture.away) return jsonError("Für Heimspiele ist keine Reise nötig.", 409);
       const gate = travelGate(game.features, fixture, now, true);
@@ -987,8 +995,8 @@ export async function POST(request: Request) {
       if (getStarXISelection(game.features.starXI.ownedIds, game.features.starXI.lineupIds).length < STAR_XI_SQUAD_SIZE) return jsonError("Für den Pokal brauchst du 11 passende Spieler in der Startelf.", 409);
       const suspendedOnSquad = game.features.cup.suspendedPlayerIds.some((playerId) => game.features.starXI.lineupIds.includes(playerId) || game.features.starXI.benchIds.includes(playerId));
       if (suspendedOnSquad) return jsonError("Ein Spieler mit Roter Karte muss vor dem Anpfiff ersetzt werden und darf nicht auf der Bank sitzen.", 409);
-      const tournamentUnlockSeason = getTournamentUnlockSeason(tournament.id);
-      if (!isSeasonContentUnlocked(tournamentUnlockSeason, game.seasons, testMode)) return jsonError(`${tournament.label} wird in Saison ${tournamentUnlockSeason} freigeschaltet.`, 409);
+      const tournamentUnlockLeague = getTournamentUnlockLeague(tournament.id);
+      if (!isLeagueContentUnlocked(tournamentUnlockLeague, reachedLeagueOf(game), testMode)) return jsonError(`${tournament.label} wird ab Liga ${tournamentUnlockLeague} freigeschaltet.`, 409);
       const starRating = getStarXIRating(game.features.starXI.ownedIds, game.features.starXI.lineupIds);
       if (starRating < tournament.minimumRating) return jsonError(`${tournament.label} braucht mindestens ${tournament.minimumRating} OVR.`, 409);
       const fixture = fixtureFor(game.features, "tournament", tournament.id);

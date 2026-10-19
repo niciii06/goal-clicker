@@ -1,4 +1,5 @@
 export type SeasonMilestone = {
+  /** Progression tier (1 = entry, 15 = top); shown to players as Liga 16 - season. */
   season: number;
   title: string;
   description: string;
@@ -34,6 +35,8 @@ const PACK_UNLOCK_SEASONS: Record<string, number> = {
   scout: 1,
   elite: 5,
   legend: 10,
+  // The fragment priced special card pack keeps the former draw's availability from the start.
+  special: 1,
 };
 
 const TOURNAMENT_UNLOCK_SEASONS: Record<string, number> = {
@@ -89,7 +92,7 @@ export const SEASON_MILESTONES: readonly SeasonMilestone[] = [
   { season: 12, title: "Weltbühne", description: "Jetzt wartet das härteste Turnier im Spiel.", rewards: ["Weltmeisterschaft", "2 neue Formationen"] },
   { season: 13, title: "Legendenjagd", description: "Die seltensten Karten kommen in Reichweite.", rewards: ["Formation 5-2-3"] },
   { season: 14, title: "Vereins Dynastie", description: "Dein Club verdient dauerhaft auf höchstem Niveau.", rewards: ["Vereins Dynastie", "Formation 5-3-2"] },
-  { season: 15, title: "Hall of Fame", description: "Die höchste Saison ist erreicht. Dein Club gehört jetzt zur ewigen Elite.", rewards: ["Hall of Fame Status", "Prestige freigeschaltet", "Alle 29 Formationen"] },
+  { season: 15, title: "Hall of Fame", description: "Liga 1 ist erreicht. Dein Club gehört jetzt zur ewigen Elite.", rewards: ["Hall of Fame Status", "Prestige freigeschaltet", "Alle 29 Formationen"] },
 ] as const;
 
 export const MAX_CAREER_SEASON = SEASON_MILESTONES.length;
@@ -98,28 +101,48 @@ export function getCurrentSeason(completedSeasons: number) {
   return Math.min(MAX_CAREER_SEASON, Math.max(1, Math.floor(Number.isFinite(completedSeasons) ? completedSeasons : 0) + 1));
 }
 
-export function getUpgradeUnlockSeason(id: string) {
-  return UPGRADE_UNLOCK_SEASONS[id] ?? 1;
+// League based unlocks. The tables above are indexed by progression tier (1 = entry, 15 = top),
+// which is the internal season mode division and the old "Saison" number. Players see leagues:
+// Liga 15 is the entry league and Liga 1 the top, so a LOWER league number means MORE progress.
+export const LEAGUE_COUNT = MAX_CAREER_SEASON;
+
+export function leagueForTier(tier: number) {
+  return LEAGUE_COUNT + 1 - Math.max(1, Math.min(LEAGUE_COUNT, Math.floor(Number.isFinite(tier) ? tier : 1)));
 }
 
-export function getPackUnlockSeason(id: string) {
-  return PACK_UNLOCK_SEASONS[id] ?? 1;
+/** Best league ever reached. Permanent: relegation never takes an unlock away.
+ * `completedSeasons` already stores the highest reached division minus one in every save,
+ * so existing careers keep exactly the entitlements they had. */
+export function getReachedLeague(completedSeasons: number, highestDivision = 1) {
+  return Math.min(leagueForTier(getCurrentSeason(completedSeasons)), leagueForTier(highestDivision));
 }
 
-export function getTournamentUnlockSeason(id: string) {
-  return TOURNAMENT_UNLOCK_SEASONS[id] ?? 1;
+export function hasReachedLeague(requiredLeague: number, reachedLeague: number) {
+  return reachedLeague <= requiredLeague;
 }
 
-export function getFormationUnlockSeason(id: string) {
-  return FORMATION_UNLOCK_SEASONS[id] ?? 1;
+export function isLeagueContentUnlocked(requiredLeague: number, reachedLeague: number, testMode = false) {
+  return testMode || hasReachedLeague(requiredLeague, reachedLeague);
 }
 
-export function isUnlockedInSeason(unlockSeason: number, completedSeasons: number) {
-  return getCurrentSeason(completedSeasons) >= unlockSeason;
+export function getUpgradeUnlockLeague(id: string) {
+  return leagueForTier(UPGRADE_UNLOCK_SEASONS[id] ?? 1);
 }
 
-export function isSeasonContentUnlocked(unlockSeason: number, completedSeasons: number, testMode = false) {
-  return testMode || isUnlockedInSeason(unlockSeason, completedSeasons);
+export function getPackUnlockLeague(id: string) {
+  return leagueForTier(PACK_UNLOCK_SEASONS[id] ?? 1);
+}
+
+export function getTournamentUnlockLeague(id: string) {
+  return leagueForTier(TOURNAMENT_UNLOCK_SEASONS[id] ?? 1);
+}
+
+export function getFormationUnlockLeague(id: string) {
+  return leagueForTier(FORMATION_UNLOCK_SEASONS[id] ?? 1);
+}
+
+export function leagueUnlockLabel(league: number) {
+  return `Liga ${league}`;
 }
 
 export function getSeasonMilestone(season: number) {
