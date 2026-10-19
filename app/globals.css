@@ -1646,3 +1646,4 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 @media (prefers-reduced-motion: reduce) { .gc-halftime-cover, .gc-halftime-cover.leaving { animation: none; } }
 /* Matches saved before the interactive engine: their half time card covers the whole stadium as well. */
 .gc-timed-overlay.halftime { inset: 0; border-radius: 0; border-width: 0; background: #0b1c15; z-index: 20; }
+.gc-stadium-label { flex-basis: 100%; color: #b9d5c1; font-size: 11px; overflow-wrap: anywhere; }

@@ -11,12 +11,13 @@ import type { RenderSnapshot } from './match-renderer-core';
 import { matchFitness } from './match-broadcast';
 import type { CameraMode } from './match-pitch-canvas';
 import { computeAmbience, STADIUM_VIEW } from './stadium-ambience';
+import { matchStadium } from './match-stadium';
 import type { Ambience } from './stadium-ambience';
 
 const ambienceCache=new Map<string,Ambience>();
 function ambienceFor(features:GameFeatures){
  const c=features.cup,key=`${c.careerMatchId}:${c.matchStartedAt}:${features.press.fanMood}:${c.fixture?.id??''}`;
- let value=ambienceCache.get(key);if(!value){value=computeAmbience(c,features.press.fanMood,c.simulation?.seed);ambienceCache.clear();ambienceCache.set(key,value);}
+ let value=ambienceCache.get(key);if(!value){value=computeAmbience(c,features.press.fanMood,c.simulation?.seed,matchStadium(features));ambienceCache.clear();ambienceCache.set(key,value);}
  return value;
 }
 type Body={x:number;y:number;vx:number;vy:number};

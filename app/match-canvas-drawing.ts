@@ -1,7 +1,7 @@
 import type { Actor } from './match-viewer';
 import type { GameFeatures } from './feature-data';
 import type { getVisualFrame } from './match-viewer';
-import { drawAtmosphere, drawCelebration, drawStands, drawWeather } from './stadium-ambience';
+import { drawAtmosphere, drawCelebration, drawPitchside, drawStands, drawWeather } from './stadium-ambience';
 import type { Ambience } from './stadium-ambience';
 import type { FrameCelebration } from './interactive-frame-data';
 
@@ -26,7 +26,7 @@ export function drawMatchFrame(ctx:CanvasRenderingContext2D,frame:ReturnType<typ
  const now=extras.now??0,animate=extras.animate!==false;
  if(extras.ambience)drawStands(ctx,extras.ambience,colours,now,extras.celebration,animate);
  drawFootballPitch(ctx);
- if(extras.ambience)drawAtmosphere(ctx,extras.ambience);
+ if(extras.ambience){drawPitchside(ctx,extras.ambience);drawAtmosphere(ctx,extras.ambience);}
    for(const p of actors){
     const keeper=p.goalkeeper;ctx.fillStyle=keeper?p.team==='club'?'#c684f4':'#74d0ed':colours[p.team];ctx.strokeStyle='#effff3';ctx.lineWidth=.35;
     ctx.beginPath();ctx.ellipse(p.x,p.y,frame.keeperDive===p.id?2.65:1.65,frame.keeperDive===p.id?.9:1.65,0,0,Math.PI*2);ctx.fill();ctx.stroke();
