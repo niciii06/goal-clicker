@@ -12,7 +12,10 @@ function precedingGoal(s:InteractiveMatch,a:SimAction|undefined){
 }
 
 export function readInteractiveFrame(s:InteractiveMatch,time:number) {
- const a=s.recent.find(a=>a.start<=time&&a.end>=time)??s.buffer.find(a=>a.start<=time&&a.end>=time)??s.recent.at(-1);
+ // A play that is still running wins over one that just ended, so at a period boundary (half time,
+ // where the kick-off positions are already set) the frame shows the next play's starting positions.
+ const running=(a:SimAction)=>a.start<=time&&time<a.end,touching=(a:SimAction)=>a.start<=time&&a.end>=time;
+ const a=s.recent.find(running)??s.buffer.find(running)??s.recent.find(touching)??s.buffer.find(touching)??s.recent.at(-1);
  const c=a?.before??s.committed,t=a?clamp((time-a.start)/(a.end-a.start),0,1):0;
  const goal=precedingGoal(s,a);
  if(a&&goal)return celebrationFrame(a,goal,time,t);
@@ -45,4 +48,21 @@ function celebrationFrame(a:SimAction,goal:SimAction,time:number,t:number) {
  });
  const ball={x:a.from.x+(a.to.x-a.from.x)*back,y:a.from.y+(a.to.y-a.from.y)*back};
  return {players,ball,action:a,time,progress:t,celebration:{side,scorerId:goal.actor,progress:t} as FrameCelebration|undefined};
+}
+
+const LOFTED=new Set(['cross','long','clearance']);
+/** Height of the ball (0 on the ground) for lofted passes, crosses and long balls. */
+export function ballHeight(a:SimAction|undefined,progress:number){return a&&(a.kind==='cross'||LOFTED.has(a.style??''))?Math.sin(clamp(progress,0,1)*Math.PI)*(a.style==='long'||a.style==='clearance'?2.6:2):0;}
+const SET_PIECE_LABELS:Record<string,string>={'throw-in':'Einwurf','goal-kick':'Abstoss',corner:'Eckball','free-kick':'Freistoss',penalty:'Penalty'};
+/** Short German description of what the current play is, for the pitch header. */
+export function playLabel(a:SimAction|undefined){
+ if(!a)return 'Spielaufbau';
+ if(a.kind==='restart')return a.setPiece?SET_PIECE_LABELS[a.setPiece]:'Anstoss';
+ if(a.kind==='shot')return a.outcome==='save'?'Parade':a.outcome==='goal'?'Torschuss':'Abschluss';
+ if(a.kind==='cross')return 'Flanke';
+ if(a.kind==='interception')return 'Ballgewinn';
+ if(a.kind==='tackle')return 'Zweikampf';
+ if(a.kind==='foul'||a.kind==='yellow'||a.kind==='red'||a.kind==='injury')return 'Foulspiel';
+ if(a.kind==='carry')return a.style==='hold'?'Ballsicherung':'Dribbling';
+ return a.style==='through'?'Steilpass':a.style==='long'?'Langer Ball':a.style==='progressive'?'Vertikalpass':'Passspiel';
 }

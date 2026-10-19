@@ -5,6 +5,7 @@ import { createMatchBroadcast } from './match-broadcast';
 import type { BroadcastKind, BroadcastEvent } from './match-broadcast';
 import { goalAssistId } from './match-goals';
 import { interactiveFrame } from './interactive-match';
+import { ballHeight, playLabel } from './interactive-frame-data';
 type Team = "club" | "opponent";
 export type Actor = { id: string; label: string; shirt: string; team: Team; role: StarPosition; x: number; y: number; goalkeeper: boolean; rating: number | null };
 export type MatchEvent = { id: string; kind: "goal" | "card" | "injury" | "penalty" | BroadcastKind; at: number; minute: number; side: Team; player: string; playerId: string | null; outcome?: string; direction?: string; keeperDirection?: string; action?: BroadcastEvent; assistId?:string; style?:string };
@@ -18,6 +19,7 @@ const hash = (text: string) => { let x = 2166136261; for (let i = 0; i < text.le
 
 export function eventLabel(event:MatchEvent) {
  const labels:Record<string,string>={goal:'Tor',card:'Rote Karte',injury:'Verletzung',penalty:'Penalty','build-up':'Spielaufbau',counter:'Konter',wide:'Flügelangriff',combination:'Doppelpass',shot:'Torschuss',corner:'Ecke','free-kick':'Freistoss','throw-in':'Einwurf',yellow:'Gelbe Karte',substitution:'Wechsel',offside:'Abseits · indirekter Freistoss'};
+ if(event.kind==='free-kick'&&event.style==='penalty')return 'Penalty';
  return labels[event.kind]??'Spielereignis';
 }
 export function goalStyle(cup:CupState,id:string|null,eventId:string) {
@@ -198,7 +200,7 @@ export function getVisualFrame(features: GameFeatures, wallNow: number, replay?:
     const f=interactiveFrame(cup,wallNow),recent=getViewerEvents(cup).filter(e=>e.at<=cup.lastTickAt).at(-1);
     const a=f.action,travelling=a&&['pass','cross','shot','interception','restart'].includes(a.kind);
     const actors:Actor[]=f.players.map(p=>({id:p.id,label:p.name,shirt:String(p.number),team:p.side,role:p.role,x:p.x,y:p.y,goalkeeper:p.role==='TW',rating:getCupPlayerMatchRating(cup,p.id,Math.max(1,Math.ceil(f.time/60)))}));
-    return {actors,ball:f.ball,height:a?.kind==='cross'?Math.sin(f.progress*Math.PI)*2:0,minute:Math.max(1,Math.min(120,Math.ceil(f.time/60))),status:cup.matchPaused?'Pausiert':f.celebration&&f.celebration.progress<.62?'Torjubel':a?.kind==='shot'?'Torschuss':a?.kind==='restart'?'Anspiel':a?.kind==='carry'?'Dribbling':'Spielaufbau',recent,age:recent?(wallNow-recent.at)/1000:Infinity,keeperDive:undefined,ballOwnerId:travelling?undefined:a?.actor,pass:undefined,shotFlight:undefined,celebration:f.celebration};
+    return {actors,ball:f.ball,height:ballHeight(a,f.progress),minute:Math.max(1,Math.min(120,Math.ceil(f.time/60))),status:cup.matchPaused?'Pausiert':f.celebration&&f.celebration.progress<.62?'Torjubel':playLabel(a),recent,age:recent?(wallNow-recent.at)/1000:Infinity,keeperDive:a?.kind==='shot'&&a.outcome==='save'&&f.progress>.55?a.target:undefined,ballOwnerId:travelling?undefined:a?.actor,pass:undefined,shotFlight:undefined,celebration:f.celebration};
   }
   const frozen=cup.timedPause;
   const visualAt=frozen?frozen.kind==='goal'?Math.min(wallNow,frozen.startsAt):frozen.frozenAt:wallNow;

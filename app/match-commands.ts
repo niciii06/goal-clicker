@@ -44,7 +44,8 @@ export function confirmMatchDraft(f:GameFeatures,d:MatchDraft,now:number):{featu
  d.lineup.forEach((id,i)=>{c.playerMatchPositions[id]=form.slots[i].position;if(c.broadcast)c.broadcast.slots[id]=i;});
  if(c.broadcast)c.broadcast.clubFormation=form.id;
  if(c.simulation){
-  const sim=c.simulation,checkpoint=sim.committed;
+  // Edit a copy so the play that ended at this boundary keeps the state it ended with.
+  const sim=c.simulation;sim.committed=structuredClone(sim.committed);const checkpoint=sim.committed;
   // Transfer the outgoing slot's position to the incoming player at this safe boundary.
   outgoing.forEach((out,i)=>{const old=checkpoint.players.find(p=>p.id===out),source=getStarXIPlayer(incoming[i]);if(old&&source){old.active=false;checkpoint.players=checkpoint.players.filter(p=>p.id!==out);checkpoint.players.push({...old,id:source.id,name:source.name,rating:source.rating,passing:source.originalAttributes?.stats?.shortPassing?.value??source.rating,shooting:source.originalAttributes?.stats?.finishing?.value??source.rating,pace:source.originalAttributes?.stats?.sprintSpeed?.value??source.rating,control:source.originalAttributes?.stats?.dribbling?.value??source.rating,defending:source.originalAttributes?.stats?.standingTackle?.value??source.rating,keeping:source.originalAttributes?.stats?.gkReflexes?.value??source.rating,stamina:source.originalAttributes?.stats?.stamina?.value??source.rating,fitness:100,active:true});if(checkpoint.owner===out)checkpoint.owner=source.id;}});
   d.lineup.forEach((id,i)=>{const p=checkpoint.players.find(p=>p.id===id);if(!p)return;const slot=form.slots[i],right=checkpoint.direction>0,x=p.role==='TW'?3:12+(100-slot.y)*.68,y=p.role==='TW'?34:5+slot.x*.58;p.role=slot.position;p.slot=i;p.anchor={x:right?x:105-x,y:right?y:68-y};});

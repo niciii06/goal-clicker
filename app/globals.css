@@ -1622,3 +1622,27 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 .starxi-pitch-slot .discipline-tag { margin: 2px auto 0; font-size: 8px; padding: 1px 5px; }
 .discipline-warning { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0; padding: 11px 13px; border: 1px solid #f3d36b; border-radius: 13px; background: #fffaf0; color: #5b4300; font-size: 12px; line-height: 1.45; }
 .discipline-warning strong { display: block; color: #3d2e00; }
+
+/* Half time: an opaque card over the whole stadium canvas while the teams change ends. */
+.gc-halftime-cover { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; padding: 12px; overflow: auto; background: radial-gradient(circle at 50% 30%, #17362a 0%, #0b1c15 70%); color: #fff; animation: gc-halftime-in .32s ease-out both; }
+.gc-halftime-cover.leaving { animation: gc-halftime-out .45s ease-in both; pointer-events: none; }
+.gc-halftime-card { width: min(520px, 100%); display: grid; gap: 10px; justify-items: center; text-align: center; }
+.gc-halftime-kicker { padding: 5px 12px; border-radius: 980px; background: rgba(255,255,255,.12); font-size: 11px; font-weight: 850; letter-spacing: .14em; }
+.gc-halftime-score { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 12px; width: 100%; }
+.gc-halftime-score strong { font-size: clamp(13px, 2.4vw, 18px); font-weight: 760; overflow-wrap: anywhere; }
+.gc-halftime-score strong:first-child { text-align: right; }
+.gc-halftime-score strong:last-child { text-align: left; }
+.gc-halftime-score b { font-size: clamp(30px, 7vw, 52px); font-weight: 860; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.gc-halftime-scorers { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 10px; color: #cfe7da; font-size: 11px; }
+.gc-halftime-cover .gc-match-statistics { width: 100%; max-width: 440px; font-size: 11px; color: #e8f3ec; }
+.gc-halftime-cover .gc-match-statistics tr:nth-child(n+7) { display: none; }
+.gc-halftime-card p { margin: 0; color: #b8cfc3; font-size: 11px; line-height: 1.4; }
+.gc-halftime-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.gc-halftime-actions button { min-height: 44px; padding: 10px 18px; border: 1px solid rgba(255,255,255,.35); border-radius: 12px; background: transparent; color: #fff; font-weight: 750; cursor: pointer; }
+.gc-halftime-actions button.primary { border-color: #fff; background: #fff; color: #10301f; }
+@keyframes gc-halftime-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes gc-halftime-out { from { opacity: 1; } to { opacity: 0; } }
+@media (max-width: 600px) { .gc-halftime-cover { padding: 8px; } .gc-halftime-card { gap: 6px; } .gc-halftime-cover .gc-match-statistics { font-size: 9.5px; } .gc-halftime-cover .gc-match-statistics tr:nth-child(n+5) { display: none; } }
+@media (prefers-reduced-motion: reduce) { .gc-halftime-cover, .gc-halftime-cover.leaving { animation: none; } }
+/* Matches saved before the interactive engine: their half time card covers the whole stadium as well. */
+.gc-timed-overlay.halftime { inset: 0; border-radius: 0; border-width: 0; background: #0b1c15; z-index: 20; }
