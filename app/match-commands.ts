@@ -1,11 +1,16 @@
 import { getStarFormation, getStarXIPlayer, canStarXIPlayerFillSlot, STAR_XI_MAX_SUBSTITUTIONS, resumeCupMatch } from './feature-data';
 import type { GameFeatures } from './feature-data';
-import { advanceInteractive, invalidateInteractive } from './interactive-match';
+import { advanceInteractive, invalidateInteractive, substituteSimPlayer } from './interactive-match';
 import { competitionOfCup, getBannedPlayerIds } from './discipline';
 import { addBroadcastSubstitution } from './match-broadcast';
 // The selectable match tactics were removed: a draft carries only lineup and formation.
 export type MatchDraft={lineup:string[];formation:string};
 export function draftMatch(f:GameFeatures):MatchDraft{return {lineup:[...f.starXI.lineupIds],formation:f.starXI.formationId};}
+/** Bench after a draft: each incoming player's bench place goes to the starter it replaces. */
+export function matchBenchPreview(f:GameFeatures,lineup:readonly string[]):string[] {
+ const incoming=lineup.filter(id=>id&&!f.starXI.lineupIds.includes(id)),outgoing=f.starXI.lineupIds.filter(id=>id&&!lineup.includes(id)&&!f.cup.sentOffPlayerIds.includes(id));
+ return f.starXI.benchIds.map(id=>{const index=incoming.indexOf(id);return index>=0?outgoing[index]??'':id;});
+}
 export function validateMatchDraft(f:GameFeatures,d:MatchDraft):string {
  const c=f.cup;if(!c.active||c.phase==='penalties')return 'Gerade sind keine Änderungen möglich.';
  const form=getStarFormation(d.formation);if(d.formation!==f.starXI.formationId)return 'Die Formation bleibt während der Partie bestehen; passende Positionen können getauscht werden.';
@@ -39,7 +44,7 @@ export function confirmMatchDraft(f:GameFeatures,d:MatchDraft,now:number):{featu
  const form=getStarFormation(d.formation);
  incoming.forEach((id,i)=>{const out=outgoing[i];c.broadcast=addBroadcastSubstitution(c,out,id,minute);c.playerExitedAt[out]=minute;c.playerEnteredAt[id]=minute;c.allTimeAppearances[id]=(c.allTimeAppearances[id]??0)+1;});
  next.starXI.lineupIds=[...d.lineup];next.starXI.formationId=form.id;next.starXI.formationPositions=form.slots.map(s=>s.position);
- next.starXI.benchIds=next.starXI.benchIds.map(id=>{const index=incoming.indexOf(id);return index>=0?outgoing[index]:id;});
+ next.starXI.benchIds=matchBenchPreview(f,d.lineup);
  c.substitutionsUsed+=incoming.length;c.lastInjury=null;
  d.lineup.forEach((id,i)=>{c.playerMatchPositions[id]=form.slots[i].position;if(c.broadcast)c.broadcast.slots[id]=i;});
  if(c.broadcast)c.broadcast.clubFormation=form.id;
@@ -47,7 +52,7 @@ export function confirmMatchDraft(f:GameFeatures,d:MatchDraft,now:number):{featu
   // Edit a copy so the play that ended at this boundary keeps the state it ended with.
   const sim=c.simulation;sim.committed=structuredClone(sim.committed);const checkpoint=sim.committed;
   // Transfer the outgoing slot's position to the incoming player at this safe boundary.
-  outgoing.forEach((out,i)=>{const old=checkpoint.players.find(p=>p.id===out),source=getStarXIPlayer(incoming[i]);if(old&&source){old.active=false;checkpoint.players=checkpoint.players.filter(p=>p.id!==out);checkpoint.players.push({...old,id:source.id,name:source.name,rating:source.rating,passing:source.originalAttributes?.stats?.shortPassing?.value??source.rating,shooting:source.originalAttributes?.stats?.finishing?.value??source.rating,pace:source.originalAttributes?.stats?.sprintSpeed?.value??source.rating,control:source.originalAttributes?.stats?.dribbling?.value??source.rating,defending:source.originalAttributes?.stats?.standingTackle?.value??source.rating,keeping:source.originalAttributes?.stats?.gkReflexes?.value??source.rating,stamina:source.originalAttributes?.stats?.stamina?.value??source.rating,fitness:100,active:true});if(checkpoint.owner===out)checkpoint.owner=source.id;}});
+  outgoing.forEach((out,i)=>{const old=checkpoint.players.find(p=>p.id===out),source=getStarXIPlayer(incoming[i]);if(old&&source){old.active=false;checkpoint.players=checkpoint.players.filter(p=>p.id!==out);checkpoint.players.push(substituteSimPlayer(old,source,c.careerBonuses?.[source.id]));if(checkpoint.owner===out)checkpoint.owner=source.id;}});
   d.lineup.forEach((id,i)=>{const p=checkpoint.players.find(p=>p.id===id);if(!p)return;const slot=form.slots[i],right=checkpoint.direction>0,x=p.role==='TW'?3:12+(100-slot.y)*.68,y=p.role==='TW'?34:5+slot.x*.58;p.role=slot.position;p.slot=i;p.anchor={x:right?x:105-x,y:right?y:68-y};});
   if(checkpoint.lastPass&&outgoing.includes(checkpoint.lastPass.id))checkpoint.lastPass=undefined;
   sim.clubFormation=form.id;invalidateInteractive(c);

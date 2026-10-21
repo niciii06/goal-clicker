@@ -95,11 +95,15 @@ test("every Icon and current 86+ base card has a fixed appearance", async () => 
 });
 
 test("walkout uses real SVG flags and shortens GOAT Nicu positions", async () => {
-  const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const [pageSource, boardSource] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/squad-board.tsx", import.meta.url), "utf8"),
+  ]);
 
   assert.match(pageSource, /country-flag-icons\/react\/3x2/);
   assert.match(pageSource, /<WalkoutCountryFlag code=\{starWalkoutPresentation\.countryCode\}/);
-  assert.match(pageSource, /player\.id === "star-goat-nicu" \? "Alle Positionen"/);
+  assert.match(pageSource, /formatStarXIPositions/);
+  assert.match(boardSource, /player\.id === 'star-goat-nicu' \? 'Alle Positionen'/);
   assert.doesNotMatch(pageSource, /star-walkout-country"><span aria-hidden="true">/);
 });
 

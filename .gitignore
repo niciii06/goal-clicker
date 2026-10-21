@@ -27,9 +27,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env and worker secret files
+# env files
 .env*
-.dev.vars*
+!.env.example
 
 # local sqlite databases
 *.db
@@ -43,11 +43,12 @@ yarn-error.log*
 
 # typescript
 next-env.d.ts
-/dist/
-/.wrangler/
-/.sites-runtime/
 /outputs/
 /work/
 
 # Generated TypeScript cache
 *.tsbuildinfo
+
+# database exports and archives (private data)
+/d1-export*.sql
+d1-archive-*.json

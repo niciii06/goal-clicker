@@ -1,5 +1,6 @@
 import type { StarPosition } from './fc26-player-pool';
-import source from './fc27-india-source.json';
+// Browser builds get the slim copy (scripts/client-data.mjs) through the package.json "imports" browser condition.
+import source from '#fc27-india-source';
 
 const positions: Record<string, StarPosition> = { GK:'TW', LB:'LV', CB:'IV', RB:'RV', CDM:'ZDM', CM:'ZM', CAM:'ZOM', LM:'LM', RM:'RM', LW:'LF', RW:'RF', ST:'ST' };
 export const FC27_INDIA_PROFILES = source.items.map(player => {

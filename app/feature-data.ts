@@ -1388,7 +1388,10 @@ export function applyCupSubstitution(cup: CupState, outgoingPlayerId: string | u
   cup = resumeCupMatch(cup, now);
   const substitutionMinute = Math.max(1, Math.min(120, Math.floor(Number(minute) || 1)));
   const outgoingMatchRating = getCupPlayerMatchRating(cup, outgoing.id, substitutionMinute) ?? 6.5;
-  const ratingDelta = incoming.rating - outgoing.rating;
+  // Same prepared match ratings (milestone card and form) the engine uses for every starter.
+  const matchRating = (player: StarXIPlayer) => Math.min(100, player.rating + (cup.careerBonuses?.[player.id] ?? 0));
+  const incomingRating = matchRating(incoming), outgoingRating = matchRating(outgoing);
+  const ratingDelta = Math.round((incomingRating - outgoingRating) * 10) / 10;
   const ratingMomentum = clamp(ratingDelta * 0.18, -4, 4);
   const formMomentum = clamp((6.5 - outgoingMatchRating) * 0.9, -2.2, 2.2);
   const freshnessMomentum = substitutionMinute >= 75 ? 1.2 : substitutionMinute >= 60 ? 0.8 : 0.25;
@@ -1400,8 +1403,8 @@ export function applyCupSubstitution(cup: CupState, outgoingPlayerId: string | u
   const momentumLabel = `${momentumDelta >= 0 ? "+" : ""}${momentumDelta.toFixed(1)}`;
   return {
     cup: { ...cup, broadcast: addBroadcastSubstitution(cup, outgoing.id, incoming.id, substitutionMinute), matchMomentum: nextMomentum, allTimeAppearances, matchPaused: false, lastResult: `Wechsel: ${incoming.name} für ${outgoing.name}. ${ratingLabel} · Momentum ${momentumLabel}.` },
-    incomingRating: incoming.rating,
-    outgoingRating: outgoing.rating,
+    incomingRating,
+    outgoingRating,
     ratingDelta,
     outgoingMatchRating,
     momentumDelta,
@@ -1434,6 +1437,15 @@ export function getTournament(id: string) {
 function boundedRandom(random: () => number) {
   const value = Number(random());
   return Number.isFinite(value) ? Math.max(0, Math.min(0.999999, value)) : 0;
+}
+
+/** Unsigned 32 bit seed for the next tournament draw. */
+export function newTournamentDrawSeed(random: () => number = Math.random) {
+  return Math.floor(boundedRandom(random) * 0x100000000) >>> 0;
+}
+
+function isDrawSeed(value: unknown): value is number {
+  return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 0xffffffff;
 }
 
 export function getTournamentOpponentSchedule(tournament: TournamentDefinition, random = Math.random) {
@@ -1481,6 +1493,13 @@ function normalizeTournamentOpponentSchedule(value: unknown, tournament: Tournam
     schedule.splice(Math.min(Math.max(0, round), schedule.length), 0, currentOpponentId);
   }
   return schedule.slice(0, tournament.rounds);
+}
+
+/** Saves from before the stored draw get a seed from their own match history, the same on every device. */
+function legacyTournamentDrawSeed(cup: Record<string, unknown>) {
+  let hash = 2166136261;
+  for (const char of `${Number(cup.matchStartedAt) || 0}:${Number(cup.wins) || 0}:${Number(cup.best) || 0}:${JSON.stringify(cup.allTimeAppearances ?? {}).length}`) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  return hash >>> 0;
 }
 
 function getCupOpponent(cup: CupState, tournament: TournamentDefinition) {
@@ -1685,7 +1704,7 @@ export function beginCupMatch(cup: CupState, now = Date.now(), tournamentId = cu
     }, tournament, cup.round, now, false, homePlayers, formationPositions, false);
   }
   const opponentIds = plannedOpponentIds?.length === tournament.rounds ? [...plannedOpponentIds] : getTournamentOpponentSchedule(tournament, random);
-  return startTournamentRound({ ...cup, round: 0, opponentIds, pendingNextRound: false, nextTournamentAt: 0, suspendedPlayerIds: [], originalLineupIds: [...originalLineupIds], originalBenchIds: [...originalBenchIds] }, tournament, 0, now, true, homePlayers, formationPositions);
+  return startTournamentRound({ ...cup, round: 0, opponentIds, drawSeed: newTournamentDrawSeed(random), pendingNextRound: false, nextTournamentAt: 0, suspendedPlayerIds: [], originalLineupIds: [...originalLineupIds], originalBenchIds: [...originalBenchIds] }, tournament, 0, now, true, homePlayers, formationPositions);
 }
 
 export function beginSeasonCupMatch(cup: CupState, seasonValue: unknown, now = Date.now(), homePlayers: readonly StarXIPlayer[] = [], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS, originalLineupIds: readonly string[] = homePlayers.map((player) => player.id), originalBenchIds: readonly string[] = []): CupState {
@@ -2246,7 +2265,7 @@ export function initialGameFeatures(now = Date.now()): GameFeatures {
     transferMarket: { offerIds: ["turbo", "wall", "maestro"], ownedIds: [] },
     starXI: { ownedIds: [], fragments: 0, lineupIds: Array.from({ length: STAR_XI_SQUAD_SIZE }, () => ""), benchIds: Array.from({ length: STAR_XI_BENCH_SIZE }, () => ""), formationId: "433", formationPositions: [...STAR_XI_FORMATION_POSITIONS] },
     club: { name: "FC Arbeitszeitbetrug", badge: "⚽", color: "#0071e3" },
-    cup: { active: false, mode: "season", phase: "regular", tournamentId: "stadium", round: 0, wins: 0, best: 0, trophies: { stadium: 0, champions: 0, world: 0 }, lastResult: "Noch kein Saisonspiel.", matchStartedAt: 0, matchEndsAt: 0, lastTickAt: 0, homeScore: 0, awayScore: 0, opponent: "", opponentRating: 58, opponentStrategyId: "ballbesitz", opponentIds: [], strategyId: "konter", substitutionsUsed: 0, matchMomentum: 0, originalLineupIds: [], originalBenchIds: [], playerEnteredAt: {}, playerExitedAt: {}, playerMatchPositions: {}, lastGoal: null, lastInjury: null, matchEvents: [], cardEvents: [], injuryEvents: [], sentOffPlayerIds: [], suspendedPlayerIds: [], injuredPlayerIds: {}, matchPaused: false, pendingNextRound: false, nextTournamentAt: 0, penaltyHomeScore: 0, penaltyAwayScore: 0, penaltyHomeTaken: 0, penaltyAwayTaken: 0, penaltyTurn: "home", penaltyEvents: [], penaltyMessage: "", allTimeScorers: {}, allTimeAppearances: {} },
+    cup: { active: false, mode: "season", phase: "regular", tournamentId: "stadium", round: 0, wins: 0, best: 0, trophies: { stadium: 0, champions: 0, world: 0 }, lastResult: "Noch kein Saisonspiel.", matchStartedAt: 0, matchEndsAt: 0, lastTickAt: 0, homeScore: 0, awayScore: 0, opponent: "", opponentRating: 58, opponentStrategyId: "ballbesitz", opponentIds: [], strategyId: "konter", substitutionsUsed: 0, matchMomentum: 0, originalLineupIds: [], originalBenchIds: [], playerEnteredAt: {}, playerExitedAt: {}, playerMatchPositions: {}, lastGoal: null, lastInjury: null, matchEvents: [], cardEvents: [], injuryEvents: [], sentOffPlayerIds: [], suspendedPlayerIds: [], injuredPlayerIds: {}, matchPaused: false, pendingNextRound: false, nextTournamentAt: 0, penaltyHomeScore: 0, penaltyAwayScore: 0, penaltyHomeTaken: 0, penaltyAwayTaken: 0, penaltyTurn: "home", penaltyEvents: [], penaltyMessage: "", allTimeScorers: {}, allTimeAppearances: {}, drawSeed: newTournamentDrawSeed() },
     seasonMode: initialSeasonMode("FC Arbeitszeitbetrug"),
     goalBoost: { tournamentId: null, multiplier: 1, startedAt: 0, endsAt: 0 },
     missions: initialMissions(),
@@ -2580,7 +2599,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     transferMarket: { offerIds: offerIds.length ? offerIds : defaults.transferMarket.offerIds, ownedIds: [...new Set(ownedIds)] },
     starXI: { ...normalizedStarXI, lockedPlayerIds: normalizeSquadLock(source.squadLock ?? asRecord(asRecord(source.travel).journey).squadLock)?.playerIds },
     club: { name: clubName, badge: CLUB_BADGES.includes(String(club.badge)) ? String(club.badge) : defaults.club.badge, color: CLUB_COLORS.includes(String(club.color)) ? String(club.color) : defaults.club.color },
-    cup: { simulation: normalizeInteractive(cup.simulation), restartAt:Number.isFinite(cup.restartAt)?Number(cup.restartAt):undefined, restartSide:cup.restartSide==='opponent'?'opponent':'club', regularDurationMs: Number(cup.regularDurationMs)>=180000&&Number(cup.regularDurationMs)<=300000?Number(cup.regularDurationMs):undefined, halftimeTaken:cup.halftimeTaken===true, timedPause:normalizeTimedPause(cup.timedPause), subWindowsUsed: Math.min(3,Math.max(0,Math.floor(Number(cup.subWindowsUsed)||0))), pendingSubstitutions: normalizePendingSubstitutions(cup.pendingSubstitutions), broadcast: normalizeMatchBroadcast(cup.broadcast), fixture: cup.fixture && typeof cup.fixture==='object' ? cup.fixture as CupState['fixture'] : undefined, careerRatingSeed: Number.isFinite(Number(cup.careerRatingSeed)) && Number(cup.careerRatingSeed) > 0 ? Number(cup.careerRatingSeed) : matchStartedAt, careerMatchId: typeof cup.careerMatchId === "string" ? cup.careerMatchId.slice(0, 200) : undefined, careerBonuses: Object.fromEntries(Object.entries(asRecord(cup.careerBonuses)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Number(value), -2, 5)])), active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && (Boolean(lastInjury) || Boolean(cup.simulation)), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
+    cup: { simulation: normalizeInteractive(cup.simulation), restartAt:Number.isFinite(cup.restartAt)?Number(cup.restartAt):undefined, restartSide:cup.restartSide==='opponent'?'opponent':'club', regularDurationMs: Number(cup.regularDurationMs)>=180000&&Number(cup.regularDurationMs)<=300000?Number(cup.regularDurationMs):undefined, halftimeTaken:cup.halftimeTaken===true, timedPause:normalizeTimedPause(cup.timedPause), subWindowsUsed: Math.min(3,Math.max(0,Math.floor(Number(cup.subWindowsUsed)||0))), pendingSubstitutions: normalizePendingSubstitutions(cup.pendingSubstitutions), broadcast: normalizeMatchBroadcast(cup.broadcast), fixture: cup.fixture && typeof cup.fixture==='object' ? cup.fixture as CupState['fixture'] : undefined, drawSeed: isDrawSeed(cup.drawSeed) ? cup.drawSeed : legacyTournamentDrawSeed(cup), careerRatingSeed: Number.isFinite(Number(cup.careerRatingSeed)) && Number(cup.careerRatingSeed) > 0 ? Number(cup.careerRatingSeed) : matchStartedAt, careerMatchId: typeof cup.careerMatchId === "string" ? cup.careerMatchId.slice(0, 200) : undefined, careerBonuses: Object.fromEntries(Object.entries(asRecord(cup.careerBonuses)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Number(value), -2, 5)])), active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && (Boolean(lastInjury) || Boolean(cup.simulation)), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
     seasonMode: normalizedSeasonMode,
     goalBoost,
     missions,

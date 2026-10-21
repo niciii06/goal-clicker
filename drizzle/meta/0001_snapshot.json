@@ -1,85 +1,163 @@
 {
-  "version": "6",
-  "dialect": "sqlite",
-  "id": "ec29f23a-800c-418f-9edb-4cf80afdc0ca",
-  "prevId": "c536b922-58d4-4f0f-8620-8e15864137f5",
+  "id": "35cf7ff7-b254-4283-8dc7-5d299c28b5e1",
+  "prevId": "7e7d567c-d896-42e8-a80d-557449f12561",
+  "version": "7",
+  "dialect": "postgresql",
   "tables": {
-    "coop_rooms": {
+    "public.coop_rooms": {
       "name": "coop_rooms",
+      "schema": "",
       "columns": {
         "code": {
           "name": "code",
           "type": "text",
           "primaryKey": true,
+          "notNull": true
+        },
+        "room_name": {
+          "name": "room_name",
+          "type": "text",
+          "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "default": "'Meine Welt'"
         },
         "host_player_id": {
           "name": "host_player_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "host_name": {
           "name": "host_name",
           "type": "text",
           "primaryKey": false,
+          "notNull": true
+        },
+        "host_last_seen_at": {
+          "name": "host_last_seen_at",
+          "type": "text",
+          "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "default": "''"
         },
         "guest_player_id": {
           "name": "guest_player_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "guest_name": {
           "name": "guest_name",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
+        },
+        "guest_last_seen_at": {
+          "name": "guest_last_seen_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "player3_player_id": {
+          "name": "player3_player_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "player3_name": {
+          "name": "player3_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "player3_last_seen_at": {
+          "name": "player3_last_seen_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "player4_player_id": {
+          "name": "player4_player_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "player4_name": {
+          "name": "player4_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "player4_last_seen_at": {
+          "name": "player4_last_seen_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
         },
         "shared_coins": {
           "name": "shared_coins",
-          "type": "real",
+          "type": "double precision",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 0
         },
         "host_goals": {
           "name": "host_goals",
-          "type": "real",
+          "type": "double precision",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 0
         },
         "guest_goals": {
           "name": "guest_goals",
-          "type": "real",
+          "type": "double precision",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
+          "default": 0
+        },
+        "player3_goals": {
+          "name": "player3_goals",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "player4_goals": {
+          "name": "player4_goals",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true,
           "default": 0
         },
         "host_clicks": {
           "name": "host_clicks",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 0
         },
         "guest_clicks": {
           "name": "guest_clicks",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
+          "default": 0
+        },
+        "player3_clicks": {
+          "name": "player3_clicks",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "player4_clicks": {
+          "name": "player4_clicks",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
           "default": 0
         },
         "shared_upgrade_level": {
@@ -87,23 +165,20 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 0
         },
         "shared_total_goals": {
           "name": "shared_total_goals",
-          "type": "real",
+          "type": "double precision",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 0
         },
         "shared_season_goals": {
           "name": "shared_season_goals",
-          "type": "real",
+          "type": "double precision",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 0
         },
         "shared_upgrades_json": {
@@ -111,7 +186,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "'{}'"
         },
         "shared_achievements_json": {
@@ -119,7 +193,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "'[]'"
         },
         "shared_stars": {
@@ -127,7 +200,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 0
         },
         "shared_seasons": {
@@ -135,7 +207,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 0
         },
         "shared_minigame_wins": {
@@ -143,7 +214,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 0
         },
         "shared_minigame_cooldowns_json": {
@@ -151,132 +221,245 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "'{}'"
+        },
+        "shared_features_json": {
+          "name": "shared_features_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "shared_state_backup_json": {
+          "name": "shared_state_backup_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "shared_state_version": {
+          "name": "shared_state_version",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "redeemed_bonus_codes_json": {
+          "name": "redeemed_bonus_codes_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'"
         },
         "last_passive_at": {
           "name": "last_passive_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
         "pending_player_id": {
           "name": "pending_player_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "pending_upgrade_id": {
           "name": "pending_upgrade_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "pending_upgrade_name": {
           "name": "pending_upgrade_name",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "pending_cost": {
           "name": "pending_cost",
-          "type": "real",
+          "type": "double precision",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "pending_upgrade_count": {
           "name": "pending_upgrade_count",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "updated_at": {
           "name": "updated_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
-          "default": "CURRENT_TIMESTAMP"
+          "default": "to_char(now() at time zone 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "coop_rooms_host_player_idx": {
+          "name": "coop_rooms_host_player_idx",
+          "columns": [
+            {
+              "expression": "host_player_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "coop_rooms_guest_player_idx": {
+          "name": "coop_rooms_guest_player_idx",
+          "columns": [
+            {
+              "expression": "guest_player_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "coop_rooms_player3_player_idx": {
+          "name": "coop_rooms_player3_player_idx",
+          "columns": [
+            {
+              "expression": "player3_player_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "coop_rooms_player4_player_idx": {
+          "name": "coop_rooms_player4_player_idx",
+          "columns": [
+            {
+              "expression": "player4_player_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": true
     },
-    "leaderboard_entries": {
-      "name": "leaderboard_entries",
+    "public.player_accounts": {
+      "name": "player_accounts",
+      "schema": "",
       "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
         "player_id": {
           "name": "player_id",
           "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "primaryKey": false,
+          "notNull": true
         },
-        "nickname": {
-          "name": "nickname",
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "total_goals": {
-          "name": "total_goals",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "season_goals": {
-          "name": "season_goals",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "minigame_wins": {
-          "name": "minigame_wins",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "CURRENT_TIMESTAMP"
+          "default": "to_char(now() at time zone 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')"
         }
       },
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "player_accounts_player_id_unique": {
+          "name": "player_accounts_player_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "player_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.solo_travel": {
+      "name": "solo_travel",
+      "schema": "",
+      "columns": {
+        "owner": {
+          "name": "owner",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fixture_id": {
+          "name": "fixture_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "journey_json": {
+          "name": "journey_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "solo_travel_owner_fixture_id_pk": {
+          "name": "solo_travel_owner_fixture_id_pk",
+          "columns": [
+            "owner",
+            "fixture_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": true
     }
   },
-  "views": {},
   "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
   "_meta": {
+    "columns": {},
     "schemas": {},
-    "tables": {},
-    "columns": {}
-  },
-  "internal": {
-    "indexes": {}
+    "tables": {}
   }
 }

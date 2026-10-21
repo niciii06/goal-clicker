@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 import { getDb } from '../../../db';
+import { resolvePlayer } from '../../auth/player';
 import { normalizeGameFeatures, getTournament } from '../../feature-data';
 import { createJourney, eligibilityError, fixtureFor } from '../../travel-data';
 import type { Journey } from '../../travel-data';
@@ -12,6 +13,8 @@ export async function POST(request: Request) {
  try {
   const p=await readJsonBody<{playerId?:unknown;action?:unknown;fixtureId?:unknown;features?:unknown;mode?:unknown;tournamentId?:unknown}>(request,MAX_GAME_STATE_BODY_BYTES);
   if(typeof p.playerId!=='string'||p.playerId.length<8||p.playerId.length>80)return Response.json({error:'Spieler-ID fehlt.'},{status:400});
+  // Solo play works without an account; a signed in player can only act for the account's player ID.
+  const auth=await resolvePlayer(request,p.playerId,{loginRequired:false});if(!auth.ok)return auth.response;
   const db=getDb(), now=Date.now();
   if(p.action==='status') {
    if(typeof p.fixtureId!=='string'||p.fixtureId.length>240)return Response.json({error:'Partie fehlt.'},{status:400});

@@ -31,26 +31,30 @@ export const STADIUM_CATEGORY_LABELS: Record<StadiumCategory, string> = {
 /** Rounded capacities by venue ID. */
 const KNOWN: Record<string, { capacity: number; signature?: StadiumSignature }> = {
   milan: { capacity: 75800, signature: 'san-siro' }, munich: { capacity: 75000, signature: 'allianz' }, wembley: { capacity: 90000, signature: 'wembley' },
-  dortmund: { capacity: 81300 }, madrid: { capacity: 78300 }, barcelona: { capacity: 99300 }, atletico: { capacity: 70500 }, manchester: { capacity: 74000 },
+  dortmund: { capacity: 81300 }, madrid: { capacity: 78300 }, barcelona: { capacity: 62000 }, atletico: { capacity: 70500 }, manchester: { capacity: 74000 },
   rio: { capacity: 78800 }, tokyo: { capacity: 68000 }, liverpool: { capacity: 61300 }, london: { capacity: 60700 }, tottenham: { capacity: 62800 },
-  lisbon: { capacity: 64600 }, amsterdam: { capacity: 55900 }, naples: { capacity: 54700 }, city: { capacity: 53400 }, istanbul: { capacity: 52200 },
+  lisbon: { capacity: 64600 }, amsterdam: { capacity: 55900 }, naples: { capacity: 54700 }, city: { capacity: 61500 }, istanbul: { capacity: 52200 },
   porto: { capacity: 50000 }, vienna: { capacity: 50900 }, paris: { capacity: 47900 }, leipzig: { capacity: 47000 }, turin: { capacity: 41500 },
-  chelsea: { capacity: 40300 }, eindhoven: { capacity: 35000 }, leverkusen: { capacity: 30200 }, monaco: { capacity: 16400 }, sydney: { capacity: 82500 },
+  chelsea: { capacity: 40300 }, eindhoven: { capacity: 35000 }, leverkusen: { capacity: 30200 }, monaco: { capacity: 16400 }, sydney: { capacity: 82500 }, miami: { capacity: 26700 },
   // Swiss anchors used by tournaments and season fixtures.
-  basel: { capacity: 38500 }, bern: { capacity: 31500 }, geneva: { capacity: 30000 }, zurich: { capacity: 26100 }, stgallen: { capacity: 19500 },
+  basel: { capacity: 38500 }, bern: { capacity: 31500 }, geneva: { capacity: 30000 }, zurich: { capacity: 26100 }, stgallen: { capacity: 19700 },
   luzern: { capacity: 16500 }, sion: { capacity: 14300 }, lausanne: { capacity: 12500 }, thun: { capacity: 10000 }, winterthur: { capacity: 8400 }, biel: { capacity: 5200 },
 };
-/** Swiss club grounds matched by stadium name (the club venues carry their own IDs). */
+/** Swiss grounds matched by stadium name. The name wins over the venue ID, so a stadium has one capacity
+ * whether it is reached as a tournament anchor or as a season club's ground. */
 const KNOWN_BY_STADIUM: Record<string, number> = {
-  'St. Jakob-Park': 38500, 'Stadion Wankdorf': 31500, 'Stade de Genève': 30000, 'Stadion Letzigrund': 26100, swissporarena: 16500,
-  'Stade de Tourbillon': 14300, 'Stade de la Tuilière': 12500, 'Stade de la Maladière': 12000, 'VISANA STADION': 10000, 'Stadion Brügglifeld': 8000,
-  'Schützenwiese': 8400, 'Tissot Arena': 5200,
+  'St. Jakob-Park': 38500, 'Stadion Wankdorf': 31500, 'Stade de Genève': 30000, 'Stadion Letzigrund': 26100, Letzigrund: 26100, swissporarena: 16500, Swissporarena: 16500,
+  'Berit Sitterstadion': 19700, Kybunpark: 19700, 'Stade de Tourbillon': 14300, 'Stade de la Tuilière': 12500, 'Stade de la Maladière': 12000,
+  'VISANA STADION': 10000, 'Stadion Brügglifeld': 8000, 'Schützenwiese': 8400, 'Tissot Arena': 5200, 'AIL Arena': 8800,
+  'Stade de la Charrière': 12700, 'Stadion Brühl': 10000, 'Stade de Bouleyres': 5000, 'Stadion Niedermatten': 3700, 'Stadion Linthstrasse': 2800,
 };
 const MILAN_ALIASES = ['San Siro', 'Stadio Giuseppe Meazza'];
 
-/** League tier of a season club (15 entry, 1 top) when the venue belongs to one. */
+/** League tier (15 entry, 1 top) of the strongest season club playing on this ground; a ground
+ * shared by several clubs is sized for the biggest of them, so it keeps one capacity. */
 function leagueOfVenue(venue: Venue) {
-  return SEASON_CLUBS.find(club => club.venue.id === venue.id)?.league;
+  const leagues = SEASON_CLUBS.filter(club => club.venue.id === venue.id || (club.venue.stadium === venue.stadium && club.venue.city === venue.city)).map(club => club.league);
+  return leagues.length ? Math.min(...leagues) : undefined;
 }
 function estimateFromLeague(league: number) {
   // Liga 15/14 local pitches, 13 to 10 village grounds, 9 to 6 small stadiums, 5 to 4 Challenge League.
@@ -86,8 +90,8 @@ export function stadiumProfile(venue: Venue | undefined, options: { homeDivision
   let capacity: number, capacitySource: StadiumProfile['capacitySource'] = 'known', signature: StadiumSignature | undefined;
   const known = KNOWN[v.id] ?? (MILAN_ALIASES.includes(v.stadium) ? KNOWN.milan : undefined);
   if (own) { capacity = homeCapacity(options.homeDivision ?? 1); capacitySource = 'club-growth'; }
-  else if (known) { capacity = known.capacity; signature = known.signature; }
   else if (KNOWN_BY_STADIUM[v.stadium]) capacity = KNOWN_BY_STADIUM[v.stadium];
+  else if (known) { capacity = known.capacity; signature = known.signature; }
   else {
     capacity = estimateFromLeague(leagueOfVenue(v) ?? (v.country === 'Schweiz' ? 12 : 4)); capacitySource = 'estimated';
     // A ground named as a sports field is a village or club ground, whatever the league.

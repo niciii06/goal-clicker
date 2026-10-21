@@ -30,7 +30,15 @@ export function readStoredGame() {
   return { saved: safest?.saved as Partial<GameState> | undefined, recovered: Boolean(safest && safest.key !== STORAGE_KEY) };
 }
 
+let persistenceSuspended = false;
+
+/** Stops all autosaves until the page reloads, so an imported save file is not overwritten on the way out. */
+export function suspendLocalPersistence() {
+  persistenceSuspended = true;
+}
+
 export function persistLocalGame(state: GameState) {
+  if (persistenceSuspended) return;
   try {
     const currentRaw = localStorage.getItem(STORAGE_KEY);
     const current = parseStoredGame(currentRaw);

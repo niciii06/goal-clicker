@@ -1,7 +1,6 @@
 import { createJourney, fixtureFor } from '../app/travel-data.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { registerHooks } from 'node:module';
 import { getTableColumns } from 'drizzle-orm';
 import { coopRooms } from '../db/schema.ts';
 import { initialGameFeatures, normalizeGameFeatures, setBestStarXI, STAR_XI_PLAYERS } from '../app/feature-data.ts';
@@ -14,8 +13,6 @@ import type { GameFeatures } from '../app/feature-data.ts';
 type TestResponse = { room: { game: { features: GameFeatures } }; error?: string };
 import type { RoomRow, RoomUpdate } from '../db/index.ts';
 
-registerHooks({ resolve(specifier, context, nextResolve) { if (specifier === 'cloudflare:workers') return { shortCircuit: true, url: 'data:text/javascript,export const env = globalThis.__SITES_TEST_ENV__ ?? {};' }; return nextResolve(specifier, context); } });
-(globalThis as typeof globalThis & {__SITES_TEST_ENV__:unknown}).__SITES_TEST_ENV__={DB:{}};
 const { GoalClickerDatabase }=await import('../db/index.ts');
 const { POST,GET }=await import('../app/api/multiplayer/route.ts');
 let row: RoomRow;

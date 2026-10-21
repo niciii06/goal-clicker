@@ -1,11 +1,13 @@
 import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
-import { env } from "cloudflare:workers";
-import { drizzle } from "drizzle-orm/d1";
+import type { AnyColumn } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import * as schema from "./schema";
-import { coopRooms, soloTravel } from "./schema";
+import { coopRooms, playerAccounts, soloTravel } from "./schema";
 
 export type RoomRow = typeof coopRooms.$inferSelect;
 export type RoomUpdate = Partial<Omit<RoomRow, "code">>;
+export type PlayerAccount = typeof playerAccounts.$inferSelect;
 
 export type RoomSeatRole = "host" | "guest" | "player3" | "player4";
 
@@ -23,44 +25,97 @@ function seatPlayerColumn(role: RoomSeatRole) {
   return coopRooms.player4PlayerId;
 }
 
+let connection: postgres.Sql | null = null;
+
 function createDatabase() {
-  if (!env.DB) {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
     throw new Error(
-      "Cloudflare D1 binding \`DB\` ist nicht verfügbar. Die bestehenden Welten werden dadurch nicht verändert.",
+      "DATABASE_URL ist nicht gesetzt. Die bestehenden Welten werden dadurch nicht verändert.",
     );
   }
-  return drizzle(env.DB, { schema });
+  // Supabase's transaction pooler (port 6543) does not keep prepared statements between queries.
+  connection = postgres(url, { prepare: false, max: Number(process.env.DATABASE_POOL_MAX) || 5, idle_timeout: 20 });
+  return drizzle(connection, { schema });
 }
 
 type Database = ReturnType<typeof createDatabase>;
 
-function increment(column: string, amount: number) {
+/** `column + amount` as a column reference and a bound parameter, never as SQL text. */
+function increment(column: AnyColumn, amount: number) {
   const safeAmount = Number.isFinite(amount) ? amount : 0;
-  return sql.raw('"' + column + '" + ' + String(safeAmount));
+  return sql`${column} + ${safeAmount}`;
 }
 
 function roleClickUpdate(role: string, amount: number, clickCount: number) {
-  if (role === "host") return { hostGoals: increment("host_goals", amount), hostClicks: increment("host_clicks", clickCount) };
-  if (role === "guest") return { guestGoals: increment("guest_goals", amount), guestClicks: increment("guest_clicks", clickCount) };
-  if (role === "player3") return { player3Goals: increment("player3_goals", amount), player3Clicks: increment("player3_clicks", clickCount) };
-  return { player4Goals: increment("player4_goals", amount), player4Clicks: increment("player4_clicks", clickCount) };
+  if (role === "host") return { hostGoals: increment(coopRooms.hostGoals, amount), hostClicks: increment(coopRooms.hostClicks, clickCount) };
+  if (role === "guest") return { guestGoals: increment(coopRooms.guestGoals, amount), guestClicks: increment(coopRooms.guestClicks, clickCount) };
+  if (role === "player3") return { player3Goals: increment(coopRooms.player3Goals, amount), player3Clicks: increment(coopRooms.player3Clicks, clickCount) };
+  return { player4Goals: increment(coopRooms.player4Goals, amount), player4Clicks: increment(coopRooms.player4Clicks, clickCount) };
 }
 
 export class GoalClickerDatabase {
-  constructor(private readonly client: Database) {}
+  private database: Database | null = null;
+
+  /** The pool opens on the first query, so a missing DATABASE_URL only fails requests that need it. */
+  constructor(private readonly connect: () => Database) {}
+
+  private get client() {
+    this.database ??= this.connect();
+    return this.database;
+  }
 
   async getSoloJourney(owner: string, fixtureId: string) {
     const [row] = await this.client.select().from(soloTravel).where(and(eq(soloTravel.owner,owner),eq(soloTravel.fixtureId,fixtureId))).limit(1);
-    return row ? JSON.parse(row.journeyJson) : null;
+    // Typed like the JSON.parse result it replaces; callers validate the receipt shape.
+    return row ? row.journeyJson as ReturnType<typeof JSON.parse> : null;
   }
   async putSoloJourney(owner: string, fixtureId: string, journey: unknown) {
-    await this.client.insert(soloTravel).values({owner,fixtureId,journeyJson:JSON.stringify(journey)}).onConflictDoNothing();
+    await this.client.insert(soloTravel).values({owner,fixtureId,journeyJson:journey}).onConflictDoNothing();
     return this.getSoloJourney(owner,fixtureId);
   }
   async consumeSoloJourney(owner: string, fixtureId: string, journey: unknown) {
-    const rows=await this.client.update(soloTravel).set({journeyJson:JSON.stringify(journey)}).where(and(eq(soloTravel.owner,owner),eq(soloTravel.fixtureId,fixtureId),sql`COALESCE(json_extract(${soloTravel.journeyJson}, '$.consumed'),0) = 0`)).returning();
+    // Only a receipt that is not consumed yet (consumed missing, null, false or 0) can be consumed, once.
+    const rows=await this.client.update(soloTravel).set({journeyJson:journey}).where(and(eq(soloTravel.owner,owner),eq(soloTravel.fixtureId,fixtureId),sql`coalesce(${soloTravel.journeyJson}->'consumed', 'null'::jsonb) in ('null'::jsonb, 'false'::jsonb, '0'::jsonb)`)).returning();
     return rows.length===1;
   }
+  async getAccount(userId: string): Promise<PlayerAccount | null> {
+    const [account] = await this.client.select().from(playerAccounts).where(eq(playerAccounts.userId, userId)).limit(1);
+    return account ?? null;
+  }
+
+  /**
+   * Links a login to a player ID once. The first link of a user wins, and a player ID belongs to one user:
+   * both are unique, so concurrent first logins cannot create two links. Returns null when the player ID
+   * already belongs to another account.
+   */
+  async linkAccount(userId: string, playerId: string, email: string | null): Promise<PlayerAccount | null> {
+    const [created] = await this.client.insert(playerAccounts).values({ userId, playerId, email }).onConflictDoNothing().returning();
+    return created ?? await this.getAccount(userId);
+  }
+
+  /**
+   * Moves the account to an imported player ID, but only while its current player ID has no world seat yet
+   * (a fresh device that logged in before importing the old save). The update is conditional on the
+   * current link, and the unique player ID keeps two accounts from claiming the same ID.
+   */
+  async relinkAccount(userId: string, playerId: string): Promise<{ account: PlayerAccount | null; reason?: "has-worlds" | "taken" }> {
+    const current = await this.getAccount(userId);
+    if (!current || current.playerId === playerId) return { account: current };
+    const seat = or(eq(coopRooms.hostPlayerId, current.playerId), eq(coopRooms.guestPlayerId, current.playerId), eq(coopRooms.player3PlayerId, current.playerId), eq(coopRooms.player4PlayerId, current.playerId));
+    const [world] = await this.client.select({ code: coopRooms.code }).from(coopRooms).where(seat).limit(1);
+    if (world) return { account: current, reason: "has-worlds" };
+    try {
+      const [moved] = await this.client.update(playerAccounts).set({ playerId }).where(and(eq(playerAccounts.userId, userId), eq(playerAccounts.playerId, current.playerId))).returning();
+      return { account: moved ?? await this.getAccount(userId) };
+    } catch (error) {
+      // drizzle wraps the driver error; 23505 is a unique violation.
+      const failure = error as { code?: string; cause?: { code?: string } };
+      if ((failure.code ?? failure.cause?.code) === "23505") return { account: current, reason: "taken" };
+      throw error;
+    }
+  }
+
   async getRoom(code: string): Promise<RoomRow | null> {
     const [room] = await this.client.select().from(coopRooms).where(eq(coopRooms.code, code)).limit(1);
     return room ?? null;
@@ -110,10 +165,10 @@ export class GoalClickerDatabase {
     const [room] = await this.client
       .update(coopRooms)
       .set({
-        sharedCoins: increment("shared_coins", amount),
-        sharedTotalGoals: increment("shared_total_goals", amount),
-        sharedSeasonGoals: increment("shared_season_goals", amount),
-        sharedStateVersion: increment("shared_state_version", 1), // shared_state_version + 1
+        sharedCoins: increment(coopRooms.sharedCoins, amount),
+        sharedTotalGoals: increment(coopRooms.sharedTotalGoals, amount),
+        sharedSeasonGoals: increment(coopRooms.sharedSeasonGoals, amount),
+        sharedStateVersion: increment(coopRooms.sharedStateVersion, 1), // shared_state_version = shared_state_version + 1
         lastPassiveAt: timestamp,
         pendingPlayerId: null,
         pendingUpgradeId: null,
@@ -133,6 +188,14 @@ export class GoalClickerDatabase {
 let database: GoalClickerDatabase | null = null;
 
 export function getDb() {
-  database ??= new GoalClickerDatabase(createDatabase());
+  database ??= new GoalClickerDatabase(createDatabase);
   return database;
+}
+
+/** Closes the pool, for scripts and tests that must exit. */
+export async function closeDb() {
+  const current = connection;
+  connection = null;
+  database = null;
+  await current?.end({ timeout: 5 });
 }

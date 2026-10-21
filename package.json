@@ -6,60 +6,57 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "install:ci": "bash scripts/install-ci.sh",
-    "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vite",
-    "build": "bash scripts/build-verified.sh",
-    "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
-    "test": "npm run build && node --import tsx --test tests/best-lineup.test.ts tests/game-balance.test.ts tests/career.test.ts tests/match-viewer.test.ts tests/match-broadcast.test.ts tests/live-quality.test.ts tests/interactive-match.test.ts tests/career-api.test.ts tests/journey-routing.test.ts tests/travel.test.ts tests/travel-api.test.ts tests/master-update.test.ts tests/match-session.test.ts tests/match-changes.test.ts tests/match-timing.test.ts tests/football-rules.test.ts tests/match-physics.test.ts tests/stadium-audit.test.ts tests/rewards-api.test.ts tests/coop-security.test.ts tests/coop-features.test.ts tests/features-v2.test.ts tests/client-data.test.ts tests/position-scrap.test.ts tests/scrap-fc27.test.ts tests/gameplay-update.test.ts tests/travel-map-camera.test.ts tests/progression-shop.test.ts tests/discipline.test.ts tests/match-ai.test.ts tests/stadium-profiles.test.ts && node --test tests/rendered-html.test.mjs tests/save-safety.test.mjs tests/test-mode-access.test.mjs tests/walkout-reveal.test.mjs tests/multiplayer-concurrency.test.mjs tests/click-progression.test.mjs tests/squad-drag-drop.test.mjs tests/event-restore.test.mjs tests/transfer-insider.test.mjs",
-    "test:browser": "node --import tsx --test --test-concurrency=1 tests/browser/smoke.test.ts",
-    "validate:artifact": "bash scripts/validate-artifact.sh",
-    "lint": "bash scripts/sites-env.sh -- eslint .",
-    "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "types:worker": "wrangler types worker-runtime.d.ts --config scripts/typecheck-wrangler.json --include-runtime --include-env --no-strict-vars",
-    "dev:external": "vite",
-    "build:external": "vinext build",
-    "preview:external": "wrangler dev --config wrangler.external.json",
-    "db:local": "wrangler d1 migrations apply DB --local --config wrangler.external.json",
-    "db:remote": "node scripts/external-hosting.mjs migrate",
-    "deploy:external": "node scripts/external-hosting.mjs deploy",
-    "check:external": "wrangler deploy --dry-run --config wrangler.external.json --outdir .wrangler/external-check",
+    "test": "npm run build && npm run test:unit && node --test tests/rendered-html.test.mjs",
+    "test:unit": "node --import tsx --test tests/best-lineup.test.ts tests/game-balance.test.ts tests/career.test.ts tests/match-viewer.test.ts tests/match-broadcast.test.ts tests/live-quality.test.ts tests/interactive-match.test.ts tests/career-api.test.ts tests/journey-routing.test.ts tests/travel.test.ts tests/travel-api.test.ts tests/master-update.test.ts tests/match-session.test.ts tests/match-changes.test.ts tests/match-timing.test.ts tests/football-rules.test.ts tests/match-physics.test.ts tests/stadium-audit.test.ts tests/rewards-api.test.ts tests/coop-security.test.ts tests/coop-features.test.ts tests/features-v2.test.ts tests/client-data.test.ts tests/position-scrap.test.ts tests/scrap-fc27.test.ts tests/gameplay-update.test.ts tests/travel-map-camera.test.ts tests/progression-shop.test.ts tests/discipline.test.ts tests/match-ai.test.ts tests/stadium-profiles.test.ts tests/match-squad-editor.test.ts tests/tournament-draw.test.ts tests/auth.test.ts && node --test tests/save-safety.test.mjs tests/test-mode-access.test.mjs tests/walkout-reveal.test.mjs tests/multiplayer-concurrency.test.mjs tests/click-progression.test.mjs tests/squad-drag-drop.test.mjs tests/event-restore.test.mjs tests/transfer-insider.test.mjs",
+    "test:browser": "node --import tsx --test --test-concurrency=1 tests/browser/smoke.test.ts",
+    "test:db": "node --import tsx --test --test-concurrency=1 tests/db-postgres.test.ts tests/d1-migration.test.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:import-d1": "node scripts/migrate-d1-to-supabase.mjs",
+    "generate:client-data": "node scripts/client-data.mjs",
     "verify:physics": "node --import tsx scripts/verify-match-physics.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "2.112.2",
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.117.2",
     "country-flag-icons": "^1.6.20",
     "drizzle-orm": "0.45.2",
     "next": "16.4.2",
+    "postgres": "3.4.9",
     "react": "19.2.9",
     "react-dom": "19.2.9"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.64.0",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "6.0.2",
-    "@vitejs/plugin-rsc": "0.5.26",
     "drizzle-kit": "0.31.11",
     "eslint": "9.39.4",
     "eslint-config-next": "16.4.2",
     "playwright-core": "1.56.1",
-    "react-server-dom-webpack": "19.2.9",
     "tailwindcss": "4.2.1",
     "tsx": "4.22.1",
-    "typescript": "5.9.3",
-    "vinext": "0.0.50",
-    "vite": "8.0.16",
-    "wrangler": "4.151.1"
+    "typescript": "5.9.3"
   },
   "type": "module",
+  "imports": {
+    "#travel-route-cache": {
+      "browser": "./app/travel-route-cache-lazy.ts",
+      "default": "./app/travel-route-cache.ts"
+    },
+    "#fc27-india-source": {
+      "browser": "./app/fc27-india-source.client.json",
+      "default": "./app/fc27-india-source.json"
+    }
+  },
   "displayName": "Goal Clicker",
   "overrides": {
-    "vinext": {
-      "image-size": "2.0.4"
-    },
     "@esbuild-kit/core-utils": {
       "esbuild": "0.25.12"
     }
