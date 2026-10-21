@@ -62,11 +62,22 @@ function roomRow(source) {
   return row;
 }
 
+/**
+ * SQLite manages sqlite_sequence (and other sqlite_ tables) itself and refuses to create or fill them,
+ * so exports that list them as ordinary tables could not be read. Their content is not needed.
+ */
+export function withoutSqliteInternals(sql) {
+  return sql
+    .split(/\r?\n/)
+    .filter((line) => !/^\s*(CREATE TABLE( IF NOT EXISTS)?|INSERT INTO|DELETE FROM)\s+["'`\[]?sqlite_/i.test(line))
+    .join("\n");
+}
+
 async function openSource({ dump, sqlite }) {
   const { DatabaseSync } = await import("node:sqlite");
   if (sqlite) return new DatabaseSync(resolve(sqlite), { readOnly: true });
   const db = new DatabaseSync(":memory:");
-  db.exec(readFileSync(resolve(dump), "utf8"));
+  db.exec(withoutSqliteInternals(readFileSync(resolve(dump), "utf8")));
   return db;
 }
 

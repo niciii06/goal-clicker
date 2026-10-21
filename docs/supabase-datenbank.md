@@ -103,7 +103,7 @@ Empfehlung für den endgültigen Umzug: einmal früh importieren und testen, dan
      const email = (await headers()).get("oai-authenticated-user-email");
      if (email?.toLowerCase() !== OWNER_EMAIL) return new Response("Nicht erlaubt", { status: 403 });
      const db = (env as { DB: D1Database }).DB;
-     const { results: tables } = await db.prepare("select name, sql from sqlite_master where type = 'table' and name not like '_cf_%' and name <> 'd1_migrations'").all<{ name: string; sql: string }>();
+     const { results: tables } = await db.prepare("select name, sql from sqlite_master where type = 'table' and name not like '_cf_%' and name not like 'sqlite_%' and name <> 'd1_migrations'").all<{ name: string; sql: string }>();
      let dump = "PRAGMA defer_foreign_keys=TRUE;\n";
      for (const table of tables) {
        dump += `${table.sql};\n`;

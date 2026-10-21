@@ -93,3 +93,10 @@ test('a dry run reads the export and writes nothing', { skip }, async () => {
   const [{ n }] = await admin`select count(*)::int as n from coop_rooms`;
   assert.equal(n, 0);
 });
+
+test('exports that list the SQLite internal sqlite_sequence table are accepted', { skip }, async () => {
+  const sql = (await readFile(join(dir, 'export.sql'), 'utf8')) + 'CREATE TABLE sqlite_sequence(name,seq);\nINSERT INTO "sqlite_sequence" ("name","seq") VALUES(\'x\',1);\n';
+  await writeFile(join(dir, 'export-with-sequence.sql'), sql);
+  const result = await migrateD1ToPostgres({ dump: join(dir, 'export-with-sequence.sql'), databaseUrl: url, dryRun: true, log: quiet });
+  assert.equal(result.rooms, 2);
+});
