@@ -32,6 +32,8 @@ Alle bedingten Updates bleiben atomar. Jede Schreiboperation ist ein einzelnes `
 | `DATABASE_URL` | Verbindung der App. Auf Vercel den **Transaction Pooler** von Supabase verwenden (Port 6543) und `?sslmode=require` anhängen. |
 | `DATABASE_POOL_MAX` | Optional, Verbindungen pro Server Instanz (Standard 5). |
 
+**Produktion (Stand 21. Oktober 2026):** Die App auf Vercel verbindet sich nicht als `postgres`, sondern als eigener Benutzer `goal_clicker_app` über den Transaction Pooler `aws-0-eu-central-1.pooler.supabase.com:6543` (Benutzername `goal_clicker_app.<projekt-ref>`). Er darf nur `coop_rooms`, `solo_travel` und `player_accounts` lesen und schreiben, jeweils über eine eigene Policy `goal_clicker_app_all`. Sein Passwort steht nur in der Vercel Variable `DATABASE_URL` (Typ *Sensitive*). Zum Wechseln des Passworts: im SQL Editor `alter role goal_clicker_app password '<neu>';` und danach `DATABASE_URL` in Vercel anpassen und neu deployen. Rolle und Policies sind bewusst nicht in `drizzle/`, weil sie ein Passwort brauchen und lokale Testdatenbanken sie nicht kennen. Eine neue Tabelle braucht deshalb zusätzlich `grant ... to goal_clicker_app` und eine Policy.
+
 Für Migrationen und den Datenimport eine **direkte Verbindung** oder den **Session Pooler** (Port 5432) verwenden. Die Werte stehen im Supabase Dashboard unter *Connect*. Passwörter gehören nie ins Repository, nur in `.env.local` (ignoriert) oder in die Vercel Einstellungen.
 
 ## Schema anlegen und ändern
