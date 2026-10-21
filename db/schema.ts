@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { bigint, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text } from "drizzle-orm/pg-core";
+import { bigint, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, uuid } from "drizzle-orm/pg-core";
 
 // Supabase exposes the public schema through its REST API. Row level security without any policy keeps
 // these tables closed to the browser keys; the server connects as the database owner, which bypasses it.
@@ -65,3 +65,12 @@ export const soloTravel = pgTable("solo_travel", {
   fixtureId: text("fixture_id").notNull(),
   journeyJson: jsonb("journey_json").notNull(),
 }, (t) => [primaryKey({ columns: [t.owner, t.fixtureId] })]).enableRLS();
+
+// Links a Supabase Auth user (Google login) to the game's player ID. The player ID stays the key of every
+// world seat and receipt, so worlds played before the login keep working once the ID is linked.
+export const playerAccounts = pgTable("player_accounts", {
+  userId: uuid("user_id").primaryKey(),
+  playerId: text("player_id").notNull().unique(),
+  email: text("email"),
+  createdAt: text("created_at").notNull().default(isoNow),
+}).enableRLS();

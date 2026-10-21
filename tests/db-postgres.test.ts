@@ -16,7 +16,7 @@ before(async () => {
   if (!url) return;
   admin = postgres(url, { max: 1, onnotice: () => {} });
   await migrate(drizzle(admin), { migrationsFolder: 'drizzle' });
-  await admin`truncate coop_rooms, solo_travel`;
+  await admin`truncate coop_rooms, solo_travel, player_accounts`;
   process.env.DATABASE_URL = url;
   process.env.DATABASE_POOL_MAX = '10';
   const dbModule = await import('../db/index.ts');
@@ -117,6 +117,8 @@ test('a solo journey receipt is created once and consumed once', { skip }, async
 test('row level security keeps the tables closed to the Supabase browser roles', { skip }, async () => {
   const rows = await admin`select relname, relrowsecurity from pg_class where relname in ('coop_rooms', 'solo_travel') order by relname`;
   assert.deepEqual(rows.map((r) => [r.relname, r.relrowsecurity]), [['coop_rooms', true], ['solo_travel', true]]);
+  const [accounts] = await admin`select relrowsecurity from pg_class where relname = 'player_accounts'`;
+  assert.equal(accounts.relrowsecurity, true);
   const policies = await admin`select count(*)::int as n from pg_policies where tablename in ('coop_rooms', 'solo_travel')`;
   assert.equal(policies[0].n, 0);
 });
@@ -139,4 +141,26 @@ test('the multiplayer API creates, joins and plays a world on PostgreSQL', { ski
   const stored = (await db.getRoom(code))!;
   assert.equal(stored.hostClicks, 8);
   assert.ok(stored.sharedStateVersion >= 8);
+});
+
+test('a login links one player ID, once, even when two devices log in at the same time', { skip }, async () => {
+  const user = '00000000-0000-4000-8000-000000000001', other = '00000000-0000-4000-8000-000000000002';
+  const links = await Promise.all(['device-a-player', 'device-b-player', 'device-c-player'].map((id) => db.linkAccount(user, id, 'a@example.com')));
+  assert.equal(new Set(links.map((l) => l!.playerId)).size, 1);
+  const owned = links[0]!.playerId;
+  // Another account can neither take that player ID nor link a second one for the same user.
+  assert.equal(await db.linkAccount(other, owned, null), null);
+  assert.equal((await db.linkAccount(user, 'yet-another-id', null))!.playerId, owned);
+});
+
+test('an account without worlds may switch to an imported player ID, one with worlds may not', { skip }, async () => {
+  const fresh = '00000000-0000-4000-8000-000000000003', busy = '00000000-0000-4000-8000-000000000004';
+  await db.linkAccount(fresh, 'fresh-random-id', null);
+  assert.equal((await db.relinkAccount(fresh, 'imported-old-id')).account!.playerId, 'imported-old-id');
+  assert.equal((await db.relinkAccount(fresh, 'device-a-player')).reason, 'taken');
+  await db.linkAccount(busy, 'busy-player-id', null);
+  await db.insertRoom({ ...room('BUSY'), hostPlayerId: 'busy-player-id' });
+  const refused = await db.relinkAccount(busy, 'another-imported-id');
+  assert.equal(refused.reason, 'has-worlds');
+  assert.equal(refused.account!.playerId, 'busy-player-id');
 });

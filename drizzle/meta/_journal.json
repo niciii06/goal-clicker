@@ -8,6 +8,13 @@
       "when": 1792585839539,
       "tag": "0000_supabase_initial",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792586283092,
+      "tag": "0001_player_accounts",
+      "breakpoints": true
     }
   ]
 }

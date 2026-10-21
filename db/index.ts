@@ -3,10 +3,11 @@ import type { AnyColumn } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
-import { coopRooms, soloTravel } from "./schema";
+import { coopRooms, playerAccounts, soloTravel } from "./schema";
 
 export type RoomRow = typeof coopRooms.$inferSelect;
 export type RoomUpdate = Partial<Omit<RoomRow, "code">>;
+export type PlayerAccount = typeof playerAccounts.$inferSelect;
 
 export type RoomSeatRole = "host" | "guest" | "player3" | "player4";
 
@@ -78,6 +79,43 @@ export class GoalClickerDatabase {
     const rows=await this.client.update(soloTravel).set({journeyJson:journey}).where(and(eq(soloTravel.owner,owner),eq(soloTravel.fixtureId,fixtureId),sql`coalesce(${soloTravel.journeyJson}->'consumed', 'null'::jsonb) in ('null'::jsonb, 'false'::jsonb, '0'::jsonb)`)).returning();
     return rows.length===1;
   }
+  async getAccount(userId: string): Promise<PlayerAccount | null> {
+    const [account] = await this.client.select().from(playerAccounts).where(eq(playerAccounts.userId, userId)).limit(1);
+    return account ?? null;
+  }
+
+  /**
+   * Links a login to a player ID once. The first link of a user wins, and a player ID belongs to one user:
+   * both are unique, so concurrent first logins cannot create two links. Returns null when the player ID
+   * already belongs to another account.
+   */
+  async linkAccount(userId: string, playerId: string, email: string | null): Promise<PlayerAccount | null> {
+    const [created] = await this.client.insert(playerAccounts).values({ userId, playerId, email }).onConflictDoNothing().returning();
+    return created ?? await this.getAccount(userId);
+  }
+
+  /**
+   * Moves the account to an imported player ID, but only while its current player ID has no world seat yet
+   * (a fresh device that logged in before importing the old save). The update is conditional on the
+   * current link, and the unique player ID keeps two accounts from claiming the same ID.
+   */
+  async relinkAccount(userId: string, playerId: string): Promise<{ account: PlayerAccount | null; reason?: "has-worlds" | "taken" }> {
+    const current = await this.getAccount(userId);
+    if (!current || current.playerId === playerId) return { account: current };
+    const seat = or(eq(coopRooms.hostPlayerId, current.playerId), eq(coopRooms.guestPlayerId, current.playerId), eq(coopRooms.player3PlayerId, current.playerId), eq(coopRooms.player4PlayerId, current.playerId));
+    const [world] = await this.client.select({ code: coopRooms.code }).from(coopRooms).where(seat).limit(1);
+    if (world) return { account: current, reason: "has-worlds" };
+    try {
+      const [moved] = await this.client.update(playerAccounts).set({ playerId }).where(and(eq(playerAccounts.userId, userId), eq(playerAccounts.playerId, current.playerId))).returning();
+      return { account: moved ?? await this.getAccount(userId) };
+    } catch (error) {
+      // drizzle wraps the driver error; 23505 is a unique violation.
+      const failure = error as { code?: string; cause?: { code?: string } };
+      if ((failure.code ?? failure.cause?.code) === "23505") return { account: current, reason: "taken" };
+      throw error;
+    }
+  }
+
   async getRoom(code: string): Promise<RoomRow | null> {
     const [room] = await this.client.select().from(coopRooms).where(eq(coopRooms.code, code)).limit(1);
     return room ?? null;

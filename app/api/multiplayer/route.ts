@@ -7,6 +7,7 @@ import { fixtureFor, travelGate, consumeTravel, eligibilityError, settleTravel }
 import { claimAllAlbumRewards, claimAlbumReward, prepareCareerMatch, recordCareerMatch } from "../../career-data";
 import { competitionFor, squadBanError } from "../../discipline";
 import { getDb } from "../../../db";
+import { resolvePlayer } from "../../auth/player";
 import type { RoomRow, RoomUpdate } from "../../../db";
 import { SPECIAL_CARD_PACK, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getTransferBonuses, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
 import type { GameFeatures, PenaltyDirection, StarFormationId, StarPackReveal } from "../../feature-data";
@@ -497,6 +498,8 @@ export async function GET(request: Request) {
     if (!isSupportedMultiplayerProtocol(url.searchParams.get("protocol"))) return jsonError(MULTIPLAYER_UPDATE_MESSAGE, 426);
     const playerId = cleanPlayerId(url.searchParams.get("playerId"));
     if (!playerId) return jsonError("Spieler-ID fehlt.");
+    const auth = await resolvePlayer(request, playerId, { loginRequired: true });
+    if (!auth.ok) return auth.response;
     if (url.searchParams.get("list") === "1") {
       const db = getDb();
       const rooms = await db.listRoomsForPlayer(playerId);
@@ -561,6 +564,9 @@ export async function POST(request: Request) {
     const playerId = cleanPlayerId(payload.playerId);
     const nickname = cleanName(payload.nickname);
     if (playerId.length < 8) return jsonError("Spieler-ID fehlt.");
+    // With Google login the world seats belong to the account's player ID, not to whoever knows the ID.
+    const auth = await resolvePlayer(request, playerId, { loginRequired: true });
+    if (!auth.ok) return auth.response;
 
     if (action === "create") {
       if (nickname.length < 2) return jsonError("Der Spielername muss mindestens 2 Zeichen haben.");

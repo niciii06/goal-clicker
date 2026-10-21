@@ -1640,3 +1640,14 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 /* Matches saved before the interactive engine: their half time card covers the whole stadium as well. */
 .gc-timed-overlay.halftime { inset: 0; border-radius: 0; border-width: 0; background: #0b1c15; z-index: 20; }
 .gc-stadium-label { flex-basis: 100%; color: #b9d5c1; font-size: 11px; overflow-wrap: anywhere; }
+
+/* Google login and save file transfer */
+.account-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; max-width: 100%; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--text); background: #fff; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.account-chip.signed-in { padding: 0 4px 0 12px; cursor: default; }
+.account-chip.signed-in span { max-width: 160px; overflow: hidden; color: var(--muted); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.account-chip.signed-in button { min-height: 26px; padding: 0 10px; border: 0; border-radius: 999px; color: var(--text); background: var(--surface-soft); font: inherit; font-size: 11px; cursor: pointer; }
+.save-transfer { display: grid; gap: 10px; margin-top: 12px; padding: 14px; border: 1px solid var(--line-soft); border-radius: 16px; background: #fff; }
+.save-transfer h4 { margin: 2px 0 4px; }
+.save-transfer p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.save-transfer-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 650px) { .account-chip.signed-in span { max-width: 96px; } }
