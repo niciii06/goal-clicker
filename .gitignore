@@ -27,10 +27,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env and worker secret files
+# env files
 .env*
 !.env.example
-.dev.vars*
 
 # local sqlite databases
 *.db
@@ -44,9 +43,6 @@ yarn-error.log*
 
 # typescript
 next-env.d.ts
-/dist/
-/.wrangler/
-/.sites-runtime/
 /outputs/
 /work/
 

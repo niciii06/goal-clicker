@@ -94,6 +94,10 @@ test('the OAuth callback and logout only redirect inside the site', async () => 
   const { POST } = await import('../app/auth/signout/route.ts');
   const foreign = await POST(new Request('http://localhost/auth/signout', { method: 'POST', headers: { origin: 'https://evil.example' } }));
   assert.equal(foreign.status, 403);
+  const proxied = await GET(new Request('http://internal:3000/auth/callback', { headers: { 'x-forwarded-host': 'goal-clicker.vercel.app', 'x-forwarded-proto': 'https' } }));
+  assert.equal(proxied.headers.get('location'), 'https://goal-clicker.vercel.app/?login=abgebrochen');
+  const spoofed = await GET(new Request('http://localhost/auth/callback', { headers: { 'x-forwarded-host': 'evil.example/path' } }));
+  assert.equal(spoofed.headers.get('location'), 'http://localhost/?login=abgebrochen');
   const own = await POST(new Request('http://localhost/auth/signout', { method: 'POST', headers: { origin: 'http://localhost' } }));
   assert.equal(own.status, 303);
   assert.equal(own.headers.get('location'), 'http://localhost/');

@@ -68,7 +68,7 @@ test('an empty seat is claimed exactly once and a taken seat only by its owner',
 test('the passive income timestamp guards a single refresh', { skip }, async () => {
   await db.insertRoom(room('PASS'));
   const before = (await db.getRoom('PASS'))!.lastPassiveAt;
-  const refreshes = await Promise.all(Array.from({ length: 15 }, (_, i) => db.updateRoom('PASS', { lastPassiveAt: `2026-01-01T00:00:${String(i).padStart(2, '0')}.000Z`, sharedCoins: i }, { lastPassiveAt: before })));
+  const refreshes = await Promise.all(Array.from({ length: 15 }, (_, i) => db.updateRoom('PASS', { lastPassiveAt: `2026-02-01T00:00:${String(i).padStart(2, '0')}.000Z`, sharedCoins: i }, { lastPassiveAt: before })));
   assert.equal(refreshes.filter(Boolean).length, 1);
 });
 
@@ -157,7 +157,8 @@ test('an account without worlds may switch to an imported player ID, one with wo
   const fresh = '00000000-0000-4000-8000-000000000003', busy = '00000000-0000-4000-8000-000000000004';
   await db.linkAccount(fresh, 'fresh-random-id', null);
   assert.equal((await db.relinkAccount(fresh, 'imported-old-id')).account!.playerId, 'imported-old-id');
-  assert.equal((await db.relinkAccount(fresh, 'device-a-player')).reason, 'taken');
+  await db.linkAccount('00000000-0000-4000-8000-000000000005', 'someone-elses-id', null);
+  assert.equal((await db.relinkAccount(fresh, 'someone-elses-id')).reason, 'taken');
   await db.linkAccount(busy, 'busy-player-id', null);
   await db.insertRoom({ ...room('BUSY'), hostPlayerId: 'busy-player-id' });
   const refused = await db.relinkAccount(busy, 'another-imported-id');

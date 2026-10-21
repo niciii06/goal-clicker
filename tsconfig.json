@@ -40,10 +40,7 @@
   "exclude": [
     "node_modules",
     "examples",
-    "dist",
     "out",
-    ".wrangler",
-    ".sites-runtime",
     "outputs",
     "work"
   ]

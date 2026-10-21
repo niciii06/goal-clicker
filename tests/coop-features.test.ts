@@ -1,14 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { registerHooks } from 'node:module';
 import { getTableColumns } from 'drizzle-orm';
 import { coopRooms } from '../db/schema.ts';
 import type { RoomRow, RoomUpdate } from '../db/index.ts';
 import { initialGameFeatures } from '../app/feature-data.ts';
 import { getPressConference } from '../app/press-conference.ts';
 import { MULTIPLAYER_PROTOCOL_VERSION } from '../app/multiplayer-protocol.ts';
-registerHooks({resolve(specifier,context,next){if(specifier==='cloudflare:workers')return{shortCircuit:true,url:'data:text/javascript,export const env=globalThis.__COOP_FEATURES_ENV__??{};'};return next(specifier,context);}});
-(globalThis as typeof globalThis & {__COOP_FEATURES_ENV__:unknown}).__COOP_FEATURES_ENV__={DB:{}};
 const { GoalClickerDatabase }=await import('../db/index.ts');
 const { POST }=await import('../app/api/multiplayer/route.ts');
 

@@ -1,5 +1,5 @@
-// Browser smoke test against the production build (dist) served by wrangler dev.
-// Run with: npm run test:browser (CI runs it after npm test, which builds dist).
+// Browser smoke test against the production build served by next start.
+// Run with: npm run test:browser (CI runs it after npm test, which builds .next).
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
@@ -12,12 +12,12 @@ import type { GameFeatures } from '../../app/feature-data.ts';
 import { prepareCareerMatch } from '../../app/career-data.ts';
 
 const PORT = Number(process.env.SMOKE_PORT ?? 8799);
-const BASE = `http://localhost:${PORT}`;
+const BASE = `http://127.0.0.1:${PORT}`;
 const SAVE_KEY = 'goalClickerSiteSaveV3';
 const VIEWPORTS = [{ name: 'desktop', width: 1280, height: 900 }, { name: 'mobile', width: 390, height: 844 }] as const;
 const TABS = ['Home', 'Spiele', 'Kader', 'Karriere', 'Packs & Album', 'Club & Mehr'];
-// The Geist font files point to a path that only exists on Sites (known, see docs); everything else must load.
-const IGNORED_URL = /\/\.vinext\/fonts\//;
+// Nothing is expected to fail to load.
+const IGNORED_URL = /^$/;
 
 let server: ChildProcess | undefined;
 let browser: Browser;
@@ -33,8 +33,8 @@ async function waitForServer(timeoutMs: number) {
 }
 
 before(async () => {
-  assert.ok(existsSync('dist/server/index.js'), 'Run npm run build first (npm test builds dist).');
-  server = spawn('npx', ['wrangler', 'dev', '--config', 'wrangler.external.json', '--port', String(PORT), '--ip', '127.0.0.1'], { stdio: 'ignore', env: { ...process.env, WRANGLER_LOG_PATH: '.wrangler/wrangler.log', WRANGLER_SEND_METRICS: 'false' }, detached: true });
+  assert.ok(existsSync('.next/BUILD_ID'), 'Run npm run build first (npm test builds .next).');
+  server = spawn('node_modules/.bin/next', ['start', '-p', String(PORT), '-H', '127.0.0.1'], { stdio: 'ignore', detached: true, env: { ...process.env, PORT: String(PORT) } });
   await waitForServer(120000);
   browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
   const page = await browser.newPage();
@@ -173,9 +173,11 @@ test('a live interactive match draws the 2D pitch with stands and the match tabs
     assert.ok(await openTab(page, 'Spiele · LIVE'), 'live tab missing');
     const canvas = page.locator('canvas.gc-viewer-pitch').first();
     await canvas.waitFor({ timeout: 15000 });
-    await page.waitForTimeout(1500);
     // A blank canvas compresses to a few hundred bytes; pitch, players and stands need far more.
-    assert.ok((await canvas.screenshot()).length > 15000, 'canvas looks empty');
+    // The render worker loads its chunks first, so wait for its first frame instead of a fixed time.
+    let size = 0;
+    for (const until = Date.now() + 8000; Date.now() < until && size <= 15000; await page.waitForTimeout(250)) size = (await canvas.screenshot()).length;
+    assert.ok(size > 15000, 'canvas looks empty');
     for (const tab of ['Live Ticker', 'Statistik', '2D', 'Wechsel']) {
       await page.getByRole('button', { name: tab, exact: true }).first().click();
       await page.waitForTimeout(500);

@@ -28,6 +28,15 @@ export async function getRequestUser(request: Request): Promise<RequestUser | nu
   return { id: claims.sub, email: typeof claims.email === "string" ? claims.email : null };
 }
 
+/** The address the browser used. Behind Vercel's proxy request.url can name the internal host. */
+export function publicOrigin(request: Request) {
+  const url = new URL(request.url);
+  const host = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  if (!host || !/^[A-Za-z0-9.-]+(:\d+)?$/.test(host)) return url.origin;
+  const proto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() === "http" ? "http" : "https";
+  return `${proto}://${host}`;
+}
+
 export function redirectWithCookies(location: string, setCookies: readonly string[]) {
   const headers = new Headers({ location, "cache-control": "no-store" });
   for (const cookie of setCookies) headers.append("set-cookie", cookie);

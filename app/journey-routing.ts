@@ -1,6 +1,7 @@
 import { HOME_VENUE, distanceKm, routePoints } from './travel-geography';
 import type { GeoPoint, Venue } from './travel-geography';
-import ROUTES from './travel-route-cache';
+// Browser builds get the lazily loaded copy through the package.json "imports" browser condition.
+import ROUTES from '#travel-route-cache';
 
 export const TRAVEL_CONFIG = { acceleration: 60, version: 2 } as const;
 export type Hub = GeoPoint & { id: string; name: string };

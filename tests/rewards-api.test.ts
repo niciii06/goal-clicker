@@ -1,14 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { registerHooks } from 'node:module';
 import { getTableColumns } from 'drizzle-orm';
 import { coopRooms } from '../db/schema.ts';
 import { initialGameFeatures, normalizeGameFeatures, STAR_XI_PLAYERS } from '../app/feature-data.ts';
 import type { GameFeatures } from '../app/feature-data.ts';
 import type { RoomRow, RoomUpdate } from '../db/index.ts';
 import { MULTIPLAYER_PROTOCOL_VERSION } from '../app/multiplayer-protocol.ts';
-registerHooks({resolve(s,c,next){if(s==='cloudflare:workers')return{shortCircuit:true,url:'data:text/javascript,export const env=globalThis.__REWARD_ENV__??{};'};return next(s,c);}});
-(globalThis as typeof globalThis&{__REWARD_ENV__:unknown}).__REWARD_ENV__={DB:{}};
 const {GoalClickerDatabase}=await import('../db/index.ts');
 const solo=await import('../app/api/rewards/route.ts');
 const shared=await import('../app/api/multiplayer/route.ts');
