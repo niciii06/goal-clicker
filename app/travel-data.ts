@@ -27,7 +27,9 @@ export function fixtureFor(features: GameFeatures, mode: 'season'|'tournament', 
  const c=features.cup, t=getTournament(tournamentId)!;
  const id=`cup:${t.id}:${c.pendingNextRound?c.matchStartedAt:c.nextTournamentAt}:${c.pendingNextRound?c.round:0}:${Object.values(c.trophies).reduce((a,b)=>a+b,0)}`;
  const previous=features.travel.journey?.fixture;
- const schedule=c.pendingNextRound ? c.opponentIds : previous?.id===id ? previous.schedule : getTournamentOpponentSchedule(t,seededRandom(id));
+ // A started journey keeps its draw; otherwise each tournament run draws from its own stored seed.
+ const pendingJourney=previous?.id===id&&!features.travel.journey?.consumed;
+ const schedule=c.pendingNextRound ? c.opponentIds : pendingJourney ? previous.schedule : getTournamentOpponentSchedule(t,seededRandom(`${id}:${c.drawSeed??0}`));
  const round=c.pendingNextRound?c.round:0, o=t.opponents.find(o=>o.id===schedule[round]) ?? t.opponents[0];
  const highest = [...TOURNAMENTS].sort((a,b)=>b.minimumRating-a.minimumRating)[0];
  const neutral = t.id===highest.id && round===t.rounds-1;

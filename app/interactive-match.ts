@@ -32,6 +32,11 @@ function player(id:string,name:string,role:StarPosition,slot:number,side:SimPlay
  const base=clamp(rating+bonus*3,1,99);
  return {id,name,role,slot,side,number,rating:base,passing:attribute(source,'shortPassing',base),shooting:attribute(source,'finishing',base),pace:attribute(source,'sprintSpeed',base),defending:attribute(source,'standingTackle',base),keeping:attribute(source,'gkReflexes',base),control:attribute(source,'dribbling',base),stamina:attribute(source,'stamina',base),fitness:100,active:true,anchor,...anchor};
 }
+/** A substitute takes over the outgoing slot with the same milestone and form bonus the starters got at kick off. */
+export function substituteSimPlayer(old:SimPlayer,source:StarXIPlayer,bonus=0):SimPlayer {
+ const base=clamp(source.rating+bonus*3,1,99);
+ return {...old,id:source.id,name:source.name,rating:base,passing:attribute(source,'shortPassing',base),shooting:attribute(source,'finishing',base),pace:attribute(source,'sprintSpeed',base),defending:attribute(source,'standingTackle',base),keeping:attribute(source,'gkReflexes',base),control:attribute(source,'dribbling',base),stamina:attribute(source,'stamina',base),fitness:100,active:true};
+}
 function kickoff(c:SimCheckpoint,side:SimPlayer['side']) {
  c.possession=side;c.lastPass=undefined;c.chain=0;c.ball={x:52.5,y:34};c.restart=true;c.setPiece=undefined;c.setPieceReady=false;c.setPieceSpot=undefined;
  for(const p of c.players){const right=(p.side==='club'?c.direction:-c.direction)>0;p.x=p.role==='TW'?p.anchor.x:right?Math.min(48,p.anchor.x*.65):Math.max(57,105-(105-p.anchor.x)*.65);p.y=p.anchor.y;}

@@ -2,13 +2,14 @@
 import { useMatchPresentation } from './use-match-presentation';
 import { useEffect, useState } from 'react';
 import type { GameFeatures } from './feature-data';
-import { getStarXIPlayer, getStarFormation, STAR_XI_MAX_SUBSTITUTIONS } from './feature-data';
+import { getStarXIPlayer } from './feature-data';
 import { MatchPitchCanvas } from './match-pitch-canvas';
 import { getViewerEvents, eventLabel, MatchStatistics } from './match-viewer';
 import { goalLabel } from './match-goals';
 import { matchStadium } from './match-stadium';
 import { stadiumLabel } from './stadium-profiles';
-import { draftMatch, validateMatchDraft } from './match-commands';
+import { validateMatchDraft } from './match-commands';
+import { MatchSquadEditor } from './match-substitutions';
 import type { MatchDraft } from './match-commands';
 export type InteractivePanelProps={features:GameFeatures;now:number;clubName:string;clubColor:string;disabled?:boolean;onEdit?:()=>void;onBatch?:(draft:MatchDraft)=>void;onResume?:()=>void};
 export function InteractiveMatchPanel({features,now,clubName,clubColor,disabled,onEdit,onBatch,onResume}:InteractivePanelProps){
@@ -31,17 +32,9 @@ export function InteractiveMatchPanel({features,now,clubName,clubColor,disabled,
  </section>;
 }
 function BatchEditor({features:f,disabled,onConfirm,onCancel}:{features:GameFeatures;disabled:boolean;onConfirm:(d:MatchDraft)=>void;onCancel:()=>void}){
- const [draft,setDraft]=useState(()=>draftMatch(f)),[past,setPast]=useState<MatchDraft[]>([]),[selected,setSelected]=useState<string>(''),[message,setMessage]=useState('');
- const form=getStarFormation(draft.formation),incoming=draft.lineup.filter(id=>!f.starXI.lineupIds.includes(id)),outgoing=f.starXI.lineupIds.filter(id=>!draft.lineup.includes(id)),error=validateMatchDraft(f,draft);
- const change=(next:MatchDraft)=>{setPast(p=>[...p,draft]);setDraft(next);setMessage('');};
- const place=(id:string,slot:number)=>{if(!id)return;const next={...draft,lineup:[...draft.lineup]},existing=next.lineup.indexOf(id);if(existing===slot)return;if(existing>=0){next.lineup[existing]=next.lineup[slot];}next.lineup[slot]=id;change(next);setSelected('');};
- const select=(id:string,slot?:number)=>{if(selected&&slot!==undefined){place(selected,slot);}else if(selected&&draft.lineup.includes(selected)&&!draft.lineup.includes(id)){place(id,draft.lineup.indexOf(selected));}else setSelected(id);};
- return <div className="gc-sub-panel gc-viewer-substitutions" role="region" aria-label="Geplante Wechsel" onKeyDown={e=>{if(e.key==='Escape')onCancel();}}><div className="gc-sub-heading"><h3>Aufstellung bearbeiten</h3><span>{STAR_XI_MAX_SUBSTITUTIONS-f.cup.substitutionsUsed-incoming.length} Wechsel übrig</span></div><p>Spieler ziehen oder zwei Karten antippen. Alle Änderungen werden gemeinsam bestätigt. Die Partie ist pausiert.</p>
- <div className="starxi-pitch gc-sub-pitch">{form.slots.map((slot,i)=>{const id=draft.lineup[i],p=getStarXIPlayer(id),dismissed=f.cup.sentOffPlayerIds.includes(id),fitness=sFitness(f,id);return <button type="button" key={i} className={`starxi-pitch-slot ${selected===id?'selected':''}`} style={{left:`${slot.x}%`,top:`${slot.y}%`}} disabled={disabled||dismissed} draggable={!disabled&&!dismissed} onDragStart={e=>e.dataTransfer.setData('text/plain',id)} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();place(e.dataTransfer.getData('text/plain'),i);}} onClick={()=>select(id,i)} aria-pressed={selected===id}><span>{slot.position}</span><strong>{dismissed?'Rote Karte':p?.name??'Leer'}</strong><small>{p?.rating} OVR · {fitness}% Fitness</small></button>;})}</div>
- <h4>Bank</h4><div className="gc-sub-bank">{f.starXI.benchIds.filter(id=>id&&!draft.lineup.includes(id)&&!f.cup.playerExitedAt[id]&&!f.cup.injuredPlayerIds[id]&&!f.cup.suspendedPlayerIds.includes(id)).map(id=>{const p=getStarXIPlayer(id)!;return <button type="button" key={id} disabled={disabled} className={`starxi-player-card bank ${selected===id?'selected':''}`} aria-pressed={selected===id} draggable={!disabled} onDragStart={e=>e.dataTransfer.setData('text/plain',id)} onClick={()=>select(id)}><strong>{p.name}</strong><small>{p.positions.join('/')} · {p.rating} OVR · 100% Fitness</small></button>;})}</div>
- <div className="gc-sub-confirm" aria-live="polite">{incoming.map((id,i)=><span key={id}>{getStarXIPlayer(outgoing[i])?.name} → {getStarXIPlayer(id)?.name}</span>)}{past.length>0&&!incoming.length&&<span>Positionsänderung geplant</span>}<small>{message||error}</small><button type="button" disabled={!past.length||disabled} onClick={()=>{setDraft(past.at(-1)!);setPast(p=>p.slice(0,-1));}}>Rückgängig</button><button type="button" onClick={onCancel}>Abbrechen</button><button type="button" disabled={disabled||Boolean(error)} onClick={()=>{const reason=validateMatchDraft(f,draft);if(reason){setMessage(reason);return;}onConfirm(draft);}}>Alles bestätigen</button></div></div>;
+ const formation=f.starXI.formationId;
+ return <MatchSquadEditor features={f} title="Aufstellung bearbeiten" intro="Spieler ziehen oder zwei Karten antippen. Alle Änderungen werden gemeinsam bestätigt. Die Partie ist pausiert." disabled={disabled} validate={lineup=>validateMatchDraft(f,{lineup,formation})} confirmLabel={()=>'Alles bestätigen'} onConfirm={lineup=>onConfirm({lineup,formation})} onCancel={onCancel}/>;
 }
-function sFitness(f:GameFeatures,id:string){return Math.round(f.cup.simulation?.committed.players.find(p=>p.id===id)?.fitness??100);}
 
 /** Keeps an element mounted for its exit animation after `visible` turns false. */
 function useLingering(visible:boolean,ms:number){

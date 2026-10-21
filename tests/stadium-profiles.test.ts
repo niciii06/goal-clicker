@@ -63,3 +63,24 @@ test('the away journey and the match use the same stadium', () => {
   home.cup.fixture = { id: 'h', away: false, venue: HOME_VENUE, opponentId: 'x' };
   assert.equal(matchStadium(home).capacitySource, 'club-growth');
 });
+
+test('Tottenham Hotspur Stadium is far larger than Burgdorf and the caption says so', () => {
+  const tottenham = stadiumProfile(tournamentVenue('champions-tottenham-hotspur'), { seed: 'spurs' });
+  const burgdorf = stadiumProfile(club('SC Burgdorf 1898'), { seed: 'burgdorf' });
+  assert.equal(tottenham.name, 'Tottenham Hotspur Stadium');
+  assert.ok(tottenham.capacity > burgdorf.capacity * 10, `${tottenham.capacity} vs ${burgdorf.capacity}`);
+  assert.match(stadiumLabel(tottenham), /Zuschauer von 62.800$/);
+  assert.match(stadiumLabel(burgdorf), /Stadion Neumatt · .* \(Kapazität geschätzt\)$/);
+});
+
+test('one stadium has one capacity, whichever club or tournament leads there', () => {
+  const byName = new Map<string, number>();
+  for (const venue of [...Object.values(VENUES), ...SEASON_CLUBS.map(c => c.venue)]) {
+    if (venue.id === HOME_VENUE.id || venue.id.startsWith('chaos-ground')) continue;
+    const capacity = stadiumProfile(venue).capacity, seen = byName.get(venue.stadium);
+    if (seen !== undefined) assert.equal(capacity, seen, venue.stadium);
+    byName.set(venue.stadium, capacity);
+  }
+  assert.equal(stadiumProfile(VENUES.lugano).capacity, stadiumProfile(club('FC Lugano')).capacity);
+  assert.equal(stadiumProfile(VENUES.stgallen).capacity, stadiumProfile(club('FC St. Gallen 1879')).capacity);
+});

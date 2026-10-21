@@ -47,6 +47,8 @@ export type CupState = {
   fixture?: {id:string;away:boolean;neutral?:boolean;venue:Venue;opponentId:string};
   careerMatchId?: string;
   careerRatingSeed?: number;
+  /** Random draw for the next tournament run; rerolled whenever a run starts. */
+  drawSeed?: number;
   careerBonuses?: Record<string, number>;
   active: boolean;
   mode: CupMatchMode;
