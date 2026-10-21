@@ -80,7 +80,8 @@ test('club passport keeps its data in the club page component', () => {
   travel.stats = { ...travel.stats, trips: 3, km: 1234.4, countries: ['Schweiz', 'Italien'], furthest: { opponent: 'Inter Milano', km: 230 }, opponents: { 'milan:Inter Milano': { name: 'Inter Milano', trips: 2 } } };
   const html = renderToStaticMarkup(createElement(TravelStatsPanel, { travel, now: 0, clubName: 'FC Test' }));
   assert.match(html, /CLUBPASS \/ FC TEST/);
-  assert.match(html, /1.234/);
+  // The de-CH group separator depends on the ICU version (’ or '); React escapes the plain apostrophe.
+  assert.ok(html.includes((1234).toLocaleString('de-CH').replaceAll("'", '&#x27;')), 'formatted distance');
   assert.match(html, /Inter Milano · 2 Reisen/);
   assert.match(html, /Schweiz · Italien/);
 });
