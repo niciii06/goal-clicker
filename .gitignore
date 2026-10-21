@@ -51,3 +51,7 @@ next-env.d.ts
 
 # Generated TypeScript cache
 *.tsbuildinfo
+
+# database exports and archives (private data)
+/d1-export*.sql
+d1-archive-*.json

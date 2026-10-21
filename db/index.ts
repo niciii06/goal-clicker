@@ -1,6 +1,7 @@
 import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
-import { env } from "cloudflare:workers";
-import { drizzle } from "drizzle-orm/d1";
+import type { AnyColumn } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import * as schema from "./schema";
 import { coopRooms, soloTravel } from "./schema";
 
@@ -23,42 +24,58 @@ function seatPlayerColumn(role: RoomSeatRole) {
   return coopRooms.player4PlayerId;
 }
 
+let connection: postgres.Sql | null = null;
+
 function createDatabase() {
-  if (!env.DB) {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
     throw new Error(
-      "Cloudflare D1 binding \`DB\` ist nicht verfügbar. Die bestehenden Welten werden dadurch nicht verändert.",
+      "DATABASE_URL ist nicht gesetzt. Die bestehenden Welten werden dadurch nicht verändert.",
     );
   }
-  return drizzle(env.DB, { schema });
+  // Supabase's transaction pooler (port 6543) does not keep prepared statements between queries.
+  connection = postgres(url, { prepare: false, max: Number(process.env.DATABASE_POOL_MAX) || 5, idle_timeout: 20 });
+  return drizzle(connection, { schema });
 }
 
 type Database = ReturnType<typeof createDatabase>;
 
-function increment(column: string, amount: number) {
+/** `column + amount` as a column reference and a bound parameter, never as SQL text. */
+function increment(column: AnyColumn, amount: number) {
   const safeAmount = Number.isFinite(amount) ? amount : 0;
-  return sql.raw('"' + column + '" + ' + String(safeAmount));
+  return sql`${column} + ${safeAmount}`;
 }
 
 function roleClickUpdate(role: string, amount: number, clickCount: number) {
-  if (role === "host") return { hostGoals: increment("host_goals", amount), hostClicks: increment("host_clicks", clickCount) };
-  if (role === "guest") return { guestGoals: increment("guest_goals", amount), guestClicks: increment("guest_clicks", clickCount) };
-  if (role === "player3") return { player3Goals: increment("player3_goals", amount), player3Clicks: increment("player3_clicks", clickCount) };
-  return { player4Goals: increment("player4_goals", amount), player4Clicks: increment("player4_clicks", clickCount) };
+  if (role === "host") return { hostGoals: increment(coopRooms.hostGoals, amount), hostClicks: increment(coopRooms.hostClicks, clickCount) };
+  if (role === "guest") return { guestGoals: increment(coopRooms.guestGoals, amount), guestClicks: increment(coopRooms.guestClicks, clickCount) };
+  if (role === "player3") return { player3Goals: increment(coopRooms.player3Goals, amount), player3Clicks: increment(coopRooms.player3Clicks, clickCount) };
+  return { player4Goals: increment(coopRooms.player4Goals, amount), player4Clicks: increment(coopRooms.player4Clicks, clickCount) };
 }
 
 export class GoalClickerDatabase {
-  constructor(private readonly client: Database) {}
+  private database: Database | null = null;
+
+  /** The pool opens on the first query, so a missing DATABASE_URL only fails requests that need it. */
+  constructor(private readonly connect: () => Database) {}
+
+  private get client() {
+    this.database ??= this.connect();
+    return this.database;
+  }
 
   async getSoloJourney(owner: string, fixtureId: string) {
     const [row] = await this.client.select().from(soloTravel).where(and(eq(soloTravel.owner,owner),eq(soloTravel.fixtureId,fixtureId))).limit(1);
-    return row ? JSON.parse(row.journeyJson) : null;
+    // Typed like the JSON.parse result it replaces; callers validate the receipt shape.
+    return row ? row.journeyJson as ReturnType<typeof JSON.parse> : null;
   }
   async putSoloJourney(owner: string, fixtureId: string, journey: unknown) {
-    await this.client.insert(soloTravel).values({owner,fixtureId,journeyJson:JSON.stringify(journey)}).onConflictDoNothing();
+    await this.client.insert(soloTravel).values({owner,fixtureId,journeyJson:journey}).onConflictDoNothing();
     return this.getSoloJourney(owner,fixtureId);
   }
   async consumeSoloJourney(owner: string, fixtureId: string, journey: unknown) {
-    const rows=await this.client.update(soloTravel).set({journeyJson:JSON.stringify(journey)}).where(and(eq(soloTravel.owner,owner),eq(soloTravel.fixtureId,fixtureId),sql`COALESCE(json_extract(${soloTravel.journeyJson}, '$.consumed'),0) = 0`)).returning();
+    // Only a receipt that is not consumed yet (consumed missing, null, false or 0) can be consumed, once.
+    const rows=await this.client.update(soloTravel).set({journeyJson:journey}).where(and(eq(soloTravel.owner,owner),eq(soloTravel.fixtureId,fixtureId),sql`coalesce(${soloTravel.journeyJson}->'consumed', 'null'::jsonb) in ('null'::jsonb, 'false'::jsonb, '0'::jsonb)`)).returning();
     return rows.length===1;
   }
   async getRoom(code: string): Promise<RoomRow | null> {
@@ -110,10 +127,10 @@ export class GoalClickerDatabase {
     const [room] = await this.client
       .update(coopRooms)
       .set({
-        sharedCoins: increment("shared_coins", amount),
-        sharedTotalGoals: increment("shared_total_goals", amount),
-        sharedSeasonGoals: increment("shared_season_goals", amount),
-        sharedStateVersion: increment("shared_state_version", 1), // shared_state_version + 1
+        sharedCoins: increment(coopRooms.sharedCoins, amount),
+        sharedTotalGoals: increment(coopRooms.sharedTotalGoals, amount),
+        sharedSeasonGoals: increment(coopRooms.sharedSeasonGoals, amount),
+        sharedStateVersion: increment(coopRooms.sharedStateVersion, 1), // shared_state_version = shared_state_version + 1
         lastPassiveAt: timestamp,
         pendingPlayerId: null,
         pendingUpgradeId: null,
@@ -133,6 +150,14 @@ export class GoalClickerDatabase {
 let database: GoalClickerDatabase | null = null;
 
 export function getDb() {
-  database ??= new GoalClickerDatabase(createDatabase());
+  database ??= new GoalClickerDatabase(createDatabase);
   return database;
+}
+
+/** Closes the pool, for scripts and tests that must exit. */
+export async function closeDb() {
+  const current = connection;
+  connection = null;
+  database = null;
+  await current?.end({ timeout: 5 });
 }
