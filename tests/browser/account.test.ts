@@ -201,6 +201,11 @@ test('the profile settings change display name and password and delete the profi
   // The account button next to the notifications opens the profile settings.
   await page.getByRole('button', { name: /^Konto von / }).click();
   const panel = page.getByRole('dialog', { name: 'Konto' });
+  // The keyboard stays inside the dialog: focus starts in it and Tab never reaches the page behind.
+  for (let i = 0; i < 14; i++) {
+    assert.equal(await page.evaluate(() => Boolean(document.activeElement?.closest('.account-dialog'))), true, `focus left the dialog after ${i} tabs`);
+    await page.keyboard.press(i % 5 === 4 ? 'Shift+Tab' : 'Tab');
+  }
   await panel.getByLabel('Anzeigename').fill('Goalie 1');
   await panel.getByRole('button', { name: 'Speichern' }).click();
   await page.getByText('Anzeigename gespeichert.').waitFor();

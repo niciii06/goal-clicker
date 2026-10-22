@@ -142,20 +142,36 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
 export function AccountButton({ onMessage }: { onMessage: (text: string) => void }) {
   const account = useContext(AccountContext);
   const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
+  // A modal dialog keeps the keyboard inside: focus moves in on open, Tab wraps around, Escape closes,
+  // and focus returns to the account button afterwards.
   useEffect(() => {
     if (!open) return;
-    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
+    const button = buttonRef.current;
+    const focusable = () => [...(dialogRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), summary, [tabindex]:not([tabindex='-1'])") ?? [])].filter((element) => element.offsetParent !== null);
+    focusable()[0]?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setOpen(false); return; }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (!items.length) return;
+      const first = items[0], last = items[items.length - 1];
+      const inside = dialogRef.current?.contains(document.activeElement);
+      if (event.shiftKey && (document.activeElement === first || !inside)) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && (document.activeElement === last || !inside)) { event.preventDefault(); first.focus(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("keydown", onKey); button?.focus(); };
   }, [open]);
 
   if (!account) return null;
   return <>
-    <button type="button" className="icon-button account-button" aria-label={`Konto von ${account.profile.displayName}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>👤</button>
+    <button ref={buttonRef} type="button" className="icon-button account-button" aria-label={`Konto von ${account.profile.displayName}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>👤</button>
     {/* The header blurs its background, which would trap a fixed dialog inside it; the dialog lives on <body>. */}
     {open && createPortal(<div className="account-overlay" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
-      <div className="account-dialog" role="dialog" aria-modal="true" aria-label="Konto">
+      <div ref={dialogRef} className="account-dialog" role="dialog" aria-modal="true" aria-label="Konto">
         <button type="button" className="account-dialog-close" aria-label="Schliessen" onClick={() => setOpen(false)}>×</button>
         <ProfilePanel onMessage={onMessage} />
         <button type="button" className="mode-secondary account-dialog-signout" onClick={() => void account.signOut()}>Abmelden</button>
