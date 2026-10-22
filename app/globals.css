@@ -1514,7 +1514,7 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 /* Player names in the substitution pitch break at German syllables instead of arbitrary letters. */
 /* The substitution pitch uses light cards: hover and selection keep them light with a blue border so the dark text stays readable. */
 
-/* Click combo (maximum x3) */
+/* Click combo (maximum x2); level-N and combo-N name the tier, not the multiplier */
 .combo-meter { position: absolute; z-index: 3; bottom: 44px; left: 50%; display: grid; justify-items: center; gap: 4px; width: min(220px, 70%); transform: translateX(-50%); color: rgba(228,249,227,.78); text-align: center; pointer-events: none; transition: opacity .2s ease; opacity: .7; }
 .combo-meter.active { opacity: 1; }
 .combo-label { font-size: 11px; font-weight: 850; letter-spacing: .08em; }

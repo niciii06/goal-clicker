@@ -1,5 +1,5 @@
-// The required login end to end: e-mail code and password sign up against a stand-in for Supabase Auth,
-// the profile with a unique username, and the cloud save across two devices including a conflict.
+// The required login end to end: registering and signing in with username and password against a stand-in
+// for Supabase Auth, the unique username, and the cloud save across two devices including a conflict.
 // Needs TEST_DATABASE_URL (an empty scratch database) and Chromium; builds its own copy into .next-account.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -10,7 +10,7 @@ import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
 import { chromium } from 'playwright-core';
 import type { Browser, BrowserContext, Page } from 'playwright-core';
-import { MOCK_CODE, startMockAuth } from './mock-auth-server.ts';
+import { startMockAuth } from './mock-auth-server.ts';
 
 const databaseUrl = process.env.TEST_DATABASE_URL ?? '';
 const skip = databaseUrl ? false : 'TEST_DATABASE_URL is not set';
@@ -63,19 +63,22 @@ async function device(name: string) {
   return page;
 }
 
-async function loginWithCode(page: Page, email: string) {
+async function register(page: Page, username: string, displayName: string, password: string) {
   await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.getByLabel('E-Mail').fill(email);
-  await page.getByRole('button', { name: 'Code senden' }).click();
-  await page.getByLabel('Code aus der Mail').fill(MOCK_CODE);
-  await page.getByRole('button', { name: 'Bestätigen' }).click();
-}
-
-async function createProfile(page: Page, username: string, displayName: string) {
+  await page.getByRole('tab', { name: 'Konto erstellen' }).click();
   await page.getByLabel('Benutzername').fill(username);
   await page.getByText('Dieser Benutzername ist frei.').waitFor();
   await page.getByLabel('Anzeigename').fill(displayName);
-  await page.getByRole('button', { name: 'Profil erstellen' }).click();
+  await page.getByLabel(/^Passwort \(mindestens/).fill(password);
+  await page.getByLabel('Passwort wiederholen').fill(password);
+  await page.getByRole('button', { name: 'Konto erstellen', exact: true }).click();
+}
+
+async function login(page: Page, username: string, password: string) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.getByLabel('Benutzername').fill(username);
+  await page.getByLabel('Passwort').fill(password);
+  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
 }
 
 async function clickBall(page: Page, times: number) {
@@ -100,8 +103,8 @@ async function localGoals(page: Page) {
   return page.evaluate((key) => Number(JSON.parse(localStorage.getItem(key) ?? '{}').totalGoals ?? 0), SAVE_KEY);
 }
 
-async function cloudSave(email: string) {
-  const [row] = await admin`select s.version, s.save_json from cloud_saves s join profiles p on p.user_id = s.user_id where p.user_id = ${auth.users.get(email)!.id}::uuid`;
+async function cloudSave(username: string) {
+  const [row] = await admin`select s.version, s.save_json from cloud_saves s join profiles p on p.user_id = s.user_id where p.username_key = ${username.toLowerCase()}`;
   return row ? { version: Number(row.version), totalGoals: Number(JSON.parse(JSON.parse(row.save_json)[SAVE_KEY]).totalGoals) } : null;
 }
 
@@ -116,26 +119,30 @@ test('without a session the login is the first thing, not the game', { skip }, a
   const page = await device('a');
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: 'Mit Google anmelden' }).waitFor();
-  assert.equal(await page.getByRole('tab', { name: 'Code per Mail' }).count(), 1);
+  assert.equal(await page.getByRole('tab', { name: 'Konto erstellen' }).count(), 1);
   assert.equal(await page.getByRole('button', { name: 'Fussball anklicken' }).count(), 0);
 });
 
-test('a code login creates the profile once and the save goes to the cloud', { skip }, async () => {
+test('a new account with username and password starts the game and saves to the cloud', { skip }, async () => {
   const page = devices.a.page;
-  await loginWithCode(page, 'nico@example.com');
-  await createProfile(page, 'Striker', 'Nico');
+  await register(page, 'Striker', 'Nico', 'sicheres-passwort-1');
   await clickBall(page, 6);
   assert.match(await page.locator('.account-chip').innerText(), /Nico/);
   await hideTab(page);
-  const saved = await waitFor(() => cloudSave('nico@example.com'), (s) => Boolean(s && s.totalGoals >= 6), 'first cloud save');
+  const saved = await waitFor(() => cloudSave('Striker'), (s) => Boolean(s && s.totalGoals >= 6), 'first cloud save');
   assert.equal(saved!.version, 1);
+  // The generated login address stays on the server; the account only knows its username.
+  assert.equal(await page.locator('.account-chip').innerText().then((text) => text.includes('@players.')), false);
 });
 
-test('a second device of the account starts with the same save and no profile step', { skip }, async () => {
+test('a wrong password is refused, the right one opens the same save on a second device', { skip }, async () => {
   const page = await device('b');
-  await loginWithCode(page, 'NICO@example.com');
+  await login(page, 'STRIKER', 'falsches-passwort');
+  await page.getByText('Benutzername oder Passwort stimmt nicht.').waitFor();
+  await page.getByLabel('Passwort').fill('sicheres-passwort-1');
+  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
   await page.getByRole('button', { name: 'Fussball anklicken' }).waitFor();
-  const cloud = await cloudSave('nico@example.com');
+  const cloud = await cloudSave('Striker');
   assert.equal(await localGoals(page), cloud!.totalGoals);
 });
 
@@ -158,7 +165,7 @@ test('when both devices were played, the second one to save asks and can load th
   await asked!.getByRole('button', { name: /Stand aus dem Profil laden/ }).click();
   await asked!.waitForLoadState('networkidle');
   await asked!.getByRole('button', { name: 'Fussball anklicken' }).waitFor();
-  assert.equal(await localGoals(asked!), (await cloudSave('nico@example.com'))!.totalGoals);
+  assert.equal(await localGoals(asked!), (await cloudSave('Striker'))!.totalGoals);
   devices.asked = devices[asked === a ? 'a' : 'b'];
   devices.other = devices[asked === a ? 'b' : 'a'];
 });
@@ -169,7 +176,7 @@ test('a device that was not played takes a newer save without asking when it com
   await clickBall(played, 4);
   await hideTab(played);
   const target = await localGoals(played);
-  await waitFor(async () => (await cloudSave('nico@example.com'))!.totalGoals, (goals) => goals === target, 'upload of the played device');
+  await waitFor(async () => (await cloudSave('Striker'))!.totalGoals, (goals) => goals === target, 'upload of the played device');
   // The idle tab comes back to the front.
   await idle.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   await waitFor(() => localGoals(idle).catch(() => -1), (goals) => goals === target, 'idle device took the newer save');
@@ -178,33 +185,29 @@ test('a device that was not played takes a newer save without asking when it com
   assert.equal(await played.getByText('Auf einem anderen Gerät wurde weitergespielt').count(), 0);
 });
 
-test('a password account confirms its address with a code and cannot take a used username', { skip }, async () => {
+test('a used username cannot be registered twice, in any case', { skip }, async () => {
   const page = await device('c');
   await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.getByRole('tab', { name: 'Passwort' }).click();
-  await page.getByRole('button', { name: 'Neues Konto mit Passwort' }).click();
-  await page.getByLabel('E-Mail').fill('keeper@example.com');
-  await page.getByLabel(/^Passwort \(mindestens/).fill('sicheres-passwort-1');
-  await page.getByLabel('Passwort wiederholen').fill('sicheres-passwort-1');
-  await page.getByRole('button', { name: 'Konto erstellen' }).click();
-  await page.getByLabel('Code aus der Mail').fill(MOCK_CODE);
-  await page.getByRole('button', { name: 'Bestätigen' }).click();
+  await page.getByRole('tab', { name: 'Konto erstellen' }).click();
   await page.getByLabel('Benutzername').fill('STRIKER');
   await page.getByText('Dieser Benutzername ist schon vergeben.').waitFor();
-  assert.equal(await page.getByRole('button', { name: 'Profil erstellen' }).isDisabled(), true);
-  await createProfile(page, 'Keeper', 'Goalie');
+  assert.equal(await page.getByRole('button', { name: 'Konto erstellen', exact: true }).isDisabled(), true);
+  await register(page, 'Keeper', 'Goalie', 'anderes-passwort-2');
   await page.getByRole('button', { name: 'Fussball anklicken' }).waitFor();
-  assert.deepEqual(auth.mails.filter((mail) => mail.email === 'keeper@example.com').map((mail) => mail.type), ['signup']);
 });
 
-test('the profile settings change the display name and delete the profile', { skip }, async () => {
+test('the profile settings change display name and password and delete the profile', { skip }, async () => {
   const page = devices.c.page;
   await page.getByRole('button', { name: 'Club & Mehr', exact: true }).first().click();
   const panel = page.locator('.profile-panel');
   await panel.getByLabel('Anzeigename').fill('Goalie 1');
   await panel.getByRole('button', { name: 'Speichern' }).click();
   await page.getByText('Anzeigename gespeichert.').waitFor();
-  const userId = auth.users.get('keeper@example.com')!.id;
+  await panel.getByLabel('Neues Passwort').fill('neues-passwort-3');
+  await panel.getByLabel('Wiederholen').fill('neues-passwort-3');
+  await panel.getByRole('button', { name: 'Passwort ändern' }).click();
+  await page.getByText('Neues Passwort gespeichert.').waitFor();
+  const [{ user_id: userId }] = await admin`select user_id from profiles where username_key = 'keeper'`;
   assert.equal((await admin`select display_name from profiles where user_id = ${userId}::uuid`)[0].display_name, 'Goalie 1');
   await panel.getByText('Profil löschen').click();
   await panel.getByLabel(/eintippen/).fill('keeper');

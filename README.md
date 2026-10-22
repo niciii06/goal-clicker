@@ -8,7 +8,7 @@ Aktueller Spielcode mit Spielerpool, Saisons, Walkouts und Multiplayer. Release 
 * [Konfigurationsreparatur und Sicherheitsprüfung](docs/config-security-repair.md)
 * [Hosting auf Vercel mit Supabase und Login](HOSTING.md)
 * [Datenbank und Datenübernahme](docs/supabase-datenbank.md)
-* [Login einrichten (Google und E-Mail), Profil und Cloud Spielstand](docs/google-login.md)
+* [Login einrichten (Google oder Benutzername), Profil und Cloud Spielstand](docs/google-login.md)
 
 Verifikation: `npm run typecheck`, `npm run lint`, `npm test` (inklusive `next build`), `npm run test:db` mit einer Testdatenbank; ergänzend `npm run verify:physics`. Die frühere ChatGPT Sites Version hat eine eigene Historie; ein GitHub Push veröffentlicht keine neue Site Version.
 

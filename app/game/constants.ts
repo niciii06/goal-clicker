@@ -82,12 +82,12 @@ export const RANKS: { icon: IconName; name: string; minimum: number }[] = [
   { icon: "diamond", name: "Hall of Fame", minimum: 100000000000 },
   { icon: "rocket", name: "Ewige Nummer 1", minimum: 1000000000000 },
 ];
-// Every click adds to the combo. The multiplier never exceeds x3.
-export const COMBO_LEVELS = [{ clicks: 0, multiplier: 1 }, { clicks: 15, multiplier: 2 }, { clicks: 40, multiplier: 3 }] as const;
+// Every click adds to the combo. The multiplier never exceeds x2; tier names the look of each level.
+export const COMBO_LEVELS = [{ clicks: 0, multiplier: 1, tier: 1 }, { clicks: 20, multiplier: 1.5, tier: 2 }, { clicks: 50, multiplier: 2, tier: 3 }] as const;
 // After the last click the combo holds for three seconds (also after a full screen announcement closed),
 // then drains by one click every third of a second instead of ending at once.
 export const COMBO_HOLD_MS = 3000;
 export const COMBO_DECAY_MS = 1000 / 3;
-// The count stops at the x3 threshold, so the drain reaches x2 right after the hold.
-export const COMBO_MAX_COUNT = 40;
+// The count stops at the top threshold, so the drain leaves the top level right after the hold.
+export const COMBO_MAX_COUNT = 50;
 export const VIBRATION_STORAGE_KEY = "goalClickerVibrationV1";

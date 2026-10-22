@@ -218,3 +218,13 @@ test('deleting an account removes profile, cloud save and link but keeps shared 
   assert.equal(await db.getAccount(user), null);
   assert.ok(await db.getRoom('KEEP'));
 });
+
+test('a username account keeps its login address on the server and is found by its username', { skip }, async () => {
+  const user = '00000000-0000-4000-8000-000000000501';
+  // The scratch database has no Supabase auth schema; there the app registers through the Auth API instead.
+  assert.equal(await db.createPasswordLogin('p-x@players.goal-clicker.vercel.app', 'sicheres-passwort'), null);
+  assert.equal(await db.deleteLogin(user), false);
+  await db.createProfile(user, 'Libero', 'Libero', iso(), 'p-libero@players.goal-clicker.vercel.app');
+  assert.equal((await db.getProfileByUsername('libero'))!.loginEmail, 'p-libero@players.goal-clicker.vercel.app');
+  assert.equal(await db.getProfileByUsername('nobody'), null);
+});

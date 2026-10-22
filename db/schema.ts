@@ -82,6 +82,9 @@ export const profiles = pgTable("profiles", {
   username: text("username").notNull(),
   usernameKey: text("username_key").notNull().unique(),
   displayName: text("display_name").notNull(),
+  // Only for accounts with username and password: the generated login address behind the username.
+  // It never leaves the server and no mail is ever sent to it.
+  loginEmail: text("login_email"),
   usernameChangedAt: text("username_changed_at").notNull().default(isoNow),
   createdAt: text("created_at").notNull().default(isoNow),
   updatedAt: text("updated_at").notNull().default(isoNow),

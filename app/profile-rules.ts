@@ -1,4 +1,4 @@
-// Rules for the profile every player creates after the first login. The form and the API share them.
+// Rules for usernames, display names and passwords. The forms and the API share them.
 export const USERNAME_MIN = 3;
 export const USERNAME_MAX = 20;
 export const DISPLAY_NAME_MIN = 2;
@@ -6,6 +6,13 @@ export const DISPLAY_NAME_MIN = 2;
 export const DISPLAY_NAME_MAX = 18;
 export const USERNAME_CHANGE_DAYS = 30;
 export const PASSWORD_MIN = 8;
+// bcrypt, which Supabase Auth uses, only reads the first 72 bytes.
+export const PASSWORD_MAX = 72;
+/**
+ * Accounts with username and password have a generated login address under this domain, because Supabase Auth
+ * needs one. No mail is ever sent to it; the player only ever sees the username.
+ */
+export const PASSWORD_LOGIN_DOMAIN = "players.goal-clicker.vercel.app";
 
 const RESERVED_USERNAMES = new Set(["admin", "administrator", "goalclicker", "goal_clicker", "support", "moderator", "mod", "system", "root", "null", "undefined", "staff", "team", "official", "help", "romario"]);
 
@@ -33,6 +40,16 @@ export function displayNameError(name: string): string | null {
   if (value.length < DISPLAY_NAME_MIN) return `Der Anzeigename braucht mindestens ${DISPLAY_NAME_MIN} Zeichen.`;
   if (value.length > DISPLAY_NAME_MAX) return `Der Anzeigename darf höchstens ${DISPLAY_NAME_MAX} Zeichen haben.`;
   return null;
+}
+
+export function passwordError(password: string): string | null {
+  if (password.length < PASSWORD_MIN) return `Das Passwort braucht mindestens ${PASSWORD_MIN} Zeichen.`;
+  if (new TextEncoder().encode(password).length > PASSWORD_MAX) return `Das Passwort darf höchstens ${PASSWORD_MAX} Zeichen haben.`;
+  return null;
+}
+
+export function isPasswordLoginEmail(email: string | null | undefined) {
+  return Boolean(email?.toLowerCase().endsWith(`@${PASSWORD_LOGIN_DOMAIN}`));
 }
 
 /** When the username may change again; the timestamps are ISO strings in UTC. */

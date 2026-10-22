@@ -7,7 +7,7 @@ import type { AppMode, ClickEffect, CoopRole, CoopRoom, CoopSession, CrossbarGam
 import type { CoopMission, CupCardEvent, GameFeatures, PenaltyDirection as CupPenaltyDirection, RandomEvent, StarFormationId, StarPackId, StarPackReveal, TournamentGazetteIssue, TournamentId, TransferInsiderEvent } from "./feature-data";
 import type { Journey, TravelFixture } from "./travel-data";
 import type { MatchDraft } from "./match-commands";
-import { ACHIEVEMENTS, BACKUP_STORAGE_KEY, BALANCE_VERSION, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_MAX_COUNT, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RECOVERY_STORAGE_KEY, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, STAR_RATING_FILTERS, STORAGE_KEY, VIBRATION_STORAGE_KEY } from "./game/constants";
+import { ACHIEVEMENTS, BACKUP_STORAGE_KEY, BALANCE_VERSION, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, COMBO_MAX_COUNT, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RECOVERY_STORAGE_KEY, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, STAR_RATING_FILTERS, STORAGE_KEY, VIBRATION_STORAGE_KEY } from "./game/constants";
 import { AL, AR, AT, AU, AZ, BA, BE, BF, BG, BR, CA, CD, CH, CI, CL, CM, CN, CO, CR, CZ, DE, DK, DZ, EC, EG, ES, FI, FR, GB_ENG, GB_NIR, GB_SCT, GB_WLS, GE, GH, GM, GN, GR, GT, HR, HT, HU, IE, IL, IS, IT, JM, JP, KN, KR, MA, ME, ML, MW, MX, NG, NL, NO, NZ, PA, PH, PL, PT, PY, RO, RS, RU, SE, SI, SK, SN, SR, TR, UA, US, UY, VE, XK, ZA, ZM } from "country-flag-icons/react/3x2";
 import { AlbumPanel, CareerPanel, CareerPlayerBadge, MatchRatingsPanel, PostMatchSummary } from "./career-panels";
 import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, SPECIAL_CARD_PACK, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_SQUAD_SIZE, STAR_XI_TOTAL_CARD_COUNT, TOURNAMENTS, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, applyPendingMatchChanges, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, getSpecialCardPackOdds, purchaseSpecialCardPack, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getRewardPackOdds, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXIRating, getStarXISelection, getTournament, getTournamentGoalBoostMultiplier, getTournamentRewardPack, getTransferBonuses, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, isRewardPack, isTransferDeadlineDay, normalizeGameFeatures, openEarnedPack, openStarPack, pauseGameFeatureTimers, queueMatchChanges, recordSeasonModeMatch, releaseMatchSquad, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige } from "./feature-data";
@@ -30,7 +30,7 @@ import { claimDailyReward } from "./daily-reward";
 import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
 import { consumeTravel, eligibilityError, fixtureFor, journeyView, settleTravel, travelTiming } from "./travel-data";
 import { coopRoleLabel, isCoopRole, multiplayerUrl, notifyCoopOffline, occupiedCoopPlayers, readCoopResponse, upsertSavedRoom } from "./game/coop";
-import { createClickResult, decayComboCount, getBasePassivePower, getBulkPurchase, getComboLevel, getComboProgress, getCost, getIncomeMultiplier, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades } from "./game/economy";
+import { createClickResult, decayComboCount, formatComboMultiplier, getBasePassivePower, getBulkPurchase, getComboLevel, getComboProgress, getCost, getIncomeMultiplier, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades } from "./game/economy";
 import { directionLabel, formatCountdown, formatGoalDifference, formatHistoryTime, formatNumber, formatPackChance, getRandomCrossbarHeight, getRandomMatchPrediction, getRandomPenaltyDirection, heightLabel, predictionLabel } from "./game/format";
 import { getCurrentTime, getTravelTime, syncTravelClock } from "./game/clock";
 import { getStarCardTier, getWalkoutPresentation } from "./walkout-data";
@@ -241,6 +241,8 @@ function App() {
   const comboTimerRef = useRef<number | null>(null);
   const [combo, setCombo] = useState({ count: 0, multiplier: 1 });
   const [comboBurst, setComboBurst] = useState<{ id: number; text: string } | null>(null);
+  const comboLevel = getComboLevel(combo.count);
+  const nextComboLevel = COMBO_LEVELS.find((level) => level.clicks > combo.count);
   const [vibrationEnabled, setVibrationEnabled] = useState(readVibrationSetting);
   const [dailyBusy, setDailyBusy] = useState(false);
   const [pressBusy, setPressBusy] = useState(false);
@@ -1983,10 +1985,10 @@ function App() {
     state.multiplier = level.multiplier;
     setCombo({ count: state.count, multiplier: level.multiplier });
     if (level.multiplier > previous.multiplier) {
-      setComboBurst({ id: now, text: `COMBO x${level.multiplier}` });
+      setComboBurst({ id: now, text: `COMBO ${formatComboMultiplier(level.multiplier)}` });
       window.setTimeout(() => setComboBurst((current) => current?.id === now ? null : current), 900);
-      playTone(level.multiplier === 3 ? 988 : 784, 0.12, "triangle", 0.045);
-      vibrate(level.multiplier === 3 ? [30, 25, 45] : 30);
+      playTone(level.tier === 3 ? 988 : 784, 0.12, "triangle", 0.045);
+      vibrate(level.tier === 3 ? [30, 25, 45] : 30);
     }
     scheduleComboDecay(COMBO_HOLD_MS + COMBO_DECAY_MS);
     return level.multiplier;
@@ -2003,7 +2005,7 @@ function App() {
     const rect = stageRef.current?.getBoundingClientRect();
     const x = rect ? event.clientX - rect.left : 50;
     const y = rect ? event.clientY - rect.top : 50;
-    const effect = { id: result.effectId, x, y, amount: result.amount, critical: result.critical, combo: comboMultiplier };
+    const effect = { id: result.effectId, x, y, amount: result.amount, critical: result.critical, combo: getComboLevel(comboRef.current.count).tier };
     setEffects((current) => [...current, effect]);
     setTimeout(() => setEffects((current) => current.filter((item) => item.id !== effect.id)), 850);
     setPulse((value) => !value);
@@ -2455,10 +2457,10 @@ function App() {
           <div className="score-display"><span className="score-label">{hasInfiniteMoney ? "UNBEGRENZTES TESTGUTHABEN" : isCoopLive ? "GEMEINSAME TORE" : "DEINE TORE"}</span><strong>{displayBalance}</strong><span className="per-click-label">+{formatNumber(clickPower)} {isCoopLive ? "pro Team-Klick" : "pro Klick"}</span></div>
           <div className="ball-stage" ref={stageRef}>
             <div className="stadium-glow" /><div className="stadium-lights"><span /><span /><span /><span /><span /></div><div className="field-circle" /><div className="field-line field-line-one" /><div className="field-line field-line-two" /><div className="field-label">{isCoopLive ? "CO-OP CLICKER ARENA" : "GOAL CLICKER ARENA"}</div>
-            <button type="button" className={`ball-button${pulse ? " hit" : ""}${combo.multiplier > 1 ? ` combo-${combo.multiplier}` : ""}`} onClick={handleBallClick} onKeyDown={handleBallKeyDown} aria-label={isCoopLive ? "Team-Ball anklicken" : "Fussball anklicken"}><span className="ball-aura" /><FootballGraphic /></button>
+            <button type="button" className={`ball-button${pulse ? " hit" : ""}${comboLevel.tier > 1 ? ` combo-${comboLevel.tier}` : ""}`} onClick={handleBallClick} onKeyDown={handleBallKeyDown} aria-label={isCoopLive ? "Team-Ball anklicken" : "Fussball anklicken"}><span className="ball-aura" /><FootballGraphic /></button>
             <p className="click-label"><span>CLICK</span> den Ball {isCoopLive ? "fürs Team" : "für Tore"}</p>
             <div className="floating-layer">{effects.map((effect) => <span className={`floating-number${effect.critical ? " critical" : ""}${effect.combo > 1 ? ` combo-${effect.combo}` : ""}`} key={effect.id} style={{ left: effect.x, top: effect.y }}>{effect.critical ? `CRIT! +${formatNumber(effect.amount)}` : `+${formatNumber(effect.amount)}`}</span>)}</div>
-            <div className={`combo-meter level-${combo.multiplier}${combo.count > 1 ? " active" : ""}`} aria-live="polite"><span className="combo-label">{comboPaused && combo.count > 1 ? `Combo pausiert${combo.multiplier > 1 ? ` · x${combo.multiplier}` : ""}` : combo.multiplier > 1 ? `COMBO x${combo.multiplier}` : combo.count > 1 ? `${combo.count} Klicks` : "Schnell klicken für Combo"}</span><span className="combo-track"><i style={{ width: `${Math.round(getComboProgress(combo.count) * 100)}%` }} /></span><small>{combo.multiplier === 3 ? "Maximum erreicht" : `Nächste Stufe: x${combo.multiplier + 1}`}</small></div>
+            <div className={`combo-meter level-${comboLevel.tier}${combo.count > 1 ? " active" : ""}`} aria-live="polite"><span className="combo-label">{comboPaused && combo.count > 1 ? `Combo pausiert${combo.multiplier > 1 ? ` · ${formatComboMultiplier(combo.multiplier)}` : ""}` : combo.multiplier > 1 ? `COMBO ${formatComboMultiplier(combo.multiplier)}` : combo.count > 1 ? `${combo.count} Klicks` : "Schnell klicken für Combo"}</span><span className="combo-track"><i style={{ width: `${Math.round(getComboProgress(combo.count) * 100)}%` }} /></span><small>{nextComboLevel ? `Nächste Stufe: ${formatComboMultiplier(nextComboLevel.multiplier)}` : "Maximum erreicht"}</small></div>
             {comboBurst && <div className={`combo-burst${comboBurst.text === "Combo vorbei" ? " ended" : ""}`} key={comboBurst.id} aria-hidden="true">{comboBurst.text}</div>}
           </div>
           <div className="production-strip"><div className="production-item"><span className="production-icon">/s</span><div><small>PRO SEKUNDE</small><strong>{formatNumber(passivePower)}</strong></div></div><div className="production-divider" /><div className="production-item"><span className="production-icon">+1</span><div><small>PRO KLICK</small><strong>{formatNumber(clickPower)}</strong></div></div><div className="production-divider" /><div className="production-item"><span className="production-icon">#</span><div><small>KLICKS</small><strong>{formatNumber(displayGame.clicks)}</strong></div></div></div>

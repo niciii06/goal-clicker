@@ -73,6 +73,11 @@ export function decayComboCount(count: number, idleMs: number) {
   return Math.max(0, count - lost);
 }
 
+/** "x1,5" in the German number format. */
+export function formatComboMultiplier(multiplier: number) {
+  return `x${String(multiplier).replace(".", ",")}`;
+}
+
 export function getComboProgress(count: number) {
   const level = getComboLevel(count), next = COMBO_LEVELS.find((item) => item.clicks > count);
   return next ? (count - level.clicks) / (next.clicks - level.clicks) : 1;

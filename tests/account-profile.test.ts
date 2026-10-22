@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
-import { createProfileResponse, deleteProfileResponse, getCloudSaveResponse, getProfileResponse, putCloudSaveResponse, updateProfileResponse, usernameAvailabilityResponse } from '../app/account-api.ts';
+import { createProfileResponse, deleteProfileResponse, getCloudSaveResponse, getProfileResponse, loginEmailResponse, putCloudSaveResponse, registerResponse, updateProfileResponse, usernameAvailabilityResponse } from '../app/account-api.ts';
 import type { AccountApiDeps } from '../app/account-api.ts';
 import { cleanCloudSaveKeys, hashText, serializeCloudSaveKeys, summarizeSave } from '../app/cloud-save-rules.ts';
 import { planInitialSync } from '../app/cloud-sync.ts';
-import { cleanDisplayName, displayNameError, nextUsernameChangeAt, usernameError } from '../app/profile-rules.ts';
+import { cleanDisplayName, displayNameError, isPasswordLoginEmail, nextUsernameChangeAt, passwordError, usernameError } from '../app/profile-rules.ts';
 import { createSaveFile } from '../app/save-file.ts';
 import type { CloudSave, Profile } from '../db/index.ts';
 
@@ -25,14 +25,23 @@ const game = (totalGoals: number) => JSON.stringify({ goals: totalGoals, totalGo
 function memoryStore() {
   const profiles = new Map<string, Profile>();
   const saves = new Map<string, CloudSave>();
+  const logins = new Map<string, { email: string; password: string }>();
+  let nextLogin = 0;
   return {
-    profiles, saves,
+    profiles, saves, logins,
     getProfile: async (userId: string) => profiles.get(userId) ?? null,
+    getProfileByUsername: async (key: string) => [...profiles.values()].find((p) => p.usernameKey === key) ?? null,
+    createPasswordLogin: async (email: string, password: string) => {
+      const id = `00000000-0000-4000-8000-${String(++nextLogin).padStart(12, '0')}`;
+      logins.set(id, { email, password });
+      return id;
+    },
+    deleteLogin: async (userId: string) => logins.delete(userId),
     isUsernameTaken: async (key: string, except?: string) => [...profiles.values()].some((p) => p.usernameKey === key && p.userId !== except),
-    createProfile: async (userId: string, username: string, displayName: string, now: string) => {
+    createProfile: async (userId: string, username: string, displayName: string, now: string, loginEmail: string | null = null) => {
       if ([...profiles.values()].some((p) => p.usernameKey === username.toLowerCase())) return { reason: 'taken' as const };
       if (profiles.has(userId)) return { reason: 'exists' as const };
-      const profile = { userId, username, usernameKey: username.toLowerCase(), displayName, usernameChangedAt: now, createdAt: now, updatedAt: now };
+      const profile = { userId, username, usernameKey: username.toLowerCase(), displayName, loginEmail, usernameChangedAt: now, createdAt: now, updatedAt: now };
       profiles.set(userId, profile);
       return { profile };
     },
@@ -61,7 +70,7 @@ function memoryStore() {
 function setup(user: { id: string; email: string | null } | null = { id: 'user-a', email: 'a@example.com' }) {
   const store = memoryStore();
   let now = new Date('2026-10-01T10:00:00.000Z');
-  const deps: AccountApiDeps = { getUser: async () => user, db: () => store, now: () => now };
+  const deps: AccountApiDeps = { getUser: async () => user, db: () => store, now: () => now, signUp: async () => { throw new Error('the database creates the logins in these tests'); } };
   const call = async (handler: (request: Request, deps: AccountApiDeps) => Promise<Response>, method = 'GET', body?: unknown, path = '/api/profile') => {
     const response = await handler(new Request(`http://localhost${path}`, { method, headers: { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) }), deps);
     return { status: response.status, data: await response.json() as Record<string, unknown> & { profile?: { username: string; displayName: string; nextUsernameChangeAt: string }; errorCode?: string } };
@@ -81,6 +90,39 @@ test('usernames are 3 to 20 plain characters, unique without regard to case, dis
   assert.equal(nextUsernameChangeAt('2026-10-01T10:00:00.000Z'), '2026-10-31T10:00:00.000Z');
 });
 
+test('passwords need 8 to 72 bytes and generated login addresses are recognised', () => {
+  assert.match(passwordError('short')!, /mindestens 8/);
+  assert.equal(passwordError('lang-genug-1'), null);
+  assert.match(passwordError('ä'.repeat(40))!, /höchstens 72/);
+  assert.equal(isPasswordLoginEmail('p-1@players.goal-clicker.vercel.app'), true);
+  assert.equal(isPasswordLoginEmail('nico@gmail.com'), false);
+});
+
+test('registering with username and password creates login and profile, the username leads to the login', async () => {
+  const { call, store } = setup(null);
+  assert.deepEqual((await call(usernameAvailabilityResponse, 'GET', undefined, '/api/profile/username?name=Keeper')).data, { available: true });
+  assert.equal((await call(registerResponse, 'POST', { username: 'Keeper', displayName: 'Goalie', password: 'short' }, '/api/register')).status, 400);
+  const created = await call(registerResponse, 'POST', { username: 'Keeper', displayName: ' Goalie ', password: 'sicheres-passwort' }, '/api/register');
+  assert.equal(created.status, 201);
+  assert.equal(created.data.profile!.displayName, 'Goalie');
+  const email = created.data.email as string;
+  assert.equal(isPasswordLoginEmail(email), true);
+  assert.deepEqual([...store.logins.values()], [{ email, password: 'sicheres-passwort' }]);
+  // The generated address is only handed out for the username, and never with the profile.
+  assert.deepEqual((await call(loginEmailResponse, 'POST', { username: 'KEEPER' }, '/api/login')).data, { email });
+  assert.equal((await call(loginEmailResponse, 'POST', { username: 'nobody' }, '/api/login')).status, 404);
+  assert.equal(JSON.stringify(created.data.profile).includes(email), false);
+  const again = await call(registerResponse, 'POST', { username: 'keeper', displayName: 'Zwei', password: 'sicheres-passwort' }, '/api/register');
+  assert.equal(again.data.errorCode, 'USERNAME_TAKEN');
+  assert.equal(store.logins.size, 1);
+});
+
+test('a Google account has no login address behind its username', async () => {
+  const { call } = setup();
+  await call(createProfileResponse, 'POST', { username: 'Googler', displayName: 'G' + 'oo' });
+  assert.equal((await call(loginEmailResponse, 'POST', { username: 'Googler' }, '/api/login')).status, 404);
+});
+
 test('without a login the profile and save API answer 401', async () => {
   const { call } = setup(null);
   assert.equal((await call(getProfileResponse)).data.errorCode, 'LOGIN_REQUIRED');
@@ -96,7 +138,7 @@ test('the first login has no profile, then creates one with a unique username', 
   assert.equal(created.data.profile!.displayName, 'Nico K');
   assert.equal((await call(createProfileResponse, 'POST', { username: 'Other', displayName: 'Nico' })).data.errorCode, 'PROFILE_EXISTS');
   store.profiles.delete('user-a');
-  store.profiles.set('user-b', { ...[...store.profiles.values()][0] ?? {}, userId: 'user-b', username: 'Taken', usernameKey: 'taken', displayName: 'B', usernameChangedAt: '', createdAt: '', updatedAt: '' });
+  store.profiles.set('user-b', { userId: 'user-b', username: 'Taken', usernameKey: 'taken', displayName: 'B', loginEmail: null, usernameChangedAt: '', createdAt: '', updatedAt: '' });
   assert.equal((await call(createProfileResponse, 'POST', { username: 'TAKEN', displayName: 'Nico' })).data.errorCode, 'USERNAME_TAKEN');
   assert.deepEqual((await call(usernameAvailabilityResponse, 'GET', undefined, '/api/profile/username?name=taken')).data, { available: false, error: 'Dieser Benutzername ist schon vergeben.' });
   assert.deepEqual((await call(usernameAvailabilityResponse, 'GET', undefined, '/api/profile/username?name=free_name')).data, { available: true });

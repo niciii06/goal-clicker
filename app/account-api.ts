@@ -1,19 +1,34 @@
-// Profile and cloud save API of signed in players. The route files only hand the request in, so the
-// tests can swap the login and the database.
+// Accounts with username and password, profiles and the cloud save. The route files only hand the request in,
+// so the tests can swap the login and the database.
+import { randomUUID } from "node:crypto";
+import { createClient } from "@supabase/supabase-js";
 import { getDb } from "../db";
 import type { CloudSave, GoalClickerDatabase, Profile } from "../db";
-import { authConfigured } from "./auth/config";
+import { authConfigured, supabasePublishableKey, supabaseUrl } from "./auth/config";
 import { getRequestUser } from "./auth/server";
 import type { RequestUser } from "./auth/server";
 import { readJsonBody, RequestBodyTooLargeError } from "./api/request-body";
 import { cleanCloudSaveKeys, MAX_CLOUD_SAVE_BYTES, serializeCloudSaveKeys } from "./cloud-save-rules";
-import { cleanDisplayName, displayNameError, nextUsernameChangeAt, usernameChangeCutoff, usernameError, usernameKey } from "./profile-rules";
+import { cleanDisplayName, displayNameError, nextUsernameChangeAt, PASSWORD_LOGIN_DOMAIN, passwordError, usernameChangeCutoff, usernameError, usernameKey } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
 
-type Store = Pick<GoalClickerDatabase, "getProfile" | "isUsernameTaken" | "createProfile" | "updateDisplayName" | "changeUsername" | "getCloudSave" | "putCloudSave" | "deleteAccount">;
-export type AccountApiDeps = { getUser: (request: Request) => Promise<RequestUser | null>; db: () => Store; now: () => Date };
+type Store = Pick<GoalClickerDatabase, "getProfile" | "getProfileByUsername" | "isUsernameTaken" | "createProfile" | "updateDisplayName" | "changeUsername" | "getCloudSave" | "putCloudSave" | "deleteAccount" | "createPasswordLogin" | "deleteLogin">;
+export type AccountApiDeps = {
+  getUser: (request: Request) => Promise<RequestUser | null>;
+  db: () => Store;
+  now: () => Date;
+  /** Registers through the Supabase Auth API, where the database cannot create logins itself (local Supabase, tests). */
+  signUp: (email: string, password: string) => Promise<string | null>;
+};
 
-const defaults: AccountApiDeps = { getUser: getRequestUser, db: getDb, now: () => new Date() };
+async function signUpThroughAuthApi(email: string, password: string) {
+  const supabase = createClient(supabaseUrl(), supabasePublishableKey(), { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) throw error;
+  return data.user?.id ?? null;
+}
+
+const defaults: AccountApiDeps = { getUser: getRequestUser, db: getDb, now: () => new Date(), signUp: signUpThroughAuthApi };
 const noStore = { "cache-control": "no-store" };
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: noStore });
 const MAX_PROFILE_BODY_BYTES = 4096;
@@ -111,13 +126,66 @@ export function deleteProfileResponse(request: Request, deps = defaults) {
   });
 }
 
+/** Runs a handler that needs no login (registration, login, the username check). */
+async function withoutUser(deps: AccountApiDeps, handler: () => Promise<Response>) {
+  if (!authConfigured()) return json({ error: "Der Login ist nicht eingerichtet.", errorCode: "AUTH_NOT_CONFIGURED" }, 404);
+  try {
+    return await handler();
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) return json({ error: error.message }, 413);
+    if (error instanceof SyntaxError) return json({ error: "Die Anfrage ist ungültig." }, 400);
+    return json({ error: "Der Server ist gerade nicht erreichbar. Bitte versuche es gleich nochmal." }, 503);
+  }
+}
+
+/** Also used before an account exists, while a new player picks a username. */
 export function usernameAvailabilityResponse(request: Request, deps = defaults) {
-  return withUser(request, deps, async (user) => {
+  return withoutUser(deps, async () => {
     const username = (new URL(request.url).searchParams.get("name") ?? "").trim();
     const invalid = usernameError(username);
     if (invalid) return json({ available: false, error: invalid });
-    const taken = await deps.db().isUsernameTaken(usernameKey(username), user.id);
+    const user = await deps.getUser(request);
+    const taken = await deps.db().isUsernameTaken(usernameKey(username), user?.id);
     return json(taken ? { available: false, error: "Dieser Benutzername ist schon vergeben." } : { available: true });
+  });
+}
+
+/**
+ * Creates an account with username and password, together with its profile. The login address is generated and
+ * returned, so the browser signs in with Supabase Auth itself; the player only ever sees the username.
+ */
+export function registerResponse(request: Request, deps = defaults) {
+  return withoutUser(deps, async () => {
+    const body = await readJsonBody<{ username?: unknown; displayName?: unknown; password?: unknown }>(request, MAX_PROFILE_BODY_BYTES);
+    const username = typeof body.username === "string" ? body.username.trim() : "";
+    const displayName = cleanDisplayName(typeof body.displayName === "string" ? body.displayName : "");
+    const password = typeof body.password === "string" ? body.password : "";
+    const invalid = usernameError(username) ?? displayNameError(displayName) ?? passwordError(password);
+    if (invalid) return json({ error: invalid, errorCode: "INVALID" }, 400);
+    const store = deps.db();
+    const taken = { error: "Dieser Benutzername ist schon vergeben.", errorCode: "USERNAME_TAKEN" };
+    if (await store.isUsernameTaken(usernameKey(username))) return json(taken, 409);
+    const email = `p-${randomUUID()}@${PASSWORD_LOGIN_DOMAIN}`;
+    const userId = await store.createPasswordLogin(email, password) ?? await deps.signUp(email, password);
+    if (!userId) return json({ error: "Das Konto konnte nicht erstellt werden." }, 503);
+    const result = await store.createProfile(userId, username, displayName, deps.now().toISOString(), email);
+    if (!result.profile) {
+      // A parallel registration took the name between the check and now; the new login must not stay behind.
+      await store.deleteLogin(userId);
+      return json(taken, 409);
+    }
+    return json({ email, profile: publicProfile(result.profile) }, 201);
+  });
+}
+
+/** The login address behind a username. Only accounts with username and password have one. */
+export function loginEmailResponse(request: Request, deps = defaults) {
+  return withoutUser(deps, async () => {
+    const body = await readJsonBody<{ username?: unknown }>(request, MAX_PROFILE_BODY_BYTES);
+    const username = typeof body.username === "string" ? body.username.trim() : "";
+    const profile = username ? await deps.db().getProfileByUsername(usernameKey(username)) : null;
+    if (!profile?.loginEmail) return json({ error: "Benutzername oder Passwort stimmt nicht.", errorCode: "INVALID_LOGIN" }, 404);
+    return json({ email: profile.loginEmail });
   });
 }
 

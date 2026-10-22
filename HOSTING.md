@@ -1,11 +1,11 @@
 # Goal Clicker hosten: Vercel, Supabase und Login
 
-Die App ist eine normale Next.js 16 Anwendung. Vercel baut sie direkt mit `next build`, ohne Anpassungen. Die Daten liegen in Supabase (PostgreSQL), angemeldet wird über Supabase Auth mit Google, mit einem Code per Mail oder mit E-Mail und Passwort. Ohne Login startet das Spiel nicht; jedes Konto hat ein Profil mit eindeutigem Benutzernamen, und der Einzelspieler Spielstand liegt im Profil (gleich auf allen Geräten).
+Die App ist eine normale Next.js 16 Anwendung. Vercel baut sie direkt mit `next build`, ohne Anpassungen. Die Daten liegen in Supabase (PostgreSQL), angemeldet wird über Supabase Auth mit Google oder mit Benutzername und Passwort (ohne Mails). Ohne Login startet das Spiel nicht; jedes Konto hat ein Profil mit eindeutigem Benutzernamen, und der Einzelspieler Spielstand liegt im Profil (gleich auf allen Geräten).
 
 Weiterführend:
 
 * [Datenbank und Datenübernahme](docs/supabase-datenbank.md)
-* [Login einrichten (Google und E-Mail), Profil und Cloud Spielstand](docs/google-login.md)
+* [Login einrichten (Google oder Benutzername), Profil und Cloud Spielstand](docs/google-login.md)
 
 Die bisherige ChatGPT Sites Version ist davon unabhängig. Nichts in diesem Repository schaltet sie ab oder verändert sie. Ein Push auf GitHub aktualisiert die Site nicht.
 
@@ -65,13 +65,13 @@ Diese Schritte erfordern Konten und Geheimnisse und können nur vom Besitzer erl
 
 Alle Tabellen haben Row Level Security ohne Policies. Damit sind sie über die öffentliche Supabase REST API gesperrt. Die App greift serverseitig direkt per PostgreSQL zu.
 
-### 2. Login (Google und E-Mail)
+### 2. Login (Google oder Benutzername)
 
-Anleitung mit allen Weiterleitungs URLs und Mailvorlagen: [docs/google-login.md](docs/google-login.md). Kurzfassung:
+Anleitung mit allen Weiterleitungs URLs: [docs/google-login.md](docs/google-login.md). Kurzfassung:
 
 * Google OAuth Client, Weiterleitungs URI: `https://<projekt-ref>.supabase.co/auth/v1/callback`
 * Supabase *URL Configuration*: Site URL `https://<domain>`, Redirect URLs `https://<domain>/auth/callback`, `https://*-<team>.vercel.app/auth/callback`, `http://localhost:3000/auth/callback`
-* E-Mail: eigener Mailversand (SMTP, zum Beispiel Gmail mit App Passwort) und die drei Mailvorlagen mit `{{ .Token }}`
+* Benutzername und Passwort: nichts einzustellen, die Datenbankfunktion `goal_clicker_private.create_password_user` legt die Logins an
 
 ### 3. Vercel Projekt verbinden
 
@@ -87,7 +87,7 @@ Hinweis: Der frühere Cloudflare Worker hatte eine optionale Anfragebegrenzung f
 
 Auf der Preview Adresse nacheinander:
 
-1. **Login**: *Mit Google anmelden* → Google Konto wählen → beim ersten Mal Profil anlegen → im Spiel stehen Anzeigename und Benutzername oben. Ebenso mit *Code per Mail*. *Abmelden* funktioniert.
+1. **Login**: *Mit Google anmelden* → Google Konto wählen → beim ersten Mal Profil anlegen → im Spiel stehen Anzeigename und Benutzername oben. Ebenso mit *Konto erstellen* (Benutzername und Passwort) und danach *Anmelden*. *Abmelden* funktioniert.
 2. **Einzelspieler**: klicken, Upgrade kaufen, Seite neu laden, Stand bleibt. Auf einem zweiten Gerät anmelden: derselbe Stand. Unter *Club & Mehr* *Spielstand herunterladen* und wieder *hochladen*.
 3. **Multiplayer**: angemeldet eine Welt erstellen, in einem zweiten Browser (anderes Google Konto) mit dem Code beitreten, beide klicken, beide sehen dieselben Tore. Abgemeldet erscheint der Hinweis, dass Multiplayer einen Login braucht.
 

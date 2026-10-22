@@ -152,12 +152,12 @@ for (const viewport of VIEWPORTS) {
   });
 }
 
-test('click combo reaches x2 and the daily reward can be claimed once', async () => {
+test('click combo reaches x1,5 and the daily reward can be claimed once', async () => {
   const now = Date.now();
   const { page, problems } = await openWithSave(VIEWPORTS[0], save(richFeatures(now), now));
   const ball = await page.getByRole('button', { name: 'Fussball anklicken' }).boundingBox();
-  for (let i = 0; i < 18; i++) await page.mouse.click(ball!.x + ball!.width / 2, ball!.y + ball!.height / 2);
-  assert.match(await page.locator('.combo-label').innerText(), /COMBO x2|COMBO x3/);
+  for (let i = 0; i < 22; i++) await page.mouse.click(ball!.x + ball!.width / 2, ball!.y + ball!.height / 2);
+  assert.match(await page.locator('.combo-label').innerText(), /COMBO x1,5|COMBO x2/);
   await page.getByRole('button', { name: /Prämie abholen/ }).click();
   await page.waitForTimeout(500);
   assert.match(await page.locator('.daily-reward').innerText(), /abgeholt/);

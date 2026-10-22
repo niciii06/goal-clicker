@@ -1,11 +1,11 @@
 "use client";
-// Login is required once Supabase is configured: Google, a code by e-mail or e-mail and password. After the
-// first login every account creates a profile (unique username, display name). Before the game starts, the
-// account's cloud save is written to localStorage; while it runs, CloudSync uploads every change.
+// Login is required once Supabase is configured: Google, or username and password (no e-mail involved). Every
+// account has a profile with a unique username and a display name; Google accounts create it after their first
+// login, username accounts when they register. Before the game starts, the account's cloud save is written to
+// localStorage; while it runs, CloudSync uploads every change.
 import { createContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { authErrorMessage, browserSupabase, resendSignupCode, sendLoginCode, sendPasswordResetCode, setAccountPassword, signInWithGoogle, signInWithPassword, signUpWithPassword, verifyEmailCode } from "./auth/browser";
-import type { EmailCodeKind } from "./auth/browser";
+import { authErrorMessage, browserSupabase, registerWithUsername, signInWithGoogle, signInWithUsername } from "./auth/browser";
 import { authConfigured } from "./auth/config";
 import { summarizeSave } from "./cloud-save-rules";
 import type { CloudSaveKeys, SaveSummary } from "./cloud-save-rules";
@@ -14,12 +14,15 @@ import type { CloudSaveState } from "./cloud-sync";
 import { PLAYER_NAME_KEY } from "./game/constants";
 import { formatNumber } from "./game/format";
 import { suspendLocalPersistence } from "./game/storage";
-import { cleanDisplayName, DISPLAY_NAME_MAX, displayNameError, PASSWORD_MIN, USERNAME_MAX, usernameError } from "./profile-rules";
+import { cleanDisplayName, DISPLAY_NAME_MAX, displayNameError, isPasswordLoginEmail, PASSWORD_MAX, PASSWORD_MIN, passwordError, USERNAME_MAX, usernameError } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
 
 export type AccountContextValue = {
   userId: string;
+  /** The Google address; null for accounts with username and password. */
   email: string | null;
+  /** Signs in with username and password (and may change that password). */
+  passwordLogin: boolean;
   profile: PublicProfile;
   setProfile: (profile: PublicProfile) => void;
   /** Saves a last time, forgets the account's save on this device and signs out. */
@@ -38,7 +41,7 @@ const LOGIN_MESSAGES: Record<string, string> = {
   "nicht-konfiguriert": "Der Login ist auf diesem Server noch nicht eingerichtet.",
 };
 
-type SessionUser = { id: string; email: string | null; suggestedName: string };
+type SessionUser = { id: string; email: string | null; passwordLogin: boolean; suggestedName: string };
 type Phase =
   | { name: "checking" }
   | { name: "signed-out"; message?: string }
@@ -67,8 +70,9 @@ function writeProfileCache(userId: string, profile: PublicProfile) {
 function sessionUser(user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> }): SessionUser {
   const metadata = user.user_metadata ?? {};
   const name = [metadata.full_name, metadata.name, metadata.given_name].find((value): value is string => typeof value === "string" && value.trim().length > 0);
-  const fromEmail = user.email ? user.email.split("@")[0] : "";
-  return { id: user.id, email: user.email ?? null, suggestedName: cleanDisplayName(name ?? fromEmail).slice(0, DISPLAY_NAME_MAX) };
+  const passwordLogin = isPasswordLoginEmail(user.email);
+  const fromEmail = user.email && !passwordLogin ? user.email.split("@")[0] : "";
+  return { id: user.id, email: passwordLogin ? null : user.email ?? null, passwordLogin, suggestedName: cleanDisplayName(name ?? fromEmail).slice(0, DISPLAY_NAME_MAX) };
 }
 
 async function readJson<T>(response: Response) {
@@ -205,7 +209,7 @@ function RequiredAccount({ children }: { children: ReactNode }) {
     if (ready) writeProfileCache(ready.user.id, profile);
     localStorage.setItem(PLAYER_NAME_KEY, profile.displayName);
   }, [ready]);
-  const context = useMemo<AccountContextValue | null>(() => ready ? { userId: ready.user.id, email: ready.user.email, profile: ready.profile, setProfile, signOut, deleteProfile } : null, [ready, setProfile, signOut, deleteProfile]);
+  const context = useMemo<AccountContextValue | null>(() => ready ? { userId: ready.user.id, email: ready.user.email, passwordLogin: ready.user.passwordLogin, profile: ready.profile, setProfile, signOut, deleteProfile } : null, [ready, setProfile, signOut, deleteProfile]);
 
   const keepThisDevice = useCallback(async (current: CloudSaveState) => {
     const sync = syncRef.current;
@@ -271,143 +275,9 @@ function SaveChoice({ cloud, local, onCloud, onLocal }: { cloud: CloudSaveState;
   </div>;
 }
 
-type LoginView = { name: "start"; tab: "code" | "password" } | { name: "signup" } | { name: "verify"; kind: EmailCodeKind } | { name: "reset" } | { name: "reset-verify" };
-
-function LoginForm({ message, onSignedIn }: { message?: string; onSignedIn: () => void }) {
-  const [view, setView] = useState<LoginView>({ name: "start", tab: "code" });
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [passwordRepeat, setPasswordRepeat] = useState("");
-  const [code, setCode] = useState("");
-  const [notice, setNotice] = useState(message ?? "");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [resendAt, setResendAt] = useState(0);
-  const [now, setNow] = useState(0);
-
-  useEffect(() => {
-    if (resendAt <= now) return;
-    const timer = window.setTimeout(() => setNow(Date.now()), 1000);
-    return () => window.clearTimeout(timer);
-  }, [resendAt, now]);
-
-  const cleanEmail = email.trim().toLowerCase();
-  const go = (next: LoginView, info = "") => { setView(next); setError(""); setNotice(info); setCode(""); };
-
-  async function run(action: () => Promise<void>) {
-    setBusy(true);
-    setError("");
-    try {
-      await action();
-    } catch (failure) {
-      setError(authErrorMessage(failure));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function codeSent(kind: EmailCodeKind | "recovery-form") {
-    const started = Date.now();
-    setNow(started);
-    setResendAt(started + 60_000);
-    if (kind === "recovery-form") go({ name: "reset-verify" }, `Wir haben dir einen Code an ${cleanEmail} geschickt.`);
-    else go({ name: "verify", kind }, `Wir haben dir einen Code an ${cleanEmail} geschickt. Schau auch im Spam Ordner nach.`);
-  }
-
-  function passwordProblem() {
-    if (password.length < PASSWORD_MIN) return `Das Passwort braucht mindestens ${PASSWORD_MIN} Zeichen.`;
-    if (password !== passwordRepeat) return "Die beiden Passwörter stimmen nicht überein.";
-    return "";
-  }
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    if (busy) return;
-    if (view.name === "start" && view.tab === "code") void run(async () => { await sendLoginCode(cleanEmail); codeSent("email"); });
-    if (view.name === "start" && view.tab === "password") void run(async () => {
-      try {
-        await signInWithPassword(cleanEmail, password);
-        onSignedIn();
-      } catch (failure) {
-        if ((failure as { code?: string }).code !== "email_not_confirmed") throw failure;
-        await resendSignupCode(cleanEmail);
-        codeSent("signup");
-      }
-    });
-    if (view.name === "signup") {
-      const problem = passwordProblem();
-      if (problem) { setError(problem); return; }
-      void run(async () => {
-        const { alreadyRegistered } = await signUpWithPassword(cleanEmail, password);
-        if (alreadyRegistered) { go({ name: "start", tab: "password" }, "Für diese Adresse gibt es schon ein Konto. Melde dich an oder nutze Passwort vergessen."); return; }
-        codeSent("signup");
-      });
-    }
-    if (view.name === "verify") void run(async () => { await verifyEmailCode(cleanEmail, code.trim(), view.kind); onSignedIn(); });
-    if (view.name === "reset") void run(async () => { await sendPasswordResetCode(cleanEmail); codeSent("recovery-form"); });
-    if (view.name === "reset-verify") {
-      const problem = passwordProblem();
-      if (problem) { setError(problem); return; }
-      void run(async () => { await verifyEmailCode(cleanEmail, code.trim(), "recovery"); await setAccountPassword(password); onSignedIn(); });
-    }
-  }
-
-  function resend() {
-    if (view.name !== "verify" && view.name !== "reset-verify") return;
-    const kind = view.name === "reset-verify" ? "recovery" : view.kind;
-    void run(async () => {
-      if (kind === "email") await sendLoginCode(cleanEmail);
-      else if (kind === "signup") await resendSignupCode(cleanEmail);
-      else await sendPasswordResetCode(cleanEmail);
-      codeSent(kind === "recovery" ? "recovery-form" : kind);
-    });
-  }
-
-  const emailField = <label className="account-field"><span>E-Mail</span><input className="mode-input" type="email" autoComplete="email" inputMode="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>;
-  const codeField = <label className="account-field"><span>Code aus der Mail</span><input className="mode-input account-code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6,10}" maxLength={10} required value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))} /></label>;
-  const newPasswordFields = <>
-    <label className="account-field"><span>Passwort (mindestens {PASSWORD_MIN} Zeichen)</span><input className="mode-input" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-    <label className="account-field"><span>Passwort wiederholen</span><input className="mode-input" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} required value={passwordRepeat} onChange={(event) => setPasswordRepeat(event.target.value)} /></label>
-  </>;
-  const waitSeconds = Math.max(0, Math.ceil((resendAt - now) / 1000));
-
-  return <>
-    <h2>{view.name === "signup" ? "Konto erstellen" : view.name === "reset" || view.name === "reset-verify" ? "Neues Passwort" : view.name === "verify" ? "Code eingeben" : "Anmelden"}</h2>
-    {view.name === "start" && <>
-      <p>Melde dich an, damit dein Spielstand auf allen deinen Geräten gleich ist.</p>
-      <button type="button" className="account-google" disabled={busy} onClick={() => void run(() => signInWithGoogle("/"))}><span aria-hidden="true">G</span>Mit Google anmelden</button>
-      <div className="account-divider"><span>oder mit E-Mail</span></div>
-      <div className="account-tabs" role="tablist">
-        <button type="button" role="tab" aria-selected={view.tab === "code"} className={view.tab === "code" ? "active" : ""} onClick={() => go({ name: "start", tab: "code" })}>Code per Mail</button>
-        <button type="button" role="tab" aria-selected={view.tab === "password"} className={view.tab === "password" ? "active" : ""} onClick={() => go({ name: "start", tab: "password" })}>Passwort</button>
-      </div>
-    </>}
-    {notice && <p className="account-notice" role="status">{notice}</p>}
-    <form className="account-form" onSubmit={submit}>
-      {view.name === "start" && view.tab === "code" && <>{emailField}<small className="account-hint">Du bekommst einen Code per Mail. Ohne Konto wird automatisch eines erstellt.</small><button type="submit" className="mode-primary" disabled={busy}>Code senden</button></>}
-      {view.name === "start" && view.tab === "password" && <>
-        {emailField}
-        <label className="account-field"><span>Passwort</span><input className="mode-input" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-        <button type="submit" className="mode-primary" disabled={busy}>Anmelden</button>
-        <div className="account-links"><button type="button" onClick={() => go({ name: "signup" })}>Neues Konto mit Passwort</button><button type="button" onClick={() => go({ name: "reset" })}>Passwort vergessen?</button></div>
-      </>}
-      {view.name === "signup" && <>{emailField}{newPasswordFields}<small className="account-hint">Danach schicken wir dir einen Code, um die Adresse zu bestätigen.</small><button type="submit" className="mode-primary" disabled={busy}>Konto erstellen</button></>}
-      {view.name === "verify" && <>{codeField}<button type="submit" className="mode-primary" disabled={busy || code.length < 6}>Bestätigen</button></>}
-      {view.name === "reset" && <>{emailField}<button type="submit" className="mode-primary" disabled={busy}>Code senden</button></>}
-      {view.name === "reset-verify" && <>{codeField}{newPasswordFields}<button type="submit" className="mode-primary" disabled={busy || code.length < 6}>Passwort speichern</button></>}
-      {(view.name === "verify" || view.name === "reset-verify") && <button type="button" className="mode-secondary" disabled={busy || waitSeconds > 0} onClick={resend}>{waitSeconds > 0 ? `Neuer Code in ${waitSeconds} s` : "Neuen Code senden"}</button>}
-      {view.name !== "start" && <button type="button" className="mode-secondary quiet" onClick={() => go({ name: "start", tab: view.name === "verify" && view.kind === "email" ? "code" : "password" })}>Zurück</button>}
-    </form>
-    {error && <p className="account-error" role="alert">{error}</p>}
-  </>;
-}
-
-function ProfileSetup({ user, onCreated, onSignOut }: { user: SessionUser; onCreated: (profile: PublicProfile) => void; onSignOut: () => void }) {
-  const [username, setUsername] = useState("");
-  const [displayName, setDisplayName] = useState(user.suggestedName);
+/** The live "free or taken" check while a username is typed. */
+function useUsernameCheck(username: string) {
   const [availability, setAvailability] = useState<{ name: string; available: boolean; error?: string } | null>(null);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
   const trimmed = username.trim();
   const localProblem = trimmed ? usernameError(trimmed) : null;
 
@@ -424,7 +294,82 @@ function ProfileSetup({ user, onCreated, onSignOut }: { user: SessionUser; onCre
   }, [trimmed, localProblem]);
 
   const checked = availability?.name === trimmed ? availability : null;
-  const usernameMessage = localProblem ?? (checked ? (checked.available ? "Dieser Benutzername ist frei." : checked.error ?? "Dieser Benutzername ist schon vergeben.") : "");
+  const message = localProblem ?? (checked ? (checked.available ? "Dieser Benutzername ist frei." : checked.error ?? "Dieser Benutzername ist schon vergeben.") : "");
+  const tone = localProblem || checked?.available === false ? " bad" : checked?.available ? " good" : "";
+  return { trimmed, message, tone, blocked: Boolean(localProblem) || checked?.available === false };
+}
+
+function UsernameHint({ check }: { check: ReturnType<typeof useUsernameCheck> }) {
+  return <small className={`account-hint${check.tone}`}>{check.message || "3 bis 20 Zeichen: Buchstaben, Zahlen und _. Änderbar alle 30 Tage."}</small>;
+}
+
+function LoginForm({ message, onSignedIn }: { message?: string; onSignedIn: () => void }) {
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordRepeat, setPasswordRepeat] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const check = useUsernameCheck(mode === "register" ? username : "");
+
+  function switchMode(next: "login" | "register") {
+    setMode(next);
+    setError("");
+    setPassword("");
+    setPasswordRepeat("");
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    if (mode === "register") {
+      const problem = usernameError(username) ?? displayNameError(displayName) ?? passwordError(password) ?? (password !== passwordRepeat ? "Die beiden Passwörter stimmen nicht überein." : null);
+      if (problem) { setError(problem); return; }
+    }
+    setBusy(true);
+    setError("");
+    try {
+      if (mode === "login") await signInWithUsername(username.trim(), password);
+      else await registerWithUsername(username.trim(), displayName, password);
+      onSignedIn();
+    } catch (failure) {
+      setError(authErrorMessage(failure));
+      setBusy(false);
+    }
+  }
+
+  return <>
+    <h2>{mode === "login" ? "Anmelden" : "Konto erstellen"}</h2>
+    <p>Melde dich an, damit dein Spielstand auf allen deinen Geräten gleich ist.</p>
+    {message && <p className="account-notice" role="status">{message}</p>}
+    <button type="button" className="account-google" disabled={busy} onClick={() => void signInWithGoogle("/").catch((failure: unknown) => setError(authErrorMessage(failure)))}><span aria-hidden="true">G</span>Mit Google anmelden</button>
+    <div className="account-divider"><span>oder mit Benutzername</span></div>
+    <div className="account-tabs" role="tablist">
+      <button type="button" role="tab" aria-selected={mode === "login"} className={mode === "login" ? "active" : ""} onClick={() => switchMode("login")}>Anmelden</button>
+      <button type="button" role="tab" aria-selected={mode === "register"} className={mode === "register" ? "active" : ""} onClick={() => switchMode("register")}>Konto erstellen</button>
+    </div>
+    <form className="account-form" onSubmit={(event) => void submit(event)}>
+      <label className="account-field"><span>Benutzername</span><input className="mode-input" autoComplete="username" autoCapitalize="none" spellCheck={false} maxLength={USERNAME_MAX} required value={username} onChange={(event) => setUsername(event.target.value)} /></label>
+      {mode === "register" && <UsernameHint check={check} />}
+      {mode === "register" && <><label className="account-field"><span>Anzeigename</span><input className="mode-input" autoComplete="nickname" maxLength={DISPLAY_NAME_MAX} required value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
+        <small className="account-hint">So heisst du im Spiel und im Multiplayer. Jederzeit änderbar.</small></>}
+      <label className="account-field"><span>{mode === "register" ? `Passwort (mindestens ${PASSWORD_MIN} Zeichen)` : "Passwort"}</span><input className="mode-input" type="password" autoComplete={mode === "register" ? "new-password" : "current-password"} minLength={mode === "register" ? PASSWORD_MIN : undefined} maxLength={PASSWORD_MAX} required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+      {mode === "register" && <label className="account-field"><span>Passwort wiederholen</span><input className="mode-input" type="password" autoComplete="new-password" maxLength={PASSWORD_MAX} required value={passwordRepeat} onChange={(event) => setPasswordRepeat(event.target.value)} /></label>}
+      {mode === "register" && <small className="account-hint">Merk dir dein Passwort gut: Ohne E-Mail Adresse lässt es sich nicht zurücksetzen.</small>}
+      <button type="submit" className="mode-primary" disabled={busy || (mode === "register" && check.blocked)}>{mode === "login" ? "Anmelden" : "Konto erstellen"}</button>
+    </form>
+    {error && <p className="account-error" role="alert">{error}</p>}
+  </>;
+}
+
+function ProfileSetup({ user, onCreated, onSignOut }: { user: SessionUser; onCreated: (profile: PublicProfile) => void; onSignOut: () => void }) {
+  const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState(user.suggestedName);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const check = useUsernameCheck(username);
+  const trimmed = check.trimmed;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -449,10 +394,10 @@ function ProfileSetup({ user, onCreated, onSignOut }: { user: SessionUser; onCre
     <p>Angemeldet als {user.email ?? "neues Konto"}. Wähle einen Benutzernamen, den es nur einmal gibt, und einen Namen, den die anderen im Spiel sehen.</p>
     <form className="account-form" onSubmit={(event) => void submit(event)}>
       <label className="account-field"><span>Benutzername</span><input className="mode-input" autoComplete="username" autoCapitalize="none" spellCheck={false} maxLength={USERNAME_MAX} required value={username} onChange={(event) => setUsername(event.target.value)} /></label>
-      <small className={`account-hint${usernameMessage && (localProblem || checked?.available === false) ? " bad" : checked?.available ? " good" : ""}`}>{usernameMessage || "3 bis 20 Zeichen: Buchstaben, Zahlen und _. Änderbar alle 30 Tage."}</small>
+      <UsernameHint check={check} />
       <label className="account-field"><span>Anzeigename</span><input className="mode-input" autoComplete="nickname" maxLength={DISPLAY_NAME_MAX} required value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
       <small className="account-hint">So heisst du im Spiel und im Multiplayer. Jederzeit änderbar.</small>
-      <button type="submit" className="mode-primary" disabled={busy || Boolean(localProblem) || checked?.available === false}>Profil erstellen</button>
+      <button type="submit" className="mode-primary" disabled={busy || check.blocked}>Profil erstellen</button>
       <button type="button" className="mode-secondary quiet" onClick={onSignOut}>Abmelden</button>
     </form>
     {error && <p className="account-error" role="alert">{error}</p>}

@@ -8,7 +8,7 @@ import { authErrorMessage, setAccountPassword } from "./auth/browser";
 import { subscribeSyncStatus } from "./cloud-sync";
 import type { SyncStatus } from "./cloud-sync";
 import { suspendLocalPersistence } from "./game/storage";
-import { DISPLAY_NAME_MAX, displayNameError, PASSWORD_MIN, USERNAME_MAX, usernameError } from "./profile-rules";
+import { DISPLAY_NAME_MAX, displayNameError, PASSWORD_MAX, PASSWORD_MIN, passwordError, USERNAME_MAX, usernameError } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
 import { applySaveFile, createSaveFile, parseSaveFile, saveFileName, savedPlayerId } from "./save-file";
 
@@ -69,7 +69,7 @@ async function patchProfile(body: { displayName?: string; username?: string }) {
   return data.profile;
 }
 
-/** Profile settings: display name, username (every 30 days), password and deleting the profile. */
+/** Profile settings: display name, username (every 30 days), password of username accounts and deleting the profile. */
 export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void }) {
   const account = useContext(AccountContext);
   const status = useSyncStatus();
@@ -112,9 +112,9 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
 
   function savePassword(event: FormEvent) {
     event.preventDefault();
-    if (password.length < PASSWORD_MIN) { onMessage(`Das Passwort braucht mindestens ${PASSWORD_MIN} Zeichen.`); return; }
-    if (password !== passwordRepeat) { onMessage("Die beiden Passwörter stimmen nicht überein."); return; }
-    void run("password", async () => { await setAccountPassword(password); setPassword(""); setPasswordRepeat(""); onMessage("Passwort gespeichert. Du kannst dich jetzt auch mit E-Mail und Passwort anmelden."); });
+    const problem = passwordError(password) ?? (password !== passwordRepeat ? "Die beiden Passwörter stimmen nicht überein." : null);
+    if (problem) { onMessage(problem); return; }
+    void run("password", async () => { await setAccountPassword(password); setPassword(""); setPasswordRepeat(""); onMessage("Neues Passwort gespeichert."); });
   }
 
   function deleteProfile(event: FormEvent) {
@@ -124,12 +124,12 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
   }
 
   return <section className="profile-panel" aria-label="Profil">
-    <div><p className="eyebrow">PROFIL / KONTO</p><h4>{profile.displayName} <small>@{profile.username}</small></h4><p>Angemeldet als {account.email ?? "unbekannt"}. Dein Spielstand wird automatisch in deinem Profil gespeichert: <strong className={`account-sync ${status}`}>{SYNC_LABELS[status]}</strong></p></div>
+    <div><p className="eyebrow">PROFIL / KONTO</p><h4>{profile.displayName} <small>@{profile.username}</small></h4><p>{account.passwordLogin ? "Angemeldet mit Benutzername und Passwort." : `Angemeldet mit Google (${account.email ?? "unbekannt"}).`} Dein Spielstand wird automatisch in deinem Profil gespeichert: <strong className={`account-sync ${status}`}>{SYNC_LABELS[status]}</strong></p></div>
     <form className="profile-row" onSubmit={saveDisplayName}><label><span>Anzeigename</span><input className="mode-input" maxLength={DISPLAY_NAME_MAX} value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || displayName.trim() === profile.displayName}>Speichern</button></form>
     <form className="profile-row" onSubmit={saveUsername}><label><span>Benutzername</span><input className="mode-input" maxLength={USERNAME_MAX} autoCapitalize="none" spellCheck={false} value={username} onChange={(event) => setUsername(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || usernameLocked || username.trim() === profile.username}>Ändern</button>
-      <small>{nextChange.getTime() > now ? `Nächste Änderung ab ${nextChange.toLocaleDateString("de-CH")} möglich (nur Gross und Kleinschreibung jederzeit).` : "Du kannst den Benutzernamen jetzt ändern. Danach erst wieder in 30 Tagen."}</small></form>
-    <form className="profile-row" onSubmit={savePassword}><label><span>Neues Passwort</span><input className="mode-input" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} value={password} onChange={(event) => setPassword(event.target.value)} /></label><label><span>Wiederholen</span><input className="mode-input" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} value={passwordRepeat} onChange={(event) => setPasswordRepeat(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || !password}>Passwort festlegen</button>
-      <small>Optional. Damit kannst du dich zusätzlich mit E-Mail und Passwort anmelden.</small></form>
+      <small>{nextChange.getTime() > now ? `Nächste Änderung ab ${nextChange.toLocaleDateString("de-CH")} möglich (nur Gross und Kleinschreibung jederzeit).` : "Du kannst den Benutzernamen jetzt ändern. Danach erst wieder in 30 Tagen."}{account.passwordLogin ? " Du meldest dich danach mit dem neuen Namen an." : ""}</small></form>
+    {account.passwordLogin && <form className="profile-row" onSubmit={savePassword}><label><span>Neues Passwort</span><input className="mode-input" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} maxLength={PASSWORD_MAX} value={password} onChange={(event) => setPassword(event.target.value)} /></label><label><span>Wiederholen</span><input className="mode-input" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} maxLength={PASSWORD_MAX} value={passwordRepeat} onChange={(event) => setPasswordRepeat(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || !password}>Passwort ändern</button>
+      <small>Du meldest dich mit deinem Benutzernamen und diesem Passwort an.</small></form>}
     <details className="profile-danger"><summary>Profil löschen</summary>
       <form className="profile-row" onSubmit={deleteProfile}><label><span>Zur Bestätigung „{profile.username}“ eintippen</span><input className="mode-input" autoCapitalize="none" spellCheck={false} value={confirm} onChange={(event) => setConfirm(event.target.value)} /></label><button type="submit" className="mode-secondary danger" disabled={Boolean(busy) || confirm.trim().toLowerCase() !== profile.username.toLowerCase()}>Endgültig löschen</button>
         <small>Löscht Profil, Spielstand und Login. Multiplayer Welten bleiben für die anderen Spieler bestehen.</small></form>

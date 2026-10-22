@@ -133,15 +133,20 @@ export class GoalClickerDatabase {
     return profile ?? null;
   }
 
+  async getProfileByUsername(key: string): Promise<Profile | null> {
+    const [profile] = await this.client.select().from(profiles).where(eq(profiles.usernameKey, key)).limit(1);
+    return profile ?? null;
+  }
+
   async isUsernameTaken(key: string, exceptUserId?: string) {
     const [owner] = await this.client.select({ userId: profiles.userId }).from(profiles).where(eq(profiles.usernameKey, key)).limit(1);
     return Boolean(owner && owner.userId !== exceptUserId);
   }
 
   /** One profile per account; the unique username_key decides concurrent claims of the same name. */
-  async createProfile(userId: string, username: string, displayName: string, now: string): Promise<{ profile: Profile; reason?: undefined } | { profile?: undefined; reason: "taken" | "exists" }> {
+  async createProfile(userId: string, username: string, displayName: string, now: string, loginEmail: string | null = null): Promise<{ profile: Profile; reason?: undefined } | { profile?: undefined; reason: "taken" | "exists" }> {
     try {
-      const [created] = await this.client.insert(profiles).values({ userId, username, usernameKey: username.toLowerCase(), displayName, usernameChangedAt: now, createdAt: now, updatedAt: now }).onConflictDoNothing({ target: profiles.userId }).returning();
+      const [created] = await this.client.insert(profiles).values({ userId, username, usernameKey: username.toLowerCase(), displayName, loginEmail, usernameChangedAt: now, createdAt: now, updatedAt: now }).onConflictDoNothing({ target: profiles.userId }).returning();
       return created ? { profile: created } : { reason: "exists" };
     } catch (error) {
       if (isUniqueViolation(error)) return { reason: "taken" };
@@ -193,6 +198,31 @@ export class GoalClickerDatabase {
   }
 
   /**
+   * Creates a confirmed Supabase Auth login with e-mail and password, without any mail, through a function only
+   * the production database has (see docs/supabase-datenbank.md). Returns null where it does not exist.
+   */
+  async createPasswordLogin(email: string, password: string): Promise<string | null> {
+    try {
+      const rows = await this.client.execute(sql`select goal_clicker_private.create_password_user(${email}, ${password}) as id`);
+      return String((rows as unknown as { id: string }[])[0].id);
+    } catch (error) {
+      if (isMissingObject(error)) return null;
+      throw error;
+    }
+  }
+
+  /** Deletes only the login, for a registration that lost its username to a parallel one. */
+  async deleteLogin(userId: string) {
+    try {
+      await this.client.execute(sql`select goal_clicker_private.delete_user(${userId}::uuid)`);
+      return true;
+    } catch (error) {
+      if (isMissingObject(error)) return false;
+      throw error;
+    }
+  }
+
+  /**
    * Removes everything stored for an account. Worlds stay, because other players share them. The login itself
    * is deleted by a function only the production database has (see docs/supabase-datenbank.md).
    */
@@ -202,13 +232,7 @@ export class GoalClickerDatabase {
       await tx.delete(profiles).where(eq(profiles.userId, userId));
       await tx.delete(playerAccounts).where(eq(playerAccounts.userId, userId));
     });
-    try {
-      await this.client.execute(sql`select goal_clicker_private.delete_user(${userId}::uuid)`);
-      return { loginDeleted: true };
-    } catch (error) {
-      if (isMissingObject(error)) return { loginDeleted: false };
-      throw error;
-    }
+    return { loginDeleted: await this.deleteLogin(userId) };
   }
 
   async getRoom(code: string): Promise<RoomRow | null> {

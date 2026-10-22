@@ -1,11 +1,9 @@
-// A small stand-in for Supabase Auth (GoTrue) for the account browser test: login codes are always the
-// code below, mails are never sent, and the access tokens are real ES256 JWTs that the app verifies through
-// the JWKS endpoint exactly like with Supabase.
+// A small stand-in for Supabase Auth (GoTrue) for the account browser test. Sign ups are confirmed at once,
+// like a project without e-mail confirmation, and the access tokens are real ES256 JWTs that the app verifies
+// through the JWKS endpoint exactly like with Supabase.
 import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
-
-export const MOCK_CODE = '123456';
 
 type MockUser = { id: string; email: string; password: string | null; confirmed: boolean; createdAt: string };
 
@@ -18,7 +16,6 @@ export function startMockAuth(port: number) {
   const users = new Map<string, MockUser>();
   const refreshTokens = new Map<string, string>();
   const issuer = `http://127.0.0.1:${port}/auth/v1`;
-  const mails: { email: string; type: string }[] = [];
 
   function jwt(user: MockUser) {
     const now = Math.floor(Date.now() / 1000);
@@ -72,19 +69,10 @@ export function startMockAuth(port: number) {
       const url = new URL(request.url ?? '/', issuer);
       const path = url.pathname.replace(/^\/auth\/v1/, '');
       if (path === '/.well-known/jwks.json') return send(200, { keys: [jwk] });
-      if (path === '/otp') { userFor(body.email, true); mails.push({ email: body.email, type: 'email' }); return send(200, {}); }
       if (path === '/signup') {
-        const existing = userFor(body.email, false);
-        if (existing?.confirmed) return send(200, { ...userJson(existing), identities: [] });
+        if (userFor(body.email, false)) return fail(422, 'user_already_exists', 'User already registered');
         const user = userFor(body.email, true)!;
         user.password = body.password;
-        mails.push({ email: user.email, type: 'signup' });
-        return send(200, userJson(user));
-      }
-      if (path === '/resend' || path === '/recover') { mails.push({ email: body.email, type: path === '/recover' ? 'recovery' : body.type }); return send(200, {}); }
-      if (path === '/verify') {
-        const user = userFor(body.email, false);
-        if (!user || body.token !== MOCK_CODE) return fail(403, 'otp_expired', 'Token has expired or is invalid');
         user.confirmed = true;
         return send(200, session(user));
       }
@@ -110,5 +98,5 @@ export function startMockAuth(port: number) {
     });
   });
   server.listen(port, '127.0.0.1');
-  return { server, mails, users, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
+  return { server, users, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
 }
