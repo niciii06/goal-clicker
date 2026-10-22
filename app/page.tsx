@@ -16,6 +16,7 @@ import { FootballGraphic, GameErrorBoundary, Icon, StarXIPositionBadges } from "
 import { LiveMatchViewer } from "./match-viewer";
 import { AccountChip, ProfilePanel, SaveTransferPanel } from "./account-panel";
 import { AccountContext, AccountGate } from "./account-gate";
+import { FLUSH_SAVE_EVENT } from "./cloud-sync";
 import { SquadBenchCard, SquadBenchPanel, SquadBenchSlot, SquadPitchPanel, SquadPitchSlot, formatStarXIPositions, useSquadDrag } from "./squad-board";
 import { MAX_CAREER_SEASON, SEASON_MILESTONES, getFormationUnlockLeague, getPackUnlockLeague, getReachedLeague, getSeasonMilestone, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked, leagueForTier } from "./season-progression";
 import { MULTIPLAYER_PROTOCOL_VERSION } from "./multiplayer-protocol";
@@ -2412,8 +2413,9 @@ function App() {
     if (document.hidden) onVisibility();
     window.addEventListener("beforeunload", saveOnExit);
     window.addEventListener("pagehide", saveOnExit);
+    window.addEventListener(FLUSH_SAVE_EVENT, saveOnExit);
     document.addEventListener("visibilitychange", onVisibility);
-    return () => { window.removeEventListener("beforeunload", saveOnExit); window.removeEventListener("pagehide", saveOnExit); document.removeEventListener("visibilitychange", onVisibility); };
+    return () => { window.removeEventListener("beforeunload", saveOnExit); window.removeEventListener("pagehide", saveOnExit); window.removeEventListener(FLUSH_SAVE_EVENT, saveOnExit); document.removeEventListener("visibilitychange", onVisibility); };
   }, [hydrated]);
 
   const rankRange = nextRank ? nextRank.minimum - currentRank.minimum : 1;

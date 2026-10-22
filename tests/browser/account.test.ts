@@ -216,10 +216,15 @@ test('the profile settings change display name and password and delete the profi
   assert.equal((await admin`select count(*)::int as n from profiles where user_id = ${userId}::uuid`)[0].n, 0);
 });
 
-test('signing out saves, forgets the save on this device and shows the login again', { skip }, async () => {
+test('signing out right after clicking still saves those clicks, then forgets the save on this device', { skip }, async () => {
   const page = devices.asked.page;
+  await page.evaluate(() => window.dispatchEvent(new Event('goalclicker:flush-save')));
+  const before = await localGoals(page);
+  // Every click earns at least one goal; the game itself would only save them a few seconds later.
+  await clickBall(page, 3);
   await page.locator('.account-chip').getByRole('button', { name: 'Abmelden' }).click();
   await page.getByRole('button', { name: 'Mit Google anmelden' }).waitFor();
   assert.equal(await page.evaluate((key) => localStorage.getItem(key), SAVE_KEY), null);
+  assert.ok((await cloudSave('Striker'))!.totalGoals >= before + 3, `cloud has ${(await cloudSave('Striker'))!.totalGoals}, before the clicks ${before}`);
   assert.deepEqual(problems, []);
 });
