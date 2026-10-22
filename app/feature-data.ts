@@ -13,7 +13,7 @@ import { FC26_STAR_PROFILES } from "./fc26-player-pool";
 import { isFC27Unavailable } from "./fc27-ratings";
 import { FC27_WOMEN_PROFILES } from "./fc27-women-pool";
 import { FC27_INDIA_PROFILES, SCRAP_RATING_GROUPS, drawScrapPlayer } from "./scrap-pack";
-import { GAZETTE_CHAMPION_HEADLINES, GAZETTE_EXIT_HEADLINES, TRANSFER_INTERESTED_CLUBS } from "./features/news-data";
+import { GAZETTE_CHAMPION_HEADLINES, GAZETTE_EXIT_HEADLINES, TRANSFER_INTERESTED_CLUBS, transferClubsForRating } from "./features/news-data";
 import { HOME_VENUE, LEAGUE_LABELS, seasonGeography, venueForClubName } from "./travel-geography";
 import { addBroadcastSubstitution, advanceMatchBroadcast, chooseGoalPattern, createMatchBroadcast, normalizeMatchBroadcast, recordedActionRating } from "./match-broadcast";
 import { advanceInteractive, normalizeInteractive, resumeInteractive } from "./interactive-match";
@@ -2828,7 +2828,6 @@ export function resolveTransferInsiderEvent(value: GameFeatures, random: () => n
     : eventRoll < loanChance + TRANSFER_SALE_CHANCE
       ? "sale"
       : "failed";
-  const club = TRANSFER_INTERESTED_CLUBS[transferRandomIndex(TRANSFER_INTERESTED_CLUBS.length, random)] ?? TRANSFER_INTERESTED_CLUBS[0];
   const loanedIds = new Set(getLoanedStarXIPlayerIds(features));
   const squadCandidateIds = [...new Set([...features.starXI.lineupIds, ...features.starXI.benchIds])]
     .filter((playerId) => Boolean(playerId) && features.starXI.ownedIds.includes(playerId) && !loanedIds.has(playerId) && Boolean(getStarXIPlayer(playerId)));
@@ -2836,6 +2835,9 @@ export function resolveTransferInsiderEvent(value: GameFeatures, random: () => n
   const matchInProgress = features.cup.active;
   const candidateId: string | null = squadCandidateIds[candidateStartIndex] ?? null;
   const player = candidateId ? getStarXIPlayer(candidateId) ?? null : null;
+  // Only clubs that would really sign a player of this rating ask for him.
+  const clubs = player ? transferClubsForRating(player.rating) : TRANSFER_INTERESTED_CLUBS;
+  const club = clubs[transferRandomIndex(clubs.length, random)] ?? clubs[0];
   const outcome = requestedOutcome !== "failed" && player && !matchInProgress ? requestedOutcome : "failed";
   let event: TransferInsiderEvent;
   let goalDelta = 0;
