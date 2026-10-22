@@ -269,7 +269,7 @@
 @media (max-width: 780px) { .feature-card { padding: 17px; border-radius: 21px; }.feature-card-heading { gap: 12px; }.feature-card-heading h2 { font-size: 25px; }.feature-panel-heading { display: block; }.feature-panel-heading .feature-stat { display: inline-block; margin-top: 9px; }.transfer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.cup-start { display: block; }.cup-start .mode-primary { width: 100%; margin-top: 13px; }.strategy-grid { grid-template-columns: 1fr; }.mission-row { grid-template-columns: 1fr; }.mission-row .feature-buy-button { width: 100%; }.event-takeover,.transfer-insider-takeover { padding: 15px; }.event-takeover-card { padding: 42px 22px 28px; border-radius: 23px; }.event-takeover-card h2 { font-size: clamp(46px, 13vw, 76px); }.event-takeover-card p { font-size: 11px; }.transfer-insider-card { padding: 24px 20px 26px; border-radius: 22px; }.transfer-insider-card h2 { font-size: 43px; }.transfer-insider-card p { font-size: 11px; } }
 @media (max-width: 540px) { .transfer-grid { grid-template-columns: 1fr; }.owned-strip { align-items: flex-start; flex-direction: column; }.owned-strip > div { justify-content: flex-start; }.event-takeover-card h2 { font-size: 48px; } }
 @media (max-width: 780px) { .season-standings-takeover { padding: 12px; }.season-standings-panel { padding: 22px 16px 18px; border-radius: 22px; }.season-standings-result { align-items: flex-start; flex-direction: column; gap: 16px; }.season-standings-outcome { justify-items: start; text-align: left; } }
-@media (max-width: 540px) { .season-standings-result > div:first-child strong { font-size: 64px; }.season-standings-large-row { grid-template-columns: 25px minmax(0,1fr) 34px 22px; gap: 7px; padding: 8px; }.season-standings-large-row strong { font-size: 11px; }.season-standings-large-row small { font-size: 11px; }.season-standings-goal-difference { font-size: 11px; }.season-standings-note { font-size: 11px; } }
+@media (max-width: 540px) { .season-standings-result > div:first-child strong { font-size: 64px; }.season-standings-large-row { grid-template-columns: 25px minmax(0,1fr) 34px 22px; gap: 7px; padding: 8px; }.season-standings-large-row strong { font-size: 10px; }.season-standings-large-row small { font-size: 10px; }.season-standings-goal-difference { font-size: 11px; }.season-standings-note { font-size: 10px; } }
 
 .starxi-summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 14px 0 18px; }
 .starxi-summary > div { min-width: 0; padding: 11px 12px; border: 1px solid var(--line-soft); border-radius: 13px; background: var(--surface-raised); }
@@ -480,11 +480,11 @@
 .cup-goal-card .event-takeover-dismiss:hover { background: #e8f3ff; }
 .cup-card-takeover { position: fixed; z-index: 42; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(35,4,8,.82); backdrop-filter: saturate(145%) blur(16px); animation: goal-overlay-in 220ms ease-out; }
 .cup-card-card { position: relative; width: min(620px, 100%); overflow: hidden; padding: 52px 30px 30px; border: 1px solid rgba(255,122,141,.58); border-radius: 30px; color: #fff; background: radial-gradient(circle at 50% 0, rgba(255,59,48,.34), transparent 48%), linear-gradient(145deg, #5b121d, #1b080d 72%); box-shadow: 0 30px 100px rgba(0,0,0,.58), 0 0 90px rgba(255,59,48,.24), inset 0 1px 0 rgba(255,255,255,.16); text-align: center; animation: goal-card-pop 420ms cubic-bezier(.16,1,.3,1); }
-.cup-card-kicker { display: block; color: #ffb3bd; font-size: 11px; font-weight: 900; letter-spacing: .2em; }
+.cup-card-kicker { display: block; color: #ffb3bd; font-size: 10px; font-weight: 900; letter-spacing: .2em; }
 .cup-card-card > strong { display: block; margin-top: 19px; overflow: hidden; color: rgba(255,255,255,.9); font-size: clamp(19px, 4vw, 29px); font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
 .cup-card-card h2 { margin: 7px 0 0; color: #fff; font-size: clamp(52px, 11vw, 108px); font-weight: 900; letter-spacing: -.09em; line-height: .88; text-shadow: 0 5px 0 rgba(0,0,0,.18), 0 0 28px rgba(255,144,154,.4); }
 .cup-card-card p { margin: 20px auto 0; max-width: 470px; color: rgba(255,255,255,.76); font-size: 12px; line-height: 1.45; }
-.cup-card-minute { display: inline-flex; margin-top: 16px; padding: 9px 12px; border: 1px solid color-mix(in srgb, var(--surface-raised) 20%, transparent); border-radius: 980px; color: #fff; background: color-mix(in srgb, var(--text) 20%, transparent); font-size: 11px; font-weight: 850; letter-spacing: .08em; }
+.cup-card-minute { display: inline-flex; margin-top: 16px; padding: 9px 12px; border: 1px solid rgba(255,255,255,.2); border-radius: 980px; color: #fff; background: rgba(0,0,0,.2); font-size: 10px; font-weight: 850; letter-spacing: .08em; }
 .cup-card-card .event-takeover-dismiss { position: relative; z-index: 2; margin-top: 24px; color: #3a0b11; background: #fff; }
 .cup-card-card .event-takeover-dismiss:hover { background: #ffe8eb; }
 .red-card-warning { display: flex; align-items: center; gap: 10px; margin: 12px 0; padding: 11px 13px; border: 1px solid rgba(255,59,48,.24); border-radius: 13px; color: color-mix(in oklab, #6d1720, var(--text) var(--tone-mix)); background: linear-gradient(135deg, color-mix(in srgb, #e60000 4%, var(--surface-raised)), var(--surface-raised)); }
@@ -916,35 +916,35 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .season-standings-takeover { position: fixed; z-index: 64; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(5,16,28,.78); backdrop-filter: blur(18px) saturate(135%); animation: event-in 220ms cubic-bezier(.2,.8,.2,1); }
 .season-standings-panel { width: min(720px,100%); max-height: calc(100vh - 40px); overflow-y: auto; padding: clamp(22px,5vw,42px); border: 1px solid rgba(137,196,255,.42); border-radius: 27px; color: #fff; background: linear-gradient(145deg,#0d2e55,#071321 78%); box-shadow: 0 35px 110px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.15); }
 .season-standings-topline, .season-standings-table-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.season-standings-topline { color: var(--accent); font-size: 11px; font-weight: 900; letter-spacing: .16em; }
-.season-standings-topline b { padding: 6px 8px; border-radius: 980px; color: color-mix(in srgb, var(--accent) 14%, var(--surface-raised)); background: color-mix(in srgb, var(--accent) 14%, transparent); font-size: 11px; letter-spacing: .08em; }
+.season-standings-topline { color: #8bc9ff; font-size: 10px; font-weight: 900; letter-spacing: .16em; }
+.season-standings-topline b { padding: 6px 8px; border-radius: 980px; color: #d9efff; background: rgba(117,191,255,.14); font-size: 10px; letter-spacing: .08em; }
 .season-standings-result { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-top: 24px; }
 .season-standings-result > div:first-child small, .season-standings-result > div:first-child span, .season-standings-outcome small { display: block; }
-.season-standings-result > div:first-child small { color: rgba(255,255,255,.55); font-size: 11px; font-weight: 850; letter-spacing: .14em; }
+.season-standings-result > div:first-child small { color: rgba(255,255,255,.55); font-size: 10px; font-weight: 850; letter-spacing: .14em; }
 .season-standings-result > div:first-child strong { display: block; margin-top: 8px; color: #fff; font-size: clamp(54px,10vw,88px); font-weight: 760; letter-spacing: -.1em; line-height: .82; }
 .season-standings-result > div:first-child span { margin-top: 10px; color: rgba(255,255,255,.7); font-size: 11px; }
 .season-standings-outcome { display: grid; justify-items: end; gap: 5px; text-align: right; }
 .season-standings-outcome b { color: #8ef0b0; font-size: 15px; font-weight: 900; letter-spacing: .06em; }
 .season-standings-outcome.loss b { color: #ff9eae; }
 .season-standings-outcome.draw b { color: #ffd77d; }
-.season-standings-outcome small { color: rgba(255,255,255,.56); font-size: 11px; font-weight: 800; letter-spacing: .08em; }
-.season-standings-table-head { margin-top: 28px; padding: 0 12px 8px; color: rgba(255,255,255,.5); font-size: 11px; font-weight: 850; letter-spacing: .12em; }
+.season-standings-outcome small { color: rgba(255,255,255,.56); font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+.season-standings-table-head { margin-top: 28px; padding: 0 12px 8px; color: rgba(255,255,255,.5); font-size: 10px; font-weight: 850; letter-spacing: .12em; }
 .season-standings-table-head span:last-of-type { margin-left: auto; }
 .season-standings-table-head b { min-width: 23px; text-align: right; }
 .season-standings-large-table { display: grid; gap: 5px; }
-.season-standings-large-row { display: grid; grid-template-columns: 32px minmax(0,1fr) 48px 23px; align-items: center; gap: 10px; min-height: 53px; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--surface-raised) 9%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--surface-raised) 6%, transparent); }
-.season-standings-large-row.club { border-color: color-mix(in srgb, var(--accent) 50%, transparent); background: linear-gradient(100deg,color-mix(in srgb, var(--accent) 40%, transparent),color-mix(in srgb, var(--surface-raised) 9%, transparent)); box-shadow: inset 3px 0 var(--accent); }
+.season-standings-large-row { display: grid; grid-template-columns: 32px minmax(0,1fr) 48px 23px; align-items: center; gap: 10px; min-height: 53px; padding: 8px 12px; border: 1px solid rgba(255,255,255,.09); border-radius: 12px; background: rgba(255,255,255,.065); }
+.season-standings-large-row.club { border-color: rgba(111,193,255,.5); background: linear-gradient(100deg,rgba(42,133,211,.4),rgba(255,255,255,.09)); box-shadow: inset 3px 0 #6fc1ff; }
 .season-standings-large-row i { color: rgba(255,255,255,.55); font-size: 12px; font-style: normal; font-weight: 900; text-align: center; }
-.season-standings-large-row.club i { color: color-mix(in srgb, var(--accent) 36%, var(--surface-raised)); }
+.season-standings-large-row.club i { color: #9bd7ff; }
 .season-standings-large-row div { min-width: 0; }
 .season-standings-large-row strong, .season-standings-large-row small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .season-standings-large-row strong { color: #fff; font-size: 12px; font-weight: 720; }
-.season-standings-large-row small { margin-top: 4px; color: rgba(255,255,255,.52); font-size: 11px; }
+.season-standings-large-row small { margin-top: 4px; color: rgba(255,255,255,.52); font-size: 10px; }
 .season-standings-goal-difference { color: rgba(255,255,255,.78); font-size: 13px; font-weight: 850; text-align: right; }
 .season-standings-goal-difference.positive { color: #8ef0b0; }
 .season-standings-goal-difference.negative { color: #ff9eae; }
 .season-standings-large-row > b { min-width: 23px; color: #fff; font-size: 17px; font-weight: 850; text-align: right; }
-.season-standings-note { margin: 17px 0 0; color: rgba(255,255,255,.58); font-size: 11px; line-height: 1.45; text-align: center; }
+.season-standings-note { margin: 17px 0 0; color: rgba(255,255,255,.58); font-size: 10px; line-height: 1.45; text-align: center; }
 .season-standings-dismiss { margin-top: 18px; color: #09213a; background: #eaf6ff; }
 .season-standings-dismiss:hover { background: #fff; }
 .mini-game-hub, .mini-game-panel { display: none !important; }
@@ -995,17 +995,17 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .header-goals.goal-boost-active { border-color: rgba(198,146,20,.38); background: linear-gradient(135deg, color-mix(in srgb, var(--surface-raised) 94%, transparent), color-mix(in srgb, color-mix(in srgb, #e6bf00 21%, var(--surface-raised)) 94%, transparent)); box-shadow: 0 8px 24px rgba(168,119,0,.13), inset 0 1px 0 rgba(255,255,255,.8); }
 .header-goal-boost { display: inline-flex; align-items: center; margin-left: 3px; padding-left: 10px; border-left: 1px solid rgba(148,105,0,.22); color: color-mix(in oklab, #765400, var(--text) var(--tone-mix)); font-size: 11px; font-style: normal; font-weight: 900; letter-spacing: .075em; }
 .star-pack-roulette { margin: 28px auto 0; }
-.star-pack-roulette-window { position: relative; height: 108px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 18px; background: color-mix(in srgb, var(--text) 20%, transparent); box-shadow: inset 0 0 28px rgba(0,0,0,.24); }
-.star-pack-roulette-window::after { position: absolute; inset: 0; border: 1px solid color-mix(in srgb, var(--surface-raised) 10%, transparent); border-radius: inherit; content: ""; pointer-events: none; }
+.star-pack-roulette-window { position: relative; height: 108px; overflow: hidden; border: 1px solid rgba(127,193,255,.3); border-radius: 18px; background: rgba(0,0,0,.2); box-shadow: inset 0 0 28px rgba(0,0,0,.24); }
+.star-pack-roulette-window::after { position: absolute; inset: 0; border: 1px solid rgba(255,255,255,.1); border-radius: inherit; content: ""; pointer-events: none; }
 .star-pack-roulette-pointer { position: absolute; z-index: 2; top: -1px; left: 50%; color: #fff; font-size: 18px; line-height: 1; text-shadow: 0 2px 8px rgba(0,0,0,.42); transform: translateX(-50%); }
 .star-pack-roulette-track { --roulette-finish: -1222px; position: relative; left: 50%; display: flex; gap: 8px; width: max-content; padding: 10px 8px; transform: translateX(160px); }
 .star-pack-roulette-track.spinning { animation: star-pack-roll 8000ms cubic-bezier(.08,.82,.14,1) forwards; }
-.star-pack-roulette-card { display: grid; width: 108px; height: 86px; flex: 0 0 108px; align-content: center; justify-items: center; gap: 3px; border: 1px solid color-mix(in srgb, var(--surface-raised) 17%, transparent); border-radius: 13px; color: rgba(255,255,255,.86); background: color-mix(in srgb, var(--surface-raised) 8%, transparent); }
-.star-pack-roulette-target { border-color: rgba(255,226,141,.86); background: linear-gradient(145deg, rgba(255,220,113,.26), color-mix(in srgb, var(--accent) 16%, transparent)); box-shadow: 0 0 0 2px rgba(255,226,141,.14), 0 0 28px rgba(255,208,92,.28); }
-.star-pack-roulette-card span { color: var(--accent); font-size: 11px; font-weight: 850; letter-spacing: .08em; }
+.star-pack-roulette-card { display: grid; width: 108px; height: 86px; flex: 0 0 108px; align-content: center; justify-items: center; gap: 3px; border: 1px solid rgba(255,255,255,.17); border-radius: 13px; color: rgba(255,255,255,.86); background: rgba(255,255,255,.08); }
+.star-pack-roulette-target { border-color: rgba(255,226,141,.86); background: linear-gradient(145deg, rgba(255,220,113,.26), rgba(0,113,227,.16)); box-shadow: 0 0 0 2px rgba(255,226,141,.14), 0 0 28px rgba(255,208,92,.28); }
+.star-pack-roulette-card span { color: #8ac7ff; font-size: 10px; font-weight: 850; letter-spacing: .08em; }
 .star-pack-roulette-card strong { font-size: 24px; font-weight: 780; letter-spacing: -.08em; line-height: .9; }
-.star-pack-roulette-card small { max-width: 96px; overflow: hidden; color: rgba(255,255,255,.6); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.star-pack-roulette-card.concealed { border-color: rgba(255,226,141,.36); background: linear-gradient(145deg, rgba(255,220,113,.12), color-mix(in srgb, var(--accent) 13%, transparent)); }
+.star-pack-roulette-card small { max-width: 96px; overflow: hidden; color: rgba(255,255,255,.6); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.star-pack-roulette-card.concealed { border-color: rgba(255,226,141,.36); background: linear-gradient(145deg, rgba(255,220,113,.12), rgba(0,113,227,.13)); }
 .star-pack-roulette-card.concealed span, .star-pack-roulette-card.concealed strong { color: #ffe28d; text-shadow: 0 0 18px rgba(255,216,100,.5); }
 .star-pack-roulette-card.concealed strong { font-size: 34px; }
 .star-pack-roulette-card.concealed small { color: rgba(255,226,141,.72); font-weight: 850; letter-spacing: .08em; }
@@ -1777,10 +1777,10 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .account-dialog-signout { width: 100%; margin-top: 14px; }
 .coop-name-field .coop-name-label { display: block; margin-bottom: 5px; color: var(--soft); font-size: 11px; font-weight: 750; }
 .coop-name-field strong { color: var(--text); font-size: 16px; }
-.theme-picker { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+.theme-picker { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
 .theme-picker > span { color: var(--soft); font-size: var(--fs-sm); font-weight: 700; }
 .theme-picker > div { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface-soft); }
-.theme-picker button { min-height: 36px; padding: 0 14px; border: 0; border-radius: var(--radius-pill); color: var(--soft); cursor: pointer; background: transparent; font-size: var(--fs-sm); font-weight: 700; }
+.theme-picker button { min-height: 36px; padding: 0 12px; border: 0; border-radius: var(--radius-pill); color: var(--soft); cursor: pointer; background: transparent; font-size: var(--fs-sm); font-weight: 700; }
 .theme-picker button.active { color: var(--on-accent); background: var(--accent); }
 
 /* Touch targets: at least 40px everywhere, 44px on touch screens. */
