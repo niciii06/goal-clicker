@@ -1,11 +1,11 @@
-# Goal Clicker hosten: Vercel, Supabase und Google Login
+# Goal Clicker hosten: Vercel, Supabase und Login
 
-Die App ist eine normale Next.js 16 Anwendung. Vercel baut sie direkt mit `next build`, ohne Anpassungen. Die Daten liegen in Supabase (PostgreSQL), angemeldet wird mit Google über Supabase Auth.
+Die App ist eine normale Next.js 16 Anwendung. Vercel baut sie direkt mit `next build`, ohne Anpassungen. Die Daten liegen in Supabase (PostgreSQL), angemeldet wird über Supabase Auth mit Google, mit einem Code per Mail oder mit E-Mail und Passwort. Ohne Login startet das Spiel nicht; jedes Konto hat ein Profil mit eindeutigem Benutzernamen, und der Einzelspieler Spielstand liegt im Profil (gleich auf allen Geräten).
 
 Weiterführend:
 
 * [Datenbank und Datenübernahme](docs/supabase-datenbank.md)
-* [Google Login einrichten](docs/google-login.md)
+* [Login einrichten (Google und E-Mail), Profil und Cloud Spielstand](docs/google-login.md)
 
 Die bisherige ChatGPT Sites Version ist davon unabhängig. Nichts in diesem Repository schaltet sie ab oder verändert sie. Ein Push auf GitHub aktualisiert die Site nicht.
 
@@ -22,7 +22,7 @@ npm run db:migrate           # Tabellen in DATABASE_URL anlegen
 npm run dev                  # http://localhost:3000
 ```
 
-Ohne Supabase Werte in `.env.local` läuft die App lokal ohne Login, wie bisher mit der Spieler ID des Browsers. Der Einzelspieler braucht gar keine Datenbank.
+Ohne Supabase Werte in `.env.local` läuft die App lokal ohne Login und ohne Profil, wie bisher mit der Spieler ID des Browsers. Der Einzelspieler braucht dann gar keine Datenbank.
 
 | Befehl | Zweck |
 | :--- | :--- |
@@ -32,6 +32,7 @@ Ohne Supabase Werte in `.env.local` läuft die App lokal ohne Login, wie bisher 
 | `npm test` | Build, alle Unit Tests und ein Test gegen `next start` |
 | `npm run test:browser` | Browser Smoke Test gegen den Produktionsbuild (Chromium) |
 | `npm run test:db` | Datenbanktests, braucht `TEST_DATABASE_URL` auf eine leere Testdatenbank |
+| `npm run test:account` | Login, Profil und Cloud Spielstand im Browser, mit einem Ersatz für Supabase Auth (braucht `TEST_DATABASE_URL`) |
 | `npm run db:migrate` / `npm run db:generate` | Migrationen anwenden bzw. nach Schemaänderungen erzeugen |
 | `npm run db:import-d1` | Daten aus einem D1 Export übernehmen |
 | `npm run generate:client-data` | Schlanke Browser Kopie von `app/fc27-india-source.json` neu erzeugen |
@@ -64,12 +65,13 @@ Diese Schritte erfordern Konten und Geheimnisse und können nur vom Besitzer erl
 
 Alle Tabellen haben Row Level Security ohne Policies. Damit sind sie über die öffentliche Supabase REST API gesperrt. Die App greift serverseitig direkt per PostgreSQL zu.
 
-### 2. Google Login
+### 2. Login (Google und E-Mail)
 
-Anleitung mit allen Weiterleitungs URLs: [docs/google-login.md](docs/google-login.md). Kurzfassung:
+Anleitung mit allen Weiterleitungs URLs und Mailvorlagen: [docs/google-login.md](docs/google-login.md). Kurzfassung:
 
 * Google OAuth Client, Weiterleitungs URI: `https://<projekt-ref>.supabase.co/auth/v1/callback`
 * Supabase *URL Configuration*: Site URL `https://<domain>`, Redirect URLs `https://<domain>/auth/callback`, `https://*-<team>.vercel.app/auth/callback`, `http://localhost:3000/auth/callback`
+* E-Mail: eigener Mailversand (SMTP, zum Beispiel Gmail mit App Passwort) und die drei Mailvorlagen mit `{{ .Token }}`
 
 ### 3. Vercel Projekt verbinden
 
@@ -85,8 +87,8 @@ Hinweis: Der frühere Cloudflare Worker hatte eine optionale Anfragebegrenzung f
 
 Auf der Preview Adresse nacheinander:
 
-1. **Login**: *Mit Google anmelden* → Google Konto wählen → zurück im Spiel, die E-Mail steht oben. *Abmelden* funktioniert.
-2. **Einzelspieler**: klicken, Upgrade kaufen, Seite neu laden, Stand bleibt. Unter *Club & Mehr* *Spielstand herunterladen* und wieder *hochladen*.
+1. **Login**: *Mit Google anmelden* → Google Konto wählen → beim ersten Mal Profil anlegen → im Spiel stehen Anzeigename und Benutzername oben. Ebenso mit *Code per Mail*. *Abmelden* funktioniert.
+2. **Einzelspieler**: klicken, Upgrade kaufen, Seite neu laden, Stand bleibt. Auf einem zweiten Gerät anmelden: derselbe Stand. Unter *Club & Mehr* *Spielstand herunterladen* und wieder *hochladen*.
 3. **Multiplayer**: angemeldet eine Welt erstellen, in einem zweiten Browser (anderes Google Konto) mit dem Code beitreten, beide klicken, beide sehen dieselben Tore. Abgemeldet erscheint der Hinweis, dass Multiplayer einen Login braucht.
 
 ### 5. Daten übernehmen
@@ -112,7 +114,7 @@ Der Einzelspieler Spielstand liegt im Browser unter der alten Adresse und zieht 
 })();
 ```
 
-Die heruntergeladene Datei auf der neuen Seite unter *Spielstand hochladen* einlesen. Sie enthält auch die Spieler ID. Wer danach mit Google angemeldet ist, bekommt seine bisherigen Multiplayer Welten zurück (Details in [docs/google-login.md](docs/google-login.md)). Die Datei nicht öffentlich teilen, die Spieler ID darin ist der Schlüssel zu den eigenen Welten.
+Die heruntergeladene Datei auf der neuen Seite unter *Spielstand hochladen* einlesen. Sie enthält auch die Spieler ID. Wer danach angemeldet ist, bekommt seine bisherigen Multiplayer Welten zurück (Details in [docs/google-login.md](docs/google-login.md)). Die Datei nicht öffentlich teilen, die Spieler ID darin ist der Schlüssel zu den eigenen Welten.
 
 ## Was entfernt wurde
 

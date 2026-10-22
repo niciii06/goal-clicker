@@ -6,13 +6,13 @@ Aktueller Spielcode mit Spielerpool, Saisons, Walkouts und Multiplayer. Release 
 * [Releasebericht und vollständige Prüfevidenz](docs/release-match-realism.md)
 * [Projektwissen und Spielregeln (aus der ChatGPT Sites Zeit)](docs/chatgpt-sites-knowledge.md)
 * [Konfigurationsreparatur und Sicherheitsprüfung](docs/config-security-repair.md)
-* [Hosting auf Vercel mit Supabase und Google Login](HOSTING.md)
+* [Hosting auf Vercel mit Supabase und Login](HOSTING.md)
 * [Datenbank und Datenübernahme](docs/supabase-datenbank.md)
-* [Google Login einrichten](docs/google-login.md)
+* [Login einrichten (Google und E-Mail), Profil und Cloud Spielstand](docs/google-login.md)
 
 Verifikation: `npm run typecheck`, `npm run lint`, `npm test` (inklusive `next build`), `npm run test:db` mit einer Testdatenbank; ergänzend `npm run verify:physics`. Die frühere ChatGPT Sites Version hat eine eigene Historie; ein GitHub Push veröffentlicht keine neue Site Version.
 
-Browser Prüfung: `npm run test:browser` startet den Produktionsbuild mit `next start` und prüft mit Chromium alle Tabs auf Desktop und Handy (Fehler, Überlauf, überlappender oder schwer lesbarer Text) sowie Combo, tägliche Prämie, Live Spiel und Pressekonferenz. Der GitHub Workflow führt sie nach `npm test` aus.
+Browser Prüfung: `npm run test:browser` startet den Produktionsbuild mit `next start` und prüft mit Chromium alle Tabs auf Desktop und Handy (Fehler, Überlauf, überlappender oder schwer lesbarer Text) sowie Combo, tägliche Prämie, Live Spiel und Pressekonferenz. Der GitHub Workflow führt sie nach `npm test` aus. `npm run test:account` spielt zusätzlich Login, Profil und Cloud Spielstand mit zwei Geräten durch (Ersatz für Supabase Auth, braucht eine Testdatenbank).
 
 **Projektstruktur:** `app/page.tsx` enthält die App Komponente; Typen, Konstanten, Wirtschaft, Spielstand, Formatierung, Koop Hilfen und kleine Komponenten liegen in `app/game/`. `app/feature-data.ts` enthält die Spiellogik; Typen, Kataloge und Texte liegen in `app/features/` und werden von `feature-data.ts` unverändert weiter exportiert. Reiserouten (`app/route-cache/`) lädt der Browser erst nach dem Start, und er bekommt eine schlanke Kopie der FC 27 Indien Daten; beides regeln die `imports` mit der Bedingung `browser` in `package.json`.
 
