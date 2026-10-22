@@ -1,6 +1,6 @@
 "use client";
-// The signed in account in the game: name and save state below the mode switch, the account button in the
-// header with the profile settings, and the save file export/import in the club tab.
+// The signed in account in the game: the account button in the header with the profile settings, the link
+// between account and player ID, and the save file export/import in the club tab.
 import { useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ChangeEvent, FormEvent } from "react";
@@ -30,12 +30,11 @@ function useSyncStatus() {
 }
 
 /**
- * Name and save state of the account in the header. The account's player ID becomes this browser's player ID,
- * so every device of the account sees the same worlds.
+ * Links the signed in account with this browser's player ID; it shows nothing. The account's player ID becomes
+ * this browser's player ID, so every device of the account sees the same worlds.
  */
-export function AccountChip({ playerId, onPlayerId, onMessage }: { playerId: string; onPlayerId: (id: string) => void; onMessage: (text: string) => void }) {
+export function AccountLink({ playerId, onPlayerId, onMessage }: { playerId: string; onPlayerId: (id: string) => void; onMessage: (text: string) => void }) {
   const account = useContext(AccountContext);
-  const status = useSyncStatus();
   const linked = useRef("");
 
   useEffect(() => {
@@ -55,12 +54,7 @@ export function AccountChip({ playerId, onPlayerId, onMessage }: { playerId: str
     });
   }, [account, playerId, onPlayerId, onMessage]);
 
-  if (!account) return null;
-  return <div className="account-chip signed-in">
-    <span title={account.email ?? undefined}><strong>{account.profile.displayName}</strong> @{account.profile.username}</span>
-    <span className={`account-sync ${status}`} title={SYNC_LABELS[status]}>{SYNC_LABELS[status]}</span>
-    <button type="button" onClick={() => void account.signOut()}>Abmelden</button>
-  </div>;
+  return null;
 }
 
 async function patchProfile(body: { displayName?: string; username?: string }) {

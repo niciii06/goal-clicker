@@ -127,12 +127,12 @@ test('a new account with username and password starts the game and saves to the 
   const page = devices.a.page;
   await register(page, 'Striker', 'Nico', 'sicheres-passwort-1');
   await clickBall(page, 6);
-  assert.match(await page.locator('.account-chip').innerText(), /Nico/);
+  assert.equal(await page.getByRole('button', { name: 'Konto von Nico' }).count(), 1);
   await hideTab(page);
   const saved = await waitFor(() => cloudSave('Striker'), (s) => Boolean(s && s.totalGoals >= 6), 'first cloud save');
   assert.equal(saved!.version, 1);
   // The generated login address stays on the server; the account only knows its username.
-  assert.equal(await page.locator('.account-chip').innerText().then((text) => text.includes('@players.')), false);
+  assert.equal(await page.locator('body').innerText().then((text) => text.includes('@players.')), false);
 });
 
 test('a wrong password is refused, the right one opens the same save on a second device', { skip }, async () => {
@@ -229,7 +229,8 @@ test('signing out right after clicking still saves those clicks, then forgets th
   const before = await localGoals(page);
   // Every click earns at least one goal; the game itself would only save them a few seconds later.
   await clickBall(page, 3);
-  await page.locator('.account-chip').getByRole('button', { name: 'Abmelden' }).click();
+  await page.getByRole('button', { name: /^Konto von / }).click();
+  await page.getByRole('dialog', { name: 'Konto' }).getByRole('button', { name: 'Abmelden' }).click();
   await page.getByRole('button', { name: 'Mit Google anmelden' }).waitFor();
   assert.equal(await page.evaluate((key) => localStorage.getItem(key), SAVE_KEY), null);
   assert.ok((await cloudSave('Striker'))!.totalGoals >= before + 3, `cloud has ${(await cloudSave('Striker'))!.totalGoals}, before the clicks ${before}`);
