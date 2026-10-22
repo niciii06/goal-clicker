@@ -16,7 +16,7 @@ before(async () => {
   if (!url) return;
   admin = postgres(url, { max: 1, onnotice: () => {} });
   await migrate(drizzle(admin), { migrationsFolder: 'drizzle' });
-  await admin`truncate coop_rooms, solo_travel, player_accounts`;
+  await admin`truncate coop_rooms, solo_travel, player_accounts, profiles, cloud_saves`;
   process.env.DATABASE_URL = url;
   process.env.DATABASE_POOL_MAX = '10';
   const dbModule = await import('../db/index.ts');
@@ -117,8 +117,8 @@ test('a solo journey receipt is created once and consumed once', { skip }, async
 test('row level security keeps the tables closed to the Supabase browser roles', { skip }, async () => {
   const rows = await admin`select relname, relrowsecurity from pg_class where relname in ('coop_rooms', 'solo_travel') order by relname`;
   assert.deepEqual(rows.map((r) => [r.relname, r.relrowsecurity]), [['coop_rooms', true], ['solo_travel', true]]);
-  const [accounts] = await admin`select relrowsecurity from pg_class where relname = 'player_accounts'`;
-  assert.equal(accounts.relrowsecurity, true);
+  const accountTables = await admin`select relname, relrowsecurity from pg_class where relname in ('player_accounts', 'profiles', 'cloud_saves') order by relname`;
+  assert.deepEqual(accountTables.map((r) => [r.relname, r.relrowsecurity]), [['cloud_saves', true], ['player_accounts', true], ['profiles', true]]);
   const policies = await admin`select count(*)::int as n from pg_policies where tablename in ('coop_rooms', 'solo_travel')`;
   assert.equal(policies[0].n, 0);
 });
@@ -164,4 +164,67 @@ test('an account without worlds may switch to an imported player ID, one with wo
   const refused = await db.relinkAccount(busy, 'another-imported-id');
   assert.equal(refused.reason, 'has-worlds');
   assert.equal(refused.account!.playerId, 'busy-player-id');
+});
+
+test('of many accounts claiming one username in any case, exactly one gets it', { skip }, async () => {
+  const now = iso();
+  const claims = await Promise.all(Array.from({ length: 12 }, (_, i) => db.createProfile(`00000000-0000-4000-8000-0000000001${String(i).padStart(2, '0')}`, i % 2 ? 'Striker' : 'STRIKER', `Spieler ${i}`, now)));
+  assert.equal(claims.filter((c) => c.profile).length, 1);
+  assert.equal(claims.filter((c) => c.reason === 'taken').length, 11);
+  const owner = claims.find((c) => c.profile)!.profile!.userId;
+  assert.equal((await db.createProfile(owner, 'another', 'Zwei', now)).reason, 'exists');
+  assert.equal(await db.isUsernameTaken('striker'), true);
+  assert.equal(await db.isUsernameTaken('striker', owner), false);
+});
+
+test('a username changes once per period, the own name may change its case any time', { skip }, async () => {
+  const user = '00000000-0000-4000-8000-000000000201';
+  await db.createProfile(user, 'Keeper', 'Torwart', '2026-10-01T10:00:00.000Z');
+  assert.equal((await db.changeUsername(user, 'KEEPER', '2026-10-02T10:00:00.000Z', '2026-09-02T10:00:00.000Z')).profile!.username, 'KEEPER');
+  assert.equal((await db.changeUsername(user, 'Goalie', '2026-10-02T10:00:00.000Z', '2026-09-02T10:00:00.000Z')).reason, 'too-soon');
+  assert.equal((await db.changeUsername(user, 'striker', '2026-11-02T10:00:00.000Z', '2026-10-03T10:00:00.000Z')).reason, 'taken');
+  const changed = await db.changeUsername(user, 'Goalie', '2026-11-02T10:00:00.000Z', '2026-10-03T10:00:00.000Z');
+  assert.equal(changed.profile!.usernameKey, 'goalie');
+  assert.equal(changed.profile!.usernameChangedAt, '2026-11-02T10:00:00.000Z');
+  // The old name is free again.
+  assert.equal(await db.isUsernameTaken('keeper'), false);
+  assert.equal((await db.changeUsername('00000000-0000-4000-8000-000000000299', 'Nobody', iso(), iso())).reason, 'missing');
+});
+
+test('two devices saving on the same cloud version: one wins, the other gets the newer save', { skip }, async () => {
+  const user = '00000000-0000-4000-8000-000000000301';
+  const first = await Promise.all(Array.from({ length: 6 }, (_, i) => db.putCloudSave(user, `{"device":${i}}`, 0, iso())));
+  assert.equal(first.filter((r) => r.save).length, 1);
+  const winner = first.find((r) => r.save)!.save!;
+  assert.equal(winner.version, 1);
+  const next = await Promise.all(Array.from({ length: 6 }, (_, i) => db.putCloudSave(user, `{"round":2,"device":${i}}`, 1, iso())));
+  assert.equal(next.filter((r) => r.save).length, 1);
+  const losers = next.filter((r) => r.conflict);
+  assert.equal(losers.length, 5);
+  assert.equal(losers[0].conflict!.version, 2);
+  assert.equal((await db.getCloudSave(user))!.saveJson, next.find((r) => r.save)!.save!.saveJson);
+});
+
+test('deleting an account removes profile, cloud save and link but keeps shared worlds', { skip }, async () => {
+  const user = '00000000-0000-4000-8000-000000000401';
+  await db.linkAccount(user, 'deleted-player-id', 'gone@example.com');
+  await db.createProfile(user, 'Leaving', 'Weg', iso());
+  await db.putCloudSave(user, '{}', 0, iso());
+  await db.insertRoom({ ...room('KEEP'), hostPlayerId: 'deleted-player-id' });
+  // The scratch database has no Supabase auth schema, so the login itself is not deleted here.
+  assert.deepEqual(await db.deleteAccount(user), { loginDeleted: false });
+  assert.equal(await db.getProfile(user), null);
+  assert.equal(await db.getCloudSave(user), null);
+  assert.equal(await db.getAccount(user), null);
+  assert.ok(await db.getRoom('KEEP'));
+});
+
+test('a username account keeps its login address on the server and is found by its username', { skip }, async () => {
+  const user = '00000000-0000-4000-8000-000000000501';
+  // The scratch database has no Supabase auth schema; there the app registers through the Auth API instead.
+  assert.equal(await db.createPasswordLogin('p-x@players.goal-clicker.vercel.app', 'sicheres-passwort'), null);
+  assert.equal(await db.deleteLogin(user), false);
+  await db.createProfile(user, 'Libero', 'Libero', iso(), 'p-libero@players.goal-clicker.vercel.app');
+  assert.equal((await db.getProfileByUsername('libero'))!.loginEmail, 'p-libero@players.goal-clicker.vercel.app');
+  assert.equal(await db.getProfileByUsername('nobody'), null);
 });

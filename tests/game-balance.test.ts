@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { FC27_OFFICIAL_POSITION_COUNT, FC27_POSITION_BY_SOURCE_ID } from "../app/fc27-positions.ts";
 import { FC27_OFFICIAL_RATING_COUNT, FC27_RATING_BY_SOURCE_ID, FC27_UNAVAILABLE_SOURCE_IDS } from "../app/fc27-ratings.ts";
+import { transferClubsForRating } from "../app/features/news-data.ts";
 import { activatePendingTransferLoans, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, canStarXIPlayerPlayPosition, completeTournamentRun, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupMatchStrength, getCupPlayerMatchRating, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarXIEffectiveMatchRating, getStarXIPlayerMatchRating, getStarXISelection, getStarXIFragmentCompensation, getTournamentGoalBoostMultiplier, getTournamentOpponentSchedule, getTransferDeadlineEventDelay, getTransferEventDelay, getUnavailableStarXIPlayerIds, initialGameFeatures, initialSeasonMode, isTransferDeadlineDay, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, playSeasonModeMatch, recordSeasonModeMatch, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, startTournamentGoalBoost, REWARD_PACKS, getRewardPackOdds, getStarXIPlayer, STAR_PACKS, STAR_XI_ACTIVE_PLAYERS, STAR_XI_BENCH_SIZE, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE, TOURNAMENTS, TOURNAMENT_COOLDOWN_MS, TOURNAMENT_OPPONENT_MULTIPLIER, TOURNAMENT_GOAL_BOOST_DURATION_MS, TRANSFER_DEADLINE_LOAN_CHANCE, TRANSFER_LOAN_CHANCE, TRANSFER_PAID_SALE_CHANCE, TRANSFER_SALE_CHANCE, YB_FC26_SOURCE_IDS } from "../app/feature-data.ts";
 import { getPackUnlockLeague, getSeasonPath } from "../app/season-progression.ts";
 import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../app/upgrade-purchase.ts";
@@ -837,7 +838,7 @@ test("a loaned squad player disappears for one whole tournament and then returns
 
 test("a transfer from the bench leaves a manual vacancy until a reserve is selected", () => {
   const before = transferReadyFeatures();
-  const loanResult = resolveTransferInsiderEvent(before, sequenceRandom([0.1, 0, 0.5, 0]), 2000);
+  const loanResult = resolveTransferInsiderEvent(before, sequenceRandom([0.1, 0.5, 0, 0]), 2000);
   const vacancy = getOpenTransferSquadVacancies(loanResult.features)[0];
 
   assert.equal(vacancy.area, "bench");
@@ -895,4 +896,21 @@ test("VAR keeps its exact timing, probability and payout rules", () => {
 test("Johhny Elefantino remains a one-percent random-event risk", () => {
   assert.equal(resolveRandomEvent(1000, 0.009).id, "elefantino");
   assert.equal(resolveRandomEvent(1000, 0.01).id === "elefantino", false);
+});
+
+test("Romario only links a player with clubs that would really sign that rating", () => {
+  const features = transferReadyFeatures();
+  const squadIds = [...features.starXI.lineupIds, ...features.starXI.benchIds].filter(Boolean);
+  for (let i = 0; i < 40; i++) {
+    const seed = i / 40;
+    const result = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.5, seed, (i * 7 % 40) / 40, 0]), 2000);
+    const player = STAR_XI_PLAYERS.find((candidate) => candidate.id === result.event!.playerId)!;
+    assert.ok(squadIds.includes(player.id));
+    assert.ok(transferClubsForRating(player.rating).includes(result.event!.club as never), `${player.name} (${player.rating}) at ${result.event!.club}`);
+  }
+  assert.equal(transferClubsForRating(55).includes("Manchester Cité" as never), false);
+  assert.ok(transferClubsForRating(55).includes("Kerala Blastors" as never));
+  assert.ok(transferClubsForRating(91).includes("Manchester Cité" as never));
+  assert.equal(transferClubsForRating(91).includes("FC Aarau Kicker" as never), false);
+  for (let rating = 40; rating <= 100; rating++) assert.ok(transferClubsForRating(rating).length >= 7, `no clubs for ${rating}`);
 });

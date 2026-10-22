@@ -1,13 +1,15 @@
-import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, lte, or, sql } from "drizzle-orm";
 import type { AnyColumn } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
-import { coopRooms, playerAccounts, soloTravel } from "./schema";
+import { cloudSaves, coopRooms, playerAccounts, profiles, soloTravel } from "./schema";
 
 export type RoomRow = typeof coopRooms.$inferSelect;
 export type RoomUpdate = Partial<Omit<RoomRow, "code">>;
 export type PlayerAccount = typeof playerAccounts.$inferSelect;
+export type Profile = typeof profiles.$inferSelect;
+export type CloudSave = typeof cloudSaves.$inferSelect;
 
 export type RoomSeatRole = "host" | "guest" | "player3" | "player4";
 
@@ -45,6 +47,18 @@ type Database = ReturnType<typeof createDatabase>;
 function increment(column: AnyColumn, amount: number) {
   const safeAmount = Number.isFinite(amount) ? amount : 0;
   return sql`${column} + ${safeAmount}`;
+}
+
+/** drizzle wraps the driver error; 23505 is a unique violation. */
+function isUniqueViolation(error: unknown) {
+  const failure = error as { code?: string; cause?: { code?: string } };
+  return (failure.code ?? failure.cause?.code) === "23505";
+}
+
+/** A database without the Supabase auth schema (local tests) has no such schema or function. */
+function isMissingObject(error: unknown) {
+  const failure = error as { code?: string; cause?: { code?: string } };
+  return ["3F000", "42883", "42P01"].includes(failure.code ?? failure.cause?.code ?? "");
 }
 
 function roleClickUpdate(role: string, amount: number, clickCount: number) {
@@ -109,11 +123,116 @@ export class GoalClickerDatabase {
       const [moved] = await this.client.update(playerAccounts).set({ playerId }).where(and(eq(playerAccounts.userId, userId), eq(playerAccounts.playerId, current.playerId))).returning();
       return { account: moved ?? await this.getAccount(userId) };
     } catch (error) {
-      // drizzle wraps the driver error; 23505 is a unique violation.
-      const failure = error as { code?: string; cause?: { code?: string } };
-      if ((failure.code ?? failure.cause?.code) === "23505") return { account: current, reason: "taken" };
+      if (isUniqueViolation(error)) return { account: current, reason: "taken" };
       throw error;
     }
+  }
+
+  async getProfile(userId: string): Promise<Profile | null> {
+    const [profile] = await this.client.select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
+    return profile ?? null;
+  }
+
+  async getProfileByUsername(key: string): Promise<Profile | null> {
+    const [profile] = await this.client.select().from(profiles).where(eq(profiles.usernameKey, key)).limit(1);
+    return profile ?? null;
+  }
+
+  async isUsernameTaken(key: string, exceptUserId?: string) {
+    const [owner] = await this.client.select({ userId: profiles.userId }).from(profiles).where(eq(profiles.usernameKey, key)).limit(1);
+    return Boolean(owner && owner.userId !== exceptUserId);
+  }
+
+  /** One profile per account; the unique username_key decides concurrent claims of the same name. */
+  async createProfile(userId: string, username: string, displayName: string, now: string, loginEmail: string | null = null): Promise<{ profile: Profile; reason?: undefined } | { profile?: undefined; reason: "taken" | "exists" }> {
+    try {
+      const [created] = await this.client.insert(profiles).values({ userId, username, usernameKey: username.toLowerCase(), displayName, loginEmail, usernameChangedAt: now, createdAt: now, updatedAt: now }).onConflictDoNothing({ target: profiles.userId }).returning();
+      return created ? { profile: created } : { reason: "exists" };
+    } catch (error) {
+      if (isUniqueViolation(error)) return { reason: "taken" };
+      throw error;
+    }
+  }
+
+  async updateDisplayName(userId: string, displayName: string, now: string): Promise<Profile | null> {
+    const [profile] = await this.client.update(profiles).set({ displayName, updatedAt: now }).where(eq(profiles.userId, userId)).returning();
+    return profile ?? null;
+  }
+
+  /**
+   * A new username at most once per period: the update only matches while the last change is older than
+   * `cutoff`. Changing only the case of the own name is always allowed and keeps the period running.
+   */
+  async changeUsername(userId: string, username: string, now: string, cutoff: string): Promise<{ profile: Profile; reason?: undefined } | { profile?: undefined; reason: "too-soon" | "taken" | "missing" }> {
+    const key = username.toLowerCase();
+    try {
+      const [renamed] = await this.client.update(profiles).set({ username, updatedAt: now }).where(and(eq(profiles.userId, userId), eq(profiles.usernameKey, key))).returning();
+      if (renamed) return { profile: renamed };
+      const [changed] = await this.client.update(profiles).set({ username, usernameKey: key, usernameChangedAt: now, updatedAt: now }).where(and(eq(profiles.userId, userId), lte(profiles.usernameChangedAt, cutoff))).returning();
+      if (changed) return { profile: changed };
+    } catch (error) {
+      if (isUniqueViolation(error)) return { reason: "taken" };
+      throw error;
+    }
+    return { reason: await this.getProfile(userId) ? "too-soon" : "missing" };
+  }
+
+  async getCloudSave(userId: string): Promise<CloudSave | null> {
+    const [save] = await this.client.select().from(cloudSaves).where(eq(cloudSaves.userId, userId)).limit(1);
+    return save ?? null;
+  }
+
+  /**
+   * Stores a save only on top of the version the device loaded (0: no save yet). Two devices that loaded the
+   * same version cannot both write; the second gets the current save back as a conflict.
+   */
+  async putCloudSave(userId: string, saveJson: string, baseVersion: number, now: string, active = true): Promise<{ save: CloudSave; conflict?: undefined } | { save?: undefined; conflict: CloudSave | null }> {
+    if (baseVersion === 0) {
+      const [created] = await this.client.insert(cloudSaves).values({ userId, saveJson, version: 1, active, updatedAt: now }).onConflictDoNothing().returning();
+      if (created) return { save: created };
+    } else {
+      const [updated] = await this.client.update(cloudSaves).set({ saveJson, version: increment(cloudSaves.version, 1), active, updatedAt: now }).where(and(eq(cloudSaves.userId, userId), eq(cloudSaves.version, baseVersion))).returning();
+      if (updated) return { save: updated };
+    }
+    return { conflict: await this.getCloudSave(userId) };
+  }
+
+  /**
+   * Creates a confirmed Supabase Auth login with e-mail and password, without any mail, through a function only
+   * the production database has (see docs/supabase-datenbank.md). Returns null where it does not exist.
+   */
+  async createPasswordLogin(email: string, password: string): Promise<string | null> {
+    try {
+      const rows = await this.client.execute(sql`select goal_clicker_private.create_password_user(${email}, ${password}) as id`);
+      return String((rows as unknown as { id: string }[])[0].id);
+    } catch (error) {
+      if (isMissingObject(error)) return null;
+      throw error;
+    }
+  }
+
+  /** Deletes only the login, for a registration that lost its username to a parallel one. */
+  async deleteLogin(userId: string) {
+    try {
+      await this.client.execute(sql`select goal_clicker_private.delete_user(${userId}::uuid)`);
+      return true;
+    } catch (error) {
+      if (isMissingObject(error)) return false;
+      throw error;
+    }
+  }
+
+  /**
+   * Removes everything stored for an account. Worlds stay, because other players share them. The login itself
+   * is deleted by a function only the production database has (see docs/supabase-datenbank.md).
+   */
+  async deleteAccount(userId: string) {
+    await this.client.transaction(async (tx) => {
+      await tx.delete(cloudSaves).where(eq(cloudSaves.userId, userId));
+      await tx.delete(profiles).where(eq(profiles.userId, userId));
+      await tx.delete(playerAccounts).where(eq(playerAccounts.userId, userId));
+    });
+    return { loginDeleted: await this.deleteLogin(userId) };
   }
 
   async getRoom(code: string): Promise<RoomRow | null> {

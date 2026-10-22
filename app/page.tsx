@@ -7,14 +7,15 @@ import type { AppMode, ClickEffect, CoopRole, CoopRoom, CoopSession, CrossbarGam
 import type { CoopMission, CupCardEvent, GameFeatures, PenaltyDirection as CupPenaltyDirection, RandomEvent, StarFormationId, StarPackId, StarPackReveal, TournamentGazetteIssue, TournamentId, TransferInsiderEvent } from "./feature-data";
 import type { Journey, TravelFixture } from "./travel-data";
 import type { MatchDraft } from "./match-commands";
-import { ACHIEVEMENTS, BACKUP_STORAGE_KEY, BALANCE_VERSION, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_MAX_COUNT, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RECOVERY_STORAGE_KEY, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, STAR_RATING_FILTERS, STORAGE_KEY, VIBRATION_STORAGE_KEY } from "./game/constants";
+import { ACHIEVEMENTS, BACKUP_STORAGE_KEY, BALANCE_VERSION, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, COMBO_MAX_COUNT, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RECOVERY_STORAGE_KEY, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, STAR_RATING_FILTERS, STORAGE_KEY, VIBRATION_STORAGE_KEY } from "./game/constants";
 import { AL, AR, AT, AU, AZ, BA, BE, BF, BG, BR, CA, CD, CH, CI, CL, CM, CN, CO, CR, CZ, DE, DK, DZ, EC, EG, ES, FI, FR, GB_ENG, GB_NIR, GB_SCT, GB_WLS, GE, GH, GM, GN, GR, GT, HR, HT, HU, IE, IL, IS, IT, JM, JP, KN, KR, MA, ME, ML, MW, MX, NG, NL, NO, NZ, PA, PH, PL, PT, PY, RO, RS, RU, SE, SI, SK, SN, SR, TR, UA, US, UY, VE, XK, ZA, ZM } from "country-flag-icons/react/3x2";
 import { AlbumPanel, CareerPanel, CareerPlayerBadge, MatchRatingsPanel, PostMatchSummary } from "./career-panels";
 import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, SPECIAL_CARD_PACK, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_SQUAD_SIZE, STAR_XI_TOTAL_CARD_COUNT, TOURNAMENTS, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, applyPendingMatchChanges, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, getSpecialCardPackOdds, purchaseSpecialCardPack, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getRewardPackOdds, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXIRating, getStarXISelection, getTournament, getTournamentGoalBoostMultiplier, getTournamentRewardPack, getTransferBonuses, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, isRewardPack, isTransferDeadlineDay, normalizeGameFeatures, openEarnedPack, openStarPack, pauseGameFeatureTimers, queueMatchChanges, recordSeasonModeMatch, releaseMatchSquad, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige } from "./feature-data";
 import { DailyRewardCard } from "./daily-reward-panel";
 import { FootballGraphic, GameErrorBoundary, Icon, StarXIPositionBadges } from "./game/ui";
 import { LiveMatchViewer } from "./match-viewer";
-import { AccountChip, SaveTransferPanel } from "./account-panel";
+import { AccountChip, ProfilePanel, SaveTransferPanel } from "./account-panel";
+import { AccountContext, AccountGate } from "./account-gate";
 import { SquadBenchCard, SquadBenchPanel, SquadBenchSlot, SquadPitchPanel, SquadPitchSlot, formatStarXIPositions, useSquadDrag } from "./squad-board";
 import { MAX_CAREER_SEASON, SEASON_MILESTONES, getFormationUnlockLeague, getPackUnlockLeague, getReachedLeague, getSeasonMilestone, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked, leagueForTier } from "./season-progression";
 import { MULTIPLAYER_PROTOCOL_VERSION } from "./multiplayer-protocol";
@@ -29,12 +30,12 @@ import { claimDailyReward } from "./daily-reward";
 import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
 import { consumeTravel, eligibilityError, fixtureFor, journeyView, settleTravel, travelTiming } from "./travel-data";
 import { coopRoleLabel, isCoopRole, multiplayerUrl, notifyCoopOffline, occupiedCoopPlayers, readCoopResponse, upsertSavedRoom } from "./game/coop";
-import { createClickResult, decayComboCount, getBasePassivePower, getBulkPurchase, getComboLevel, getComboProgress, getCost, getIncomeMultiplier, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades } from "./game/economy";
+import { createClickResult, decayComboCount, formatComboMultiplier, getBasePassivePower, getBulkPurchase, getComboLevel, getComboProgress, getCost, getIncomeMultiplier, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades } from "./game/economy";
 import { directionLabel, formatCountdown, formatGoalDifference, formatHistoryTime, formatNumber, formatPackChance, getRandomCrossbarHeight, getRandomMatchPrediction, getRandomPenaltyDirection, heightLabel, predictionLabel } from "./game/format";
 import { getCurrentTime, getTravelTime, syncTravelClock } from "./game/clock";
 import { getStarCardTier, getWalkoutPresentation } from "./walkout-data";
 import { loadRouteCache } from "./travel-route-cache-lazy";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 
 type FeatureTab = "fabrizio" | "cup" | "club" | "missions" | "history" | "career" | "album" | "squad" | "packs" | "home";
@@ -180,6 +181,9 @@ function App() {
   const [appMode, setAppMode] = useState<AppMode>("single");
   const [playerId, setPlayerId] = useState("");
   const [playerName, setPlayerName] = useState("");
+  const account = useContext(AccountContext);
+  // With an account the display name of the profile is the nickname in every world.
+  const coopNickname = account?.profile.displayName ?? playerName;
   const [coopCodeInput, setCoopCodeInput] = useState("");
   const [coopRoomName, setCoopRoomName] = useState("Meine Welt");
   const [lobbyBonusCode, setLobbyBonusCode] = useState("");
@@ -237,6 +241,8 @@ function App() {
   const comboTimerRef = useRef<number | null>(null);
   const [combo, setCombo] = useState({ count: 0, multiplier: 1 });
   const [comboBurst, setComboBurst] = useState<{ id: number; text: string } | null>(null);
+  const comboLevel = getComboLevel(combo.count);
+  const nextComboLevel = COMBO_LEVELS.find((level) => level.clicks > combo.count);
   const [vibrationEnabled, setVibrationEnabled] = useState(readVibrationSetting);
   const [dailyBusy, setDailyBusy] = useState(false);
   const [pressBusy, setPressBusy] = useState(false);
@@ -917,7 +923,7 @@ function App() {
   }
 
   async function createCoopRoom() {
-    const nickname = normalizeNickname(playerName);
+    const nickname = normalizeNickname(coopNickname);
     if (!playerId) {
       setCoopMessage("Deine Spieler-ID wird noch vorbereitet.");
       return;
@@ -947,7 +953,7 @@ function App() {
   }
 
   async function joinCoopRoom() {
-    const nickname = normalizeNickname(playerName);
+    const nickname = normalizeNickname(coopNickname);
     const code = coopCodeInput.trim().toUpperCase().slice(0, 6);
     if (!playerId) {
       setCoopMessage("Deine Spieler-ID wird noch vorbereitet.");
@@ -1979,10 +1985,10 @@ function App() {
     state.multiplier = level.multiplier;
     setCombo({ count: state.count, multiplier: level.multiplier });
     if (level.multiplier > previous.multiplier) {
-      setComboBurst({ id: now, text: `COMBO x${level.multiplier}` });
+      setComboBurst({ id: now, text: `COMBO ${formatComboMultiplier(level.multiplier)}` });
       window.setTimeout(() => setComboBurst((current) => current?.id === now ? null : current), 900);
-      playTone(level.multiplier === 3 ? 988 : 784, 0.12, "triangle", 0.045);
-      vibrate(level.multiplier === 3 ? [30, 25, 45] : 30);
+      playTone(level.tier === 3 ? 988 : 784, 0.12, "triangle", 0.045);
+      vibrate(level.tier === 3 ? [30, 25, 45] : 30);
     }
     scheduleComboDecay(COMBO_HOLD_MS + COMBO_DECAY_MS);
     return level.multiplier;
@@ -1999,7 +2005,7 @@ function App() {
     const rect = stageRef.current?.getBoundingClientRect();
     const x = rect ? event.clientX - rect.left : 50;
     const y = rect ? event.clientY - rect.top : 50;
-    const effect = { id: result.effectId, x, y, amount: result.amount, critical: result.critical, combo: comboMultiplier };
+    const effect = { id: result.effectId, x, y, amount: result.amount, critical: result.critical, combo: getComboLevel(comboRef.current.count).tier };
     setEffects((current) => [...current, effect]);
     setTimeout(() => setEffects((current) => current.filter((item) => item.id !== effect.id)), 850);
     setPulse((value) => !value);
@@ -2451,10 +2457,10 @@ function App() {
           <div className="score-display"><span className="score-label">{hasInfiniteMoney ? "UNBEGRENZTES TESTGUTHABEN" : isCoopLive ? "GEMEINSAME TORE" : "DEINE TORE"}</span><strong>{displayBalance}</strong><span className="per-click-label">+{formatNumber(clickPower)} {isCoopLive ? "pro Team-Klick" : "pro Klick"}</span></div>
           <div className="ball-stage" ref={stageRef}>
             <div className="stadium-glow" /><div className="stadium-lights"><span /><span /><span /><span /><span /></div><div className="field-circle" /><div className="field-line field-line-one" /><div className="field-line field-line-two" /><div className="field-label">{isCoopLive ? "CO-OP CLICKER ARENA" : "GOAL CLICKER ARENA"}</div>
-            <button type="button" className={`ball-button${pulse ? " hit" : ""}${combo.multiplier > 1 ? ` combo-${combo.multiplier}` : ""}`} onClick={handleBallClick} onKeyDown={handleBallKeyDown} aria-label={isCoopLive ? "Team-Ball anklicken" : "Fussball anklicken"}><span className="ball-aura" /><FootballGraphic /></button>
+            <button type="button" className={`ball-button${pulse ? " hit" : ""}${comboLevel.tier > 1 ? ` combo-${comboLevel.tier}` : ""}`} onClick={handleBallClick} onKeyDown={handleBallKeyDown} aria-label={isCoopLive ? "Team-Ball anklicken" : "Fussball anklicken"}><span className="ball-aura" /><FootballGraphic /></button>
             <p className="click-label"><span>CLICK</span> den Ball {isCoopLive ? "fürs Team" : "für Tore"}</p>
             <div className="floating-layer">{effects.map((effect) => <span className={`floating-number${effect.critical ? " critical" : ""}${effect.combo > 1 ? ` combo-${effect.combo}` : ""}`} key={effect.id} style={{ left: effect.x, top: effect.y }}>{effect.critical ? `CRIT! +${formatNumber(effect.amount)}` : `+${formatNumber(effect.amount)}`}</span>)}</div>
-            <div className={`combo-meter level-${combo.multiplier}${combo.count > 1 ? " active" : ""}`} aria-live="polite"><span className="combo-label">{comboPaused && combo.count > 1 ? `Combo pausiert${combo.multiplier > 1 ? ` · x${combo.multiplier}` : ""}` : combo.multiplier > 1 ? `COMBO x${combo.multiplier}` : combo.count > 1 ? `${combo.count} Klicks` : "Schnell klicken für Combo"}</span><span className="combo-track"><i style={{ width: `${Math.round(getComboProgress(combo.count) * 100)}%` }} /></span><small>{combo.multiplier === 3 ? "Maximum erreicht" : `Nächste Stufe: x${combo.multiplier + 1}`}</small></div>
+            <div className={`combo-meter level-${comboLevel.tier}${combo.count > 1 ? " active" : ""}`} aria-live="polite"><span className="combo-label">{comboPaused && combo.count > 1 ? `Combo pausiert${combo.multiplier > 1 ? ` · ${formatComboMultiplier(combo.multiplier)}` : ""}` : combo.multiplier > 1 ? `COMBO ${formatComboMultiplier(combo.multiplier)}` : combo.count > 1 ? `${combo.count} Klicks` : "Schnell klicken für Combo"}</span><span className="combo-track"><i style={{ width: `${Math.round(getComboProgress(combo.count) * 100)}%` }} /></span><small>{nextComboLevel ? `Nächste Stufe: ${formatComboMultiplier(nextComboLevel.multiplier)}` : "Maximum erreicht"}</small></div>
             {comboBurst && <div className={`combo-burst${comboBurst.text === "Combo vorbei" ? " ended" : ""}`} key={comboBurst.id} aria-hidden="true">{comboBurst.text}</div>}
           </div>
           <div className="production-strip"><div className="production-item"><span className="production-icon">/s</span><div><small>PRO SEKUNDE</small><strong>{formatNumber(passivePower)}</strong></div></div><div className="production-divider" /><div className="production-item"><span className="production-icon">+1</span><div><small>PRO KLICK</small><strong>{formatNumber(clickPower)}</strong></div></div><div className="production-divider" /><div className="production-item"><span className="production-icon">#</span><div><small>KLICKS</small><strong>{formatNumber(displayGame.clicks)}</strong></div></div></div>
@@ -2600,6 +2606,7 @@ function App() {
           {featureTab === "club" && <div className="feature-panel">            <section className="trophy-room" aria-label="Gewonnene Pokale"><div className="trophy-room-heading"><div><p className="eyebrow">TROPHÄENRAUM</p><h4>Deine gewonnenen Pokale.</h4></div><span>{totalTrophies} GESAMT</span></div><div className="trophy-grid">{TOURNAMENTS.map((tournament) => { const count = displayGame.features.cup.trophies[tournament.id]; return <article className={`trophy-card${count > 0 ? " earned" : " locked"}`} key={`trophy-${tournament.id}`} style={{ "--trophy-accent": tournament.accent } as CSSProperties}><span className="trophy-icon" aria-hidden="true">{tournament.trophyIcon}</span><div><strong>{tournament.trophyName}</strong><small>{count > 0 ? `${count} Mal gewonnen` : `${tournament.rounds} Runden bis zum Pokal`}</small></div><b>{count}</b></article>; })}</div></section>
             <section className="club-scorer-board" aria-label="Ewige Torschützenliste"><div className="club-scorer-heading"><div><p className="eyebrow">CLUBREKORDE / EWIG</p><h4>Deine drei besten Torschützen.</h4></div><span>ALLE SPIELE</span></div>{allTimeTopScorers.length ? <ol>{allTimeTopScorers.map(({ player, goals, appearances }, index) => <li key={`all-time-${player.id}`}><span>{index + 1}</span><div><strong>{player.name}</strong><small>{formatStarXIPositions(player)} · OVR {player.rating}</small></div><b>{goals} {goals === 1 ? "TOR" : "TORE"} · {appearances} {appearances === 1 ? "SPIEL" : "SPIELE"}</b></li>)}</ol> : <div className="club-scorer-empty"><strong>Die Rekordliste wartet.</strong><small>Das erste Tor eröffnet deine Klubgeschichte.</small></div>}</section>
             <TravelStatsPanel travel={displayGame.features.travel} now={getTravelTime()} clubName={displayGame.features.club.name} />
+            <ProfilePanel onMessage={accountMessage} />
             <SaveTransferPanel onMessage={accountMessage} />
 <div className="feature-panel-heading"><div><p className="eyebrow">CLUBIDENTITÄT / DEIN VEREIN</p><h3>Mach ihn zu deinem Club.</h3></div><span className="club-preview" style={{ color: clubDraft.color, borderColor: clubDraft.color }}>{clubDraft.badge}</span></div><div className="club-form"><label htmlFor="club-name">Clubname</label><input id="club-name" className="mode-input" value={clubDraft.name} maxLength={22} onChange={(event) => setClubDraft((current) => ({ ...current, name: event.target.value }))} /><div><span className="club-form-label">Wappen</span><div className="club-choice-row">{CLUB_BADGES.map((badge) => <button key={badge} className={clubDraft.badge === badge ? "selected" : ""} onClick={() => setClubDraft((current) => ({ ...current, badge }))}>{badge}</button>)}</div></div><div><span className="club-form-label">Clubfarbe</span><div className="club-choice-row colors">{CLUB_COLORS.map((color) => <button key={color} className={clubDraft.color === color ? "selected" : ""} style={{ background: color }} aria-label={`Clubfarbe ${color}`} onClick={() => setClubDraft((current) => ({ ...current, color }))} />)}</div></div><button className="mode-primary" onClick={() => void saveClubProfile()} disabled={coopBusy}>Clubprofil speichern</button></div></div>}
 
@@ -2642,7 +2649,7 @@ function App() {
           {!coopSession ? <div className="coop-lobby">
             <div className="coop-lobby-panel"><span className="coop-panel-number">01</span><div><p className="eyebrow">NEUE WELT ERÖFFNEN</p><h3>Du bist der Host.</h3><p>Gib deiner Welt einen Namen und teile den Raumcode mit bis zu drei Mitspielern.</p></div><input className="mode-input room-name-input" value={coopRoomName} maxLength={28} placeholder="z. B. Xevihans United" onChange={(event) => setCoopRoomName(event.target.value)} aria-label="Name der neuen Welt" /><button className="mode-primary" onClick={() => void createCoopRoom()} disabled={coopBusy}>Welt erstellen</button></div>
             <div className="coop-lobby-panel"><span className="coop-panel-number">02</span><div><p className="eyebrow">MIT RAUMCODE BEITRETEN</p><h3>Schon eingeladen?</h3><p>Code eingeben und direkt im gemeinsamen Match landen.</p></div><input className="mode-input code-input" value={coopCodeInput} maxLength={6} placeholder="ABC123" onChange={(event) => setCoopCodeInput(event.target.value.toUpperCase())} /><button className="mode-secondary" onClick={() => void joinCoopRoom()} disabled={coopBusy}>Beitreten</button></div>
-            <div className="coop-name-field"><label htmlFor="coop-name">Dein Spielername für den Koop-Raum</label><input id="coop-name" className="mode-input" value={playerName} maxLength={18} placeholder="z. B. Team Captain" onChange={(event) => setPlayerName(event.target.value)} /><small>Dieser Name wird allen Personen im Raum angezeigt.</small></div>
+            {account ? <div className="coop-name-field"><span className="coop-name-label">Du spielst als</span><strong>{account.profile.displayName}</strong><small>Deinen Anzeigenamen änderst du unter Club &amp; Mehr im Profil.</small></div> : <div className="coop-name-field"><label htmlFor="coop-name">Dein Spielername für den Koop-Raum</label><input id="coop-name" className="mode-input" value={playerName} maxLength={18} placeholder="z. B. Team Captain" onChange={(event) => setPlayerName(event.target.value)} /><small>Dieser Name wird allen Personen im Raum angezeigt.</small></div>}
             {savedRooms.length > 0 && <div className="saved-rooms"><div className="saved-rooms-heading"><div><p className="eyebrow">DEINE KOOP WELTEN</p><h3>Gespeicherte Matches</h3></div><button className="mode-secondary" onClick={() => void loadSavedRooms()} disabled={roomsLoading}>{roomsLoading ? "Lädt …" : "Aktualisieren"}</button></div><div className="saved-room-list">{savedRooms.map((room) => { const otherOnlineCount = room.players.filter((player) => player.occupied && player.role !== room.viewerRole && player.online).length; const otherOnline = otherOnlineCount > 0; const names = occupiedCoopPlayers(room).map((player) => player.name).join(" · "); return <div className={`saved-room-row${otherOnline ? " other-online" : ""}`} key={room.code}><button className="saved-room-main" onClick={() => void reopenSavedRoom(room.code)} disabled={coopBusy}><span className="saved-room-code">{room.code}</span><span className="saved-room-copy"><strong>{room.roomName}</strong><small>{names} · {room.playerCount}/4 Spieler · {room.testMode ? "∞ AZB Testmodus" : `${formatNumber(room.sharedCoins)} Tore`}</small></span><span className={`saved-room-presence${otherOnline ? " online" : ""}`}><i />{otherOnline ? `${otherOnlineCount} ONLINE` : "OFFLINE"}</span><span className="saved-room-open">Öffnen&nbsp;↗</span></button>{room.canDelete && <button className="saved-room-delete" onClick={() => void deleteCoopRoom(room.code)} disabled={coopBusy}>Löschen</button>}</div>; })}</div><p className="saved-rooms-note">Jede Welt erscheint bei allen vier Mitgliedern mit demselben gemeinsamen Spielstand. Nach Updates wird dein Platz automatisch wiederhergestellt.</p></div>}
           </div> : <div className="coop-room">
             <div className="coop-room-bar"><div><p className="eyebrow">{coopSession.room.roomName} / RAUMCODE</p><strong className="coop-code">{coopSession.code}</strong><span>{coopSession.room.status === "live" ? `LIVE · ${coopSession.room.playerCount} von 4 Spielern verbunden` : "WARTET · Code mit bis zu drei Mitspielern teilen"}</span></div><div className="coop-room-actions"><button className="mode-secondary" onClick={() => void copyCoopCode()}>Code kopieren</button>{coopSession.role === "host" && <button className="mode-secondary danger" onClick={() => void deleteCoopRoom(coopSession.code)}>Raum löschen</button>}<button className="mode-secondary quiet" onClick={leaveCoopRoom}>Verlassen</button></div></div>
@@ -2730,4 +2737,4 @@ function App() {
 }
 
 
-export default function Home() { return <GameErrorBoundary><App /></GameErrorBoundary>; }
+export default function Home() { return <GameErrorBoundary><AccountGate><App /></AccountGate></GameErrorBoundary>; }

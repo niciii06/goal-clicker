@@ -1514,7 +1514,7 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 /* Player names in the substitution pitch break at German syllables instead of arbitrary letters. */
 /* The substitution pitch uses light cards: hover and selection keep them light with a blue border so the dark text stays readable. */
 
-/* Click combo (maximum x3) */
+/* Click combo (maximum x2); level-N and combo-N name the tier, not the multiplier */
 .combo-meter { position: absolute; z-index: 3; bottom: 44px; left: 50%; display: grid; justify-items: center; gap: 4px; width: min(220px, 70%); transform: translateX(-50%); color: rgba(228,249,227,.78); text-align: center; pointer-events: none; transition: opacity .2s ease; opacity: .7; }
 .combo-meter.active { opacity: 1; }
 .combo-label { font-size: 11px; font-weight: 850; letter-spacing: .08em; }
@@ -1652,4 +1652,67 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 .save-transfer h4 { margin: 2px 0 4px; }
 .save-transfer p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .save-transfer-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-@media (max-width: 650px) { .account-chip.signed-in span { max-width: 96px; } }
+.account-chip.signed-in span strong { color: var(--text); font-weight: 750; }
+.account-chip .account-sync { max-width: 120px; padding: 3px 8px; border-radius: 999px; font-size: 10px; }
+.account-sync.saved { color: #268b45; background: #effaf1; }
+.account-sync.saving { color: var(--accent); background: var(--accent-soft); }
+.account-sync.offline, .account-sync.conflict { color: #9a5b00; background: #fff4e0; }
+@media (max-width: 650px) { .account-chip.signed-in span { max-width: 96px; } .account-chip .account-sync { display: none; } }
+
+/* Login, profile setup and the choice between two saves, before the game starts. */
+.account-screen { display: grid; min-height: 100vh; min-height: 100dvh; place-items: center; padding: 24px 16px; background: radial-gradient(circle at 20% 10%, #e8f2ff, transparent 45%), var(--bg); }
+.account-card { width: min(440px, 100%); padding: 28px; border: 1px solid rgba(29,29,31,.08); border-radius: 25px; background: var(--surface-raised); box-shadow: 0 16px 45px rgba(29,29,31,.08); }
+.account-card h2 { margin: 18px 0 6px; color: var(--text); font-size: 28px; font-weight: 720; letter-spacing: -.05em; line-height: 1.05; }
+.account-card > p, .account-card section > p { margin: 0 0 16px; color: var(--soft); font-size: 13px; line-height: 1.5; }
+.account-brand { display: flex; align-items: center; gap: 12px; }
+.account-brand .eyebrow { margin: 0 0 2px; }
+.account-brand strong { color: var(--text); font-size: 20px; font-weight: 760; letter-spacing: -.04em; }
+.account-brand-ball { display: grid; width: 46px; height: 46px; place-items: center; border-radius: 14px; background: var(--accent); font-size: 24px; }
+.account-status { margin: 18px 0 0; color: var(--muted); font-size: 13px; }
+.account-google { display: flex; width: 100%; min-height: 46px; align-items: center; justify-content: center; gap: 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--text); background: #fff; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: 160ms ease; }
+.account-google:hover:not(:disabled) { border-color: rgba(0,113,227,.34); background: var(--accent-soft); }
+.account-google span { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 50%; color: #fff; background: #4285f4; font-size: 13px; font-weight: 800; }
+.account-divider { display: flex; align-items: center; gap: 10px; margin: 18px 0 12px; color: var(--muted); font-size: 11px; }
+.account-divider::before, .account-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.account-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 999px; background: var(--surface-soft); }
+.account-tabs button { min-height: 34px; border: 0; border-radius: 999px; color: var(--soft); background: transparent; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.account-tabs button.active { color: var(--text); background: #fff; box-shadow: 0 2px 8px rgba(29,29,31,.08); }
+.account-form { display: grid; gap: 10px; margin-top: 14px; }
+.account-form .mode-primary, .account-form .mode-secondary { min-height: 44px; font-size: 13px; }
+.account-field { display: grid; gap: 5px; }
+.account-field span { color: var(--soft); font-size: 12px; font-weight: 700; }
+.account-field .mode-input { min-height: 44px; font-size: 16px; }
+.account-code { letter-spacing: .3em; text-align: center; font-weight: 750; }
+.account-hint { margin-top: -4px; color: var(--muted); font-size: 11px; line-height: 1.4; }
+.account-hint.good { color: #268b45; }
+.account-hint.bad { color: #b52a4c; }
+.account-links { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.account-links button { padding: 4px 0; border: 0; color: var(--accent); background: none; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+.account-notice { margin: 14px 0 0; padding: 10px 12px; border-radius: 12px; color: #0b4f9c; background: var(--accent-soft); font-size: 12px; line-height: 1.45; }
+.account-error { margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; color: #b52a4c; background: #fff5f7; font-size: 12px; line-height: 1.45; }
+.account-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.account-actions button { min-height: 44px; font-size: 13px; }
+.save-choice { display: grid; gap: 10px; }
+.save-choice button { display: grid; gap: 4px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 16px; color: var(--text); background: #fff; font: inherit; text-align: left; cursor: pointer; transition: 160ms ease; }
+.save-choice button:hover { border-color: rgba(0,113,227,.4); background: var(--accent-soft); }
+.save-choice .eyebrow { margin: 0; }
+.save-choice strong { font-size: 15px; }
+.save-choice small { color: var(--soft); font-size: 12px; }
+.account-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 16px; background: rgba(15,20,25,.55); backdrop-filter: blur(6px); }
+.account-overlay .account-card h2 { margin-top: 4px; }
+
+/* Profile settings in the club tab. */
+.profile-panel { display: grid; gap: 12px; margin-top: 12px; padding: 14px; border: 1px solid var(--line-soft); border-radius: 16px; background: #fff; }
+.profile-panel h4 { margin: 2px 0 4px; }
+.profile-panel h4 small { color: var(--muted); font-weight: 600; }
+.profile-panel p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.profile-panel .account-sync { padding: 2px 7px; border-radius: 999px; font-size: 11px; }
+.profile-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.profile-row label { display: grid; flex: 1 1 180px; gap: 4px; min-width: 0; }
+.profile-row label span { color: var(--soft); font-size: 11px; font-weight: 700; }
+.profile-row .mode-input { min-height: 40px; font-size: 14px; }
+.profile-row small { flex-basis: 100%; color: var(--muted); font-size: 11px; line-height: 1.4; }
+.profile-danger summary { color: #b52a4c; font-size: 12px; font-weight: 700; cursor: pointer; }
+.profile-danger .profile-row { margin-top: 10px; }
+.coop-name-field .coop-name-label { display: block; margin-bottom: 5px; color: var(--soft); font-size: 9px; font-weight: 750; }
+.coop-name-field strong { color: var(--text); font-size: 16px; }

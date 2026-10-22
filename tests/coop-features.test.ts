@@ -50,12 +50,13 @@ test('the shared press conference is answered once per match and pays a media re
  assert.ok(JSON.parse(row.sharedFeaturesJson).press.answered.includes('coop-match-1'));
 });
 
-test('a x3 combo click batch is accepted by the server but larger amounts stay capped',async()=>{
+test('a top combo click batch is accepted by the server but larger amounts stay capped',async()=>{
  setup();
  const before=row.sharedCoins;
- assert.equal((await action('click',{amount:6,clickCount:1})).status,200);
- assert.equal(row.sharedCoins-before,6);
+ assert.equal((await action('click',{amount:4,clickCount:1})).status,200);
+ assert.equal(row.sharedCoins-before,4);
  const capped=row.sharedCoins;
  assert.equal((await action('click',{amount:1000,clickCount:1})).status,200);
- assert.ok(row.sharedCoins-capped<=6.6,`gained ${row.sharedCoins-capped}`);
+ // x2 combo, x1.1 streak and x2 critical hit.
+ assert.ok(row.sharedCoins-capped<=4.4,`gained ${row.sharedCoins-capped}`);
 });

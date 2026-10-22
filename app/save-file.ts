@@ -8,12 +8,14 @@ const MAX_SAVE_FILE_BYTES = 8 * 1024 * 1024;
 const GAME_KEYS = ["goalClickerSiteSaveV3", "goalClickerSiteSaveBackupV3", "goalClickerSiteSaveV2", "goalClickerSiteSave", "goalClickerSave"];
 /** The keys present before the last import, so an import can be undone by hand. */
 export const PRE_IMPORT_BACKUP_KEY = "goalClickerBeforeImportV1";
+// Which account and cloud version this browser holds; it belongs to the device, not to a save.
+const DEVICE_KEYS = new Set(["goalClickerCloudMetaV1", "goalClickerProfileCacheV1"]);
 
 export type SaveFile = { format: typeof SAVE_FILE_FORMAT; version: number; exportedAt: string; origin: string; keys: Record<string, string> };
 type KeyStorage = Pick<Storage, "length" | "key" | "getItem" | "setItem" | "removeItem">;
 
 function saveKeys(storage: Pick<Storage, "length" | "key">) {
-  return Array.from({ length: storage.length }, (_, i) => storage.key(i)).filter((key): key is string => Boolean(key?.startsWith(SAVE_KEY_PREFIX)) && key !== PRE_IMPORT_BACKUP_KEY);
+  return Array.from({ length: storage.length }, (_, i) => storage.key(i)).filter((key): key is string => Boolean(key?.startsWith(SAVE_KEY_PREFIX)) && key !== PRE_IMPORT_BACKUP_KEY && !DEVICE_KEYS.has(key ?? ""));
 }
 
 export function createSaveFile(storage: Pick<Storage, "length" | "key" | "getItem">, origin: string, now = new Date()): SaveFile {
@@ -38,7 +40,7 @@ export function parseSaveFile(text: string): { ok: true; file: SaveFile } | { ok
   if (file.version !== SAVE_FILE_VERSION) return { ok: false, error: "Diese Spielstand Version wird nicht unterstützt." };
   if (!file.keys || typeof file.keys !== "object" || Array.isArray(file.keys)) return { ok: false, error: "Der Spielstand ist unvollständig." };
   const entries = Object.entries(file.keys);
-  if (entries.some(([key, raw]) => !key.startsWith(SAVE_KEY_PREFIX) || key === PRE_IMPORT_BACKUP_KEY || typeof raw !== "string")) return { ok: false, error: "Der Spielstand enthält unerwartete Einträge." };
+  if (entries.some(([key, raw]) => !key.startsWith(SAVE_KEY_PREFIX) || key === PRE_IMPORT_BACKUP_KEY || DEVICE_KEYS.has(key) || typeof raw !== "string")) return { ok: false, error: "Der Spielstand enthält unerwartete Einträge." };
   const game = GAME_KEYS.map((key) => file.keys![key]).find((raw) => typeof raw === "string");
   if (!game) return { ok: false, error: "Im Spielstand fehlt das Spiel." };
   try {

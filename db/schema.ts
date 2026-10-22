@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { bigint, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, uuid } from "drizzle-orm/pg-core";
 
 // Supabase exposes the public schema through its REST API. Row level security without any policy keeps
 // these tables closed to the browser keys; the server connects as the database owner, which bypasses it.
@@ -73,4 +73,30 @@ export const playerAccounts = pgTable("player_accounts", {
   playerId: text("player_id").notNull().unique(),
   email: text("email"),
   createdAt: text("created_at").notNull().default(isoNow),
+}).enableRLS();
+
+// The profile every account creates after its first login. username_key (lower case) keeps usernames unique
+// regardless of case; username keeps the spelling the player chose.
+export const profiles = pgTable("profiles", {
+  userId: uuid("user_id").primaryKey(),
+  username: text("username").notNull(),
+  usernameKey: text("username_key").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  // Only for accounts with username and password: the generated login address behind the username.
+  // It never leaves the server and no mail is ever sent to it.
+  loginEmail: text("login_email"),
+  usernameChangedAt: text("username_changed_at").notNull().default(isoNow),
+  createdAt: text("created_at").notNull().default(isoNow),
+  updatedAt: text("updated_at").notNull().default(isoNow),
+}).enableRLS();
+
+// The single player save of an account, as the goalClicker localStorage keys of the last device that saved.
+// version grows with every save, so a device can only overwrite the save it loaded. active is false when the
+// device only collected passive goals since its previous save, nobody clicked or typed there.
+export const cloudSaves = pgTable("cloud_saves", {
+  userId: uuid("user_id").primaryKey(),
+  saveJson: text("save_json").notNull(),
+  version: bigint("version", { mode: "number" }).notNull().default(1),
+  active: boolean("active").notNull().default(true),
+  updatedAt: text("updated_at").notNull().default(isoNow),
 }).enableRLS();

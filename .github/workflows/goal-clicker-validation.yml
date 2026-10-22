@@ -54,3 +54,7 @@ jobs:
         run: npx playwright-core install --with-deps chromium
       - name: Run browser smoke tests against the production build
         run: npm run test:browser
+      - name: Run account browser tests (login, profile, cloud save)
+        run: npm run test:account
+        env:
+          TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/goalclicker_test

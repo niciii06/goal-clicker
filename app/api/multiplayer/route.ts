@@ -16,6 +16,9 @@ import { getFormationUnlockLeague, getPackUnlockLeague, getReachedLeague, getTou
 import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../../upgrade-purchase";
 import { MAX_MULTIPLAYER_BODY_BYTES, readJsonBody, RequestBodyTooLargeError } from "../request-body";
 import { claimDailyReward } from "../../daily-reward";
+import { COMBO_LEVELS } from "../../game/constants";
+
+const MAX_COMBO_MULTIPLIER = Math.max(...COMBO_LEVELS.map((level) => level.multiplier));
 import { answerPressConference, getPressReward } from "../../press-conference";
 
 const MAX_NAME_LENGTH = 18;
@@ -712,8 +715,8 @@ export async function POST(request: Request) {
     if (action === "click") {
       const clickPower = getClickPower(game.upgrades, game.stars, game.features, Date.parse(timestamp));
       const clickCount = Math.max(1, Math.min(50, Math.floor(finite(payload.clickCount, 1))));
-      // Highest legitimate click: combo x3, streak bonus x1.1 and a critical hit x2.
-      const maxAmount = Math.max(clickCount, Math.floor(clickPower * clickCount * 6.6));
+      // Highest legitimate click: the top combo, streak bonus x1.1 and a critical hit x2.
+      const maxAmount = Math.max(clickCount, Math.floor(clickPower * clickCount * MAX_COMBO_MULTIPLIER * 1.1 * 2));
       const amount = Math.max(clickCount, Math.min(maxAmount, Math.floor(finite(payload.amount, clickPower * clickCount))));
       const updated = await db.applyClick(code, role, amount, clickCount, timestamp);
       if (!updated) return jsonError("Dieser Raum wurde gelöscht.", 404);

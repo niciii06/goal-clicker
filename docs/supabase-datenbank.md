@@ -1,6 +1,6 @@
 # Datenbank: Supabase (PostgreSQL)
 
-Die Multiplayer Welten (`coop_rooms`) und die Reise und Prämienbelege der Einzelspieler (`solo_travel`) liegen in PostgreSQL bei Supabase. Die frühere Cloudflare D1 Datenbank (SQLite) wird vom Code nicht mehr verwendet.
+Die Multiplayer Welten (`coop_rooms`), die Reise und Prämienbelege der Einzelspieler (`solo_travel`), die Verknüpfung Konto ↔ Spieler ID (`player_accounts`), die Profile (`profiles`) und die Cloud Spielstände (`cloud_saves`) liegen in PostgreSQL bei Supabase. Die frühere Cloudflare D1 Datenbank (SQLite) wird vom Code nicht mehr verwendet.
 
 ## Was sich gegenüber D1 geändert hat
 
@@ -22,6 +22,8 @@ Alle bedingten Updates bleiben atomar. Jede Schreiboperation ist ein einzelnes `
 * `lastPassiveAt`: das passive Einkommen wird pro Zeitpunkt genau einmal gutgeschrieben.
 * Klicks: `shared_coins = shared_coins + betrag` direkt in der Datenbank.
 * Reisebelege: `insert ... on conflict do nothing` und Verbrauch nur, solange `consumed` fehlt, `null`, `false` oder `0` ist.
+* Benutzernamen: `username_key` (klein geschrieben) ist eindeutig; eine Registrierung, die den Namen trotzdem verliert, löscht ihren eben erzeugten Login wieder, von gleichzeitigen Anmeldungen mit demselben Namen bekommt ihn genau eine. Ein Namenswechsel ist eine bedingte Änderung auf `username_changed_at`.
+* Cloud Spielstände: Speichern nur auf die geladene `version` (`update ... where version = <geladen>`), sonst bekommt das Gerät den neueren Stand zurück.
 
 `tests/db-postgres.test.ts` prüft genau diese Fälle mit vielen gleichzeitigen Anfragen gegen eine echte Datenbank.
 
@@ -32,7 +34,12 @@ Alle bedingten Updates bleiben atomar. Jede Schreiboperation ist ein einzelnes `
 | `DATABASE_URL` | Verbindung der App. Auf Vercel den **Transaction Pooler** von Supabase verwenden (Port 6543) und `?sslmode=require` anhängen. |
 | `DATABASE_POOL_MAX` | Optional, Verbindungen pro Server Instanz (Standard 5). |
 
-**Produktion (Stand 21. Oktober 2026):** Die App auf Vercel verbindet sich nicht als `postgres`, sondern als eigener Benutzer `goal_clicker_app` über den Transaction Pooler `aws-0-eu-central-1.pooler.supabase.com:6543` (Benutzername `goal_clicker_app.<projekt-ref>`). Er darf nur `coop_rooms`, `solo_travel` und `player_accounts` lesen und schreiben, jeweils über eine eigene Policy `goal_clicker_app_all`. Sein Passwort steht nur in der Vercel Variable `DATABASE_URL` (Typ *Sensitive*). Zum Wechseln des Passworts: im SQL Editor `alter role goal_clicker_app password '<neu>';` und danach `DATABASE_URL` in Vercel anpassen und neu deployen. Rolle und Policies sind bewusst nicht in `drizzle/`, weil sie ein Passwort brauchen und lokale Testdatenbanken sie nicht kennen. Eine neue Tabelle braucht deshalb zusätzlich `grant ... to goal_clicker_app` und eine Policy.
+**Produktion (Stand 21. Oktober 2026):** Die App auf Vercel verbindet sich nicht als `postgres`, sondern als eigener Benutzer `goal_clicker_app` über den Transaction Pooler `aws-0-eu-central-1.pooler.supabase.com:6543` (Benutzername `goal_clicker_app.<projekt-ref>`). Er darf nur `coop_rooms`, `solo_travel`, `player_accounts`, `profiles` und `cloud_saves` lesen und schreiben, jeweils über eine eigene Policy `goal_clicker_app_all`. Zusätzlich darf er zwei Funktionen im Schema `goal_clicker_private` aufrufen, das die Supabase REST API nicht anbietet. Beide gehören `postgres` und laufen mit dessen Rechten (`security definer`):
+
+* `delete_user(uuid)` löscht genau einen Login in `auth.users` (*Profil löschen*).
+* `create_password_user(email, password)` legt einen bestätigten Login mit Passwort an (Registrieren mit Benutzername). Sie nimmt nur erzeugte Adressen `@players.goal-clicker.vercel.app` an, verschlüsselt das Passwort mit bcrypt (`extensions.crypt`) und schreibt `auth.users` und `auth.identities` so, wie Supabase Auth es selbst tut.
+
+Lokale Testdatenbanken haben beide nicht; dort bleibt beim Löschen der Login bestehen und registriert wird über die Auth API. Sein Passwort steht nur in der Vercel Variable `DATABASE_URL` (Typ *Sensitive*). Zum Wechseln des Passworts: im SQL Editor `alter role goal_clicker_app password '<neu>';` und danach `DATABASE_URL` in Vercel anpassen und neu deployen. Rolle und Policies sind bewusst nicht in `drizzle/`, weil sie ein Passwort brauchen und lokale Testdatenbanken sie nicht kennen. Eine neue Tabelle braucht deshalb zusätzlich `grant ... to goal_clicker_app` und eine Policy.
 
 Für Migrationen und den Datenimport eine **direkte Verbindung** oder den **Session Pooler** (Port 5432) verwenden. Die Werte stehen im Supabase Dashboard unter *Connect*. Passwörter gehören nie ins Repository, nur in `.env.local` (ignoriert) oder in die Vercel Einstellungen.
 
