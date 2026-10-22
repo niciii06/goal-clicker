@@ -196,6 +196,28 @@ test('a used username cannot be registered twice, in any case', { skip }, async 
   await page.getByRole('button', { name: 'Fussball anklicken' }).waitFor();
 });
 
+test('the account menu switches between light and dark, and the choice survives a reload', { skip }, async () => {
+  const page = devices.c.page;
+  const background = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const light = await background();
+  await page.getByRole('button', { name: /^Konto von / }).click();
+  await page.getByRole('dialog', { name: 'Konto' }).getByRole('radio', { name: 'Dunkel' }).click();
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
+  const dark = await background();
+  assert.notEqual(dark, light);
+  await page.keyboard.press('Escape');
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Fussball anklicken' }).waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
+  assert.equal(await background(), dark);
+  await page.getByRole('button', { name: /^Konto von / }).click();
+  const automatic = page.getByRole('dialog', { name: 'Konto' }).getByRole('radio', { name: 'Automatisch' });
+  await automatic.click();
+  assert.equal(await automatic.getAttribute('aria-checked'), 'true');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), undefined);
+  await page.keyboard.press('Escape');
+});
+
 test('the profile settings change display name and password and delete the profile', { skip }, async () => {
   const page = devices.c.page;
   // The account button next to the notifications opens the profile settings.
