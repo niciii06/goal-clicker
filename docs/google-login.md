@@ -47,7 +47,7 @@ Dafür ist in Supabase nichts einzustellen. Supabase Auth braucht für ein Passw
 
 * **Registrieren** (`POST /api/register`): prüft Benutzername, Anzeigename und Passwort (8 bis 72 Zeichen), legt Login und Profil an und gibt die erzeugte Adresse zurück. Der Browser meldet sich damit bei Supabase an.
 * **Anmelden** (`POST /api/login`): liefert zum Benutzernamen die erzeugte Adresse, der Browser meldet sich damit und dem Passwort bei Supabase an. Das Passwort sieht nur Supabase, und die Begrenzung der Anmeldeversuche gilt pro Gerät.
-* **Passwort ändern**: unter *Club & Mehr* → *Profil*.
+* **Passwort ändern**: über den Konto Knopf (👤) oben neben der Glocke.
 * **Passwort vergessen** gibt es nicht, weil keine Mailadresse bekannt ist. Im Notfall kann der Besitzer im Supabase Dashboard unter *Authentication* → *Users* beim betroffenen Login ein neues Passwort setzen (die Adresse steht in `profiles.login_email`).
 
 Ein späterer Login per E-Mail bräuchte einen eigenen Mailversand (eigene Domain mit einem Dienst wie Resend) und Mailvorlagen mit `{{ .Token }}`.
@@ -57,7 +57,7 @@ Ein späterer Login per E-Mail bräuchte einen eigenen Mailversand (eigene Domai
 | Teil | Datei |
 | :--- | :--- |
 | Login Pflicht, Login Formulare, Profil anlegen, Auswahl zwischen zwei Spielständen | `app/account-gate.tsx` |
-| Name, Speicherstand und Abmelden in der Kopfzeile, Profil Einstellungen im Club Tab | `app/account-panel.tsx` (`AccountChip`, `ProfilePanel`) |
+| Name, Speicherstand und Abmelden unter der Modusauswahl, Konto Knopf mit den Profil Einstellungen in der Kopfzeile | `app/account-panel.tsx` (`AccountChip`, `AccountButton`, `ProfilePanel`) |
 | Google Login (PKCE), Anmelden und Registrieren mit Benutzername, Passwort ändern | `app/auth/browser.ts` |
 | Regeln für Benutzername und Anzeigename | `app/profile-rules.ts` |
 | Registrieren, Anmelden, Profil und Cloud Spielstand API (`/api/register`, `/api/login`, `/api/profile`, `/api/profile/username`, `/api/save`) | `app/account-api.ts` |
@@ -72,7 +72,7 @@ Ein späterer Login per E-Mail bräuchte einen eigenen Mailversand (eigene Domai
 
 * **Benutzername**: 3 bis 20 Zeichen, Buchstaben ohne Umlaute, Zahlen und `_`. Eindeutig ohne Rücksicht auf Gross und Kleinschreibung (`username_key`). Änderbar alle 30 Tage, nur die Gross und Kleinschreibung des eigenen Namens jederzeit. Ein alter Name wird nach der Änderung sofort wieder frei.
 * **Anzeigename**: 2 bis 18 Zeichen, jederzeit änderbar. Er ist auch der Name in allen Multiplayer Welten.
-* **Profil löschen** (Club & Mehr): löscht Profil, Cloud Spielstand, die Verknüpfung zur Spieler ID und den Login selbst. Multiplayer Welten bleiben für die anderen Spieler bestehen.
+* **Profil löschen** (Konto Knopf): löscht Profil, Cloud Spielstand, die Verknüpfung zur Spieler ID und den Login selbst. Multiplayer Welten bleiben für die anderen Spieler bestehen.
 * Wer sich mit Benutzername und Passwort anmeldet, meldet sich nach einer Namensänderung mit dem neuen Namen an.
 
 ### Spielstand in der Cloud

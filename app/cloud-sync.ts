@@ -12,6 +12,8 @@ import type { CloudSaveKeys } from "./cloud-save-rules";
 
 /** Which account and save version this browser's localStorage belongs to, and whether it was played since. */
 export const CLOUD_META_KEY = "goalClickerCloudMetaV1";
+/** Asks the running game to write its current state to localStorage right now, before an upload reads it. */
+export const FLUSH_SAVE_EVENT = "goalclicker:flush-save";
 export type CloudMeta = { userId: string; version: number; hash: string; played?: boolean };
 export type CloudSaveState = { version: number; updatedAt: string | null; active: boolean; keys: CloudSaveKeys | null };
 export type SyncStatus = "saved" | "saving" | "offline" | "conflict";
@@ -173,25 +175,24 @@ export class CloudSync {
     if (this.stopped || !meta) return;
     try {
       const cloud = await fetchCloudSave(meta.version);
-      if (!cloud.unchanged && cloud.version > meta.version) this.resolve(cloud);
+      if (!cloud.unchanged && cloud.version > meta.version && this.resolve(cloud) === "overwrite") void this.upload({ overwriteVersion: cloud.version });
     } catch {
       setStatus("offline");
     }
   }
 
-  private resolve(cloud: CloudSaveState) {
+  /** A newer save from another device: take it, overwrite it (it only collected passive goals) or ask. */
+  private resolve(cloud: CloudSaveState): "overwrite" | "handled" {
     if (!this.played) {
       this.stop();
       this.handlers.onNewerSave(cloud);
-      return;
+      return "handled";
     }
-    if (!cloud.active) {
-      void this.upload({ overwriteVersion: cloud.version });
-      return;
-    }
+    if (!cloud.active) return "overwrite";
     this.stop();
     setStatus("conflict");
     this.handlers.onConflict(cloud);
+    return "handled";
   }
 
   /** Uploads now if the save changed; resolves true once the cloud has this device's save. */
@@ -202,8 +203,10 @@ export class CloudSync {
     return run;
   }
 
-  private async uploadOnce({ keepalive = false, overwriteVersion }: { keepalive?: boolean; overwriteVersion?: number }) {
+  private async uploadOnce({ keepalive = false, overwriteVersion }: { keepalive?: boolean; overwriteVersion?: number }): Promise<boolean> {
     if (this.stopped && overwriteVersion === undefined) return false;
+    // The game saves every few seconds on its own; the upload must not miss the clicks since then.
+    window.dispatchEvent(new Event(FLUSH_SAVE_EVENT));
     const keys = cleanCloudSaveKeys(readLocalSaveKeys());
     // Without a game in this browser there is nothing to save, and an empty save must never replace a real one.
     if (!keys) return true;
@@ -229,7 +232,9 @@ export class CloudSync {
         return true;
       }
       if (response.status === 409 && data.errorCode === "SAVE_CONFLICT") {
-        this.resolve({ version: data.version ?? 0, updatedAt: data.updatedAt ?? null, active: data.active !== false, keys: cleanCloudSaveKeys(data.keys) });
+        const cloud = { version: data.version ?? 0, updatedAt: data.updatedAt ?? null, active: data.active !== false, keys: cleanCloudSaveKeys(data.keys) };
+        // Overwriting belongs to this same upload, so whoever waits for it (signing out) waits for the overwrite too.
+        if (this.resolve(cloud) === "overwrite") return this.uploadOnce({ keepalive, overwriteVersion: cloud.version });
         return false;
       }
       setStatus("offline");

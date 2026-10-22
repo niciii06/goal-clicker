@@ -1,7 +1,8 @@
 "use client";
-// The signed in account in the game: name and save state in the header, profile settings and the save file
-// export/import in the club tab.
+// The signed in account in the game: name and save state below the mode switch, the account button in the
+// header with the profile settings, and the save file export/import in the club tab.
 import { useContext, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ChangeEvent, FormEvent } from "react";
 import { AccountContext } from "./account-gate";
 import { authErrorMessage, setAccountPassword } from "./auth/browser";
@@ -135,6 +136,51 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
         <small>Löscht Profil, Spielstand und Login. Multiplayer Welten bleiben für die anderen Spieler bestehen.</small></form>
     </details>
   </section>;
+}
+
+/** The account button in the header; it opens the profile settings in a dialog. */
+export function AccountButton() {
+  const account = useContext(AccountContext);
+  const [open, setOpen] = useState(false);
+  // Feedback stays inside the dialog; the page toast would sit under the dimmed overlay.
+  const [notice, setNotice] = useState("");
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // A modal dialog keeps the keyboard inside: focus moves in on open, Tab wraps around, Escape closes,
+  // and focus returns to the account button afterwards.
+  useEffect(() => {
+    if (!open) return;
+    const button = buttonRef.current;
+    const focusable = () => [...(dialogRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), summary, [tabindex]:not([tabindex='-1'])") ?? [])].filter((element) => element.offsetParent !== null);
+    focusable()[0]?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setOpen(false); return; }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (!items.length) return;
+      const first = items[0], last = items[items.length - 1];
+      const inside = dialogRef.current?.contains(document.activeElement);
+      if (event.shiftKey && (document.activeElement === first || !inside)) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && (document.activeElement === last || !inside)) { event.preventDefault(); first.focus(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("keydown", onKey); button?.focus(); };
+  }, [open]);
+
+  if (!account) return null;
+  return <>
+    <button ref={buttonRef} type="button" className="icon-button account-button" aria-label={`Konto von ${account.profile.displayName}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => { setNotice(""); setOpen(true); }}>👤</button>
+    {/* The header blurs its background, which would trap a fixed dialog inside it; the dialog lives on <body>. */}
+    {open && createPortal(<div className="account-overlay" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
+      <div ref={dialogRef} className="account-dialog" role="dialog" aria-modal="true" aria-label="Konto">
+        <button type="button" className="account-dialog-close" aria-label="Schliessen" onClick={() => setOpen(false)}>×</button>
+        <ProfilePanel onMessage={setNotice} />
+        {notice && <p className="account-notice" role="status">{notice}</p>}
+        <button type="button" className="mode-secondary account-dialog-signout" onClick={() => void account.signOut()}>Abmelden</button>
+      </div>
+    </div>, document.body)}
+  </>;
 }
 
 /** Download and upload of the single player save, for moving to a new address or device. */

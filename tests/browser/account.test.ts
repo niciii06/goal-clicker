@@ -198,15 +198,22 @@ test('a used username cannot be registered twice, in any case', { skip }, async 
 
 test('the profile settings change display name and password and delete the profile', { skip }, async () => {
   const page = devices.c.page;
-  await page.getByRole('button', { name: 'Club & Mehr', exact: true }).first().click();
-  const panel = page.locator('.profile-panel');
+  // The account button next to the notifications opens the profile settings.
+  await page.getByRole('button', { name: /^Konto von / }).click();
+  const panel = page.getByRole('dialog', { name: 'Konto' });
+  // The keyboard stays inside the dialog: focus starts in it and Tab never reaches the page behind.
+  for (let i = 0; i < 14; i++) {
+    assert.equal(await page.evaluate(() => Boolean(document.activeElement?.closest('.account-dialog'))), true, `focus left the dialog after ${i} tabs`);
+    await page.keyboard.press(i % 5 === 4 ? 'Shift+Tab' : 'Tab');
+  }
   await panel.getByLabel('Anzeigename').fill('Goalie 1');
   await panel.getByRole('button', { name: 'Speichern' }).click();
-  await page.getByText('Anzeigename gespeichert.').waitFor();
+  // Feedback shows inside the dialog, above its dimmed background.
+  await panel.getByRole('status').filter({ hasText: 'Anzeigename gespeichert.' }).waitFor();
   await panel.getByLabel('Neues Passwort').fill('neues-passwort-3');
   await panel.getByLabel('Wiederholen').fill('neues-passwort-3');
   await panel.getByRole('button', { name: 'Passwort ändern' }).click();
-  await page.getByText('Neues Passwort gespeichert.').waitFor();
+  await panel.getByRole('status').filter({ hasText: 'Neues Passwort gespeichert.' }).waitFor();
   const [{ user_id: userId }] = await admin`select user_id from profiles where username_key = 'keeper'`;
   assert.equal((await admin`select display_name from profiles where user_id = ${userId}::uuid`)[0].display_name, 'Goalie 1');
   await panel.getByText('Profil löschen').click();
@@ -216,10 +223,15 @@ test('the profile settings change display name and password and delete the profi
   assert.equal((await admin`select count(*)::int as n from profiles where user_id = ${userId}::uuid`)[0].n, 0);
 });
 
-test('signing out saves, forgets the save on this device and shows the login again', { skip }, async () => {
+test('signing out right after clicking still saves those clicks, then forgets the save on this device', { skip }, async () => {
   const page = devices.asked.page;
+  await page.evaluate(() => window.dispatchEvent(new Event('goalclicker:flush-save')));
+  const before = await localGoals(page);
+  // Every click earns at least one goal; the game itself would only save them a few seconds later.
+  await clickBall(page, 3);
   await page.locator('.account-chip').getByRole('button', { name: 'Abmelden' }).click();
   await page.getByRole('button', { name: 'Mit Google anmelden' }).waitFor();
   assert.equal(await page.evaluate((key) => localStorage.getItem(key), SAVE_KEY), null);
+  assert.ok((await cloudSave('Striker'))!.totalGoals >= before + 3, `cloud has ${(await cloudSave('Striker'))!.totalGoals}, before the clicks ${before}`);
   assert.deepEqual(problems, []);
 });
