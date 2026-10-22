@@ -7,7 +7,7 @@ import type { AppMode, ClickEffect, CoopRole, CoopRoom, CoopSession, CrossbarGam
 import type { CoopMission, CupCardEvent, GameFeatures, PenaltyDirection as CupPenaltyDirection, RandomEvent, StarFormationId, StarPackId, StarPackReveal, TournamentGazetteIssue, TournamentId, TransferInsiderEvent } from "./feature-data";
 import type { Journey, TravelFixture } from "./travel-data";
 import type { MatchDraft } from "./match-commands";
-import { ACHIEVEMENTS, BACKUP_STORAGE_KEY, BALANCE_VERSION, COMBO_RESUME_GRACE_MS, COMBO_WINDOW_MS, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RECOVERY_STORAGE_KEY, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, STAR_RATING_FILTERS, STORAGE_KEY, VIBRATION_STORAGE_KEY } from "./game/constants";
+import { ACHIEVEMENTS, BACKUP_STORAGE_KEY, BALANCE_VERSION, COMBO_DECAY_MS, COMBO_MAX_COUNT, COMBO_RESUME_GRACE_MS, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RECOVERY_STORAGE_KEY, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, STAR_RATING_FILTERS, STORAGE_KEY, VIBRATION_STORAGE_KEY } from "./game/constants";
 import { AL, AR, AT, AU, AZ, BA, BE, BF, BG, BR, CA, CD, CH, CI, CL, CM, CN, CO, CR, CZ, DE, DK, DZ, EC, EG, ES, FI, FR, GB_ENG, GB_NIR, GB_SCT, GB_WLS, GE, GH, GM, GN, GR, GT, HR, HT, HU, IE, IL, IS, IT, JM, JP, KN, KR, MA, ME, ML, MW, MX, NG, NL, NO, NZ, PA, PH, PL, PT, PY, RO, RS, RU, SE, SI, SK, SN, SR, TR, UA, US, UY, VE, XK, ZA, ZM } from "country-flag-icons/react/3x2";
 import { AlbumPanel, CareerPanel, CareerPlayerBadge, MatchRatingsPanel, PostMatchSummary } from "./career-panels";
 import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, SPECIAL_CARD_PACK, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_SQUAD_SIZE, STAR_XI_TOTAL_CARD_COUNT, TOURNAMENTS, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, applyPendingMatchChanges, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, getSpecialCardPackOdds, purchaseSpecialCardPack, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getRewardPackOdds, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXIRating, getStarXISelection, getTournament, getTournamentGoalBoostMultiplier, getTournamentRewardPack, getTransferBonuses, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, isRewardPack, isTransferDeadlineDay, normalizeGameFeatures, openEarnedPack, openStarPack, pauseGameFeatureTimers, queueMatchChanges, recordSeasonModeMatch, releaseMatchSquad, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige } from "./feature-data";
@@ -29,7 +29,7 @@ import { claimDailyReward } from "./daily-reward";
 import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
 import { consumeTravel, eligibilityError, fixtureFor, journeyView, settleTravel, travelTiming } from "./travel-data";
 import { coopRoleLabel, isCoopRole, multiplayerUrl, notifyCoopOffline, occupiedCoopPlayers, readCoopResponse, upsertSavedRoom } from "./game/coop";
-import { createClickResult, getBasePassivePower, getBulkPurchase, getComboLevel, getComboProgress, getCost, getIncomeMultiplier, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades } from "./game/economy";
+import { createClickResult, decayComboCount, getBasePassivePower, getBulkPurchase, getComboLevel, getComboProgress, getCost, getIncomeMultiplier, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades } from "./game/economy";
 import { directionLabel, formatCountdown, formatGoalDifference, formatHistoryTime, formatNumber, formatPackChance, getRandomCrossbarHeight, getRandomMatchPrediction, getRandomPenaltyDirection, heightLabel, predictionLabel } from "./game/format";
 import { getCurrentTime, getTravelTime, syncTravelClock } from "./game/clock";
 import { getStarCardTier, getWalkoutPresentation } from "./walkout-data";
@@ -233,7 +233,7 @@ function App() {
   const stageRef = useRef<HTMLDivElement>(null);
   const lastClickRef = useRef(0);
   const streakRef = useRef(0);
-  const comboRef = useRef({ count: 0, last: 0, paused: false });
+  const comboRef = useRef({ count: 0, last: 0, paused: false, multiplier: 1 });
   const comboTimerRef = useRef<number | null>(null);
   const [combo, setCombo] = useState({ count: 0, multiplier: 1 });
   const [comboBurst, setComboBurst] = useState<{ id: number; text: string } | null>(null);
@@ -1056,6 +1056,24 @@ function App() {
   // Travel previews use exact routes as soon as the background route data arrived.
   const [, setRoutesLoaded] = useState(false);
   useEffect(() => { let active = true; void loadRouteCache().then((loaded) => { if (active && loaded) setRoutesLoaded(true); }); return () => { active = false; }; }, []);
+  // Without clicks the combo drains one click per step, so a short pause costs a little instead of everything.
+  const scheduleComboDecay = useCallback(function scheduleDecay(delay: number) {
+    if (comboTimerRef.current) window.clearTimeout(comboTimerRef.current);
+    comboTimerRef.current = window.setTimeout(() => {
+      const state = comboRef.current;
+      const count = decayComboCount(state.count, Date.now() - state.last);
+      const { multiplier } = getComboLevel(count);
+      if (state.multiplier > 1 && multiplier === 1) setComboBurst({ id: Date.now(), text: "Combo vorbei" });
+      setCombo({ count, multiplier });
+      if (count > 0) {
+        state.multiplier = multiplier;
+        scheduleDecay(COMBO_DECAY_MS);
+      } else {
+        comboTimerRef.current = null;
+        comboRef.current = { count: 0, last: 0, paused: false, multiplier: 1 };
+      }
+    }, delay);
+  }, []);
   // Full screen announcements (Fabrizio Romario, gazette) pause the combo instead of ending it.
   const comboPaused = Boolean(transferAnnouncement || gazetteAnnouncement);
   useEffect(() => {
@@ -1063,14 +1081,15 @@ function App() {
     if (comboPaused) {
       if (comboTimerRef.current) window.clearTimeout(comboTimerRef.current);
       comboTimerRef.current = null;
+      if (!state.paused) state.count = decayComboCount(state.count, Date.now() - state.last);
       state.paused = true;
       return;
     }
     if (!state.paused) return;
     state.paused = false;
-    state.last = Date.now() + COMBO_RESUME_GRACE_MS - COMBO_WINDOW_MS;
-    if (state.count > 0) scheduleComboEnd(COMBO_RESUME_GRACE_MS + 50);
-  }, [comboPaused]);
+    state.last = Date.now() + COMBO_RESUME_GRACE_MS;
+    if (state.count > 0) scheduleComboDecay(COMBO_RESUME_GRACE_MS + COMBO_DECAY_MS);
+  }, [comboPaused, scheduleComboDecay]);
   useEffect(() => () => { if (comboTimerRef.current) window.clearTimeout(comboTimerRef.current); }, []);
   const latestClubGoalId = displayGame.features.cup.matchEvents.filter((event) => event.side === "home").at(-1)?.id ?? null;
   const liveMatch = displayGame.features.cup.active;
@@ -1949,23 +1968,15 @@ function App() {
     showToast(next ? "Vibration an" : "Vibration aus");
   }
 
-  function scheduleComboEnd(delay: number) {
-    if (comboTimerRef.current) window.clearTimeout(comboTimerRef.current);
-    comboTimerRef.current = window.setTimeout(() => {
-      const ended = getComboLevel(comboRef.current.count).multiplier;
-      comboRef.current = { count: 0, last: 0, paused: false };
-      setCombo({ count: 0, multiplier: 1 });
-      if (ended > 1) setComboBurst({ id: Date.now(), text: "Combo vorbei" });
-    }, delay);
-  }
-
   function registerCombo(now: number) {
     const state = comboRef.current;
     if (state.paused) return getComboLevel(state.count).multiplier;
-    const previous = getComboLevel(state.count);
-    state.count = now - state.last <= COMBO_WINDOW_MS ? state.count + 1 : 1;
+    const current = decayComboCount(state.count, now - state.last);
+    const previous = getComboLevel(current);
+    state.count = Math.min(COMBO_MAX_COUNT, current + 1);
     state.last = now;
     const level = getComboLevel(state.count);
+    state.multiplier = level.multiplier;
     setCombo({ count: state.count, multiplier: level.multiplier });
     if (level.multiplier > previous.multiplier) {
       setComboBurst({ id: now, text: `COMBO x${level.multiplier}` });
@@ -1973,7 +1984,7 @@ function App() {
       playTone(level.multiplier === 3 ? 988 : 784, 0.12, "triangle", 0.045);
       vibrate(level.multiplier === 3 ? [30, 25, 45] : 30);
     }
-    scheduleComboEnd(COMBO_WINDOW_MS + 50);
+    scheduleComboDecay(COMBO_DECAY_MS);
     return level.multiplier;
   }
 

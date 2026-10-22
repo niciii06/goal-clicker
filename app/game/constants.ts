@@ -83,8 +83,11 @@ export const RANKS: { icon: IconName; name: string; minimum: number }[] = [
   { icon: "rocket", name: "Ewige Nummer 1", minimum: 1000000000000 },
 ];
 // Fast consecutive clicks build a combo. The multiplier never exceeds x3.
-export const COMBO_WINDOW_MS = 450;
 // Time to get back to the ball after a full screen announcement closed.
 export const COMBO_RESUME_GRACE_MS = 1500;
 export const COMBO_LEVELS = [{ clicks: 0, multiplier: 1 }, { clicks: 15, multiplier: 2 }, { clicks: 40, multiplier: 3 }] as const;
+// Without clicks the combo drains by one click every third of a second instead of ending at once.
+export const COMBO_DECAY_MS = 1000 / 3;
+// Clicks beyond x3 only buy a little time before the drain reaches x2.
+export const COMBO_MAX_COUNT = 50;
 export const VIBRATION_STORAGE_KEY = "goalClickerVibrationV1";

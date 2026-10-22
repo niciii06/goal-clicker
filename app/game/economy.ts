@@ -1,7 +1,7 @@
 // Upgrade costs, click and passive power, ranks and the click combo.
 import type { GameFeatures } from "../feature-data";
 import type { PurchaseMode, UpgradeDefinition } from "./types";
-import { COMBO_LEVELS, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, RANKS } from "./constants";
+import { COMBO_DECAY_MS, COMBO_LEVELS, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, RANKS } from "./constants";
 import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../upgrade-purchase";
 import { getGoalBoostMultiplier, getTransferBonuses } from "../feature-data";
 
@@ -65,6 +65,12 @@ export function getComboLevel(count: number) {
   let level: (typeof COMBO_LEVELS)[number] = COMBO_LEVELS[0];
   for (const item of COMBO_LEVELS) if (count >= item.clicks) level = item;
   return level;
+}
+
+/** The combo left after `idleMs` without a click: one click less for every COMBO_DECAY_MS. */
+export function decayComboCount(count: number, idleMs: number) {
+  const lost = Math.floor(Math.max(0, idleMs) / COMBO_DECAY_MS);
+  return Math.max(0, count - lost);
 }
 
 export function getComboProgress(count: number) {
