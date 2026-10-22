@@ -79,8 +79,8 @@ function finishedMatch(now: number) {
   return f;
 }
 
-async function openWithSave(viewport: { width: number; height: number }, saveJson: string) {
-  const page = await browser.newPage({ viewport });
+async function openWithSave(viewport: { width: number; height: number }, saveJson: string, colorScheme: 'light' | 'dark' = 'light') {
+  const page = await browser.newPage({ viewport, colorScheme });
   // tsx keeps function names with a __name helper; functions passed to page.evaluate need it in the browser too.
   await page.addInitScript('globalThis.__name = (fn) => fn;');
   const problems: string[] = [];
@@ -104,7 +104,9 @@ async function openTab(page: Page, name: string) {
 async function layoutProblems(page: Page) {
   await page.evaluate('globalThis.__name ??= (fn) => fn;');
   return page.evaluate(() => {
-    const parse = (c: string) => (c.match(/[\d.]+/g) ?? ['0', '0', '0', '0']).map(Number);
+    // Computed colours can be color(srgb …) or oklab(…) after color-mix(); a canvas turns any of them into RGBA.
+    const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+    const parse = (c: string) => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1); const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data; return [r, g, b, a / 255]; };
     const lum = ([r, g, b]: number[]) => { const f = (v: number) => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }; return .2126 * f(r) + .7152 * f(g) + .0722 * f(b); };
     const visible = (e: Element) => { const s = getComputedStyle(e), r = e.getBoundingClientRect(); return s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > .2 && r.width > 2 && r.height > 2; };
     const hidden = (e: Element) => Boolean(e.closest('canvas,svg,script,style,[aria-hidden=true],.toast,[role=status],button:disabled')) || Boolean(e.closest('details:not([open])') && !e.closest('summary'));
@@ -138,14 +140,14 @@ async function layoutProblems(page: Page) {
   });
 }
 
-for (const viewport of VIEWPORTS) {
-  test(`${viewport.name}: every tab loads without errors, overflow, overlapping or unreadable text`, async () => {
+for (const viewport of VIEWPORTS) for (const colorScheme of ['light', 'dark'] as const) {
+  test(`${viewport.name} ${colorScheme}: every tab loads without errors, overflow, overlapping or unreadable text`, async () => {
     const now = Date.now();
-    const { page, problems } = await openWithSave(viewport, save(richFeatures(now), now));
+    const { page, problems } = await openWithSave(viewport, save(richFeatures(now), now), colorScheme);
     for (const tab of TABS) {
       assert.ok(await openTab(page, tab), `tab ${tab} missing`);
       const found = await layoutProblems(page);
-      assert.deepEqual(found, [], `${viewport.name} / ${tab}`);
+      assert.deepEqual(found, [], `${viewport.name} ${colorScheme} / ${tab}`);
     }
     assert.deepEqual(problems, []);
     await page.close();

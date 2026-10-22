@@ -196,6 +196,38 @@ test('a used username cannot be registered twice, in any case', { skip }, async 
   await page.getByRole('button', { name: 'Fussball anklicken' }).waitFor();
 });
 
+test('the account menu switches between light and dark, and the choice survives a reload', { skip }, async () => {
+  const page = devices.c.page;
+  const background = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const light = await background();
+  await page.getByRole('button', { name: /^Konto von / }).click();
+  await page.getByRole('dialog', { name: 'Konto' }).getByRole('radio', { name: 'Dunkel' }).click();
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
+  const dark = await background();
+  assert.notEqual(dark, light);
+  // The browser bar follows the chosen theme, not only the device setting: it uses the first theme-color tag.
+  const barColors = () => page.evaluate(() => [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')].map((meta) => meta.media ? `${meta.content} ${meta.media}` : meta.content));
+  const deviceColors = ['#f3f6f4 (prefers-color-scheme: light)', '#07130e (prefers-color-scheme: dark)'];
+  assert.deepEqual(await barColors(), ['#07130e', ...deviceColors]);
+  // On a narrow phone the picker wraps instead of pushing the dialog sideways.
+  await page.setViewportSize({ width: 340, height: 740 });
+  assert.equal(await page.evaluate(() => { const dialog = document.querySelector('.account-dialog')!; return dialog.scrollWidth <= dialog.clientWidth; }), true);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.keyboard.press('Escape');
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Fussball anklicken' }).waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
+  assert.equal(await background(), dark);
+  assert.deepEqual(await barColors(), ['#07130e', ...deviceColors]);
+  await page.getByRole('button', { name: /^Konto von / }).click();
+  const automatic = page.getByRole('dialog', { name: 'Konto' }).getByRole('radio', { name: 'Automatisch' });
+  await automatic.click();
+  assert.equal(await automatic.getAttribute('aria-checked'), 'true');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), undefined);
+  assert.deepEqual(await barColors(), deviceColors);
+  await page.keyboard.press('Escape');
+});
+
 test('the profile settings change display name and password and delete the profile', { skip }, async () => {
   const page = devices.c.page;
   // The account button next to the notifications opens the profile settings.

@@ -12,6 +12,8 @@ import { suspendLocalPersistence } from "./game/storage";
 import { DISPLAY_NAME_MAX, displayNameError, PASSWORD_MAX, PASSWORD_MIN, passwordError, USERNAME_MAX, usernameError } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
 import { applySaveFile, createSaveFile, parseSaveFile, saveFileName, savedPlayerId } from "./save-file";
+import { readThemePreference, setThemePreference, THEME_OPTIONS } from "./theme";
+import type { ThemePreference } from "./theme";
 
 const ADOPT_AFTER_IMPORT_KEY = "goalClickerAdoptAfterImport";
 const SYNC_LABELS: Record<SyncStatus, string> = { saved: "Gespeichert", saving: "Speichert …", offline: "Offline, wird später gespeichert", conflict: "Anderes Gerät" };
@@ -170,11 +172,23 @@ export function AccountButton() {
       <div ref={dialogRef} className="account-dialog" role="dialog" aria-modal="true" aria-label="Konto">
         <button type="button" className="account-dialog-close" aria-label="Schliessen" onClick={() => setOpen(false)}>×</button>
         <ProfilePanel onMessage={setNotice} />
+        <ThemePicker />
         {notice && <p className="account-notice" role="status">{notice}</p>}
         <button type="button" className="mode-secondary account-dialog-signout" onClick={() => void account.signOut()}>Abmelden</button>
       </div>
     </div>, document.body)}
   </>;
+}
+
+/** Light, dark or the device setting; applies at once and is remembered on this device. */
+function ThemePicker() {
+  const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
+  return <div className="theme-picker">
+    <span id="theme-picker-label">Darstellung</span>
+    <div role="radiogroup" aria-labelledby="theme-picker-label">
+      {THEME_OPTIONS.map((option) => <button key={option.value} type="button" role="radio" aria-checked={theme === option.value} className={theme === option.value ? "active" : ""} onClick={() => { setThemePreference(option.value); setTheme(option.value); }}>{option.label}</button>)}
+    </div>
+  </div>;
 }
 
 /** Download and upload of the single player save, for moving to a new address or device. */
