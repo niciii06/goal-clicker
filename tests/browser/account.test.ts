@@ -198,8 +198,9 @@ test('a used username cannot be registered twice, in any case', { skip }, async 
 
 test('the profile settings change display name and password and delete the profile', { skip }, async () => {
   const page = devices.c.page;
-  await page.getByRole('button', { name: 'Club & Mehr', exact: true }).first().click();
-  const panel = page.locator('.profile-panel');
+  // The account button next to the notifications opens the profile settings.
+  await page.getByRole('button', { name: /^Konto von / }).click();
+  const panel = page.getByRole('dialog', { name: 'Konto' });
   await panel.getByLabel('Anzeigename').fill('Goalie 1');
   await panel.getByRole('button', { name: 'Speichern' }).click();
   await page.getByText('Anzeigename gespeichert.').waitFor();

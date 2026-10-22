@@ -638,8 +638,6 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 .brand-copy h1 { margin: 0; color: var(--text); font-size: 20px; font-weight: 720; letter-spacing: -.035em; line-height: 1; }
 .brand-copy h1 span { color: var(--accent); }
 .top-actions { justify-content: flex-end; gap: 8px; }
-.save-status { color: var(--muted); font-size: 10px; white-space: nowrap; }
-.save-status i { display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(52,199,89,.14); }
 .icon-button, .reset-button { border: 1px solid var(--line); border-radius: 980px; color: var(--soft); cursor: pointer; background: rgba(255,255,255,.72); transition: border-color 180ms ease, color 180ms ease, background 180ms ease, transform 180ms ease; }
 .icon-button { display: grid; width: 36px; height: 36px; place-items: center; }
 .reset-button { height: 36px; padding: 0 14px; font-size: 10px; font-weight: 650; }
@@ -777,7 +775,7 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 @keyframes float-up { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.75); } 16% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -80px) scale(1.03); } }
 
 @media (max-width: 1200px) { .clicker-layout { grid-template-columns: minmax(360px,1fr) minmax(330px,.9fr); }.side-column { grid-column: 1 / -1; grid-template-columns: repeat(3,1fr); align-items: start; } }
-@media (max-width: 780px) { .app-shell { width: min(650px, calc(100% - 28px)); padding-top: 17px; }.save-status { display: none; }.clicker-layout { grid-template-columns: 1fr; gap: 14px; }.side-column { grid-column: auto; grid-template-columns: 1fr 1fr; }.feed-card { grid-column: 1 / -1; }.ball-stage { min-height: 370px; }.hero-football { width: 150px; height: 150px; }.mode-page { padding-top: 16px; }.mode-card { padding: 20px; }.mode-card-heading h2 { font-size: 37px; }.coop-lobby { grid-template-columns: 1fr; }.coop-name-field { grid-column: auto; max-width: none; }.coop-score-hero { padding: 19px; }.coop-click-button { min-width: 132px; } }
+@media (max-width: 780px) { .app-shell { width: min(650px, calc(100% - 28px)); padding-top: 17px; }.clicker-layout { grid-template-columns: 1fr; gap: 14px; }.side-column { grid-column: auto; grid-template-columns: 1fr 1fr; }.feed-card { grid-column: 1 / -1; }.ball-stage { min-height: 370px; }.hero-football { width: 150px; height: 150px; }.mode-page { padding-top: 16px; }.mode-card { padding: 20px; }.mode-card-heading h2 { font-size: 37px; }.coop-lobby { grid-template-columns: 1fr; }.coop-name-field { grid-column: auto; max-width: none; }.coop-score-hero { padding: 19px; }.coop-click-button { min-width: 132px; } }
 
 /* Personal layout editor: the four dashboard cards always land in fixed grid slots. */
 .layout-toolbar { grid-column: 1 / -1 !important; order: 0 !important; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 12px 15px; border: 1px solid rgba(0,113,227,.15); border-radius: 16px; background: rgba(255,255,255,.72); box-shadow: 0 8px 26px rgba(29,29,31,.04); }
@@ -1714,5 +1712,9 @@ button:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 3p
 .profile-row small { flex-basis: 100%; color: var(--muted); font-size: 11px; line-height: 1.4; }
 .profile-danger summary { color: #b52a4c; font-size: 12px; font-weight: 700; cursor: pointer; }
 .profile-danger .profile-row { margin-top: 10px; }
+.account-dialog { position: relative; width: min(560px, 100%); max-height: calc(100dvh - 32px); overflow: auto; padding: 18px; border-radius: 22px; background: var(--surface-raised); box-shadow: 0 24px 60px rgba(15,20,25,.25); }
+.account-dialog .profile-panel { margin-top: 0; padding: 0; border: 0; }
+.account-dialog-close { position: absolute; top: 10px; right: 12px; width: 32px; height: 32px; border: 0; border-radius: 50%; color: var(--soft); background: var(--surface-soft); font-size: 20px; line-height: 1; cursor: pointer; }
+.account-dialog-signout { width: 100%; margin-top: 14px; }
 .coop-name-field .coop-name-label { display: block; margin-bottom: 5px; color: var(--soft); font-size: 9px; font-weight: 750; }
 .coop-name-field strong { color: var(--text); font-size: 16px; }
