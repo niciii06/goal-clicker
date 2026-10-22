@@ -5,8 +5,19 @@ import { THEME_BOOT_SCRIPT, THEME_COLORS } from "./theme";
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
+  // Link previews need absolute image URLs; the preview image itself is app/opengraph-image.jpg.
+  metadataBase: new URL("https://goal-clicker.vercel.app"),
   title: "Goal Clicker | Football Idle Club",
   description: "Klick den Ball, sammle Tore und baue dein eigenes Fussball Imperium.",
+  openGraph: {
+    title: "Goal Clicker | Football Idle Club",
+    description: "Klick den Ball, sammle Tore und baue dein eigenes Fussball Imperium.",
+    url: "/",
+    siteName: "Goal Clicker",
+    locale: "de_CH",
+    type: "website",
+  },
+  twitter: { card: "summary_large_image" },
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
