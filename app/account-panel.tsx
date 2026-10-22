@@ -139,9 +139,11 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
 }
 
 /** The account button in the header; it opens the profile settings in a dialog. */
-export function AccountButton({ onMessage }: { onMessage: (text: string) => void }) {
+export function AccountButton() {
   const account = useContext(AccountContext);
   const [open, setOpen] = useState(false);
+  // Feedback stays inside the dialog; the page toast would sit under the dimmed overlay.
+  const [notice, setNotice] = useState("");
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -168,12 +170,13 @@ export function AccountButton({ onMessage }: { onMessage: (text: string) => void
 
   if (!account) return null;
   return <>
-    <button ref={buttonRef} type="button" className="icon-button account-button" aria-label={`Konto von ${account.profile.displayName}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>👤</button>
+    <button ref={buttonRef} type="button" className="icon-button account-button" aria-label={`Konto von ${account.profile.displayName}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => { setNotice(""); setOpen(true); }}>👤</button>
     {/* The header blurs its background, which would trap a fixed dialog inside it; the dialog lives on <body>. */}
     {open && createPortal(<div className="account-overlay" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
       <div ref={dialogRef} className="account-dialog" role="dialog" aria-modal="true" aria-label="Konto">
         <button type="button" className="account-dialog-close" aria-label="Schliessen" onClick={() => setOpen(false)}>×</button>
-        <ProfilePanel onMessage={onMessage} />
+        <ProfilePanel onMessage={setNotice} />
+        {notice && <p className="account-notice" role="status">{notice}</p>}
         <button type="button" className="mode-secondary account-dialog-signout" onClick={() => void account.signOut()}>Abmelden</button>
       </div>
     </div>, document.body)}

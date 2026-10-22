@@ -208,11 +208,12 @@ test('the profile settings change display name and password and delete the profi
   }
   await panel.getByLabel('Anzeigename').fill('Goalie 1');
   await panel.getByRole('button', { name: 'Speichern' }).click();
-  await page.getByText('Anzeigename gespeichert.').waitFor();
+  // Feedback shows inside the dialog, above its dimmed background.
+  await panel.getByRole('status').filter({ hasText: 'Anzeigename gespeichert.' }).waitFor();
   await panel.getByLabel('Neues Passwort').fill('neues-passwort-3');
   await panel.getByLabel('Wiederholen').fill('neues-passwort-3');
   await panel.getByRole('button', { name: 'Passwort ändern' }).click();
-  await page.getByText('Neues Passwort gespeichert.').waitFor();
+  await panel.getByRole('status').filter({ hasText: 'Neues Passwort gespeichert.' }).waitFor();
   const [{ user_id: userId }] = await admin`select user_id from profiles where username_key = 'keeper'`;
   assert.equal((await admin`select display_name from profiles where user_id = ${userId}::uuid`)[0].display_name, 'Goalie 1');
   await panel.getByText('Profil löschen').click();
