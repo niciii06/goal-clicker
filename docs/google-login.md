@@ -57,7 +57,7 @@ Ein späterer Login per E-Mail bräuchte einen eigenen Mailversand (eigene Domai
 | Teil | Datei |
 | :--- | :--- |
 | Login Pflicht, Login Formulare, Profil anlegen, Auswahl zwischen zwei Spielständen | `app/account-gate.tsx` |
-| Name, Speicherstand und Abmelden unter der Modusauswahl, Konto Knopf mit den Profil Einstellungen in der Kopfzeile | `app/account-panel.tsx` (`AccountChip`, `AccountButton`, `ProfilePanel`) |
+| Konto Knopf in der Kopfzeile mit Profil Einstellungen, Speicherstand und Abmelden; Verknüpfung Konto ↔ Spieler ID | `app/account-panel.tsx` (`AccountButton`, `ProfilePanel`, `AccountLink`) |
 | Google Login (PKCE), Anmelden und Registrieren mit Benutzername, Passwort ändern | `app/auth/browser.ts` |
 | Regeln für Benutzername und Anzeigename | `app/profile-rules.ts` |
 | Registrieren, Anmelden, Profil und Cloud Spielstand API (`/api/register`, `/api/login`, `/api/profile`, `/api/profile/username`, `/api/save`) | `app/account-api.ts` |

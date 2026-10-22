@@ -14,7 +14,7 @@ import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIO
 import { DailyRewardCard } from "./daily-reward-panel";
 import { FootballGraphic, GameErrorBoundary, Icon, StarXIPositionBadges } from "./game/ui";
 import { LiveMatchViewer } from "./match-viewer";
-import { AccountButton, AccountChip, SaveTransferPanel } from "./account-panel";
+import { AccountButton, AccountLink, SaveTransferPanel } from "./account-panel";
 import { AccountContext, AccountGate } from "./account-gate";
 import { FLUSH_SAVE_EVENT } from "./cloud-sync";
 import { SquadBenchCard, SquadBenchPanel, SquadBenchSlot, SquadPitchPanel, SquadPitchSlot, formatStarXIPositions, useSquadDrag } from "./squad-board";
@@ -2447,7 +2447,7 @@ function App() {
         <button className={appMode === "single" ? "active" : ""} onClick={() => setAppMode("single")}>Singleplayer</button>
         <button className={appMode === "coop" ? "active" : ""} onClick={() => setAppMode("coop")}>Koop Multiplayer</button>
       </nav>
-      <div className="account-row"><AccountChip playerId={playerId} onPlayerId={adoptAccountPlayerId} onMessage={accountMessage} /></div>
+      <AccountLink playerId={playerId} onPlayerId={adoptAccountPlayerId} onMessage={accountMessage} />
 
       {(appMode === 'single' || isCoopLive) && <nav className="section-navigation" aria-label="Hauptnavigation">{primaryTabs.map(tab=><button type="button" key={tab.id} aria-current={primarySection===tab.id?'page':undefined} className={primarySection===tab.id?'active':''} onClick={()=>{setFeatureTab(tab.id);setLayoutEditMode(false);}}>{tab.label}</button>)}</nav>}
       {(appMode === "single" || isCoopLive) && <main className={`clicker-layout${isCoopLive ? " coop-clicker-layout" : ""}`}>
