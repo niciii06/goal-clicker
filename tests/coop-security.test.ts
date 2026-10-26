@@ -69,3 +69,9 @@ test('two concurrent joins fill both free seats without overwriting each other',
  assert.deepEqual([first.data.role,second.data.role].sort(),['player3','player4']);
  assert.deepEqual([row.player3PlayerId,row.player4PlayerId].sort(),['fourth-player-123','third-player-123']);
 });
+
+test('with accounts a seat is never handed over by name; without accounts an offline seat can be reclaimed', async () => {
+ const { nameRecoveryAllowed } = await import('../app/auth/player.ts');
+ assert.equal(nameRecoveryAllowed('some-account-id'), false, 'a signed-in player needs the account that owns the seat');
+ assert.equal(nameRecoveryAllowed(null), true, 'without accounts a new device has no other way back in');
+});

@@ -228,3 +228,15 @@ test('a username account keeps its login address on the server and is found by i
   assert.equal((await db.getProfileByUsername('libero'))!.loginEmail, 'p-libero@players.goal-clicker.vercel.app');
   assert.equal(await db.getProfileByUsername('nobody'), null);
 });
+
+test('a new display name renames the account\'s seats in every world', { skip }, async () => {
+  const user = '00000000-0000-4000-8000-000000000021';
+  await db.linkAccount(user, 'renamed-player-id', null);
+  await db.createProfile(user, 'Renamer', 'Alter Name', iso());
+  await db.insertRoom({ ...room('NAM1'), hostPlayerId: 'renamed-player-id', hostName: 'Alter Name' });
+  await db.insertRoom({ ...room('NAM2'), guestPlayerId: 'renamed-player-id', guestName: 'Alter Name' });
+  await db.updateDisplayName(user, 'Neuer Name', iso());
+  assert.equal((await db.getRoom('NAM1'))!.hostName, 'Neuer Name');
+  assert.equal((await db.getRoom('NAM2'))!.guestName, 'Neuer Name');
+  assert.equal((await db.getRoom('NAM2'))!.hostName, 'Host', 'other players keep their names');
+});

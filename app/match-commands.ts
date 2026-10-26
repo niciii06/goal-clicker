@@ -27,8 +27,13 @@ export function validateMatchDraft(f:GameFeatures,d:MatchDraft):string {
   if(!f.starXI.lineupIds.includes(id)){if(!f.starXI.benchIds.includes(id))return 'Neue Spieler müssen von der Bank kommen.';changes++;}
  }
  if(c.substitutionsUsed+changes>STAR_XI_MAX_SUBSTITUTIONS)return 'Zu viele Wechsel geplant.';
+ // Same rule as the queued substitutions: three windows in play, the half time break is free.
+ if(changes&&!atHalftime(c)&&(c.subWindowsUsed??0)>=STAR_XI_SUB_WINDOWS)return 'Alle drei Wechselfenster sind aufgebraucht.';
  return '';
 }
+/** Substitution windows in play; changes during the half time break do not use one. */
+export const STAR_XI_SUB_WINDOWS=3;
+const atHalftime=(c:GameFeatures['cup'])=>c.simulation?.status==='halftime'||c.timedPause?.kind==='halftime';
 export function requestMatchEdit(f:GameFeatures,now:number):GameFeatures {
  if(!f.cup.active||f.cup.phase==='penalties'||f.cup.matchPaused)return f;
  const next=structuredClone(f);
@@ -46,6 +51,7 @@ export function confirmMatchDraft(f:GameFeatures,d:MatchDraft,now:number):{featu
  next.starXI.lineupIds=[...d.lineup];next.starXI.formationId=form.id;next.starXI.formationPositions=form.slots.map(s=>s.position);
  next.starXI.benchIds=matchBenchPreview(f,d.lineup);
  c.substitutionsUsed+=incoming.length;c.lastInjury=null;
+ if(incoming.length&&!atHalftime(f.cup))c.subWindowsUsed=(c.subWindowsUsed??0)+1;
  d.lineup.forEach((id,i)=>{c.playerMatchPositions[id]=form.slots[i].position;if(c.broadcast)c.broadcast.slots[id]=i;});
  if(c.broadcast)c.broadcast.clubFormation=form.id;
  if(c.simulation){

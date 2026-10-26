@@ -53,6 +53,15 @@ export async function resolvePlayer(request: Request, claimedPlayerId: string, {
   return { ok: true, playerId, userId: user.id };
 }
 
+/**
+ * Whether a world seat may be reclaimed by its player name. Only without accounts, where a new device has no
+ * other way back in. With accounts the seat follows the account's player ID to every device, and a name plus
+ * an expired presence prove no ownership.
+ */
+export function nameRecoveryAllowed(userId: string | null) {
+  return userId === null;
+}
+
 export function forgetAccountLink(userId: string) {
   linkCache.delete(userId);
 }

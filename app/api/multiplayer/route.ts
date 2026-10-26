@@ -7,7 +7,7 @@ import { fixtureFor, travelGate, consumeTravel, eligibilityError, settleTravel }
 import { claimAllAlbumRewards, claimAlbumReward, prepareCareerMatch, recordCareerMatch } from "../../career-data";
 import { competitionFor, squadBanError } from "../../discipline";
 import { getDb } from "../../../db";
-import { resolvePlayer } from "../../auth/player";
+import { nameRecoveryAllowed, resolvePlayer } from "../../auth/player";
 import type { RoomRow, RoomUpdate } from "../../../db";
 import { SPECIAL_CARD_PACK, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getTransferBonuses, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
 import type { GameFeatures, PenaltyDirection, StarFormationId, StarPackReveal } from "../../feature-data";
@@ -604,7 +604,9 @@ export async function POST(request: Request) {
       const hasSameName = (player: ReturnType<typeof getRoomPlayer>) => player.name?.localeCompare(nickname, "de-CH", { sensitivity: "base" }) === 0;
       // Name based recovery may only reclaim a seat whose owner is offline. An active
       // player can never be displaced by someone who only knows the code and the name.
-      const isReclaimable = (player: ReturnType<typeof getRoomPlayer>) => Boolean(player.playerId) && !isOnline(player.lastSeenAt);
+      // With accounts a seat belongs to the account's player ID, which follows the player to every device,
+      // so a seat is never handed over by name: a nickname and an expired presence prove no ownership.
+      const isReclaimable = (player: ReturnType<typeof getRoomPlayer>) => nameRecoveryAllowed(auth.userId) && Boolean(player.playerId) && !isOnline(player.lastSeenAt);
       const sameNamePlayers = getOccupiedRoomPlayers(room).filter(hasSameName);
       const matchingNameRoles = sameNamePlayers.filter(isReclaimable).map((player) => player.role);
       const requestedPlayer = requestedRole ? getRoomPlayer(room, requestedRole) : null;

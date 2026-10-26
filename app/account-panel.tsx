@@ -9,7 +9,7 @@ import { useDialogFocus } from "./confirm-dialog";
 import { authErrorMessage, setAccountPassword } from "./auth/browser";
 import { subscribeSyncStatus } from "./cloud-sync";
 import type { SyncStatus } from "./cloud-sync";
-import { suspendLocalPersistence } from "./game/storage";
+import { resumeLocalPersistence, suspendLocalPersistence } from "./game/storage";
 import { DISPLAY_NAME_MAX, displayNameError, PASSWORD_MAX, PASSWORD_MIN, passwordError, USERNAME_MAX, usernameError } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
 import { applySaveFile, createSaveFile, parseSaveFile, saveFileName, savedPlayerId } from "./save-file";
@@ -205,6 +205,8 @@ export function SaveTransferPanel({ onMessage }: { onMessage: (text: string) => 
       if (importedPlayerId) localStorage.setItem(ADOPT_AFTER_IMPORT_KEY, importedPlayerId);
       window.location.reload();
     } catch {
+      // The previous game is back in storage; it has to keep saving, or the next minutes would be lost.
+      resumeLocalPersistence();
       onMessage("Der Spielstand konnte nicht importiert werden. Dein bisheriger Stand bleibt erhalten.");
     } finally {
       setBusy(false);

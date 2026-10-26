@@ -205,10 +205,12 @@ test('a device keeps its save when it continues the cloud version, otherwise tak
   // An upload sent while the page closed went through without an answer: the device recognises its own save
   // and simply continues, instead of mistaking it for another device's save.
   const sent = hashText(serializeCloudSaveKeys(cloud.keys!));
-  const own = adoptOwnUpload({ userId: 'u', version: 3, hash: 'older', played: true, pending: sent }, cloud);
+  const own = adoptOwnUpload({ userId: 'u', version: 3, hash: 'older', played: true, pending: [sent] }, cloud);
   assert.deepEqual(own, { userId: 'u', version: cloud.version, hash: sent, played: true });
   assert.equal(planInitialSync(own, cloud, local), 'use-local');
-  assert.equal(adoptOwnUpload({ userId: 'u', version: 3, hash: 'older', pending: 'something-else' }, cloud), null);
+  // A retry with newer progress does not forget the earlier upload that the cloud may already hold.
+  assert.deepEqual(adoptOwnUpload({ userId: 'u', version: 3, hash: 'older', played: true, pending: [sent, 'newer-progress'] }, cloud), own);
+  assert.equal(adoptOwnUpload({ userId: 'u', version: 3, hash: 'older', pending: ['something-else'] }, cloud), null);
   assert.equal(adoptOwnUpload({ userId: 'u', version: 3, hash: 'older' }, cloud), null);
 });
 

@@ -43,11 +43,15 @@ export function parseSaveFile(text: string): { ok: true; file: SaveFile } | { ok
   if (entries.some(([key, raw]) => !key.startsWith(SAVE_KEY_PREFIX) || key === PRE_IMPORT_BACKUP_KEY || DEVICE_KEYS.has(key) || typeof raw !== "string")) return { ok: false, error: "Der Spielstand enthält unerwartete Einträge." };
   const game = GAME_KEYS.map((key) => file.keys![key]).find((raw) => typeof raw === "string");
   if (!game) return { ok: false, error: "Im Spielstand fehlt das Spiel." };
+  // The game must be a game: an object with a goal count, not null, a number or a list.
+  let parsedGame: unknown;
   try {
-    JSON.parse(game);
+    parsedGame = JSON.parse(game);
   } catch {
     return { ok: false, error: "Der Spielstand ist beschädigt." };
   }
+  const goals = parsedGame && typeof parsedGame === "object" && !Array.isArray(parsedGame) ? (parsedGame as { totalGoals?: unknown; goals?: unknown }) : null;
+  if (!goals || !Number.isFinite(Number(goals.totalGoals ?? goals.goals))) return { ok: false, error: "Der Spielstand ist beschädigt." };
   return { ok: true, file: { format: SAVE_FILE_FORMAT, version: SAVE_FILE_VERSION, exportedAt: String(file.exportedAt ?? ""), origin: String(file.origin ?? ""), keys: Object.fromEntries(entries) as Record<string, string> } };
 }
 

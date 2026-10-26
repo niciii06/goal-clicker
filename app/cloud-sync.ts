@@ -13,8 +13,10 @@ import type { CloudSaveKeys } from "./cloud-save-rules";
 export const CLOUD_META_KEY = "goalClickerCloudMetaV1";
 /** Asks the running game to write its current state to localStorage right now, before an upload reads it. */
 export const FLUSH_SAVE_EVENT = "goalclicker:flush-save";
-/** `pending` is the hash of an upload that was sent but whose answer never arrived, e.g. while the page closed. */
-export type CloudMeta = { userId: string; version: number; hash: string; played?: boolean; pending?: string };
+/** `pending` lists the hashes of uploads that were sent but whose answer never arrived (the page closed or the
+ * connection dropped), newest last; the cloud may hold any of them. */
+export type CloudMeta = { userId: string; version: number; hash: string; played?: boolean; pending?: string[] };
+const MAX_PENDING_UPLOADS = 6;
 export type CloudSaveState = { version: number; updatedAt: string | null; active: boolean; keys: CloudSaveKeys | null };
 export type SyncStatus = "saved" | "saving" | "offline";
 
@@ -26,7 +28,9 @@ export function readCloudMeta(userId: string): CloudMeta | null {
   try {
     const meta = JSON.parse(localStorage.getItem(CLOUD_META_KEY) ?? "null") as Partial<CloudMeta> | null;
     if (!meta || meta.userId !== userId || !Number.isSafeInteger(meta.version) || typeof meta.hash !== "string") return null;
-    return { userId, version: meta.version!, hash: meta.hash, played: meta.played === true, ...(typeof meta.pending === "string" ? { pending: meta.pending } : {}) };
+    // Older versions stored a single pending hash as a string.
+    const raw: unknown = meta.pending, pending = (typeof raw === "string" ? [raw] : Array.isArray(raw) ? raw : []).filter((item): item is string => typeof item === "string").slice(-MAX_PENDING_UPLOADS);
+    return { userId, version: meta.version!, hash: meta.hash, played: meta.played === true, ...(pending.length ? { pending } : {}) };
   } catch {
     return null;
   }
@@ -50,8 +54,17 @@ export function readLocalSaveKeys(): CloudSaveKeys {
  * game would pick an older local backup that looks more advanced.
  */
 export function applyCloudSave(userId: string, save: CloudSaveState) {
-  for (const key of [...SYNCED_SAVE_KEYS, BACKUP_STORAGE_KEY, RECOVERY_STORAGE_KEY, ...LEGACY_STORAGE_KEYS]) localStorage.removeItem(key);
-  if (save.keys) for (const [key, value] of Object.entries(save.keys)) if (value !== undefined) localStorage.setItem(key, value);
+  const keys = [...SYNCED_SAVE_KEYS, BACKUP_STORAGE_KEY, RECOVERY_STORAGE_KEY, ...LEGACY_STORAGE_KEYS];
+  const previous = keys.flatMap((key) => { const value = localStorage.getItem(key); return value === null ? [] : [[key, value] as const]; });
+  try {
+    for (const key of keys) localStorage.removeItem(key);
+    if (save.keys) for (const [key, value] of Object.entries(save.keys)) if (value !== undefined) localStorage.setItem(key, value);
+  } catch (error) {
+    // Storage full: put the previous game and its recovery copies back before giving up.
+    for (const key of keys) localStorage.removeItem(key);
+    for (const [key, value] of previous) { try { localStorage.setItem(key, value); } catch { /* keep restoring the rest */ } }
+    throw error;
+  }
   writeCloudMeta({ userId, version: save.version, hash: save.keys ? hashText(serializeCloudSaveKeys(save.keys)) : "", played: false });
 }
 
@@ -70,14 +83,15 @@ export function clearLocalAccountData() {
 export type InitialSyncPlan = "use-local" | "use-cloud" | "keep-local" | "fresh";
 
 /**
- * When the cloud holds exactly the save this device last sent, that upload went through even though its
- * answer was lost (the page closed or reloaded). The device then simply is at that cloud version, instead
- * of mistaking its own save for one from another device. Returns the corrected meta, or null.
+ * When the cloud holds exactly a save this device sent, that upload went through even though its answer was
+ * lost (the page closed, the connection dropped, a retry followed). The device then simply is at that cloud
+ * version, instead of mistaking its own save for one from another device. Returns the corrected meta, or null.
  */
 export function adoptOwnUpload(meta: CloudMeta | null, cloud: CloudSaveState): CloudMeta | null {
-  if (!meta?.pending || !cloud.keys || cloud.version <= meta.version) return null;
-  if (hashText(serializeCloudSaveKeys(cloud.keys)) !== meta.pending) return null;
-  return { userId: meta.userId, version: cloud.version, hash: meta.pending, played: meta.played };
+  if (!meta?.pending?.length || !cloud.keys || cloud.version <= meta.version) return null;
+  const cloudHash = hashText(serializeCloudSaveKeys(cloud.keys));
+  if (!meta.pending.includes(cloudHash)) return null;
+  return { userId: meta.userId, version: cloud.version, hash: cloudHash, played: meta.played };
 }
 
 export function planInitialSync(meta: CloudMeta | null, cloud: CloudSaveState, local: CloudSaveKeys): InitialSyncPlan {
@@ -227,8 +241,9 @@ export class CloudSync {
     const active = this.played || meta.played === true;
     const body = JSON.stringify({ baseVersion: overwriteVersion ?? meta.version, keys, active });
     setStatus("saving");
-    // Remembered until the answer arrives: if the page closes first, the next start recognises this save.
-    writeCloudMeta({ ...meta, pending: hash });
+    // Remembered until an answer arrives: if the page closes or the request fails first, the next start or
+    // retry recognises this save in the cloud. Earlier unanswered uploads stay on the list.
+    writeCloudMeta({ ...meta, pending: [...(meta.pending ?? []).filter((item) => item !== hash), hash].slice(-MAX_PENDING_UPLOADS) });
     try {
       const response = await fetch("/api/save", { method: "PUT", headers: { "content-type": "application/json" }, body, keepalive: keepalive && body.length < KEEPALIVE_LIMIT });
       const data = await response.json() as { version?: number; errorCode?: string } & Partial<CloudSaveState>;

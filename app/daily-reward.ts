@@ -33,10 +33,24 @@ export function getPreviousRewardDay(day: string) {
   return new Date(Date.UTC(year, month - 1, date - 1)).toISOString().slice(0, 10);
 }
 
-/** Milliseconds until the next midnight in Zurich. */
+/** How far the Zurich wall clock is ahead of UTC at a moment (one or two hours). */
+function zurichOffset(at: number) {
+  const { day, hour, minute, second } = zurichParts(at);
+  const [year, month, date] = day.split('-').map(Number);
+  return Date.UTC(year, month - 1, date, hour, minute, second) - (at - (at % 1000));
+}
+
+/**
+ * Milliseconds until the next midnight in Zurich, as an instant: on the days the clocks change the day has
+ * 23 or 25 hours, so counting down from 24 hours would be an hour off.
+ */
 export function getMsUntilNextRewardDay(now = Date.now()) {
-  const { hour, minute, second } = zurichParts(now);
-  return Math.max(1000, (24 * 3600 - (hour * 3600 + minute * 60 + second)) * 1000 - (now % 1000));
+  const [year, month, date] = getRewardDay(now).split('-').map(Number);
+  const midnight = Date.UTC(year, month - 1, date + 1);
+  // The offset that applies at midnight decides the instant; one correction step settles it.
+  let at = midnight - zurichOffset(now);
+  at = midnight - zurichOffset(at);
+  return Math.max(1000, at - now);
 }
 
 export function normalizeDailyRewards(value: unknown): DailyRewardState {

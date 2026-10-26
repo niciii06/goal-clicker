@@ -125,7 +125,8 @@ test('worker drawing continues through a real one-second main-thread stall',asyn
  const worker=new Worker(`
   const {parentPort,workerData}=require('node:worker_threads');
   let frames=0,lastBall;
-  const ctx=new Proxy({}, {get:(_,key)=>key==='fillRect'?((x)=>{if(x===-4)frames++;}):key==='arc'?((x,y,r)=>{if(r>=.74&&r<1)lastBall={x,y};}):(()=>{}),set:()=>true});
+  const gradient={addColorStop(){}};
+  const ctx=new Proxy({}, {get:(_,key)=>key==='fillRect'?((x)=>{if(x===-4)frames++;}):key==='arc'?((x,y,r)=>{if(r>=.74&&r<1)lastBall={x,y};}):key==='createLinearGradient'||key==='createRadialGradient'?(()=>gradient):key==='measureText'?(()=>({width:1})):key==='getTransform'?(()=>({a:1,d:1,e:0,f:0})):(()=>{}),set:()=>true});
   globalThis.postMessage=m=>parentPort.postMessage(m);
   (async()=>{const {register}=await import(workerData.registerApi);register();await import(workerData.entry);
    parentPort.on('message',m=>{if(m.kind==='inspect'){parentPort.postMessage({kind:'inspection',frames,lastBall});return;}if(m.kind==='init')m.canvas={width:320,height:224,getContext:()=>ctx};globalThis.onmessage({data:m});});
@@ -171,4 +172,34 @@ test('xG adds up the chance of every shot, and over many matches it matches the 
  const rating = (f: ReturnType<typeof fixture>, side: 'club' | 'opponent') => createInteractiveMatch(f.cup, f.starXI.lineupIds, f.starXI.formationId).committed.players.filter(p => p.side === side).reduce((n, p) => n + p.rating, 0);
  assert.ok(rating(home, 'club') > rating(away, 'club'));
  assert.ok(rating(away, 'opponent') > rating(home, 'opponent'));
+});
+
+test('interactive substitutions use the three windows in play; the half time break is free', () => {
+ let f=fixture(1201);
+ const substitute=(at:number)=>{
+  f=requestMatchEdit(f,at);f.cup=advanceInteractive(f.cup,at+4000);
+  const d=draftMatch(f);
+  for(let slot=1;slot<11;slot++){const incoming=f.starXI.benchIds.find(id=>id&&!d.lineup.includes(id)&&!f.cup.playerExitedAt[id]&&getStarXIPlayer(id)?.positions.includes(f.starXI.formationPositions[slot]));if(incoming){d.lineup[slot]=incoming;break;}}
+  return confirmMatchDraft(f,d,f.cup.lastTickAt+1000);
+ };
+ for(let i=0;i<3;i++){const r=substitute(f.cup.matchStartedAt+14000+i*12000);assert.equal(r.error,'',`window ${i+1}`);f=r.features;}
+ assert.equal(f.cup.subWindowsUsed,3);
+ const fourth=substitute(f.cup.lastTickAt+12000);
+ assert.equal(fourth.error,'Alle drei Wechselfenster sind aufgebraucht.');
+ // At half time a change still goes through and uses no window.
+ f=fourth.features;f.cup.matchPaused=false;f.cup.simulation!.status='running';
+ f.cup=advanceInteractive(f.cup,f.cup.matchEndsAt+900000);
+ assert.equal(f.cup.simulation!.status,'halftime');
+ const d=draftMatch(f);for(let slot=1;slot<11;slot++){const incoming=f.starXI.benchIds.find(id=>id&&!d.lineup.includes(id)&&!f.cup.playerExitedAt[id]&&getStarXIPlayer(id)?.positions.includes(f.starXI.formationPositions[slot]));if(incoming){d.lineup[slot]=incoming;break;}}
+ const half=confirmMatchDraft(f,d,f.cup.lastTickAt+1000);
+ assert.equal(half.error,'');assert.equal(half.features.cup.subWindowsUsed,3);
+});
+
+test('an injury picked up in a match keeps its full absence; older injuries count down', () => {
+ const f=fixture(1301),[hurt]=f.starXI.lineupIds;
+ f.cup.injuredPlayerIds={[hurt]:1,'older-injury':2};
+ f.cup.injuryEvents=[{id:'i1',playerId:hurt,player:'X',reason:'Muskelverletzung',matches:1,minute:30,createdAt:f.cup.matchStartedAt+1000,homeScore:0,awayScore:0}];
+ complete(f);
+ assert.equal(f.cup.injuredPlayerIds[hurt],1,'still misses the next match');
+ assert.equal(f.cup.injuredPlayerIds['older-injury'],1,'an older injury served this match');
 });

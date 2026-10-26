@@ -1867,8 +1867,10 @@ function getInjuryReason(position: StarPosition, random: () => number) {
   return reasons[Math.floor(clamp(random(), 0, 0.999999) * reasons.length)] ?? reasons[0];
 }
 
-function decrementCupInjuries(injuredPlayerIds: Record<string, number>) {
-  return Object.fromEntries(Object.entries(injuredPlayerIds).map(([playerId, matches]) => [playerId, Math.max(0, Math.floor(Number(matches) || 0) - 1)]).filter(([, matches]) => Number(matches) > 0));
+/** One match served for every injury, except those picked up in this very match: they start with the next one. */
+function decrementCupInjuries(injuredPlayerIds: Record<string, number>, injuredThisMatch: readonly { playerId: string }[] = []) {
+  const fresh = new Set(injuredThisMatch.map((injury) => injury.playerId));
+  return Object.fromEntries(Object.entries(injuredPlayerIds).map(([playerId, matches]) => [playerId, Math.max(0, Math.floor(Number(matches) || 0) - (fresh.has(playerId) ? 0 : 1))]).filter(([, matches]) => Number(matches) > 0));
 }
 
 function getCupBaseResult(cup: CupState, starRating: number) {
@@ -1903,7 +1905,7 @@ function finishCupRound(cup: CupState, starRating: number, won: boolean, now: nu
       pendingNextRound: false,
       nextTournamentAt: 0,
       round: 0,
-      injuredPlayerIds: decrementCupInjuries(cup.injuredPlayerIds ?? {}),
+      injuredPlayerIds: decrementCupInjuries(cup.injuredPlayerIds ?? {}, cup.injuryEvents ?? []),
       matchPaused: false,
       lastResult: `${cup.homeScore}:${cup.awayScore} gegen ${cup.opponent} beendet.`,
     };
@@ -1915,7 +1917,7 @@ function finishCupRound(cup: CupState, starRating: number, won: boolean, now: nu
     ...cup,
     wins: cup.wins + (won ? 1 : 0),
     best: Math.max(cup.best, won ? completedRound : round),
-    injuredPlayerIds: decrementCupInjuries(cup.injuredPlayerIds ?? {}),
+    injuredPlayerIds: decrementCupInjuries(cup.injuredPlayerIds ?? {}, cup.injuryEvents ?? []),
     matchPaused: false,
   };
 

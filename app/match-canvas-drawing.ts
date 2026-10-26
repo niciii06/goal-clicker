@@ -90,7 +90,7 @@ export function drawMatchFrame(ctx:CanvasRenderingContext2D,frame:ReturnType<typ
    for(let i=1;i<trail.length;i++){ctx.strokeStyle=`rgba(255,255,255,${(i/trail.length)*.35})`;ctx.lineWidth=.5*(i/trail.length);ctx.beginPath();ctx.moveTo(trail[i-1].x,trail[i-1].y);ctx.lineTo(trail[i].x,trail[i].y);ctx.stroke();}
    // Ball: the shadow stays on the grass and spreads as the ball rises.
    ctx.fillStyle=`rgba(0,0,0,${Math.max(.12,.3-frame.height*.03)})`;ctx.beginPath();ctx.ellipse(ball.x+.35+frame.height*.25,ball.y+.6,1+frame.height*.12,.48+frame.height*.06,0,0,Math.PI*2);ctx.fill();
-   const br=.72+frame.height*.06,by=ball.y-lift;
+   const br=.75+frame.height*.06,by=ball.y-lift;
    const shine=ctx.createRadialGradient(ball.x-br*.35,by-br*.35,br*.1,ball.x,by,br);shine.addColorStop(0,'#ffffff');shine.addColorStop(1,'#cfd6d2');
    ctx.fillStyle=shine;ctx.strokeStyle='#0f1d16';ctx.lineWidth=.16;ctx.beginPath();ctx.arc(ball.x,by,br,0,Math.PI*2);ctx.fill();ctx.stroke();
    ctx.fillStyle='#16241c';const spin=animate?t*(flying?9:2):0;

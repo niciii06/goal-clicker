@@ -82,10 +82,15 @@ export function selectSafestStoredGame(candidates: StoredGameCandidate[]) {
   return safest;
 }
 
+/**
+ * A write is stale when it has fewer lifetime goals, or the same goals but an older save time (a tab that fell
+ * behind). With equal goals the newer write wins even if it owns fewer players or upgrades: a free transfer or
+ * a departure is a real change, not lost progress.
+ */
 export function shouldRejectRegressedSave(current: StoredGameLike | null, next: StoredGameLike | null) {
   if (!current || !next) return false;
   const currentProgress = getStoredGameProgress(current);
   const nextProgress = getStoredGameProgress(next);
   if (currentProgress[0] > nextProgress[0]) return true;
-  return currentProgress[0] === nextProgress[0] && compareStoredGameProgress(current, next) > 0;
+  return currentProgress[0] === nextProgress[0] && nonNegative(current.lastSaved) > nonNegative(next.lastSaved);
 }

@@ -37,6 +37,16 @@ export function suspendLocalPersistence() {
   persistenceSuspended = true;
 }
 
+/** Saves again after an import that did not go through; the previous game is still the one in storage. */
+export function resumeLocalPersistence() {
+  persistenceSuspended = false;
+}
+
+/** Forgets every stored copy of the game, including backups and old save versions, so a reset stays a reset. */
+export function clearStoredGames() {
+  for (const key of [STORAGE_KEY, BACKUP_STORAGE_KEY, RECOVERY_STORAGE_KEY, ...LEGACY_STORAGE_KEYS]) localStorage.removeItem(key);
+}
+
 export function persistLocalGame(state: GameState) {
   if (persistenceSuspended) return;
   try {

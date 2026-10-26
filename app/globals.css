@@ -1696,6 +1696,9 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .club-passport .club-passport-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0 4px; font-size: var(--text-footnote); color: var(--muted); }
 .club-passport .club-passport-stats span { padding: 10px; border: 1px solid var(--line-soft); border-radius: 13px; background: var(--surface-soft); min-width: 0; }
 .club-passport .club-passport-stats b { display: block; color: var(--accent); font-size: 20px; font-weight: 760; letter-spacing: -.05em; }
+/* Long words like "Auswärtsreisen" need more than a third of a phone screen; wider fonts made them overlap. */
+.club-passport .club-passport-stats span { overflow-wrap: break-word; hyphens: auto; }
+@media (max-width: 520px) { .club-passport .club-passport-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .club-passport .club-passport-stats span:nth-child(3) { grid-column: 1 / -1; } }
 @media (max-width: 300px) { .club-passport .club-passport-stats { grid-template-columns: 1fr; } }
 .club-passport > small { display: block; margin-top: 6px; color: color-mix(in oklab, #526178, var(--text) var(--tone-mix)); font-size: var(--text-footnote); line-height: 1.6; overflow-wrap: anywhere; }
 

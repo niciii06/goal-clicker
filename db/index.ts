@@ -5,6 +5,9 @@ import postgres from "postgres";
 import * as schema from "./schema";
 import { cloudSaves, coopRooms, playerAccounts, profiles, soloTravel } from "./schema";
 
+/** Longest player name on a world seat (the same limit the multiplayer API applies when joining). */
+const ROOM_SEAT_NAME_MAX = 18;
+
 export type RoomRow = typeof coopRooms.$inferSelect;
 export type RoomUpdate = Partial<Omit<RoomRow, "code">>;
 export type PlayerAccount = typeof playerAccounts.$inferSelect;
@@ -154,9 +157,19 @@ export class GoalClickerDatabase {
     }
   }
 
+  /** The display name is the player's name in every world, so the seats of the account's player follow it. */
   async updateDisplayName(userId: string, displayName: string, now: string): Promise<Profile | null> {
     const [profile] = await this.client.update(profiles).set({ displayName, updatedAt: now }).where(eq(profiles.userId, userId)).returning();
-    return profile ?? null;
+    if (!profile) return null;
+    const account = await this.getAccount(userId);
+    if (account) {
+      const seatName = displayName.trim().replace(/\s+/g, " ").slice(0, ROOM_SEAT_NAME_MAX);
+      await this.client.update(coopRooms).set({ hostName: seatName, updatedAt: now }).where(eq(coopRooms.hostPlayerId, account.playerId));
+      await this.client.update(coopRooms).set({ guestName: seatName, updatedAt: now }).where(eq(coopRooms.guestPlayerId, account.playerId));
+      await this.client.update(coopRooms).set({ player3Name: seatName, updatedAt: now }).where(eq(coopRooms.player3PlayerId, account.playerId));
+      await this.client.update(coopRooms).set({ player4Name: seatName, updatedAt: now }).where(eq(coopRooms.player4PlayerId, account.playerId));
+    }
+    return profile;
   }
 
   /**
