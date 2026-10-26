@@ -6,6 +6,7 @@ import { initialGameFeatures, normalizeGameFeatures, STAR_XI_PLAYERS } from '../
 import type { GameFeatures } from '../app/feature-data.ts';
 import type { RoomRow, RoomUpdate } from '../db/index.ts';
 import { MULTIPLAYER_PROTOCOL_VERSION } from '../app/multiplayer-protocol.ts';
+import { installLightRoomMocks } from './helpers/light-room-mock.ts';
 const {GoalClickerDatabase}=await import('../db/index.ts');
 const solo=await import('../app/api/rewards/route.ts');
 const shared=await import('../app/api/multiplayer/route.ts');
@@ -14,6 +15,7 @@ GoalClickerDatabase.prototype.getSoloJourney=async(o,id)=>structuredClone(ledger
 GoalClickerDatabase.prototype.putSoloJourney=async(o,id,v)=>{const key=`${o}:${id}`;if(!ledger.has(key))ledger.set(key,structuredClone(v));return structuredClone(ledger.get(key));};
 GoalClickerDatabase.prototype.getRoom=async code=>code===row.code?structuredClone(row):null;
 GoalClickerDatabase.prototype.updateRoom=async(code,values:RoomUpdate,conditions={})=>{if(code!==row.code||conditions.sharedStateVersion!==undefined&&conditions.sharedStateVersion!==row.sharedStateVersion||conditions.lastPassiveAt!==undefined&&conditions.lastPassiveAt!==row.lastPassiveAt)return null;row={...row,...values};return structuredClone(row);};
+installLightRoomMocks(GoalClickerDatabase);
 function ready(){const f=initialGameFeatures();f.earnedPacks=[{id:'world:123456',packId:'reward-6',earnedAt:1}];f.completedTournamentRuns=['world:123456'];return f;}
 async function request(f:GameFeatures,id='world:123456',playerId='reward-owner-123'){const r=await solo.POST(new Request('http://localhost/api/rewards',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({playerId,rewardId:id,features:f})}));return{status:r.status,data:await r.json()};}
 function setup(f:GameFeatures){const iso=new Date().toISOString(),defaults=Object.fromEntries(Object.entries(getTableColumns(coopRooms)).map(([k,c])=>[k,c.default??null]));row={...defaults,code:'REWARD',hostPlayerId:'host-12345678',hostName:'Nicolas',guestPlayerId:'guest-12345678',guestName:'Silvan',hostLastSeenAt:iso,guestLastSeenAt:iso,lastPassiveAt:iso,updatedAt:iso,sharedFeaturesJson:JSON.stringify(f),sharedSeasons:14} as RoomRow;}

@@ -4,6 +4,7 @@ import { getTableColumns } from 'drizzle-orm';
 import { coopRooms } from '../db/schema.ts';
 import type { RoomRow, RoomSeatRole, RoomUpdate } from '../db/index.ts';
 import { MULTIPLAYER_PROTOCOL_VERSION } from '../app/multiplayer-protocol.ts';
+import { installLightRoomMocks } from './helpers/light-room-mock.ts';
 const { GoalClickerDatabase }=await import('../db/index.ts');
 const { POST }=await import('../app/api/multiplayer/route.ts');
 
@@ -18,6 +19,7 @@ GoalClickerDatabase.prototype.updateRoom=async(code,values:RoomUpdate,conditions
  row={...row,...values};return structuredClone(row);
 };
 
+installLightRoomMocks(GoalClickerDatabase);
 function setup(overrides:Partial<RoomRow>={}){
  const iso=new Date().toISOString();
  const defaults=Object.fromEntries(Object.entries(getTableColumns(coopRooms)).map(([k,c])=>[k,c.default??null]));

@@ -48,6 +48,9 @@ export type CoopRoom = {
   sharedUpgradeLevel: number;
   revision: number;
   testMode: boolean;
+  /** md5 of the shared features; a response with `featuresOmitted` leaves them out because they did not change. */
+  featuresKey?: string;
+  featuresOmitted?: boolean;
   game: GameState;
 };
 

@@ -6,6 +6,7 @@ import type { RoomRow, RoomUpdate } from '../db/index.ts';
 import { initialGameFeatures } from '../app/feature-data.ts';
 import { getPressConference } from '../app/press-conference.ts';
 import { MULTIPLAYER_PROTOCOL_VERSION } from '../app/multiplayer-protocol.ts';
+import { installLightRoomMocks } from './helpers/light-room-mock.ts';
 const { GoalClickerDatabase }=await import('../db/index.ts');
 const { POST }=await import('../app/api/multiplayer/route.ts');
 
@@ -17,8 +18,9 @@ GoalClickerDatabase.prototype.updateRoom=async(code,values:RoomUpdate,conditions
  if(conditions.lastPassiveAt!==undefined&&conditions.lastPassiveAt!==row.lastPassiveAt)return null;
  row={...row,...values};return structuredClone(row);
 };
-GoalClickerDatabase.prototype.applyClick=async(code,role,amount,clickCount)=>{row={...row,sharedCoins:row.sharedCoins+amount,sharedTotalGoals:row.sharedTotalGoals+amount};void role;void clickCount;return structuredClone(row);};
+GoalClickerDatabase.prototype.applyClick=async(code,role,amount,clickCount)=>{row={...row,sharedCoins:row.sharedCoins+amount,sharedTotalGoals:row.sharedTotalGoals+amount};void role;void clickCount;return structuredClone(row) as never;};
 
+installLightRoomMocks(GoalClickerDatabase);
 function setup(features=initialGameFeatures(Date.now())){
  const iso=new Date().toISOString();
  const defaults=Object.fromEntries(Object.entries(getTableColumns(coopRooms)).map(([k,c])=>[k,c.default??null]));

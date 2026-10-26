@@ -87,6 +87,11 @@ function getStarRevealReadyDelay(reveal: StarPackReveal) {
 
 function mergeCoopSessionRoom(current: CoopSession | null, room: CoopRoom, role?: CoopRole) {
   if (!current || current.code !== room.code || room.revision < current.room.revision) return current;
+  // A slim answer keeps the features this client already has; without matching ones it waits for a full answer.
+  if (room.featuresOmitted) {
+    if (!current.room.featuresKey || current.room.featuresKey !== room.featuresKey || !current.room.game?.features) return current;
+    room = { ...room, featuresOmitted: false, game: { ...room.game, features: current.room.game.features } };
+  }
   return { ...current, room, role: role ?? current.role };
 }
 
@@ -196,6 +201,8 @@ function App() {
   const [lobbyBonusCode, setLobbyBonusCode] = useState("");
   const [coopSession, setCoopSession] = useState<CoopSession | null>(null);
   const [confirmSingle, setConfirmSingle] = useState(false);
+  // The md5 of the shared features this client holds; polls send it so the server can leave them out.
+  const coopFeaturesKeyRef = useRef("");
   const [savedRooms, setSavedRooms] = useState<CoopRoom[]>([]);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [coopMessage, setCoopMessage] = useState("");
@@ -297,6 +304,8 @@ function App() {
   const pageInactiveAtRef = useRef<number | null>(null);
 
   const activeCoopCode = coopSession?.code;
+  const coopFeaturesKey = coopSession?.room.featuresKey ?? "";
+  useEffect(() => { coopFeaturesKeyRef.current = coopFeaturesKey; }, [coopFeaturesKey]);
   const activeCoopPlayerId = coopSession?.playerId;
 
   const loadSavedRooms = useCallback(async () => {
@@ -364,7 +373,7 @@ function App() {
   const syncCoopRoom = useCallback(async () => {
     if (!activeCoopCode || !activeCoopPlayerId) return;
     try {
-      const response = await fetch(multiplayerUrl({ code: activeCoopCode, playerId: activeCoopPlayerId }), { cache: "no-store" });
+      const response = await fetch(multiplayerUrl({ code: activeCoopCode, playerId: activeCoopPlayerId, featuresKey: coopFeaturesKeyRef.current }), { cache: "no-store" });
       const data = await readCoopResponse(response);
       syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
       if (!response.ok) {
@@ -721,22 +730,26 @@ function App() {
   useEffect(() => {
     if (!hydrated || appMode !== "coop" || !playerId || coopSession) return;
     const initialLoad = window.setTimeout(() => void loadSavedRooms(), 0);
-    const timer = window.setInterval(() => void loadSavedRooms(), 5000);
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void loadSavedRooms(); }, 15000);
     return () => { window.clearTimeout(initialLoad); window.clearInterval(timer); };
   }, [appMode, coopSession, hydrated, loadSavedRooms, playerId]);
 
   useEffect(() => {
     if (!hydrated || appMode !== "coop" || !activeCoopCode || !activeCoopPlayerId || coopSession?.room.status === "live") return;
-    const syncWhileOpen = () => void syncCoopRoom();
+    // A tab in the background does not poll; it catches up as soon as it is visible again.
+    const syncWhileOpen = () => { if (document.visibilityState === "visible") void syncCoopRoom(); };
     const initialSync = window.setTimeout(syncWhileOpen, 0);
     const timer = window.setInterval(syncWhileOpen, 1500);
-    return () => { window.clearTimeout(initialSync); window.clearInterval(timer); };
+    document.addEventListener("visibilitychange", syncWhileOpen);
+    return () => { window.clearTimeout(initialSync); window.clearInterval(timer); document.removeEventListener("visibilitychange", syncWhileOpen); };
   }, [activeCoopCode, activeCoopPlayerId, appMode, coopSession?.room.status, hydrated, syncCoopRoom]);
 
   useEffect(() => {
     if (!hydrated || appMode !== "coop" || !activeCoopCode || !activeCoopPlayerId || coopSession?.room.status !== "live") return;
-    const timer = window.setInterval(() => void sendCoopAction("tick"), 1500);
-    return () => window.clearInterval(timer);
+    const tick = () => { if (document.visibilityState === "visible") void sendCoopAction("tick", { featuresKey: coopFeaturesKeyRef.current }); };
+    const timer = window.setInterval(tick, 1500);
+    document.addEventListener("visibilitychange", tick);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", tick); };
     // Background synchronisation is coalesced by sendCoopAction and must not restart on every room update.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCoopCode, activeCoopPlayerId, appMode, coopSession?.room.status, hydrated]);

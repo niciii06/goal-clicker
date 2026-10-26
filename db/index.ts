@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, isNull, lte, or, sql } from "drizzle-orm";
 import type { AnyColumn } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -15,6 +15,25 @@ export type Profile = typeof profiles.$inferSelect;
 export type CloudSave = typeof cloudSaves.$inferSelect;
 
 export type RoomSeatRole = "host" | "guest" | "player3" | "player4";
+
+// Egress: every byte Postgres sends to the server counts against the Supabase quota, uncompressed. A world
+// row holds the shared features (several hundred KB) and a full backup copy of the game (as much again),
+// and open worlds are polled every few seconds. So the backup is only read where the features are missing
+// (old rooms), the features only where they are needed, and their md5 is computed inside Postgres.
+const { sharedStateBackupJson: backupColumn, sharedFeaturesJson: featuresColumn, ...lightColumns } = getTableColumns(coopRooms);
+const backupIfNeeded = sql<string>`case when ${featuresColumn} in ('', '{}') then ${backupColumn} else '' end`;
+/** Every column except the backup copy, which comes along only when the features are empty. */
+const ROOM_FIELDS = { ...lightColumns, sharedFeaturesJson: featuresColumn, sharedStateBackupJson: backupIfNeeded };
+/** A world without its features and backup, plus the md5 of the features to tell whether they changed. */
+const LIGHT_ROOM_FIELDS = { ...lightColumns, featuresKey: sql<string>`md5(${featuresColumn})` };
+export type LightRoomRow = Omit<RoomRow, "sharedFeaturesJson" | "sharedStateBackupJson"> & { featuresKey: string };
+const SEAT_FIELDS = {
+  hostPlayerId: coopRooms.hostPlayerId, hostName: coopRooms.hostName, hostLastSeenAt: coopRooms.hostLastSeenAt,
+  guestPlayerId: coopRooms.guestPlayerId, guestName: coopRooms.guestName, guestLastSeenAt: coopRooms.guestLastSeenAt,
+  player3PlayerId: coopRooms.player3PlayerId, player3Name: coopRooms.player3Name, player3LastSeenAt: coopRooms.player3LastSeenAt,
+  player4PlayerId: coopRooms.player4PlayerId, player4Name: coopRooms.player4Name, player4LastSeenAt: coopRooms.player4LastSeenAt,
+};
+export type RoomSeats = { [K in keyof typeof SEAT_FIELDS]: RoomRow[K] };
 
 type RoomConditions = {
   sharedStateVersion?: number;
@@ -249,13 +268,26 @@ export class GoalClickerDatabase {
   }
 
   async getRoom(code: string): Promise<RoomRow | null> {
-    const [room] = await this.client.select().from(coopRooms).where(eq(coopRooms.code, code)).limit(1);
+    const [room] = await this.client.select(ROOM_FIELDS).from(coopRooms).where(eq(coopRooms.code, code)).limit(1);
     return room ?? null;
   }
 
-  async listRoomsForPlayer(playerId: string) {
+  /** The world without its big JSON columns: enough to answer "nothing changed" to a poll. */
+  async getLightRoom(code: string): Promise<LightRoomRow | null> {
+    const [room] = await this.client.select(LIGHT_ROOM_FIELDS).from(coopRooms).where(eq(coopRooms.code, code)).limit(1);
+    return room ?? null;
+  }
+
+  /** Writes small columns such as a presence timestamp and returns only the seats, not the game. */
+  async touchRoom(code: string, values: RoomUpdate): Promise<RoomSeats | null> {
+    const [seats] = await this.client.update(coopRooms).set(values).where(eq(coopRooms.code, code)).returning(SEAT_FIELDS);
+    return seats ?? null;
+  }
+
+  /** The worlds of a player for the world list; the list shows no game, so it reads none. */
+  async listRoomsForPlayer(playerId: string): Promise<LightRoomRow[]> {
     return this.client
-      .select()
+      .select(LIGHT_ROOM_FIELDS)
       .from(coopRooms)
       .where(or(
         eq(coopRooms.hostPlayerId, playerId),
@@ -268,11 +300,15 @@ export class GoalClickerDatabase {
   }
 
   async insertRoom(values: typeof coopRooms.$inferInsert) {
-    const [room] = await this.client.insert(coopRooms).values(values).returning();
+    const [room] = await this.client.insert(coopRooms).values(values).returning(ROOM_FIELDS);
     if (!room) throw new Error("Die Welt konnte nicht gespeichert werden.");
     return room;
   }
 
+  /**
+   * Updates a world and returns it. The features are never sent back: a write that sets them already has
+   * them, and only the rare writes without them (joining, renaming) read them once afterwards.
+   */
   async updateRoom(code: string, values: RoomUpdate, conditions: RoomConditions = {}): Promise<RoomRow | null> {
     const predicates = [eq(coopRooms.code, code)];
     if (conditions.sharedStateVersion !== undefined) predicates.push(eq(coopRooms.sharedStateVersion, conditions.sharedStateVersion));
@@ -285,15 +321,19 @@ export class GoalClickerDatabase {
       .update(coopRooms)
       .set(values)
       .where(and(...predicates))
-      .returning();
-    return room ?? null;
+      .returning(lightColumns);
+    if (!room) return null;
+    if (typeof values.sharedFeaturesJson === "string" && values.sharedFeaturesJson !== "{}") return { ...room, sharedFeaturesJson: values.sharedFeaturesJson, sharedStateBackupJson: "" };
+    const [game] = await this.client.select({ sharedFeaturesJson: featuresColumn, sharedStateBackupJson: backupIfNeeded }).from(coopRooms).where(eq(coopRooms.code, code)).limit(1);
+    return game ? { ...room, ...game } : null;
   }
 
   async deleteRoom(code: string) {
     await this.client.delete(coopRooms).where(eq(coopRooms.code, code));
   }
 
-  async applyClick(code: string, role: string, amount: number, clickCount: number, timestamp: string) {
+  /** Clicks change only counters, so the world comes back without its features (with their md5). */
+  async applyClick(code: string, role: string, amount: number, clickCount: number, timestamp: string): Promise<LightRoomRow | null> {
     const [room] = await this.client
       .update(coopRooms)
       .set({
@@ -311,7 +351,7 @@ export class GoalClickerDatabase {
         ...roleClickUpdate(role, amount, clickCount),
       })
       .where(eq(coopRooms.code, code))
-      .returning();
+      .returning(LIGHT_ROOM_FIELDS);
     return room ?? null;
   }
 

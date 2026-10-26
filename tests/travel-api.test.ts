@@ -8,6 +8,7 @@ import type { GameFeatures } from '../app/feature-data.ts';
 import { fixtureFor } from '../app/travel-data.ts';
 import type { Journey } from '../app/travel-data.ts';
 import { MULTIPLAYER_PROTOCOL_VERSION } from '../app/multiplayer-protocol.ts';
+import { installLightRoomMocks } from './helpers/light-room-mock.ts';
 const { GoalClickerDatabase }=await import('../db/index.ts');
 const {POST,GET}=await import('../app/api/multiplayer/route.ts');
 const solo=await import('../app/api/travel/route.ts');
@@ -21,6 +22,7 @@ const ledger=new Map<string,Journey>();
 GoalClickerDatabase.prototype.getSoloJourney=async(owner,id)=>structuredClone(ledger.get(`${owner}:${id}`)||null);
 GoalClickerDatabase.prototype.putSoloJourney=async(owner,id,raw)=>{const key=`${owner}:${id}`;if(!ledger.has(key))ledger.set(key,structuredClone(raw as Journey));return structuredClone(ledger.get(key));};
 GoalClickerDatabase.prototype.consumeSoloJourney=async(owner,id,raw)=>{const key=`${owner}:${id}`;if(ledger.get(key)?.consumed)return false;ledger.set(key,structuredClone(raw as Journey));return true;};
+installLightRoomMocks(GoalClickerDatabase);
 function setup(day=5){const f=initialGameFeatures();f.starXI=setBestStarXI({...f.starXI,ownedIds:STAR_XI_PLAYERS.map(p=>p.id)});f.seasonMode.matchday=day;const iso=new Date().toISOString();const defaults=Object.fromEntries(Object.entries(getTableColumns(coopRooms)).map(([k,c])=>[k,c.default??null]));row={...defaults,code:'TRAVEL',hostPlayerId:'host-player-123',hostName:'Nicolas',guestPlayerId:'guest-player-123',guestName:'Silvan',hostLastSeenAt:iso,guestLastSeenAt:iso,lastPassiveAt:iso,updatedAt:iso,sharedFeaturesJson:JSON.stringify(f),sharedSeasons:14} as RoomRow;return f;}
 async function action(action:string,extra:Record<string,unknown>={},playerId='host-player-123'){const r=await POST(new Request('http://localhost/api/multiplayer',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,code:'TRAVEL',playerId,protocol:MULTIPLAYER_PROTOCOL_VERSION,...extra})}));return{status:r.status,data:await r.json() as {room?:{game:{features:GameFeatures}};serverNow?:number;error?:string}};}
 async function soloAction(action:string,extra:Record<string,unknown>={}){const r=await solo.POST(new Request('http://localhost/api/travel',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,playerId:'solo-player-123',...extra})}));return{status:r.status,data:await r.json() as {journey:Journey;serverNow:number;error?:string}};}

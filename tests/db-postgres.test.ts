@@ -240,3 +240,27 @@ test('a new display name renames the account\'s seats in every world', { skip },
   assert.equal((await db.getRoom('NAM2'))!.guestName, 'Neuer Name');
   assert.equal((await db.getRoom('NAM2'))!.hostName, 'Host', 'other players keep their names');
 });
+
+test('world reads leave the backup copy out and features only where needed', { skip }, async () => {
+  const features = JSON.stringify({ big: 'x'.repeat(200_000) });
+  await db.insertRoom({ ...room('EGR1'), sharedFeaturesJson: features, sharedStateBackupJson: JSON.stringify({ features: JSON.parse(features) }) });
+  const full = (await db.getRoom('EGR1'))!;
+  assert.equal(full.sharedFeaturesJson, features);
+  assert.equal(full.sharedStateBackupJson, '', 'no backup while the features are there');
+  const light = (await db.getLightRoom('EGR1'))!;
+  assert.equal('sharedFeaturesJson' in light, false);
+  assert.match(light.featuresKey, /^[0-9a-f]{32}$/);
+  const { createHash } = await import('node:crypto');
+  assert.equal(light.featuresKey, createHash('md5').update(features, 'utf8').digest('hex'), 'Postgres and Node agree on the md5');
+  const seats = (await db.touchRoom('EGR1', { hostLastSeenAt: iso() }))!;
+  assert.deepEqual(Object.keys(seats).sort().slice(0, 3), ['guestLastSeenAt', 'guestName', 'guestPlayerId']);
+  const [listed] = await db.listRoomsForPlayer('host-EGR1');
+  assert.equal('sharedFeaturesJson' in listed, false);
+  // Old rooms without features still get their backup to recover from.
+  await db.insertRoom({ ...room('EGR2'), sharedFeaturesJson: '{}', sharedStateBackupJson: '{"features":{"club":{}}}' });
+  assert.equal((await db.getRoom('EGR2'))!.sharedStateBackupJson, '{"features":{"club":{}}}');
+  // A write with the features does not read them back; one without reads them once.
+  const written = (await db.updateRoom('EGR1', { sharedFeaturesJson: '{"a":1}' }))!;
+  assert.equal(written.sharedFeaturesJson, '{"a":1}');
+  assert.equal((await db.updateRoom('EGR1', { roomName: 'Neu' }))!.sharedFeaturesJson, '{"a":1}');
+});
