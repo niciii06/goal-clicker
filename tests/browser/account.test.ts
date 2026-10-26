@@ -1,5 +1,5 @@
 // The required login end to end: registering and signing in with username and password against a stand-in
-// for Supabase Auth, the unique username, and the cloud save across two devices including a conflict.
+// for Supabase Auth, the unique username, and the cloud save across two devices: the profile's save always wins.
 // Needs TEST_DATABASE_URL (an empty scratch database) and Chromium; builds its own copy into .next-account.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -146,7 +146,7 @@ test('a wrong password is refused, the right one opens the same save on a second
   assert.equal(await localGoals(page), cloud!.totalGoals);
 });
 
-test('when both devices were played, the second one to save asks and can load the newer save', { skip }, async () => {
+test('when both devices were played, the second one to save takes the newer save without asking', { skip }, async () => {
   const a = devices.a.page, b = devices.b.page;
   // Let both settle first: their passive saves resolve without a question, at most with a reload.
   await hideTab(a);
@@ -155,19 +155,23 @@ test('when both devices were played, the second one to save asks and can load th
   await Promise.all([a.waitForLoadState('networkidle'), b.waitForLoadState('networkidle')]);
   await clickBall(a, 2);
   await clickBall(b, 3);
+  const before = { a: await localGoals(a), b: await localGoals(b) };
   await hideTab(a);
   await a.waitForTimeout(1500);
   await hideTab(b);
-  const asked = await waitFor(async () => {
-    for (const page of [a, b]) if (await page.getByText('Auf einem anderen Gerät wurde weitergespielt').count()) return page;
-    return null;
-  }, Boolean, 'one device asks');
-  await asked!.getByRole('button', { name: /Stand aus dem Profil laden/ }).click();
-  await asked!.waitForLoadState('networkidle');
-  await asked!.getByRole('button', { name: 'Fussball anklicken' }).waitFor();
-  assert.equal(await localGoals(asked!), (await cloudSave('Striker'))!.totalGoals);
-  devices.asked = devices[asked === a ? 'a' : 'b'];
-  devices.other = devices[asked === a ? 'b' : 'a'];
+  // Signing in is required, so the profile's save wins: the device that saved second loads it and asks nothing.
+  await waitFor(async () => {
+    const cloud = (await cloudSave('Striker'))!.totalGoals;
+    return (await localGoals(a).catch(() => -1)) === cloud && (await localGoals(b).catch(() => -1)) === cloud;
+  }, Boolean, 'both devices show the cloud save');
+  for (const page of [a, b]) {
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: 'Fussball anklicken' }).waitFor();
+    assert.equal(await page.getByText('Welchen Spielstand willst du?').count(), 0);
+  }
+  const took = (await localGoals(a)) !== before.a ? 'a' : 'b';
+  devices.asked = devices[took];
+  devices.other = devices[took === 'a' ? 'b' : 'a'];
 });
 
 test('a device that was not played takes a newer save without asking when it comes back', { skip }, async () => {
@@ -181,8 +185,8 @@ test('a device that was not played takes a newer save without asking when it com
   await idle.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   await waitFor(() => localGoals(idle).catch(() => -1), (goals) => goals === target, 'idle device took the newer save');
   await idle.waitForLoadState('networkidle');
-  assert.equal(await idle.getByText('Auf einem anderen Gerät wurde weitergespielt').count(), 0);
-  assert.equal(await played.getByText('Auf einem anderen Gerät wurde weitergespielt').count(), 0);
+  assert.equal(await idle.getByText('Welchen Spielstand willst du?').count(), 0);
+  assert.equal(await played.getByText('Welchen Spielstand willst du?').count(), 0);
 });
 
 test('a used username cannot be registered twice, in any case', { skip }, async () => {

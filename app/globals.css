@@ -1797,12 +1797,6 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .account-error { margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; color: color-mix(in oklab, #b52a4c, var(--text) var(--tone-mix)); background: color-mix(in srgb, #e6002e 4%, var(--surface-raised)); font-size: var(--text-footnote); line-height: 1.45; }
 .account-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .account-actions button { min-height: 44px; font-size: var(--text-footnote); }
-.save-choice { display: grid; gap: 10px; }
-.save-choice button { display: grid; gap: 4px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 16px; color: var(--text); background: var(--surface-raised); font: inherit; text-align: left; cursor: pointer; transition: 160ms ease; }
-.save-choice button:hover { border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: var(--accent-soft); }
-.save-choice .eyebrow { margin: 0; }
-.save-choice strong { font-size: var(--text-subhead); }
-.save-choice small { color: var(--soft); font-size: var(--text-footnote); }
 .account-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 16px; background: rgba(15,20,25,.55); backdrop-filter: blur(6px); }
 .account-overlay .account-card h2 { margin-top: 4px; }
 

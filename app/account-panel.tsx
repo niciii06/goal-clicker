@@ -17,7 +17,7 @@ import { readThemePreference, setThemePreference, THEME_OPTIONS } from "./theme"
 import type { ThemePreference } from "./theme";
 
 const ADOPT_AFTER_IMPORT_KEY = "goalClickerAdoptAfterImport";
-const SYNC_LABELS: Record<SyncStatus, string> = { saved: "Gespeichert", saving: "Speichert …", offline: "Offline, wird später gespeichert", conflict: "Anderes Gerät" };
+const SYNC_LABELS: Record<SyncStatus, string> = { saved: "Gespeichert", saving: "Speichert …", offline: "Offline, wird später gespeichert" };
 
 async function linkAccount(playerId: string, adopt: boolean) {
   const response = await fetch("/api/account", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ playerId, adopt }) });

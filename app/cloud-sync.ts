@@ -2,10 +2,9 @@
 // Keeps the single player save of a signed in account in the cloud. The game itself only knows localStorage:
 // before it starts, the save of the account is written there, and while it runs, every change is uploaded.
 //
-// Two devices can be open at once. What counts is where the player actually plays: a device without any
-// click or key press since its last save never asks, it simply takes the newer save. A save from a device
-// that only collected passive goals is overwritten by a device that is played. Only when both were played
-// the player decides.
+// Signing in is required, so the save in the profile always wins: a device never asks, it takes the newer
+// cloud save. Only a cloud save from a device that merely collected passive goals (nobody clicked there)
+// is overwritten by a device that is actually played, so an idle tab cannot wipe real progress.
 import { BACKUP_STORAGE_KEY, COOP_ROOM_KEY, LEGACY_STORAGE_KEYS, PLAYER_NAME_KEY, RECOVERY_STORAGE_KEY } from "./game/constants";
 import { cleanCloudSaveKeys, hashText, hasProgress, serializeCloudSaveKeys, summarizeSave, SYNCED_SAVE_KEYS } from "./cloud-save-rules";
 import type { CloudSaveKeys } from "./cloud-save-rules";
@@ -14,9 +13,10 @@ import type { CloudSaveKeys } from "./cloud-save-rules";
 export const CLOUD_META_KEY = "goalClickerCloudMetaV1";
 /** Asks the running game to write its current state to localStorage right now, before an upload reads it. */
 export const FLUSH_SAVE_EVENT = "goalclicker:flush-save";
-export type CloudMeta = { userId: string; version: number; hash: string; played?: boolean };
+/** `pending` is the hash of an upload that was sent but whose answer never arrived, e.g. while the page closed. */
+export type CloudMeta = { userId: string; version: number; hash: string; played?: boolean; pending?: string };
 export type CloudSaveState = { version: number; updatedAt: string | null; active: boolean; keys: CloudSaveKeys | null };
-export type SyncStatus = "saved" | "saving" | "offline" | "conflict";
+export type SyncStatus = "saved" | "saving" | "offline";
 
 const UPLOAD_INTERVAL_MS = 15_000;
 // Browsers drop keepalive requests above 64 KB, the limit for the last upload while a page closes.
@@ -26,7 +26,7 @@ export function readCloudMeta(userId: string): CloudMeta | null {
   try {
     const meta = JSON.parse(localStorage.getItem(CLOUD_META_KEY) ?? "null") as Partial<CloudMeta> | null;
     if (!meta || meta.userId !== userId || !Number.isSafeInteger(meta.version) || typeof meta.hash !== "string") return null;
-    return { userId, version: meta.version!, hash: meta.hash, played: meta.played === true };
+    return { userId, version: meta.version!, hash: meta.hash, played: meta.played === true, ...(typeof meta.pending === "string" ? { pending: meta.pending } : {}) };
   } catch {
     return null;
   }
@@ -65,9 +65,20 @@ export function clearLocalAccountData() {
  * - "use-local": the device continues the cloud version it last synced (or the cloud has nothing yet).
  * - "use-cloud": the device has nothing of its own, or was not played since its last sync.
  * - "keep-local": both changed, but the cloud save only collected passive goals; this device overwrites it.
- * - "ask": both saves were played; the player decides.
+ * Otherwise the cloud save wins.
  */
-export type InitialSyncPlan = "use-local" | "use-cloud" | "keep-local" | "ask" | "fresh";
+export type InitialSyncPlan = "use-local" | "use-cloud" | "keep-local" | "fresh";
+
+/**
+ * When the cloud holds exactly the save this device last sent, that upload went through even though its
+ * answer was lost (the page closed or reloaded). The device then simply is at that cloud version, instead
+ * of mistaking its own save for one from another device. Returns the corrected meta, or null.
+ */
+export function adoptOwnUpload(meta: CloudMeta | null, cloud: CloudSaveState): CloudMeta | null {
+  if (!meta?.pending || !cloud.keys || cloud.version <= meta.version) return null;
+  if (hashText(serializeCloudSaveKeys(cloud.keys)) !== meta.pending) return null;
+  return { userId: meta.userId, version: cloud.version, hash: meta.pending, played: meta.played };
+}
 
 export function planInitialSync(meta: CloudMeta | null, cloud: CloudSaveState, local: CloudSaveKeys): InitialSyncPlan {
   const localGame = cleanCloudSaveKeys(local);
@@ -77,8 +88,8 @@ export function planInitialSync(meta: CloudMeta | null, cloud: CloudSaveState, l
   const localText = serializeCloudSaveKeys(localGame);
   if (localText === serializeCloudSaveKeys(cloud.keys)) return "use-cloud";
   if (meta && (meta.hash === hashText(localText) || !meta.played)) return "use-cloud";
-  if (meta && !cloud.active) return "keep-local";
-  return "ask";
+  if (meta && meta.played && !cloud.active) return "keep-local";
+  return "use-cloud";
 }
 
 export async function fetchCloudSave(since?: number): Promise<CloudSaveState & { unchanged?: boolean }> {
@@ -104,9 +115,7 @@ export function subscribeSyncStatus(listener: (status: SyncStatus) => void) {
 }
 
 type SyncHandlers = {
-  /** Both devices were played: the player has to choose. */
-  onConflict: (cloud: CloudSaveState) => void;
-  /** This device was not played since its last save: load the newer save (the page reloads). */
+  /** Another device saved something newer: load it (the page reloads). */
   onNewerSave: (cloud: CloudSaveState) => void;
 };
 
@@ -175,23 +184,20 @@ export class CloudSync {
     if (this.stopped || !meta) return;
     try {
       const cloud = await fetchCloudSave(meta.version);
-      if (!cloud.unchanged && cloud.version > meta.version && this.resolve(cloud) === "overwrite") void this.upload({ overwriteVersion: cloud.version });
+      if (cloud.unchanged || cloud.version <= meta.version) return;
+      const own = adoptOwnUpload(meta, cloud);
+      if (own) { writeCloudMeta(own); void this.upload(); return; }
+      if (this.resolve(cloud) === "overwrite") void this.upload({ overwriteVersion: cloud.version });
     } catch {
       setStatus("offline");
     }
   }
 
-  /** A newer save from another device: take it, overwrite it (it only collected passive goals) or ask. */
+  /** A newer save from another device: take it, or overwrite it when it only collected passive goals. */
   private resolve(cloud: CloudSaveState): "overwrite" | "handled" {
-    if (!this.played) {
-      this.stop();
-      this.handlers.onNewerSave(cloud);
-      return "handled";
-    }
-    if (!cloud.active) return "overwrite";
+    if (this.played && !cloud.active) return "overwrite";
     this.stop();
-    setStatus("conflict");
-    this.handlers.onConflict(cloud);
+    this.handlers.onNewerSave(cloud);
     return "handled";
   }
 
@@ -221,6 +227,8 @@ export class CloudSync {
     const active = this.played || meta.played === true;
     const body = JSON.stringify({ baseVersion: overwriteVersion ?? meta.version, keys, active });
     setStatus("saving");
+    // Remembered until the answer arrives: if the page closes first, the next start recognises this save.
+    writeCloudMeta({ ...meta, pending: hash });
     try {
       const response = await fetch("/api/save", { method: "PUT", headers: { "content-type": "application/json" }, body, keepalive: keepalive && body.length < KEEPALIVE_LIMIT });
       const data = await response.json() as { version?: number; errorCode?: string } & Partial<CloudSaveState>;
@@ -233,6 +241,9 @@ export class CloudSync {
       }
       if (response.status === 409 && data.errorCode === "SAVE_CONFLICT") {
         const cloud = { version: data.version ?? 0, updatedAt: data.updatedAt ?? null, active: data.active !== false, keys: cleanCloudSaveKeys(data.keys) };
+        // The cloud is ahead only by this device's own earlier upload: continue on top of it.
+        const own = adoptOwnUpload(readCloudMeta(this.userId) ?? meta, cloud);
+        if (own) { writeCloudMeta(own); return this.uploadOnce({ keepalive, overwriteVersion: cloud.version }); }
         // Overwriting belongs to this same upload, so whoever waits for it (signing out) waits for the overwrite too.
         if (this.resolve(cloud) === "overwrite") return this.uploadOnce({ keepalive, overwriteVersion: cloud.version });
         return false;

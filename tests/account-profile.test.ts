@@ -3,7 +3,7 @@ import { afterEach, beforeEach, test } from 'node:test';
 import { createProfileResponse, deleteProfileResponse, getCloudSaveResponse, getProfileResponse, loginEmailResponse, putCloudSaveResponse, registerResponse, updateProfileResponse, usernameAvailabilityResponse } from '../app/account-api.ts';
 import type { AccountApiDeps } from '../app/account-api.ts';
 import { cleanCloudSaveKeys, hashText, serializeCloudSaveKeys, summarizeSave } from '../app/cloud-save-rules.ts';
-import { planInitialSync } from '../app/cloud-sync.ts';
+import { adoptOwnUpload, planInitialSync } from '../app/cloud-sync.ts';
 import { cleanDisplayName, displayNameError, isPasswordLoginEmail, nextUsernameChangeAt, passwordError, usernameError } from '../app/profile-rules.ts';
 import { createSaveFile } from '../app/save-file.ts';
 import type { CloudSave, Profile } from '../db/index.ts';
@@ -183,7 +183,7 @@ test('deleting the profile needs the username as confirmation', async () => {
   assert.equal(store.profiles.size, 0);
 });
 
-test('a device keeps its save when it continues the cloud version, otherwise takes the cloud or asks', () => {
+test('a device keeps its save when it continues the cloud version, otherwise takes the cloud', () => {
   const local = { goalClickerSiteSaveV3: game(50) };
   const cloud = { version: 4, updatedAt: '2026-10-01T10:00:00.000Z', active: true, keys: { goalClickerSiteSaveV3: game(80) } };
   const hash = hashText(serializeCloudSaveKeys(local));
@@ -196,10 +196,20 @@ test('a device keeps its save when it continues the cloud version, otherwise tak
   assert.equal(planInitialSync({ userId: 'u', version: 3, hash, played: true }, cloud, local), 'use-cloud');
   // Changed only by passive goals since the last sync: the device takes the newer cloud save.
   assert.equal(planInitialSync({ userId: 'u', version: 3, hash: 'changed-since' }, cloud, local), 'use-cloud');
-  assert.equal(planInitialSync({ userId: 'u', version: 3, hash: 'changed-since', played: true }, cloud, local), 'ask');
+  // Signing in is required, so the profile's save wins without asking, even when this device was played.
+  assert.equal(planInitialSync({ userId: 'u', version: 3, hash: 'changed-since', played: true }, cloud, local), 'use-cloud');
+  // Only a cloud save that merely collected passive goals gives way to a device that was played.
   assert.equal(planInitialSync({ userId: 'u', version: 3, hash: 'changed-since', played: true }, { ...cloud, active: false }, local), 'keep-local');
-  assert.equal(planInitialSync(null, cloud, local), 'ask');
+  assert.equal(planInitialSync(null, cloud, local), 'use-cloud');
   assert.equal(planInitialSync(null, cloud, { ...cloud.keys }), 'use-cloud');
+  // An upload sent while the page closed went through without an answer: the device recognises its own save
+  // and simply continues, instead of mistaking it for another device's save.
+  const sent = hashText(serializeCloudSaveKeys(cloud.keys!));
+  const own = adoptOwnUpload({ userId: 'u', version: 3, hash: 'older', played: true, pending: sent }, cloud);
+  assert.deepEqual(own, { userId: 'u', version: cloud.version, hash: sent, played: true });
+  assert.equal(planInitialSync(own, cloud, local), 'use-local');
+  assert.equal(adoptOwnUpload({ userId: 'u', version: 3, hash: 'older', pending: 'something-else' }, cloud), null);
+  assert.equal(adoptOwnUpload({ userId: 'u', version: 3, hash: 'older' }, cloud), null);
 });
 
 test('only the game, layout and vibration keys travel, and device keys stay out of save files', () => {

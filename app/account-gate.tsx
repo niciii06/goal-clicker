@@ -7,12 +7,9 @@ import { createContext, useCallback, useEffect, useMemo, useRef, useState } from
 import type { FormEvent, ReactNode } from "react";
 import { authErrorMessage, browserSupabase, registerWithUsername, signInWithGoogle, signInWithUsername } from "./auth/browser";
 import { authConfigured } from "./auth/config";
-import { summarizeSave } from "./cloud-save-rules";
-import type { CloudSaveKeys, SaveSummary } from "./cloud-save-rules";
-import { applyCloudSave, clearLocalAccountData, CloudSync, fetchCloudSave, planInitialSync, readCloudMeta, readLocalSaveKeys, writeCloudMeta } from "./cloud-sync";
+import { adoptOwnUpload, applyCloudSave, clearLocalAccountData, CloudSync, fetchCloudSave, planInitialSync, readCloudMeta, readLocalSaveKeys, writeCloudMeta } from "./cloud-sync";
 import type { CloudSaveState } from "./cloud-sync";
 import { PLAYER_NAME_KEY } from "./game/constants";
-import { formatNumber } from "./game/format";
 import { suspendLocalPersistence } from "./game/storage";
 import { cleanDisplayName, DISPLAY_NAME_MAX, displayNameError, isPasswordLoginEmail, PASSWORD_MAX, PASSWORD_MIN, passwordError, USERNAME_MAX, usernameError } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
@@ -46,7 +43,6 @@ type Phase =
   | { name: "checking" }
   | { name: "signed-out"; message?: string }
   | { name: "profile"; user: SessionUser }
-  | { name: "choose"; user: SessionUser; profile: PublicProfile; cloud: CloudSaveState; local: CloudSaveKeys }
   | { name: "unreachable"; message: string; user: SessionUser | null; offlineProfile: PublicProfile | null }
   | { name: "ready"; user: SessionUser; profile: PublicProfile };
 
@@ -87,14 +83,12 @@ export function AccountGate({ children }: { children: ReactNode }) {
 
 function RequiredAccount({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<Phase>({ name: "checking" });
-  const [conflict, setConflict] = useState<CloudSaveState | null>(null);
   const syncRef = useRef<CloudSync | null>(null);
 
   const startGame = useCallback((user: SessionUser, profile: PublicProfile) => {
     localStorage.setItem(PLAYER_NAME_KEY, profile.displayName);
     syncRef.current?.stop();
     const sync = new CloudSync(user.id, {
-      onConflict: setConflict,
       onNewerSave: (cloud) => {
         suspendLocalPersistence();
         applyCloudSave(user.id, cloud);
@@ -115,11 +109,10 @@ function RequiredAccount({ children }: { children: ReactNode }) {
       setPhase({ name: "unreachable", message: "Dein Spielstand konnte nicht geladen werden.", user, offlineProfile: readCloudMeta(user.id) ? profile : null });
       return;
     }
+    // An upload that went through while the page closed is this device's own save, not another device's.
+    const own = adoptOwnUpload(readCloudMeta(user.id), cloud);
+    if (own) writeCloudMeta(own);
     const plan = planInitialSync(readCloudMeta(user.id), cloud, readLocalSaveKeys());
-    if (plan === "ask") {
-      setPhase({ name: "choose", user, profile, cloud, local: readLocalSaveKeys() });
-      return;
-    }
     if (plan === "use-cloud") applyCloudSave(user.id, cloud);
     // The next upload replaces the cloud save on top of its current version.
     else if (plan === "keep-local") writeCloudMeta({ userId: user.id, version: cloud.version, hash: "", played: true });
@@ -211,31 +204,9 @@ function RequiredAccount({ children }: { children: ReactNode }) {
   }, [ready]);
   const context = useMemo<AccountContextValue | null>(() => ready ? { userId: ready.user.id, email: ready.user.email, passwordLogin: ready.user.passwordLogin, profile: ready.profile, setProfile, signOut, deleteProfile } : null, [ready, setProfile, signOut, deleteProfile]);
 
-  const keepThisDevice = useCallback(async (current: CloudSaveState) => {
-    const sync = syncRef.current;
-    if (sync && await sync.upload({ overwriteVersion: current.version })) {
-      setConflict(null);
-      sync.start();
-    }
-  }, []);
-
-  const loadCloud = useCallback((userId: string, current: CloudSaveState) => {
-    suspendLocalPersistence();
-    applyCloudSave(userId, current);
-    window.location.reload();
-  }, []);
-
   if (phase.name === "ready") {
     return <AccountContext.Provider value={context}>
       {children}
-      {conflict && <div className="account-overlay" role="dialog" aria-modal="true" aria-labelledby="save-conflict-title">
-        <section className="account-card">
-          <p className="eyebrow">SPIELSTAND / ANDERES GERÄT</p>
-          <h2 id="save-conflict-title">Auf einem anderen Gerät wurde weitergespielt</h2>
-          <p>Dein Profil hat inzwischen einen neueren Spielstand. Welchen willst du behalten? Der andere wird überschrieben.</p>
-          <SaveChoice cloud={conflict} local={readLocalSaveKeys()} onCloud={() => loadCloud(phase.user.id, conflict)} onLocal={() => void keepThisDevice(conflict)} />
-        </section>
-      </div>}
     </AccountContext.Provider>;
   }
 
@@ -245,11 +216,6 @@ function RequiredAccount({ children }: { children: ReactNode }) {
       {phase.name === "checking" && <p className="account-status" role="status">Anmeldung wird geprüft …</p>}
       {phase.name === "signed-out" && <LoginForm message={phase.message} onSignedIn={() => void enter()} />}
       {phase.name === "profile" && <ProfileSetup user={phase.user} onCreated={(profile) => { writeProfileCache(phase.user.id, profile); void syncAndStart(phase.user, profile); }} onSignOut={() => void signOut()} />}
-      {phase.name === "choose" && <>
-        <h2>Welchen Spielstand willst du?</h2>
-        <p>Auf diesem Gerät gibt es einen Spielstand, und in deinem Profil liegt ein anderer. Der nicht gewählte wird überschrieben.</p>
-        <SaveChoice cloud={phase.cloud} local={phase.local} onCloud={() => { applyCloudSave(phase.user.id, phase.cloud); startGame(phase.user, phase.profile); }} onLocal={() => { writeCloudMeta({ userId: phase.user.id, version: phase.cloud.version, hash: "", played: true }); startGame(phase.user, phase.profile); }} />
-      </>}
       {phase.name === "unreachable" && <>
         <h2>Keine Verbindung</h2>
         <p>{phase.message} Prüfe dein Internet und versuche es nochmal.{phase.offlineProfile ? " Du kannst auch offline weiterspielen; dein Fortschritt wird gespeichert, sobald die Verbindung zurück ist." : ""}</p>
@@ -260,19 +226,6 @@ function RequiredAccount({ children }: { children: ReactNode }) {
       </>}
     </section>
   </main>;
-}
-
-function SaveSummaryText({ summary }: { summary: SaveSummary | null }) {
-  if (!summary) return <small>Kein Spielstand</small>;
-  return <small>{formatNumber(summary.totalGoals)} Tore insgesamt · Saison {summary.seasons + 1} · {summary.stars} Sterne</small>;
-}
-
-function SaveChoice({ cloud, local, onCloud, onLocal }: { cloud: CloudSaveState; local: CloudSaveKeys; onCloud: () => void; onLocal: () => void }) {
-  const savedAt = cloud.updatedAt ? new Date(cloud.updatedAt).toLocaleString("de-CH", { dateStyle: "medium", timeStyle: "short" }) : "";
-  return <div className="save-choice">
-    <button type="button" onClick={onCloud}><span className="eyebrow">IM PROFIL</span><strong>Stand aus dem Profil laden</strong><SaveSummaryText summary={summarizeSave(cloud.keys)} />{savedAt && <small>Gespeichert am {savedAt}</small>}</button>
-    <button type="button" onClick={onLocal}><span className="eyebrow">DIESES GERÄT</span><strong>Diesen Stand behalten</strong><SaveSummaryText summary={summarizeSave(local)} /></button>
-  </div>;
 }
 
 /** The live "free or taken" check while a username is typed. */
