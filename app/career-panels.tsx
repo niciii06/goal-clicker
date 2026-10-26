@@ -118,12 +118,14 @@ export function AlbumPanel({ features, busy, onClaim }: { features: GameFeatures
 
 export function PostMatchSummary({features,onCareer,onContinue}:{features:GameFeatures;onCareer:()=>void;onContinue:()=>void}) {
   const c=features.cup;
-  const report=features.career.reports.find(r=>r.id===c.careerMatchId) ?? features.career.reports.findLast(r=>r.opponent===c.opponent && r.homeScore===c.homeScore && r.awayScore===c.awayScore);
+  const report=features.career.reports.find(r=>r.id===c.careerMatchId) ?? features.career.reports.findLast(r=>r.opponent===c.opponent && r.homeScore===c.homeScore && r.awayScore===c.awayScore) ?? features.career.reports.findLast(r=>r.createdAt>=c.matchStartedAt);
   if(c.active||!c.matchStartedAt)return null;
-  const away=Boolean(c.fixture?.away);
+  // Once the match is over the cup already points at the next fixture (opponent, venue, maybe a journey);
+  // the summary shows the match that was played, as the report recorded it.
+  const opponent=report?.opponent??c.opponent,away=report?.away??Boolean(c.fixture?.away),clubScore=report?.homeScore??c.homeScore,opponentScore=report?.awayScore??c.awayScore;
   const top=[...(report?.players??[])].sort((a,b)=>b.rating-a.rating).slice(0,3);
   const rewards=features.history.filter(e=>e.timestamp>= (report?.createdAt??c.lastTickAt)-1000 && /prämie|freigeschaltet|gewonnen|aufstieg|turnieraus|derby/i.test(e.title)).slice(-6);
-  return <section className="post-match-summary" aria-label="Matchabschluss"><p className="eyebrow">ABPFIFF · {report?.competition??(c.mode==='season'?'SAISON':'TURNIER')}</p><div className="summary-score"><strong>{away?c.opponent:features.club.name}</strong><b>{away?c.awayScore:c.homeScore} : {away?c.homeScore:c.awayScore}</b><strong>{away?features.club.name:c.opponent}</strong></div>
+  return <section className="post-match-summary" aria-label="Matchabschluss"><p className="eyebrow">ABPFIFF · {report?.competition??(c.mode==='season'?'SAISON':'TURNIER')}</p><div className="summary-score"><strong>{away?opponent:features.club.name}</strong><b>{away?opponentScore:clubScore} : {away?clubScore:opponentScore}</b><strong>{away?features.club.name:opponent}</strong></div>
   <p>{c.lastResult}{c.penaltyEvents.length>0&&` · Elfmeterschiessen ${c.penaltyHomeScore}:${c.penaltyAwayScore}`}</p>
   {c.simulation&&<div className="summary-match-stats"><span>Schüsse: {c.broadcast?.clubStats.shots??0} : {c.broadcast?.opponentStats.shots??0}</span><span>Aufs Tor: {c.broadcast?.clubStats.onTarget??0} : {c.broadcast?.opponentStats.onTarget??0}</span></div>}
   {c.matchEvents.length>0&&<div className="summary-goals">{c.matchEvents.map(e=><span key={e.id}>{goalLabel(e)}</span>)}</div>}

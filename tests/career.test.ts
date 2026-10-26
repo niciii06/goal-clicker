@@ -163,3 +163,15 @@ test('eight-report legacy saves retain available data and the historical panel v
  const restored=normalizeGameFeatures(old);assert.equal(restored.career.reports.length,8);assert.equal(restored.career.reports[0].events,undefined);
  restored.cup.active=true;assert.equal(renderToStaticMarkup(React.createElement(MatchRatingsPanel,{features:restored,minute:30})), '');
 });
+
+test('the match summary shows the opponent that was played, even when the cup already points at the next fixture', async () => {
+ const { PostMatchSummary } = await import('../app/career-panels.tsx');
+ const f=fixture(); f.cup.opponent='FC Gestern'; f.cup.fixture={id:'played',away:false,venue:f.cup.fixture?.venue??({} as never),opponentId:'x'};
+ finishFixture(f,3); recordCareerMatch(f);
+ // A journey to the next round, or a reload, sets the next opponent and an away venue before the summary is closed.
+ f.cup.opponent='FC Luzerne'; f.cup.fixture={...f.cup.fixture!,id:'next',away:true};
+ const html=renderToStaticMarkup(React.createElement(PostMatchSummary,{features:f,onCareer:()=>{},onContinue:()=>{}}));
+ const score=html.match(/<div class="summary-score"><strong>([^<]*)<\/strong><b>([^<]*)<\/b><strong>([^<]*)<\/strong>/)!;
+ assert.deepEqual(score.slice(1),[f.club.name,'3 : 0','FC Gestern']);
+ assert.doesNotMatch(html,/FC Luzerne/);
+});
