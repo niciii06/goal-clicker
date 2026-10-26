@@ -45,12 +45,14 @@ test("loaned players disappear from every squad list without looking suspended",
 });
 
 test("Fabrizio stays available while the player transfer market is closed", async () => {
-  const [apiSource, pageSource] = await Promise.all([
+  const [apiSource, pageSource, routesSource] = await Promise.all([
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/tab-routes.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(pageSource, /type FeatureTab = "fabrizio"/);
+  assert.match(pageSource, /type FeatureTab = RoutedTab;/);
+  assert.match(routesSource, /fabrizio: '\/club\/fabrizio'/);
   assert.match(pageSource, /\{ id: "fabrizio", label: "Fabrizio" \}/);
   assert.match(pageSource, /Keine Spielerkäufe bei Fabrizio/);
   assert.match(pageSource, /featureTab === "fabrizio"/);
