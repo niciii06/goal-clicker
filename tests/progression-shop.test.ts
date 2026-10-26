@@ -126,3 +126,19 @@ test('player statistics equal the authoritative match records and are counted on
   assert.match(html, new RegExp(`<dt>Tore</dt><dd>${f.career.players[scorer].goals}</dd>`));
   assert.match(html, new RegExp(`<dt>Assists</dt><dd>${f.career.players[scorer].assists}</dd>`));
 });
+
+test('formation picker lists available formations first, locked ones in unlock order', async () => {
+  const { sortFormationsForPicker } = await import('../app/season-progression');
+  const { STAR_FORMATIONS } = await import('../app/feature-data');
+  const reached = 12;
+  const available = (f: { id: string }) => isLeagueContentUnlocked(getFormationUnlockLeague(f.id), reached);
+  const sorted = sortFormationsForPicker(STAR_FORMATIONS, available);
+  assert.equal(sorted.length, STAR_FORMATIONS.length);
+  const firstLocked = sorted.findIndex(f => !available(f));
+  assert.ok(firstLocked > 0, 'some formations are available at Liga 12');
+  assert.ok(sorted.slice(firstLocked).every(f => !available(f)), 'no available formation after a locked one');
+  const lockedLeagues = sorted.slice(firstLocked).map(f => getFormationUnlockLeague(f.id));
+  assert.deepEqual(lockedLeagues, [...lockedLeagues].sort((a, b) => b - a), 'locked formations follow the unlock order');
+  const availableIds = sorted.slice(0, firstLocked).map(f => f.id);
+  assert.deepEqual(availableIds, STAR_FORMATIONS.filter(available).map(f => f.id), 'available formations keep the catalogue order');
+});

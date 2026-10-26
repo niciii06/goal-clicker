@@ -165,3 +165,10 @@ export function getSeasonPath(currentGoals: number, completedSeasons: number) {
     reward,
   };
 }
+
+/** Formations for the picker: available ones first in catalogue order, locked ones after them
+ * in the order they unlock (Liga 15 is the entry, so Liga 14 comes before Liga 13). */
+export function sortFormationsForPicker<T extends { id: string }>(formations: readonly T[], isUnlocked: (formation: T) => boolean) {
+  return formations.map((formation, index) => ({ formation, index, rank: isUnlocked(formation) ? 0 : 100 - getFormationUnlockLeague(formation.id) }))
+    .sort((first, second) => first.rank - second.rank || first.index - second.index).map((entry) => entry.formation);
+}
