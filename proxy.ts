@@ -1,11 +1,16 @@
-// Next.js 16 proxy (formerly middleware): refreshes an expiring Supabase session before pages and API
-// routes read it, and passes the renewed cookies to both the route and the browser.
+// Next.js 16 proxy (formerly middleware): sends odd spellings of tab addresses to the real one, refreshes
+// an expiring Supabase session before pages and API routes read it, and passes the renewed cookies to
+// both the route and the browser.
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { authConfigured, supabasePublishableKey, supabaseUrl } from "./app/auth/config";
+import { canonicalTabPath } from "./app/tab-routes";
 
 export async function proxy(request: NextRequest) {
+  // /Kader or /kader/ lead to /kader.
+  const canonical = canonicalTabPath(request.nextUrl.pathname);
+  if (canonical) { const url = request.nextUrl.clone(); url.pathname = canonical; return NextResponse.redirect(url, 308); }
   if (!authConfigured()) return NextResponse.next();
   let response = NextResponse.next({ request });
   const supabase = createServerClient(supabaseUrl(), supabasePublishableKey(), {

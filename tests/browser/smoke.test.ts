@@ -208,6 +208,36 @@ test('the press conference appears after a finished match and accepts one answer
   await page.close();
 });
 
+test('every tab has its own address, and switching tabs or going back keeps the game running', async () => {
+  const now = Date.now();
+  const { page, problems } = await openWithSave(VIEWPORTS[0], save(richFeatures(now), now));
+  const current = () => page.locator('nav[aria-label="Hauptnavigation"] [aria-current="page"]').getAttribute('aria-label');
+  await openTab(page, 'Kader');
+  assert.equal(new URL(page.url()).pathname, '/kader');
+  // State that lives only in the mounted game: it survives tab changes and the back button.
+  await page.getByLabel('Spieler im Reservekader suchen').fill('Zidane');
+  await openTab(page, 'Spiele');
+  assert.equal(new URL(page.url()).pathname, '/spiele');
+  await openTab(page, 'Club & Mehr');
+  await page.getByRole('tab', { name: 'Missionen' }).click();
+  assert.equal(new URL(page.url()).pathname, '/club/missionen');
+  await page.goBack(); await page.goBack(); await page.goBack();
+  await page.waitForTimeout(500);
+  assert.equal(new URL(page.url()).pathname, '/kader');
+  assert.equal(await current(), 'Kader');
+  assert.equal(await page.getByLabel('Spieler im Reservekader suchen').inputValue(), 'Zidane', 'the game was not reloaded');
+  // Direct links open their tab; other spellings lead to the real address; unknown paths do not exist.
+  await page.goto(`${BASE}/Karriere`, { waitUntil: 'networkidle' });
+  assert.equal(new URL(page.url()).pathname, '/karriere');
+  assert.equal(await current(), 'Karriere');
+  await page.goto(`${BASE}/packs/album`, { waitUntil: 'networkidle' });
+  assert.equal(await current(), 'Packs & Album');
+  assert.equal(await page.getByRole('tab', { name: 'Sammelalbum' }).getAttribute('aria-selected'), 'true');
+  assert.equal((await fetch(`${BASE}/gibt-es-nicht`)).status, 404);
+  assert.deepEqual(problems, []);
+  await page.close();
+});
+
 test('switching from co-op back to single player asks first', async () => {
   const now = Date.now();
   const { page } = await openWithSave(VIEWPORTS[0], save(richFeatures(now), now));

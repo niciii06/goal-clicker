@@ -16,6 +16,10 @@ Browser Prüfung: `npm run test:browser` startet den Produktionsbuild mit `next 
 
 **Projektstruktur:** `app/page.tsx` enthält die App Komponente; Typen, Konstanten, Wirtschaft, Spielstand, Formatierung, Koop Hilfen und kleine Komponenten liegen in `app/game/`. `app/feature-data.ts` enthält die Spiellogik; Typen, Kataloge und Texte liegen in `app/features/` und werden von `feature-data.ts` unverändert weiter exportiert. Reiserouten (`app/route-cache/`) lädt der Browser erst nach dem Start, und er bekommt eine schlanke Kopie der FC 27 Indien Daten; beides regeln die `imports` mit der Bedingung `browser` in `package.json`.
 
+**Adressen:** Jeder Reiter hat eine eigene Adresse: `/home`, `/spiele`, `/kader`, `/karriere`, `/packs`, `/packs/album`, `/club`, `/club/fabrizio`, `/club/missionen`, `/club/verlauf` (Liste in `app/tab-routes.ts`). Alle zeigen dieselbe Seite (Rewrites in `next.config.ts`), deshalb lädt ein Reiterwechsel das Spiel nie neu; die Zurück Taste wechselt den Reiter.
+
+**Stadion:** Das 2D Spiel zeigt immer das ganze Stadion, jeder Platz ist sichtbar (Fan oder leerer Sitz). Die Zuschauerzahl hängt von Stadion, Fanstimmung, Gegner, Derby, Tabelle, Pokalrunde, Wetter und Anstosszeit ab (`app/stadium-profiles.ts`, `app/match-stadium.ts`). Im Spiel laufen Stadionsounds (`app/match-audio.ts`): Fangemurmel, Pfiffe, Jubel, Raunen und Gesänge; die Aufnahmen sind CC0 (`public/sounds/LICENSES.md`).
+
 **Reisen:** Die Mannschaft nimmt die schnellste Verbindung von Tür zu Tür: unter 80 km immer den Teambus, sonst Bus, Zug (Intercity ab Bern, EuroCity nach Mailand, TGV Lyria nach Paris) oder Flugzeug ab Zürich bzw. Genf. Busse fahren auf echten Strassen (OSRM), Züge auf echten Gleisen (BRouter, Fahrzeiten gerundet nach Fahrplan). `npx tsx scripts/travel/fetch-real-routes.mts` ergänzt fehlende Strecken im Routencache und teilt ihn neu auf; die Heimadresse wird dabei nie an einen Routingdienst geschickt.
 
 **Hosting:** Next.js 16 auf Vercel, Daten in Supabase (PostgreSQL), Login mit Google über Supabase Auth. Anleitung: [HOSTING.md](HOSTING.md). Laufende Datenbankinhalte und Browser Spielstände sind nicht Teil dieses Repositories.

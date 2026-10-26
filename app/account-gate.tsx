@@ -343,7 +343,7 @@ function LoginForm({ message, onSignedIn }: { message?: string; onSignedIn: () =
     <h2>{mode === "login" ? "Anmelden" : "Konto erstellen"}</h2>
     <p>Melde dich an, damit dein Spielstand auf allen deinen Geräten gleich ist.</p>
     {message && <p className="account-notice" role="status">{message}</p>}
-    <button type="button" className="account-google" disabled={busy} onClick={() => void signInWithGoogle("/").catch((failure: unknown) => setError(authErrorMessage(failure)))}><span aria-hidden="true">G</span>Mit Google anmelden</button>
+    <button type="button" className="account-google" disabled={busy} onClick={() => void signInWithGoogle(window.location.pathname).catch((failure: unknown) => setError(authErrorMessage(failure)))}><span aria-hidden="true">G</span>Mit Google anmelden</button>
     <div className="account-divider"><span>oder mit Benutzername</span></div>
     <div className="account-tabs" role="tablist">
       <button type="button" role="tab" aria-selected={mode === "login"} className={mode === "login" ? "active" : ""} onClick={() => switchMode("login")}>Anmelden</button>
