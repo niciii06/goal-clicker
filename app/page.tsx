@@ -18,7 +18,7 @@ import { AccountButton, AccountLink, SaveTransferPanel } from "./account-panel";
 import { ConfirmDialog } from "./confirm-dialog";
 import { TAB_PATHS, tabForPath } from "./tab-routes";
 import type { RoutedTab } from "./tab-routes";
-import { gameAudioContext } from "./match-audio";
+import { gameAudioContext, playPackReveal } from "./match-audio";
 import { MatchAudio } from "./match-audio-player";
 import { AccountContext, AccountGate } from "./account-gate";
 import { FLUSH_SAVE_EVENT } from "./cloud-sync";
@@ -244,6 +244,9 @@ function App() {
   const [seasonStandingsAnnouncement, setSeasonStandingsAnnouncement] = useState<SeasonStandingsAnnouncement | null>(null);
   const [starReveal, setStarReveal] = useState<StarPackReveal | null>(null);
   const [starWalkoutReady, setStarWalkoutReady] = useState(false);
+  // How far the reveal had already run when it appeared (after a reload); fixed for the whole animation.
+  const [starRevealLag, setStarRevealLag] = useState(0);
+  const packSoundRef = useRef<(() => void) | null>(null);
   const [activeMiniGame, setActiveMiniGame] = useState<MiniGameId | null>(null);
   const [penaltyGame, setPenaltyGame] = useState<PenaltyGame | null>(null);
   const [dribbleGame, setDribbleGame] = useState<DribbleGame | null>(null);
@@ -444,12 +447,13 @@ function App() {
   const starRevealIsRare = starRevealTier === "rare";
   const starRevealTrollActive = Boolean(starReveal?.troll && starRevealIsWalkout && starRevealAge < PACK_TROLL_INTRO_MS);
   const starRevealTrollDelay = starReveal?.troll && starRevealIsWalkout ? PACK_TROLL_INTRO_MS : 0;
-  const starRevealPresentationAge = Math.max(0, starRevealAge - starRevealTrollDelay);
   const starWalkoutIsTop = starRevealIsWalkout && (starReveal?.player.rating ?? 0) >= 90;
   const starWalkoutConfetti = starRevealIsLegendary || starWalkoutIsTop ? GOLD_CONFETTI : starRevealIsIconic ? SILVER_CONFETTI : null;
   const starWalkoutAnimationDuration = starWalkoutIsTop ? STAR_TOP_WALKOUT_ANIMATION_MS : STAR_WALKOUT_ANIMATION_MS;
-  const starWalkoutElapsed = Math.min(starWalkoutAnimationDuration, starRevealPresentationAge);
-  const starRareElapsed = Math.min(STAR_RARE_REVEAL_DURATION_MS, starRevealAge);
+  // The CSS animations start once and keep their own clock. Their delay must not follow the one-second
+  // countdown tick, otherwise every tick pushes them forward and the reveal races through in a second.
+  const starWalkoutElapsed = Math.min(starWalkoutAnimationDuration, Math.max(0, starRevealLag - starRevealTrollDelay));
+  const starRareElapsed = Math.min(STAR_RARE_REVEAL_DURATION_MS, starRevealLag);
   const starWalkoutPresentation = starReveal ? getWalkoutPresentation(starReveal.player) : null;
   const starWalkoutStyle = starWalkoutPresentation ? {
     "--walkout-skin": starWalkoutPresentation.skin,
@@ -856,7 +860,15 @@ function App() {
     if (starRevealTimerRef.current) window.clearTimeout(starRevealTimerRef.current);
     const elapsed = Math.max(0, Date.now() - reveal.openedAt);
     const revealDuration = getStarRevealReadyDelay(reveal);
+    setStarRevealLag(elapsed);
     setStarReveal(reveal);
+    packSoundRef.current?.();
+    packSoundRef.current = null;
+    // Only a reveal that starts now gets its sound, not one restored half way through after a reload.
+    if (gameRef.current.sound && elapsed < 1000) {
+      const tier = getStarCardTier(reveal.player), walkout = tier === "walkout" || tier === "icon" || tier === "legendary";
+      packSoundRef.current = playPackReveal(tier, { top: reveal.player.rating >= 90, delay: reveal.troll && walkout ? PACK_TROLL_INTRO_MS - elapsed : -elapsed });
+    }
     if (elapsed < revealDuration) {
       const tier = getStarCardTier(reveal.player);
       if (tier === "walkout" || tier === "icon" || tier === "legendary") vibrate([90, 50, 90, 50, 260]);
@@ -873,6 +885,8 @@ function App() {
 
   function dismissStarReveal() {
     packPurchaseRef.current = false;
+    packSoundRef.current?.();
+    packSoundRef.current = null;
     if (starRevealTimerRef.current) window.clearTimeout(starRevealTimerRef.current);
     starRevealTimerRef.current = null;
     setStarWalkoutReady(false);

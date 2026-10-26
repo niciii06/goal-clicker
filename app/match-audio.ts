@@ -98,11 +98,16 @@ export class StadiumAudio {
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
   }
 
-  async start() {
+  /** Loads the crowd recordings without starting the constant crowd (for short effects like pack openings). */
+  async load() {
     const names = Object.keys(SAMPLE_URLS) as SampleName[];
     const buffers = await Promise.all(names.map((name) => loadSample(this.ctx, name)));
-    if (this.stopped) return;
     names.forEach((name, i) => { const buffer = buffers[i]; if (buffer) this.samples[name] = buffer; });
+  }
+
+  async start() {
+    await this.load();
+    if (this.stopped) return;
     // The constant crowd: the murmur recording (or filtered noise without it) plus a low rumble.
     const murmur = this.samples.murmur;
     if (murmur) this.loop(murmur, this.bed, 1);
@@ -234,6 +239,72 @@ export class StadiumAudio {
     this.claps(3, .25, tune.length * .46 + 1.7, .26);
   }
 
+  /** Rising filtered noise: the tension before a reveal. */
+  riser(length: number, delay = 0, volume = .22) {
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass'; filter.Q.value = 2.5;
+    const { gain, t, end } = this.envelope(volume, length * .9, .02, .25, delay);
+    filter.frequency.setValueAtTime(220, t);
+    filter.frequency.exponentialRampToValueAtTime(3200, t + length);
+    filter.connect(gain);
+    this.play(this.noise, filter, t, end, 1, Math.random());
+  }
+
+  /** A fast swish of air as something flies in. */
+  whoosh(delay = 0, volume = .22) {
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass'; filter.Q.value = 1.4;
+    const { gain, t, end } = this.envelope(volume, .12, .05, .35, delay);
+    filter.frequency.setValueAtTime(600, t);
+    filter.frequency.exponentialRampToValueAtTime(2600, t + .2);
+    filter.frequency.exponentialRampToValueAtTime(900, t + .5);
+    filter.connect(gain);
+    this.play(this.noise, filter, t, end, 1, Math.random());
+  }
+
+  /** A deep hit, like a drum in an arena. */
+  boom(delay = 0, volume = .55) {
+    const { gain, t, end } = this.envelope(volume, .006, .04, .9, delay);
+    const osc = this.ctx.createOscillator();
+    osc.frequency.setValueAtTime(140, t);
+    osc.frequency.exponentialRampToValueAtTime(42, t + .5);
+    osc.connect(gain); osc.start(t); osc.stop(end + .05);
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass'; filter.frequency.value = 900;
+    const hit = this.envelope(volume * .5, .002, .02, .18, delay);
+    filter.connect(hit.gain);
+    this.play(this.noise, filter, hit.t, hit.end, 1, Math.random());
+  }
+
+  /** A bright shimmer for a good card. */
+  chime(delay = 0, volume = .14, notes = [1046.5, 1318.5, 1568, 2093]) {
+    notes.forEach((freq, i) => {
+      const { gain, t, end } = this.envelope(volume, .01, .05, 1.1, delay + i * .07);
+      const osc = this.ctx.createOscillator();
+      osc.type = 'triangle'; osc.frequency.setValueAtTime(freq, t);
+      osc.connect(gain); osc.start(t); osc.stop(end + .05);
+    });
+  }
+
+  /** Pyrotechnics: hissing launches and crackling bursts. */
+  fireworks(count: number, delay = 0, volume = .2) {
+    for (let i = 0; i < count; i++) {
+      const at = delay + i * (.18 + Math.random() * .2);
+      const hiss = this.ctx.createBiquadFilter();
+      hiss.type = 'highpass'; hiss.frequency.value = 3000;
+      const launch = this.envelope(volume * .5, .05, .25, .2, at);
+      hiss.connect(launch.gain);
+      this.play(this.noise, hiss, launch.t, launch.end, 1, Math.random());
+      for (let k = 0; k < 6; k++) {
+        const crack = this.ctx.createBiquadFilter();
+        crack.type = 'bandpass'; crack.frequency.value = 1800 + Math.random() * 2500; crack.Q.value = 3;
+        const pop = this.envelope(volume * (.6 + Math.random() * .4), .002, .005, .06, at + .5 + Math.random() * .35);
+        crack.connect(pop.gain);
+        this.play(this.noise, crack, pop.t, pop.end, 1, Math.random());
+      }
+    }
+  }
+
   cue(cue: SoundCue) {
     if (cue.kind === 'kickoff') { this.whistle(.55); this.applause(.35, 1.2); }
     else if (cue.kind === 'halftime') { this.whistle(.28); this.whistle(.85, .45); this.applause(.4, 2); }
@@ -256,4 +327,37 @@ export class StadiumAudio {
 /** How full and big the ground is, 0 to 1, for the loudness of the crowd. */
 export function crowdSize(attendance: number) {
   return Math.max(0, Math.min(1, Math.sqrt(Math.max(0, attendance) / 40000)));
+}
+
+export type PackRevealTier = 'standard' | 'rare' | 'walkout' | 'icon' | 'legendary';
+
+/**
+ * Sound for a pack opening, timed to the animation: a short shimmer for a normal card, a riser and a
+ * chime for a rare one, and for a walkout tension, a hit for the flag, the positions and the rating, then
+ * fireworks and the crowd when the player walks out. Returns a function that stops it early.
+ */
+export function playPackReveal(tier: PackRevealTier, options: { top?: boolean; delay?: number } = {}) {
+  const ctx = gameAudioContext();
+  if (!ctx) return () => {};
+  const fx = new StadiumAudio(ctx, 1);
+  fx.setEnabled(true);
+  const timers: number[] = [];
+  const at = (ms: number, run: () => void) => { timers.push(window.setTimeout(run, ms + (options.delay ?? 0))); };
+  void fx.load().then(() => {
+    if (tier === 'standard') at(0, () => fx.chime(0, .08, [784, 988, 1175]));
+    else if (tier === 'rare') { at(0, () => fx.riser(.6, 0, .16)); at(600, () => { fx.boom(0, .3); fx.chime(); fx.applause(.25, .8); }); }
+    else {
+      const name = options.top ? 8000 : 6200, walk = options.top ? 5500 : 4500;
+      at(0, () => { fx.riser(1, 0, .2); fx.boom(.5, .25); });
+      at(1000, () => { fx.whoosh(); fx.boom(.05, .5); });
+      at(2900, () => fx.whoosh(0, .16));
+      at(3350, () => fx.riser(.2, 0, .18));
+      at(3550, () => { fx.boom(0, .7); fx.ooh(.5, 1.05, 1.8); if (tier !== 'walkout') fx.chime(.1, .12); });
+      at(walk, () => { fx.fireworks(options.top ? 7 : 4); fx.applause(.35, 2.5); });
+      at(name, () => { fx.cheer(true); fx.chime(0, .1); });
+    }
+    // Let the last sound ring out, then release the nodes.
+    at(tier === 'standard' ? 2500 : tier === 'rare' ? 4000 : (options.top ? 8000 : 6200) + 7000, () => fx.stop());
+  });
+  return () => { timers.forEach((timer) => window.clearTimeout(timer)); fx.stop(); };
 }

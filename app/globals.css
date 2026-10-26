@@ -1990,3 +1990,35 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
   .gc-sub-panel .starxi-lineup-heading small { text-align: left; }
   .gc-sub-panel.gc-squad-substitutions { padding: 10px; border-radius: 16px; }
 }
+
+/* Walkout in stages, like a pack opening on TV: the flag fills the stage and flies to its corner, then the
+   positions, then the rating in the middle, and only then the player walks out and his name
+   appears. The stage is a size container so the big moments can be centred with cqw/cqh. */
+.star-walkout-stage { container-type: size; }
+.star-walkout-country { transform-origin: 0 0; animation: star-walkout-country-stage 1.8s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(1s + var(--walkout-delay, 0ms)); }
+.star-walkout-rating-panel > .starxi-position-badges { opacity: 0; animation: star-walkout-position 700ms cubic-bezier(.16,1,.3,1) both; animation-delay: calc(2.9s + var(--walkout-delay, 0ms)); }
+.star-walkout-rating-panel strong { transform-origin: 0 100%; animation: star-walkout-rating-stage 1.7s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(3.4s + var(--walkout-delay, 0ms)); }
+.star-walkout-rating-panel em { animation-delay: calc(5s + var(--walkout-delay, 0ms)); }
+.star-walkout-avatar-wrap { animation-name: star-avatar-walk-late; }
+.star-walkout-avatar-wrap .avatar-arm, .star-walkout-avatar-wrap .avatar-leg { animation-iteration-count: 3; animation-delay: calc(4.5s + var(--walkout-delay, 0ms)); }
+.star-reveal-top-walkout .star-walkout-avatar-wrap .avatar-arm, .star-reveal-top-walkout .star-walkout-avatar-wrap .avatar-leg { animation-iteration-count: 3; animation-delay: calc(5.6s + var(--walkout-delay, 0ms)); }
+.star-walkout-nameplate { animation-delay: calc(6.2s + var(--walkout-delay, 0ms)); }
+.star-reveal-top-walkout .star-walkout-nameplate { animation-delay: calc(8s + var(--walkout-delay, 0ms)); }
+@keyframes star-walkout-country-stage {
+  0% { opacity: 0; transform: translate(calc(50cqw - 30px - 50%), calc(38cqh - 30px - 50%)) scale(.6); filter: blur(10px); }
+  15% { opacity: 1; transform: translate(calc(50cqw - 30px - 50%), calc(38cqh - 30px - 50%)) scale(2.1); filter: blur(0); }
+  58% { opacity: 1; transform: translate(calc(50cqw - 30px - 50%), calc(38cqh - 30px - 50%)) scale(2); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes star-walkout-rating-stage {
+  0% { opacity: 0; transform: translate(calc(50cqw - 30px - 50%), calc(-50cqh + 95px)) scale(.4); filter: blur(16px); }
+  18% { opacity: 1; transform: translate(calc(50cqw - 30px - 50%), calc(-50cqh + 95px)) scale(2.6); filter: blur(0); }
+  60% { opacity: 1; transform: translate(calc(50cqw - 30px - 50%), calc(-50cqh + 95px)) scale(2.4); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes star-avatar-walk-late {
+  0%, 47% { opacity: 0; transform: translate3d(0,34px,-180px) scale(.5); filter: blur(8px) brightness(.4); }
+  53% { opacity: 1; }
+  72% { opacity: 1; transform: translate3d(0,0,0) scale(1); filter: blur(0) brightness(1); }
+  100% { opacity: 1; transform: translate3d(0,0,0) scale(1); filter: none; }
+}
