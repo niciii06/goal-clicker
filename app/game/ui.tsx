@@ -36,6 +36,15 @@ export function iconPaths(name: IconName): ReactNode {
     case "sound": return <><path d="M4 10v4h3l4 3V7L7 10H4Z" {...stroke} /><path d="M15 9.5c1.4 1.3 1.4 3.7 0 5M17.5 7.3c2.5 2.4 2.5 7 0 9.4" {...stroke} /></>;
     case "mute": return <><path d="M4 10v4h3l4 3V7L7 10H4Z" {...stroke} /><path d="m16 10 4 4m0-4-4 4" {...stroke} /></>;
     case "broadcast": return <><circle cx="12" cy="12" r="2" {...stroke} /><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2" {...stroke} /></>;
+    case "home": return <path d="M4 11.2 12 4.5l8 6.7M6.5 9.4V19.5h4v-5h3v5h4V9.4" {...stroke} />;
+    case "trophy": return <path d="M8 4.5h8v5a4 4 0 0 1-8 0v-5ZM8 6.5H5v1.2A3.3 3.3 0 0 0 8.3 11M16 6.5h3v1.2a3.3 3.3 0 0 1-3.3 3.3M12 13.5v3.5M8.5 20h7M9.5 20l.5-3h4l.5 3" {...stroke} />;
+    case "squad": return <><circle cx="9" cy="8.5" r="3" {...stroke} /><path d="M3.5 19c.4-3.3 2.3-5.2 5.5-5.2s5.1 1.9 5.5 5.2" {...stroke} /><path d="M15.5 5.8a3 3 0 0 1 0 5.6M17.3 14.2c1.9.6 3 2.2 3.2 4.8" {...stroke} /></>;
+    case "career": return <path d="M4 19.5h16M6.5 16v-4M10.5 16V9M14.5 16v-3M18.5 16V6.5M6.5 8.5l4-3.5 4 3 4-3.5" {...stroke} />;
+    case "cards": return <><rect x="8" y="3.5" width="11" height="15" rx="2" {...stroke} /><path d="M5.5 6.8 5 7a2 2 0 0 0-1.2 2.5l3 9.5a2 2 0 0 0 2.5 1.3l4.2-1.3" {...stroke} /></>;
+    case "shield": return <path d="M12 3.5 5 6v5.5c0 4.2 2.9 7.5 7 9 4.1-1.5 7-4.8 7-9V6l-7-2.5ZM9 12l2 2 4-4" {...stroke} />;
+    case "bell": return <path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 1.5H5l1.5-1.5ZM10 20.5a2.2 2.2 0 0 0 4 0" {...stroke} />;
+    case "vibrate": return <><rect x="8" y="4" width="8" height="16" rx="2" {...stroke} /><path d="M5 8.5v7M3 10.5v3M19 8.5v7M21 10.5v3" {...stroke} /></>;
+    case "grip": return <path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" {...stroke} strokeWidth={3} />;
     default: return <circle cx="12" cy="12" r="8" {...stroke} />;
   }
 }
