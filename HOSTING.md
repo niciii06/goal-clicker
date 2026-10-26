@@ -11,7 +11,7 @@ Die bisherige ChatGPT Sites Version ist davon unabhängig. Nichts in diesem Repo
 
 ## Lokal entwickeln
 
-Voraussetzungen: Node.js ab 22.13, npm, Git. Für Multiplayer lokal zusätzlich ein PostgreSQL (Supabase CLI mit Docker oder ein normales PostgreSQL).
+Voraussetzungen: Node.js 24, npm, Git. Für Multiplayer lokal zusätzlich ein PostgreSQL (Supabase CLI mit Docker oder ein normales PostgreSQL).
 
 ```sh
 git clone https://github.com/niciii06/goal-clicker.git
