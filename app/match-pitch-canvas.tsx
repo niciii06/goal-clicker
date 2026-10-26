@@ -1,11 +1,11 @@
 'use client';
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { getVisualFrame } from './match-visual-frame';
 import type { Actor, Replay } from './match-visual-frame';
 import type { GameFeatures } from './feature-data';
 import { MatchPresentation, resolvedBall } from './match-motion';
 import { InteractivePitchCanvas } from './interactive-pitch-canvas';
-import { computeAmbience, drawAtmosphere, drawPitchside, drawStands, drawWeather, STADIUM_VIEW } from './stadium-ambience';
+import { computeAmbience, drawAtmosphere, drawPitchside, drawStands, drawWeather, stadiumView } from './stadium-ambience';
 import { matchStadium } from './match-stadium';
 import type { Ambience } from './stadium-ambience';
 export { MatchMotion, BallMotion, resolvedBall, MatchPresentation } from './match-motion';
@@ -51,6 +51,9 @@ export function LegacyPitchCanvas({features,now,replay,colours,camera,reducedMot
  const offset=useRef(0);
  useLayoutEffect(()=>{latest.current={features,now,replay,colours,camera,reducedMotion,onSelect,onFps};offset.current=now-Date.now();},[features,now,replay,colours,camera,reducedMotion,onSelect,onFps]);
  const displayed=useRef<Actor[]>([]),view=useRef({x:52.5,y:34,zoom:1}),ambience=useRef<{key:string;value?:Ambience}>({key:''});
+ const stadiumKey=`${features.cup.careerMatchId}:${features.cup.matchStartedAt}:${features.cup.fixture?.id??''}`;
+ // eslint-disable-next-line react-hooks/exhaustive-deps -- the stadium only changes with the match
+ const shape=useMemo(()=>stadiumView(matchStadium(features)),[stadiumKey]);
  useEffect(()=>{
   const el=canvas.current;if(!el)return;
   const ctx=el.getContext('2d');if(!ctx)return;
@@ -69,11 +72,11 @@ export function LegacyPitchCanvas({features,now,replay,colours,camera,reducedMot
    const zoom=data.camera==='full'?1:data.camera==='follow'?1.35:frame.recent?1.35:1;
    view.current.zoom+=(zoom-view.current.zoom)*Math.min(1,dt*3);
    view.current.x+=(clamp(frame.ball.x,38,67)-view.current.x)*Math.min(1,dt*2);view.current.y+=(clamp(frame.ball.y,24,44)-view.current.y)*Math.min(1,dt*2);
-   const scale=Math.min(width/STADIUM_VIEW.width,height/STADIUM_VIEW.height)*view.current.zoom;
-   const center=data.camera==='full'?{x:52.5,y:34}:view.current;
-   ctx.setTransform(scale,0,0,scale,width/2-center.x*scale,height/2-center.y*scale);
    const cup=data.features.cup,ambienceKey=`${cup.careerMatchId}:${cup.matchStartedAt}:${data.features.press.fanMood}`;
    if(ambience.current.key!==ambienceKey)ambience.current={key:ambienceKey,value:computeAmbience(cup,data.features.press.fanMood,undefined,matchStadium(data.features))};
+   const stadium=stadiumView(ambience.current.value?.stadium),scale=Math.min(width/stadium.width,height/stadium.height)*view.current.zoom;
+   const center=data.camera==='full'?{x:stadium.centerX,y:stadium.centerY}:view.current;
+   ctx.setTransform(scale,0,0,scale,width/2-center.x*scale,height/2-center.y*scale);
    drawMatchFrame(ctx,frame,actors,data.colours,cup,ball,{ambience:ambience.current.value!,now:timestamp,animate:!data.reducedMotion});
    ctx.setTransform(1,0,0,1,0,0);
    frames++;if(timestamp-sampleAt>=1000){data.onFps(Math.round(frames*1000/(timestamp-sampleAt)));frames=0;sampleAt=timestamp;}
@@ -84,9 +87,9 @@ export function LegacyPitchCanvas({features,now,replay,colours,camera,reducedMot
   return()=>{stopped=true;cancelAnimationFrame(request);document.removeEventListener('visibilitychange',visibility);};
  },[]);
  const select=(event:React.PointerEvent<HTMLCanvasElement>)=>{
-  const el=canvas.current;if(!el)return;const b=el.getBoundingClientRect(),z=view.current.zoom,scale=Math.min(b.width/STADIUM_VIEW.width,b.height/STADIUM_VIEW.height)*z,center=camera==='full'?{x:52.5,y:34}:view.current;
+  const el=canvas.current;if(!el)return;const b=el.getBoundingClientRect(),z=view.current.zoom,stadium=stadiumView(ambience.current.value?.stadium),scale=Math.min(b.width/stadium.width,b.height/stadium.height)*z,center=camera==='full'?{x:stadium.centerX,y:stadium.centerY}:view.current;
   const x=(event.clientX-b.left-b.width/2)/scale+center.x,y=(event.clientY-b.top-b.height/2)/scale+center.y;
   const p=displayed.current.find(p=>Math.hypot(p.x-x,p.y-y)<3.2);if(p)onSelect(p.id);
  };
- return <canvas ref={canvas} className="gc-viewer-pitch" role="img" aria-label="Live Fussballfeld mit 22 bewegten Spielern und Ball; Spieler antippen für Details" onPointerDown={select}><svg viewBox="-3 -3 111 74" aria-label="Fussballfeld"><rect width="105" height="68" fill="#237648"/><path d="M52.5 0V68" stroke="white"/></svg></canvas>;
+  return <canvas ref={canvas} className="gc-viewer-pitch" style={{'--stadium-ratio':(shape.width/shape.height).toFixed(4)} as React.CSSProperties} role="img" aria-label="Live Fussballfeld mit 22 bewegten Spielern und Ball; Spieler antippen für Details" onPointerDown={select}><svg viewBox="-3 -3 111 74" aria-label="Fussballfeld"><rect width="105" height="68" fill="#237648"/><path d="M52.5 0V68" stroke="white"/></svg></canvas>;
 }

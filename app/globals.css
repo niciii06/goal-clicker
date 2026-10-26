@@ -1507,10 +1507,11 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .gc-viewer-score{text-align:center;white-space:nowrap}
 .gc-viewer-score span{display:block;font-size:clamp(22px,3vw,37px);font-weight:900;letter-spacing:.01em}
 .gc-viewer-score small{font-size: var(--text-caption2)}
-.gc-viewer-pitch-shell{border:1px solid rgba(230,255,238,.14);border-radius:12px;background:#183e2e;overflow:hidden}
+.gc-viewer-pitch-shell{border:1px solid rgba(230,255,238,.14);border-radius:12px;background:#1d262b;overflow:hidden}
 .gc-viewer-pitch-head{display:flex;justify-content:space-between;gap:8px;padding:9px 12px;color:#dcf7e5;background:#102f23;font-size: var(--text-caption2);font-weight:800;letter-spacing:.06em}
 .gc-live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;background:#74f7a4;box-shadow:0 0 9px #74f7a4}
-.gc-viewer-pitch{display:block;width:100%;height:auto;aspect-ratio:121/84;max-height:580px;background:#2a3036}
+/* The canvas has the shape of the whole stadium; on wide screens it stays centred instead of showing more ground. */
+.gc-viewer-pitch{--pitch-max-height:min(640px,76vh);display:block;width:min(100%,calc(var(--pitch-max-height) * var(--stadium-ratio,1.44)));height:auto;aspect-ratio:var(--stadium-ratio,1.44);margin-inline:auto;background:#262f35}
 .gc-viewer-legend{display:flex;flex-wrap:wrap;gap:7px 14px;align-items:center;justify-content:center;padding:8px 10px;font-size: var(--text-caption2);color:#c3dacd}
 .gc-viewer-legend span{display:flex;align-items:center;gap:6px}
 .gc-viewer-legend i{width:10px;height:10px;border:1px solid white;border-radius:50%}

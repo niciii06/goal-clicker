@@ -84,3 +84,39 @@ test('one stadium has one capacity, whichever club or tournament leads there', (
   assert.equal(stadiumProfile(VENUES.lugano).capacity, stadiumProfile(club('FC Lugano')).capacity);
   assert.equal(stadiumProfile(VENUES.stgallen).capacity, stadiumProfile(club('FC St. Gallen 1879')).capacity);
 });
+
+test('the crowd depends on the match: derby, final, weather, weekday and opponent', async () => {
+  const { crowdBoost } = await import('../app/stadium-profiles');
+  const venue = club('BSC Young Boys'), fill = (crowd: import('../app/stadium-profiles').CrowdFactors, seed = 'm') => stadiumProfile(venue, { seed, crowd }).attendance;
+  const base = { opponentRating: 70, weather: 'clear' as const, time: 'day' as const, weekday: 6 };
+  assert.ok(fill({ ...base, derby: true }) > fill(base), 'a derby draws more people');
+  assert.ok(fill({ ...base, weather: 'rain' }) < fill(base), 'rain keeps people at home');
+  assert.ok(fill({ ...base, weekday: 2 }) < fill(base), 'a weekday afternoon is emptier than a Saturday');
+  assert.ok(fill({ ...base, opponentRating: 95 }) > fill({ ...base, opponentRating: 50 }), 'a strong opponent draws more people');
+  assert.ok(fill({ ...base, cupRound: 3, cupRounds: 4 }) > fill({ ...base, cupRound: 1, cupRounds: 4 }), 'later cup rounds are fuller');
+  assert.ok(crowdBoost({ tablePosition: 1, tableSize: 10 }) > crowdBoost({ tablePosition: 10, tableSize: 10 }), 'promotion race beats relegation battle');
+  for (const seed of ['a', 'b', 'c', 'd']) {
+    const final = stadiumProfile(venue, { seed, crowd: { ...base, weather: 'rain', cupRound: 4, cupRounds: 4 } });
+    assert.ok(final.attendance >= final.capacity * .92 && final.attendance <= final.capacity, 'a final is close to sold out');
+  }
+  for (const c of SEASON_CLUBS.slice(0, 40)) for (const crowd of [{ ...base, derby: true, cupRound: 4, cupRounds: 4, opponentRating: 99 }, { weather: 'snow' as const, weekday: 2, time: 'day' as const, opponentRating: 40, tablePosition: 10, tableSize: 10 }]) {
+    const p = stadiumProfile(c.venue, { seed: c.id, crowd });
+    assert.ok(p.attendance > 0 && p.attendance <= p.capacity, c.name);
+  }
+});
+
+test('the drawn stadium has every place visible and fills them like the attendance', async () => {
+  const { computeAmbience, crowdSummary, stadiumBounds, stadiumView } = await import('../app/stadium-ambience');
+  const small = stadiumProfile(club('FC Bethlehem BE'), { seed: 's' }), big = stadiumProfile(VENUES.milan, { seed: 's' });
+  for (const profile of [small, big, stadiumProfile(club('BSC Young Boys'), { seed: 's' })]) {
+    const ambience = { ...computeAmbience({ matchStartedAt: 1_000_000, fixture: undefined, careerMatchId: 'x', opponent: 'FC Test' }), stadium: profile };
+    const { places, fans, away } = crowdSummary(ambience);
+    assert.ok(places > 0, profile.name);
+    assert.ok(Math.abs(fans / places - profile.attendance / profile.capacity) < .02, `${profile.name}: ${fans}/${places} vs ${profile.attendance}/${profile.capacity}`);
+    assert.ok(away > 0 && away < fans / 4, `${profile.name}: away fans ${away}`);
+    // The full camera shows the whole ground: its view contains the outer edge of every stand.
+    const b = stadiumBounds(profile), v = stadiumView(profile);
+    assert.ok(v.centerX - v.width / 2 < b.left && v.centerX + v.width / 2 > b.right && v.centerY - v.height / 2 < b.top && v.centerY + v.height / 2 > b.bottom);
+  }
+  assert.ok(stadiumView(big).width > stadiumView(small).width, 'a big stadium has deeper stands');
+});

@@ -80,11 +80,50 @@ const LAYOUT: Record<StadiumCategory, Pick<StadiumProfile, 'stands' | 'tiers' | 
   elite: { stands: { top: 'tiered', bottom: 'tiered', left: 'tiered', right: 'tiered' }, tiers: 3, roof: true, floodlights: 'roof', boards: true },
 };
 
+/** What draws people to a particular match. Every field is optional; missing ones are neutral. */
+export type CrowdFactors = {
+  /** Strength of the visiting side, 40 to 99. */
+  opponentRating?: number;
+  derby?: boolean;
+  /** League position of the home club and of the opponent (1 = top) in a table of `tableSize` teams. */
+  tablePosition?: number;
+  opponentTablePosition?: number;
+  tableSize?: number;
+  /** Cup round (1 based) out of `cupRounds`; the last round is the final. */
+  cupRound?: number;
+  cupRounds?: number;
+  weather?: 'clear' | 'cloudy' | 'rain' | 'snow';
+  time?: 'day' | 'dusk' | 'night';
+  /** 0 Sunday to 6 Saturday, at the venue. */
+  weekday?: number;
+};
+
+/** Share of the seats a match fills on top of the usual crowd of the ground, from about -.25 to +.45. */
+export function crowdBoost(c: CrowdFactors = {}) {
+  let boost = 0;
+  if (c.opponentRating !== undefined) boost += (Math.max(40, Math.min(99, c.opponentRating)) - 65) / 34 * .12;
+  if (c.derby) boost += .16;
+  const size = c.tableSize ?? 0;
+  if (size > 2 && c.tablePosition) {
+    // Promotion races fill the ground, relegation battles empty it; a top-of-the-table clash draws extra.
+    if (c.tablePosition <= 2) boost += .07; else if (c.tablePosition > size - 2) boost -= .07;
+    if (c.opponentTablePosition && c.tablePosition <= 3 && c.opponentTablePosition <= 3) boost += .06;
+  }
+  if (c.cupRound && c.cupRounds) boost += c.cupRound >= c.cupRounds ? .4 : (c.cupRound - 1) / Math.max(1, c.cupRounds - 1) * .2;
+  boost += { clear: 0, cloudy: -.02, rain: -.07, snow: -.1 }[c.weather ?? 'clear'];
+  if (c.weekday !== undefined) {
+    const weekend = c.weekday === 0 || c.weekday === 6 || (c.weekday === 5 && c.time !== 'day');
+    boost += weekend ? .04 : c.time === 'day' ? -.08 : -.03;
+  }
+  return boost;
+}
+
 /**
- * Stadium of a fixture venue. `homeDivision` sizes the player's own ground; `fanMood` (0 to 100)
- * and the seed set the attendance, which stays below capacity unless the mood is at its best.
+ * Stadium of a fixture venue. `homeDivision` sizes the player's own ground; `fanMood` (0 to 100),
+ * the match (`crowd`) and the seed set the attendance, which stays below capacity unless everything
+ * comes together. A final is close to sold out.
  */
-export function stadiumProfile(venue: Venue | undefined, options: { homeDivision?: number; fanMood?: number; seed?: string; home?: boolean } = {}): StadiumProfile {
+export function stadiumProfile(venue: Venue | undefined, options: { homeDivision?: number; fanMood?: number; seed?: string; home?: boolean; crowd?: CrowdFactors } = {}): StadiumProfile {
   const v = venue ?? HOME_VENUE;
   const own = options.home || v.id === HOME_VENUE.id;
   let capacity: number, capacitySource: StadiumProfile['capacitySource'] = 'known', signature: StadiumSignature | undefined;
@@ -101,7 +140,10 @@ export function stadiumProfile(venue: Venue | undefined, options: { homeDivision
   // Small grounds are rarely full; big clubs usually are. Fan mood lifts the home crowd.
   const base = { amateur: .3, regional: .38, 'pro-small': .5, 'pro-medium': .62, national: .74, elite: .86 }[category];
   const mood = Math.max(0, Math.min(100, options.fanMood ?? 60)) / 100;
-  const fill = Math.max(.12, Math.min(1, base + (own ? (mood - .5) * .3 : 0) + (hash(`${v.id}:${options.seed ?? ''}`) - .5) * .16));
+  const crowd = options.crowd ?? {}, final = Boolean(crowd.cupRound && crowd.cupRounds && crowd.cupRound >= crowd.cupRounds);
+  let fill = base + (own ? (mood - .5) * .3 : 0) + crowdBoost(crowd) + (hash(`${v.id}:${options.seed ?? ''}`) - .5) * .12;
+  if (final) fill = Math.max(fill, .93 + hash(`final:${options.seed ?? ''}`) * .07);
+  fill = Math.max(.08, Math.min(1, fill));
   return { name: v.stadium, category, capacity, attendance: Math.round(capacity * fill / 10) * 10, capacitySource, ...LAYOUT[category], signature };
 }
 
