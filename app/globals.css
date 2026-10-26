@@ -1024,6 +1024,11 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
   .side-column-stack-achievements { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tournament-grid { grid-template-columns: 1fr; }
 }
+/* iPad portrait: three dashboard columns would squeeze the season table; use two like on large phones. */
+@media (min-width: 781px) and (max-width: 1000px) {
+  .side-column.layout-card { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .side-column-stack-achievements { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 540px) {
   .side-column.layout-card { grid-template-columns: 1fr; }
   .side-column-stack-achievements { grid-column: auto; grid-template-columns: 1fr; }
@@ -1956,3 +1961,33 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .confirm-dialog h2 { margin: 0 0 8px; font-size: var(--text-title3); }
 .confirm-dialog p { margin: 0; color: var(--soft); line-height: 1.45; }
 .confirm-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+
+/* The in-match lineup editor looks like the "Kader" tab: same heading, formation box, pitch and bench. */
+.gc-sub-panel.gc-squad-substitutions { border: 1px solid var(--line-soft); border-radius: 22px; padding: 18px; }
+.gc-sub-panel .starxi-lineup-heading { margin-top: 10px; gap: 16px; }
+.gc-sub-panel .starxi-lineup-heading small { text-align: right; line-height: 1.4; }
+.gc-sub-panel .starxi-squad-layout { margin-top: 11px; }
+.gc-sub-panel .starxi-pitch { min-height: 520px; }
+.gc-sub-panel .starxi-formation-grid { min-height: 510px; }
+.starxi-formation-fixed { justify-self: end; min-width: 120px; padding: 8px 14px; border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent); border-radius: 10px; color: var(--text); background: var(--surface-raised); font-size: var(--text-footnote); font-weight: 800; text-align: center; }
+
+/* Tablets (iPad portrait and landscape): pitch on top, bench and reserve below with room for full names. */
+@media (min-width: 781px) and (max-width: 1200px) {
+  .starxi-squad-layout { grid-template-columns: 1fr; }
+  .starxi-pitch-panel .starxi-pitch, .starxi-pitch-panel .starxi-formation-picker, .starxi-pitch-help { max-width: 760px; margin-left: auto; margin-right: auto; }
+  .starxi-pitch-panel .starxi-formation-picker { margin-top: 10px; }
+  .starxi-pitch { min-height: 470px; }
+  .starxi-formation-grid { min-height: 460px; }
+  .starxi-pitch-slot { width: clamp(88px, 17%, 124px); }
+  .starxi-filter-tools { grid-template-columns: minmax(0, 1fr) 170px; }
+  .starxi-bank-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .starxi-reserve-list { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 330px; align-content: start; }
+}
+@media (min-width: 781px) and (max-width: 900px) {
+  .starxi-bank-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 780px) {
+  .gc-sub-panel .starxi-lineup-heading { flex-direction: column; align-items: flex-start; }
+  .gc-sub-panel .starxi-lineup-heading small { text-align: left; }
+  .gc-sub-panel.gc-squad-substitutions { padding: 10px; border-radius: 16px; }
+}

@@ -63,9 +63,9 @@ export function MatchSquadEditor({features:f,title,intro,disabled,initialSlot=nu
  const position=selectedSlot!==null?positions[selectedSlot]:null;
  return <div ref={panel} onKeyDown={e=>{if(e.key==='Escape')onCancel();}} className="gc-sub-panel gc-squad-substitutions" role="region" aria-label={title}>
   <div className="gc-sub-heading"><h3>{title}</h3><span>{STAR_XI_MAX_SUBSTITUTIONS-f.cup.substitutionsUsed-incoming.length} Wechsel übrig</span><button type="button" onClick={onCancel}>Schliessen</button></div>
-  <p>{intro}</p>
+  <div className="starxi-lineup-heading"><span>DEINE ELF / {formation.label}</span><small>{intro}</small></div>
   <div className="starxi-squad-layout">
-   <SquadPitchPanel status={selectedSlot===null?'Feldspieler wählen':`Platz ${selectedSlot+1} · ${position}`} help={`Live Wechsel: Bankspieler auf den passenden Feldspieler ziehen oder zwei Spieler nacheinander antippen, um sie zu tauschen. Maximal ${STAR_XI_MAX_SUBSTITUTIONS} Wechsel, ${f.cup.substitutionsUsed} bereits genutzt.`}>{formation.slots.map((slot,index)=>{
+   <SquadPitchPanel status={selectedSlot===null?'Spieler wählen':`Platz ${selectedSlot+1} · ${position}`} controls={<div className="starxi-formation-picker"><span><strong>FORMATION</strong><small>Während des Spiels fest · {f.cup.substitutionsUsed} von {STAR_XI_MAX_SUBSTITUTIONS} Wechseln genutzt</small></span><div className="starxi-formation-fixed">{formation.label}</div></div>} help={`Live Wechsel: Bankspieler auf den passenden Feldspieler ziehen oder zwei Spieler nacheinander antippen, um sie zu tauschen. Maximal ${STAR_XI_MAX_SUBSTITUTIONS} Wechsel, ${f.cup.substitutionsUsed} bereits genutzt.`}>{formation.slots.map((slot,index)=>{
     const id=lineup[index],player=getStarXIPlayer(id)??null,dismissed=f.cup.sentOffPlayerIds.includes(id);
     const detail=[id&&!f.starXI.lineupIds.includes(id)?'NEU':'',fitness(id)].filter(Boolean).join(' · ');
     return <SquadPitchSlot key={`${formation.id}-${index}`} features={f} drag={drag} index={index} position={positions[index]} x={slot.x} y={slot.y} player={player} selected={selectedSlot===index} liveRating={player?getCupPlayerMatchRating(f.cup,player.id,minute):null} draggable={!disabled&&!dismissed} disabled={disabled||!player||dismissed} touchDrag detail={detail} onClick={()=>chooseSlot(index)}/>;

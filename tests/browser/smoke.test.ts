@@ -14,7 +14,7 @@ import { prepareCareerMatch } from '../../app/career-data.ts';
 const PORT = Number(process.env.SMOKE_PORT ?? 8799);
 const BASE = `http://127.0.0.1:${PORT}`;
 const SAVE_KEY = 'goalClickerSiteSaveV3';
-const VIEWPORTS = [{ name: 'desktop', width: 1280, height: 900 }, { name: 'mobile', width: 390, height: 844 }] as const;
+const VIEWPORTS = [{ name: 'desktop', width: 1280, height: 900 }, { name: 'mobile', width: 390, height: 844 }, { name: 'tablet portrait', width: 834, height: 1194 }, { name: 'tablet landscape', width: 1194, height: 834 }] as const;
 const TABS = ['Home', 'Spiele', 'Kader', 'Karriere', 'Packs & Album', 'Club & Mehr'];
 // Nothing is expected to fail to load.
 const IGNORED_URL = /^$/;
