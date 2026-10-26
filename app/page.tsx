@@ -15,6 +15,7 @@ import { DailyRewardCard } from "./daily-reward-panel";
 import { FootballGraphic, GameErrorBoundary, Icon, StarXIPositionBadges } from "./game/ui";
 import { LiveMatchViewer } from "./match-viewer";
 import { AccountButton, AccountLink, SaveTransferPanel } from "./account-panel";
+import { ConfirmDialog } from "./confirm-dialog";
 import { AccountContext, AccountGate } from "./account-gate";
 import { FLUSH_SAVE_EVENT } from "./cloud-sync";
 import { SquadBenchCard, SquadBenchPanel, SquadBenchSlot, SquadPitchPanel, SquadPitchSlot, formatStarXIPositions, useSquadDrag } from "./squad-board";
@@ -189,6 +190,7 @@ function App() {
   const [coopRoomName, setCoopRoomName] = useState("Meine Welt");
   const [lobbyBonusCode, setLobbyBonusCode] = useState("");
   const [coopSession, setCoopSession] = useState<CoopSession | null>(null);
+  const [confirmSingle, setConfirmSingle] = useState(false);
   const [savedRooms, setSavedRooms] = useState<CoopRoom[]>([]);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [coopMessage, setCoopMessage] = useState("");
@@ -2446,8 +2448,11 @@ function App() {
         <div className="top-actions"><AccountButton /><button className="icon-button" aria-label="Benachrichtigungsverlauf" onClick={()=>setFeatureTab("history")}><Icon name="bell" size={18} /></button><button className="icon-button" onClick={toggleSound} aria-label={game.sound ? "Sound ausschalten" : "Sound einschalten"}><Icon name={game.sound ? "sound" : "mute"} size={17} /></button>{vibrationSupported && <button className={`icon-button vibration-toggle${vibrationEnabled ? "" : " off"}`} onClick={toggleVibration} aria-pressed={vibrationEnabled} aria-label={vibrationEnabled ? "Vibration ausschalten" : "Vibration einschalten"}><Icon name="vibrate" size={18} /></button>}<button className="reset-button" onClick={resetGame}>Reset</button></div>
       </header>
 
+      {confirmSingle && <ConfirmDialog title="Zum Singleplayer wechseln?" confirmLabel="Wechseln" onCancel={() => setConfirmSingle(false)} onConfirm={() => { setConfirmSingle(false); setAppMode("single"); }}>
+        <p>{coopSession ? `Du verlässt „${coopSession.room.roomName}“. Die Welt bleibt gespeichert und du kannst jederzeit zurück.` : "Du verlässt den Koop Multiplayer und spielst mit deinem eigenen Spielstand weiter."}</p>
+      </ConfirmDialog>}
       <nav className="mode-switch" aria-label="Spielmodus">
-        <button className={appMode === "single" ? "active" : ""} onClick={() => setAppMode("single")}>Singleplayer</button>
+        <button className={appMode === "single" ? "active" : ""} onClick={() => { if (appMode === "coop") setConfirmSingle(true); }}>Singleplayer</button>
         <button className={appMode === "coop" ? "active" : ""} onClick={() => setAppMode("coop")}>Koop Multiplayer</button>
       </nav>
       <AccountLink playerId={playerId} onPlayerId={adoptAccountPlayerId} onMessage={accountMessage} />

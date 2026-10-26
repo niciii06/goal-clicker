@@ -1950,3 +1950,9 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 
 /* Keyboard focus: one clear ring in the accent colour. */
 :where(button, a, input, select, textarea, summary, [tabindex]):focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 2px; }
+
+/* Confirmation before leaving co-op and similar choices. */
+.confirm-dialog { width: min(420px, 100%); }
+.confirm-dialog h2 { margin: 0 0 8px; font-size: var(--text-title3); }
+.confirm-dialog p { margin: 0; color: var(--soft); line-height: 1.45; }
+.confirm-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; flex-wrap: wrap; }

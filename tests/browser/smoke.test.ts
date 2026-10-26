@@ -204,6 +204,29 @@ test('the press conference appears after a finished match and accepts one answer
   await page.close();
 });
 
+test('switching from co-op back to single player asks first', async () => {
+  const now = Date.now();
+  const { page } = await openWithSave(VIEWPORTS[0], save(richFeatures(now), now));
+  const single = page.getByRole('button', { name: 'Singleplayer', exact: true });
+  const coop = page.getByRole('button', { name: 'Koop Multiplayer', exact: true });
+  await single.click();
+  assert.equal(await page.getByRole('alertdialog').count(), 0, 'no question while already in single player');
+  await coop.click();
+  await single.click();
+  const dialog = page.getByRole('alertdialog', { name: 'Zum Singleplayer wechseln?' });
+  await dialog.waitFor({ timeout: 3000 });
+  await dialog.getByRole('button', { name: 'Abbrechen' }).click();
+  assert.equal(await dialog.count(), 0);
+  assert.match(await coop.getAttribute('class') ?? '', /active/, 'cancel stays in co-op');
+  await single.click();
+  await page.keyboard.press('Escape');
+  assert.match(await coop.getAttribute('class') ?? '', /active/, 'Escape stays in co-op');
+  await single.click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Wechseln' }).click();
+  assert.match(await single.getAttribute('class') ?? '', /active/, 'confirm switches to single player');
+  await page.close();
+});
+
 test('the layout checker itself reports overlapping text, unreadable text and horizontal overflow', async () => {
   const page = await browser.newPage({ viewport: { width: 400, height: 600 } });
   await page.addInitScript('globalThis.__name = (fn) => fn;');
