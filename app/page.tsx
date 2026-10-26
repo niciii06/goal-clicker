@@ -16,6 +16,8 @@ import { FootballGraphic, GameErrorBoundary, Icon, StarXIPositionBadges } from "
 import { LiveMatchViewer } from "./match-viewer";
 import { AccountButton, AccountLink, SaveTransferPanel } from "./account-panel";
 import { ConfirmDialog } from "./confirm-dialog";
+import { gameAudioContext } from "./match-audio";
+import { MatchAudio } from "./match-audio-player";
 import { AccountContext, AccountGate } from "./account-gate";
 import { FLUSH_SAVE_EVENT } from "./cloud-sync";
 import { resolveSquadTap, SquadBenchCard, SquadBenchPanel, SquadBenchSlot, SquadPitchPanel, SquadPitchSlot, formatStarXIPositions, useSquadDrag } from "./squad-board";
@@ -253,7 +255,6 @@ function App() {
   const [dailyBusy, setDailyBusy] = useState(false);
   const [pressBusy, setPressBusy] = useState(false);
   const clubGoalRef = useRef<string | null>(null);
-  const audioRef = useRef<AudioContext | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const starRevealTimerRef = useRef<number | null>(null);
   const cupCardTimerRef = useRef<number | null>(null);
@@ -1972,11 +1973,8 @@ function App() {
 
   function playTone(frequency: number, duration: number, type: OscillatorType = "sine", volume = 0.03, delay = 0) {
     if (!gameRef.current.sound || typeof window === "undefined") return;
-    const AudioClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioClass) return;
-    if (!audioRef.current) audioRef.current = new AudioClass();
-    const audio = audioRef.current;
-    if (audio.state === "suspended") void audio.resume();
+    const audio = gameAudioContext();
+    if (!audio) return;
     const oscillator = audio.createOscillator();
     const gain = audio.createGain();
     const start = audio.currentTime + delay;
@@ -2594,6 +2592,7 @@ function App() {
             </section>}
             {!displayGame.features.cup.active && <details className="season-overview"><summary>Saisontabelle · {getSeasonModeDivisionLabel(seasonMode.division)}</summary><div className="season-table">{seasonTable.map((team,index)=><div className={`season-table-row${team.id==='club'?' club':''}`} key={team.id}><i>{index+1}</i><strong>{team.name}</strong><small>{team.points} P · {team.played} SP · {team.wins}-{team.draws}-{team.losses} · TD {formatGoalDifference(team)}</small></div>)}</div></details>}
             <details className="tournament-reward-odds"><summary>Turnierprämie: {getTournamentRewardPack(selectedTournament.id).label} · Chancen anzeigen</summary><div className="star-pack-odds">{getRewardPackOdds(getTournamentRewardPack(selectedTournament.id).id as import('./feature-data').RewardPackId).map(o=><span key={o.label}><em>{o.label}</em><b>{formatPackChance(o.chance)}</b></span>)}</div><small>Eine Basiskarte. Keine Custom-, Icon- oder legendären Karten.</small></details>
+            <MatchAudio features={displayGame.features} now={countdownNow} sound={displayGame.sound} />
             {displayGame.features.cup.active && <LiveMatchViewer key={displayGame.features.cup.careerMatchId ?? displayGame.features.cup.matchStartedAt} features={displayGame.features} now={countdownNow} clubName={displayClubName} clubColor={displayClubColor} disabled={coopBusy} onEdit={()=>{void editInteractiveMatch();}} onBatch={draft=>{void batchInteractiveMatch(draft);}} onResume={()=>{void resumeInteractiveMatch();}} onSubstitute={changes=>{void confirmMatchChanges(changes);}} />}
               {activeMatchInjury && <div className="cup-injury-pause" role="alert"><div className="cup-injury-pause-icon">🩹</div><div><span className="eyebrow">MEDIZINISCHE PAUSE / {activeMatchInjury.minute}′</span><h4>{activeMatchInjury.player} muss raus.</h4><p>{activeMatchInjury.reason}. Die Verletzung zählt für dieses Spiel und noch {activeMatchInjury.matches} {activeMatchInjury.matches === 1 ? "weitere Partie" : "weitere Partien"}.</p><small>Wähle den verletzten Platz und danach einen passenden Bankspieler – oder setze die Partie ohne Wechsel fort.</small></div><div className="cup-injury-pause-actions"><button className="mode-primary" onClick={() => { document.querySelector<HTMLButtonElement>(".match-sub-button")?.click(); }} disabled={coopBusy || !lineupStarIds.includes(activeMatchInjury.playerId)}>Auswechslungen</button><button className="mode-secondary" onClick={() => void resumeCupWithoutSubstitution()} disabled={coopBusy}>Ohne Wechsel weiterspielen</button></div></div>}
 

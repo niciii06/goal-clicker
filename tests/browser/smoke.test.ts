@@ -172,6 +172,8 @@ test('a live interactive match draws the 2D pitch with stands and the match tabs
   for (const viewport of VIEWPORTS) {
     const now = Date.now();
     const { page, problems } = await openWithSave(viewport, save(liveMatch(now), now));
+    const sounds: string[] = [];
+    page.on('response', (response) => { if (response.url().includes('/sounds/') && response.ok()) sounds.push(response.url()); });
     assert.ok(await openTab(page, 'Spiele · LIVE'), 'live tab missing');
     const canvas = page.locator('canvas.gc-viewer-pitch').first();
     await canvas.waitFor({ timeout: 15000 });
@@ -185,6 +187,8 @@ test('a live interactive match draws the 2D pitch with stands and the match tabs
       await page.waitForTimeout(500);
       assert.deepEqual((await layoutProblems(page)).filter((p) => !p.startsWith('overlap')), [], `${viewport.name} / ${tab}`);
     }
+    // The stadium sound loads its crowd recordings once the match is on screen.
+    assert.ok(['crowd-murmur', 'crowd-applause', 'crowd-ooh'].every((name) => sounds.some((url) => url.includes(name))), `stadium sounds: ${sounds.join(', ')}`);
     assert.deepEqual(problems, []);
     await page.close();
   }
