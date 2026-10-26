@@ -85,3 +85,28 @@ test('the substitution impact compares prepared match ratings', () => {
   const impact = applyCupSubstitution(f.cup, outgoing, incoming, 60);
   assert.equal(impact.ratingDelta, Math.min(100, getStarXIPlayer(incoming)!.rating + 3) - getStarXIPlayer(outgoing)!.rating);
 });
+
+test('two taps swap or substitute like a drag, in either order, and a third tap on the pick clears it', async () => {
+  const { resolveSquadTap } = await import('../app/squad-board');
+  type Source = import('../app/game/types').SquadDragSource; type Target = import('../app/game/types').SquadDropTarget;
+  const f = liveMatch(5), lineup = [...f.starXI.lineupIds], bench = matchBenchPreview(f, lineup), { slot, incoming } = benchSwap(f);
+  const canDrop = (source: Source, target: Target) => Boolean(moveInMatchLineup(lineup, bench, source, target));
+  const benchIndex = bench.indexOf(incoming);
+  const slotPick = { source: { playerId: lineup[slot], area: 'lineup' as const, index: slot }, target: { area: 'lineup' as const, index: slot } };
+  const benchPick = { source: { playerId: incoming, area: 'bench' as const, index: benchIndex }, target: { area: 'bench' as const, index: benchIndex } };
+  // Pitch player first, then the bench card: the bench player comes on for him.
+  assert.deepEqual(resolveSquadTap(slotPick, benchPick, canDrop), { move: [slotPick.source, benchPick.target] });
+  // Bench card first, then the pitch player: the same substitution.
+  assert.deepEqual(resolveSquadTap(benchPick, slotPick, canDrop), { move: [benchPick.source, slotPick.target] });
+  // Two pitch players swap their places.
+  const other = { source: { playerId: lineup[slot === 1 ? 2 : 1], area: 'lineup' as const, index: slot === 1 ? 2 : 1 }, target: { area: 'lineup' as const, index: slot === 1 ? 2 : 1 } };
+  const swap = resolveSquadTap(slotPick, other, canDrop);
+  assert.ok('move' in swap);
+  const swapped = moveInMatchLineup(lineup, bench, ...swap.move)!;
+  assert.equal(swapped[slot], lineup[other.target.index]);
+  assert.equal(swapped[other.target.index], lineup[slot]);
+  // Tapping the pick again clears it; a move that is not allowed picks the new spot instead.
+  assert.deepEqual(resolveSquadTap(slotPick, slotPick, canDrop), { pick: null });
+  assert.deepEqual(resolveSquadTap(slotPick, other, () => false), { pick: other });
+  assert.deepEqual(resolveSquadTap(null, benchPick, canDrop), { pick: benchPick });
+});

@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { matchChangeError, getCupMatchMinute, getCupPlayerMatchRating, getStarFormation, getStarXIPlayer, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS } from './feature-data';
 import type { GameFeatures, MatchChange } from './feature-data';
 import { matchBenchPreview } from './match-commands';
-import { SquadBenchCard, SquadBenchPanel, SquadBenchSlot, SquadPitchPanel, SquadPitchSlot, useSquadDrag } from './squad-board';
+import { resolveSquadTap, SquadBenchCard, SquadBenchPanel, SquadBenchSlot, SquadPitchPanel, SquadPitchSlot, useSquadDrag } from './squad-board';
+import type { SquadPick } from './squad-board';
 import type { SquadDragSource, SquadDropTarget } from './game/types';
 
 export function substitutionError(features:GameFeatures,id:string,slot:number) {
@@ -45,23 +46,26 @@ export function MatchSquadEditor({features:f,title,intro,disabled,initialSlot=nu
   if(reason){setMessage(reason);return;}
   setPast(p=>[...p,lineup]);setLineup(next);setMessage('');
  };
- const drag=useSquadDrag({canDrop,onDrop:apply,onBlocked:()=>setMessage('Dieser Wechsel ist wegen Position oder Spielstatus nicht möglich.'),locked:source=>disabled||source.area==='reserve'});
  const benchSource=(index:number):SquadDragSource=>({playerId:bench[index],area:'bench',index});
- const chooseSlot=(index:number)=>{
-  if(selectedBench!==null&&bench[selectedBench]){apply(benchSource(selectedBench),{area:'lineup',index});return;}
-  setSelectedSlot(current=>current===index?null:index);setSelectedBench(null);setMessage('');
+ const slotSource=(index:number):SquadDragSource=>({playerId:lineup[index],area:'lineup',index});
+ const picked=():SquadPick|null=>selectedSlot!==null?{source:slotSource(selectedSlot),target:{area:'lineup',index:selectedSlot}}:selectedBench!==null&&bench[selectedBench]?{source:benchSource(selectedBench),target:{area:'bench',index:selectedBench}}:null;
+ const drag=useSquadDrag({canDrop,onDrop:apply,onBlocked:()=>setMessage('Dieser Wechsel ist wegen Position oder Spielstatus nicht möglich.'),locked:source=>disabled||source.area==='reserve',picked:()=>picked()?.source??null});
+ // First tap picks a player, the second swaps or substitutes; see resolveSquadTap.
+ const tap=(tapped:SquadPick)=>{
+  const result=resolveSquadTap(picked(),tapped,canDrop);
+  if('move' in result){apply(...result.move);return;}
+  setSelectedSlot(result.pick?.target?.area==='lineup'?result.pick.target.index:null);
+  setSelectedBench(result.pick?.target?.area==='bench'?result.pick.target.index:null);setMessage('');
  };
- const chooseBench=(index:number)=>{
-  if(selectedSlot!==null){apply(benchSource(index),{area:'lineup',index:selectedSlot});return;}
-  setSelectedBench(current=>current===index?null:index);setMessage('');
- };
+ const chooseSlot=(index:number)=>tap({source:slotSource(index),target:{area:'lineup',index}});
+ const chooseBench=(index:number)=>tap({source:benchSource(index),target:{area:'bench',index}});
  const remove=(id:string)=>{const slot=lineup.indexOf(id),out=outgoing[incoming.indexOf(id)];if(slot<0||!out)return;const next=[...lineup];next[slot]=out;setPast(p=>[...p,lineup]);setLineup(next);setMessage(validate(next));};
  const position=selectedSlot!==null?positions[selectedSlot]:null;
  return <div ref={panel} onKeyDown={e=>{if(e.key==='Escape')onCancel();}} className="gc-sub-panel gc-squad-substitutions" role="region" aria-label={title}>
   <div className="gc-sub-heading"><h3>{title}</h3><span>{STAR_XI_MAX_SUBSTITUTIONS-f.cup.substitutionsUsed-incoming.length} Wechsel übrig</span><button type="button" onClick={onCancel}>Schliessen</button></div>
   <p>{intro}</p>
   <div className="starxi-squad-layout">
-   <SquadPitchPanel status={selectedSlot===null?'Feldspieler wählen':`Platz ${selectedSlot+1} · ${position}`} help={`Live Wechsel: Bankspieler direkt auf den passenden Feldspieler ziehen oder wie bisher beide anklicken. Maximal ${STAR_XI_MAX_SUBSTITUTIONS} Wechsel, ${f.cup.substitutionsUsed} bereits genutzt.`}>{formation.slots.map((slot,index)=>{
+   <SquadPitchPanel status={selectedSlot===null?'Feldspieler wählen':`Platz ${selectedSlot+1} · ${position}`} help={`Live Wechsel: Bankspieler auf den passenden Feldspieler ziehen oder zwei Spieler nacheinander antippen, um sie zu tauschen. Maximal ${STAR_XI_MAX_SUBSTITUTIONS} Wechsel, ${f.cup.substitutionsUsed} bereits genutzt.`}>{formation.slots.map((slot,index)=>{
     const id=lineup[index],player=getStarXIPlayer(id)??null,dismissed=f.cup.sentOffPlayerIds.includes(id);
     const detail=[id&&!f.starXI.lineupIds.includes(id)?'NEU':'',fitness(id)].filter(Boolean).join(' · ');
     return <SquadPitchSlot key={`${formation.id}-${index}`} features={f} drag={drag} index={index} position={positions[index]} x={slot.x} y={slot.y} player={player} selected={selectedSlot===index} liveRating={player?getCupPlayerMatchRating(f.cup,player.id,minute):null} draggable={!disabled&&!dismissed} disabled={disabled||!player||dismissed} touchDrag detail={detail} onClick={()=>chooseSlot(index)}/>;
@@ -73,14 +77,14 @@ export function MatchSquadEditor({features:f,title,intro,disabled,initialSlot=nu
      const leaving=outgoing.includes(player.id),subbedOut=Boolean(f.cup.playerExitedAt[player.id]);
      const fits=selectedSlot!==null&&canDrop(benchSource(index),{area:'lineup',index:selectedSlot});
      const status=subbedOut?'Bereits ausgewechselt':leaving?'Wird ausgewechselt':selectedSlot!==null?fits?'Nur für dieses Spiel einwechseln':`Passt nicht auf ${position}`:'Auf einen Feldspieler ziehen';
-     return <SquadBenchCard key={player.id} features={f} drag={drag} index={index} player={player} selected={selectedBench===index} incompatible={selectedSlot!==null&&!fits} liveRating={getCupPlayerMatchRating(f.cup,player.id,minute)} status={[status,fitness(player.id)].filter(Boolean).join(' · ')} draggable={!disabled&&!subbedOut} disabled={disabled||(!drag.dragging&&selectedSlot!==null&&!fits)} touchDrag onClick={()=>chooseBench(index)}/>;
+     return <SquadBenchCard key={player.id} features={f} drag={drag} index={index} player={player} selected={selectedBench===index} incompatible={selectedSlot!==null&&!fits} liveRating={getCupPlayerMatchRating(f.cup,player.id,minute)} status={[status,fitness(player.id)].filter(Boolean).join(' · ')} draggable={!disabled&&!subbedOut} disabled={disabled} touchDrag onClick={()=>chooseBench(index)}/>;
     })}</SquadBenchPanel>
    </div>
   </div>
   <div className="gc-sub-confirm" aria-live="polite">
    {incoming.map((id,i)=><span key={id}>{getStarXIPlayer(outgoing[i])?.name} → {getStarXIPlayer(id)?.name} <button type="button" disabled={disabled} onClick={()=>remove(id)}>Entfernen</button></span>)}
    {changed&&!incoming.length&&<span>Positionsänderung geplant</span>}
-   {!changed&&<strong>Ziehe eine Bankkarte auf einen Feldspieler</strong>}
+   {!changed&&<strong>Zwei Spieler antippen oder eine Karte ziehen</strong>}
    <small>{message||error}</small>
    <button type="button" disabled={!past.length||disabled} onClick={()=>{setLineup(past.at(-1)!);setPast(p=>p.slice(0,-1));setMessage('');}}>Rückgängig</button>
    <button type="button" onClick={onCancel}>Abbrechen</button>
@@ -93,5 +97,5 @@ export function MatchSquadEditor({features:f,title,intro,disabled,initialSlot=nu
 export function MatchSubstitutions({features,disabled,onConfirm,onClose}:{features:GameFeatures;disabled:boolean;onConfirm:(changes:{playerId:string;slot:number}[])=>void;onClose:()=>void}) {
  const injurySlot=features.starXI.lineupIds.indexOf(features.cup.lastInjury?.playerId??'');
  const validate=(lineup:string[])=>{const changes=lineupChanges(features,lineup);return changes.length?matchChangeError(features,changes):'';};
- return <MatchSquadEditor features={features} title="Wechseln" intro="Feldspieler wählen, dann Bankkarte. Du kannst die Bankkarte auch auf den Feldspieler ziehen. Alle vorgemerkten Wechsel gemeinsam bestätigen." disabled={disabled} initialSlot={injurySlot>=0?injurySlot:null} validate={validate} confirmBlocked={Boolean(features.cup.pendingSubstitutions)} confirmLabel={n=>`${n} Wechsel bestätigen`} onConfirm={lineup=>{onConfirm(lineupChanges(features,lineup));onClose();}} onCancel={onClose}/>;
+ return <MatchSquadEditor features={features} title="Wechseln" intro="Tippe einen Spieler an und dann den, mit dem er tauschen soll, oder ziehe die Karte direkt hin. Alle vorgemerkten Wechsel gemeinsam bestätigen." disabled={disabled} initialSlot={injurySlot>=0?injurySlot:null} validate={validate} confirmBlocked={Boolean(features.cup.pendingSubstitutions)} confirmLabel={n=>`${n} Wechsel bestätigen`} onConfirm={lineup=>{onConfirm(lineupChanges(features,lineup));onClose();}} onCancel={onClose}/>;
 }

@@ -18,7 +18,8 @@ import { AccountButton, AccountLink, SaveTransferPanel } from "./account-panel";
 import { ConfirmDialog } from "./confirm-dialog";
 import { AccountContext, AccountGate } from "./account-gate";
 import { FLUSH_SAVE_EVENT } from "./cloud-sync";
-import { SquadBenchCard, SquadBenchPanel, SquadBenchSlot, SquadPitchPanel, SquadPitchSlot, formatStarXIPositions, useSquadDrag } from "./squad-board";
+import { resolveSquadTap, SquadBenchCard, SquadBenchPanel, SquadBenchSlot, SquadPitchPanel, SquadPitchSlot, formatStarXIPositions, useSquadDrag } from "./squad-board";
+import type { SquadPick } from "./squad-board";
 import { MAX_CAREER_SEASON, SEASON_MILESTONES, getFormationUnlockLeague, sortFormationsForPicker, getPackUnlockLeague, getReachedLeague, getSeasonMilestone, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked, leagueForTier } from "./season-progression";
 import { MULTIPLAYER_PROTOCOL_VERSION } from "./multiplayer-protocol";
 import { PressConferencePanel } from "./press-conference-panel";
@@ -201,6 +202,7 @@ function App() {
   const [selectedTournamentId, setSelectedTournamentId] = useState<TournamentId>("stadium");
   const [selectedLineupSlot, setSelectedLineupSlot] = useState<number | null>(null);
   const [selectedBenchSlot, setSelectedBenchSlot] = useState<number | null>(null);
+  const [selectedReserveId, setSelectedReserveId] = useState<string | null>(null);
   const [starRatingFilter, setStarRatingFilter] = useState("all");
   const [starPositionFilter, setStarPositionFilter] = useState("all");
   const [starSearch, setStarSearch] = useState("");
@@ -215,6 +217,7 @@ function App() {
     onDrop: dropSquadPlayer,
     onBlocked: () => showToast("Dieser Wechsel ist wegen Position oder Spielstatus nicht möglich."),
     locked: (source) => layoutEditMode || coopBusy || (source.area === "reserve" && displayGame.features.cup.active),
+    picked: () => pickedSquadSpot()?.source ?? null,
   });
   const draggingSquadPlayer = squadDrag.dragging;
   const [clubDraft, setClubDraft] = useState(initialGameFeatures().club);
@@ -1511,14 +1514,6 @@ function App() {
     setSelectedBenchSlot(null);
   }
 
-  async function selectStarXIPlayer(playerId: string) {
-    if (activeLineupSlot === null) {
-      showToast("Wähle zuerst einen Platz in der Startelf oder ziehe den Spieler direkt aufs Feld.");
-      return;
-    }
-    await moveStarXIPlayerToLineup(playerId, activeLineupSlot);
-  }
-
   async function changeStarXIFormation(formationId: StarFormationId) {
     if (displayGame.features.cup.active || activeFormation.id === formationId) return;
     const formation = getStarFormation(formationId);
@@ -1603,6 +1598,27 @@ function App() {
     showToast(`${player.name} auf die Bank verschoben`);
   }
 
+  /** The spot picked by a first tap in the "Kader" tab: a pitch place, a bench place or a reserve player. */
+  function pickedSquadSpot(): SquadPick | null {
+    if (activeLineupSlot !== null) { const id = lineupStarIds[activeLineupSlot]; return { source: id ? { playerId: id, area: "lineup", index: activeLineupSlot } : null, target: { area: "lineup", index: activeLineupSlot } }; }
+    if (selectedBenchSlot !== null) { const id = benchStarIds[selectedBenchSlot]; return { source: id ? { playerId: id, area: "bench", index: selectedBenchSlot } : null, target: { area: "bench", index: selectedBenchSlot } }; }
+    return selectedReserveId ? { source: { playerId: selectedReserveId, area: "reserve", index: null }, target: null } : null;
+  }
+
+  function pickSquadSpot(pick: SquadPick | null) {
+    setSelectedLineupSlot(pick?.target?.area === "lineup" ? pick.target.index : null);
+    setSelectedBenchSlot(pick?.target?.area === "bench" ? pick.target.index : null);
+    setSelectedReserveId(pick && !pick.target ? pick.source?.playerId ?? null : null);
+    if (pick?.target) setReservePage(0);
+  }
+
+  // First tap picks, second tap moves or swaps (see resolveSquadTap); drag and drop does the same in one go.
+  function tapSquadSpot(tapped: SquadPick) {
+    const result = resolveSquadTap(pickedSquadSpot(), tapped, canDropSquadPlayer);
+    if ("move" in result) { pickSquadSpot(null); void dropSquadPlayer(...result.move); return; }
+    pickSquadSpot(result.pick);
+  }
+
   function chooseLineupSlot(index: number) {
     const playerId = lineupStarIds[index];
     if (displayGame.features.cup.active && playerId && displayGame.features.cup.sentOffPlayerIds.includes(playerId)) {
@@ -1610,9 +1626,7 @@ function App() {
       showToast(`${player?.name ?? "Dieser Spieler"} kann nach einer Roten Karte nicht ausgewechselt werden.`);
       return;
     }
-    setSelectedLineupSlot((current) => current === index ? null : index);
-    setSelectedBenchSlot(null);
-    setReservePage(0);
+    tapSquadSpot({ source: playerId ? { playerId, area: "lineup", index } : null, target: { area: "lineup", index } });
   }
 
   function chooseBenchSlot(index: number) {
@@ -1620,9 +1634,12 @@ function App() {
       showToast("Wähle zuerst den Spieler in der Startelf, den du auswechseln willst.");
       return;
     }
-    setSelectedBenchSlot((current) => current === index ? null : index);
-    setSelectedLineupSlot(null);
-    setReservePage(0);
+    const playerId = benchStarIds[index];
+    tapSquadSpot({ source: playerId ? { playerId, area: "bench", index } : null, target: { area: "bench", index } });
+  }
+
+  function chooseReservePlayer(playerId: string) {
+    tapSquadSpot({ source: { playerId, area: "reserve", index: null }, target: null });
   }
 
   function canDropSquadPlayer(source: SquadDragSource, target: SquadDropTarget) {
@@ -2590,9 +2607,9 @@ function App() {
             <p className="star-pack-rarity-note">Icons stecken in ihrer jeweiligen Ratingstufe, sind darin aber nochmals deutlich seltener als normale Karten. Doppelte Karten geben je nach Rating und Kartentyp unterschiedlich viele Fragmente.</p>
           </div>}
           {featureTab === "squad" && <div className="feature-panel">{displayGame.features.cup.active ? <div className="career-empty"><p>Auswechslungen steuerst du im laufenden Match.</p><button className="mode-primary" onClick={()=>setFeatureTab('cup')}>Zum Live-Match</button></div> : <>
-            <div className="starxi-lineup-heading"><span>DEINE ELF / {activeFormation.label}</span><small>Spieler ziehen und einrasten lassen · Anklicken bleibt möglich</small></div>
+            <div className="starxi-lineup-heading"><span>DEINE ELF / {activeFormation.label}</span><small>Spieler ziehen oder zwei Spieler nacheinander antippen zum Tauschen</small></div>
             <div className="starxi-squad-layout">
-              <SquadPitchPanel status={activeLineupSlot === null ? "Startplatz wählen" : `Platz ${activeLineupSlot + 1} · ${activeLineupPosition}`} controls={<div className="starxi-formation-picker"><span><strong>FORMATION WÄHLEN</strong><small>{displayGame.features.cup.active ? "Während des Spiels gesperrt" : `${unlockedFormationCount} von ${STAR_FORMATIONS.length} Formationen freigeschaltet`}</small></span><div className="starxi-formation-actions"><select value={activeFormation.id} disabled={displayGame.features.cup.active || coopBusy} onChange={(event) => void changeStarXIFormation(event.target.value as StarFormationId)} aria-label="Formation wählen">{pickerFormations.map((formation) => { const unlockLeague = getFormationUnlockLeague(formation.id); const unlocked = isFormationAvailable(formation); return <option value={formation.id} key={formation.id} disabled={!unlocked}>{formation.label}{unlocked ? "" : ` · ab Liga ${unlockLeague}`}</option>; })}</select><button type="button" className="starxi-best-button" onClick={() => void autoPickBestStarXI()} disabled={displayGame.features.cup.active || coopBusy || ownedStarXIPlayers.length === 0}>★ Beste Startelf</button></div></div>} help={displayGame.features.cup.active ? `Live Wechsel: Bankspieler direkt auf den passenden Feldspieler ziehen oder wie bisher beide anklicken. Maximal ${STAR_XI_MAX_SUBSTITUTIONS} Wechsel, ${displayGame.features.cup.substitutionsUsed} bereits genutzt.` : activeLineupSlot !== null ? `Für ${activeLineupPosition} werden nur passende Spieler angezeigt. Du kannst sie auch direkt hierher ziehen.` : selectedBenchSlot !== null ? `Bankplatz ${selectedBenchSlot + 1} gewählt. Klicke einen Spieler an oder ziehe ihn auf den Bankplatz.` : `Ziehe Spieler zwischen Feld und Bank oder aus dem Speicher auf einen passenden Platz. Alles rastet automatisch ein.`}>{activeFormation.slots.map((slot, index) => {
+              <SquadPitchPanel status={activeLineupSlot === null ? "Startplatz wählen" : `Platz ${activeLineupSlot + 1} · ${activeLineupPosition}`} controls={<div className="starxi-formation-picker"><span><strong>FORMATION WÄHLEN</strong><small>{displayGame.features.cup.active ? "Während des Spiels gesperrt" : `${unlockedFormationCount} von ${STAR_FORMATIONS.length} Formationen freigeschaltet`}</small></span><div className="starxi-formation-actions"><select value={activeFormation.id} disabled={displayGame.features.cup.active || coopBusy} onChange={(event) => void changeStarXIFormation(event.target.value as StarFormationId)} aria-label="Formation wählen">{pickerFormations.map((formation) => { const unlockLeague = getFormationUnlockLeague(formation.id); const unlocked = isFormationAvailable(formation); return <option value={formation.id} key={formation.id} disabled={!unlocked}>{formation.label}{unlocked ? "" : ` · ab Liga ${unlockLeague}`}</option>; })}</select><button type="button" className="starxi-best-button" onClick={() => void autoPickBestStarXI()} disabled={displayGame.features.cup.active || coopBusy || ownedStarXIPlayers.length === 0}>★ Beste Startelf</button></div></div>} help={displayGame.features.cup.active ? `Live Wechsel: Bankspieler auf den passenden Feldspieler ziehen oder zwei Spieler nacheinander antippen. Maximal ${STAR_XI_MAX_SUBSTITUTIONS} Wechsel, ${displayGame.features.cup.substitutionsUsed} bereits genutzt.` : activeLineupSlot !== null ? `Für ${activeLineupPosition} werden nur passende Spieler angezeigt. Du kannst sie auch direkt hierher ziehen.` : selectedBenchSlot !== null ? `Bankplatz ${selectedBenchSlot + 1} gewählt. Klicke einen Spieler an oder ziehe ihn auf den Bankplatz.` : selectedReserveId !== null ? `${getStarXIPlayer(selectedReserveId)?.name ?? "Spieler"} gewählt. Tippe einen passenden Platz auf dem Feld oder der Bank an.` : `Ziehe Spieler zwischen Feld, Bank und Reserve oder tippe zwei Spieler nacheinander an, um sie zu tauschen.`}>{activeFormation.slots.map((slot, index) => {
                   const player = startingStarXIPlayers[index];
                   const liveRating = displayGame.features.cup.active && player ? getCupPlayerMatchRating(displayGame.features.cup, player.id, cupMatchMinute) : null;
                   return <SquadPitchSlot key={`${activeFormation.id}-${index}`} features={displayGame.features} drag={squadDrag} index={index} position={activeFormationPositions[index]} x={slot.x} y={slot.y} player={player} selected={activeLineupSlot === index} liveRating={liveRating} draggable={!layoutEditMode && !coopBusy} disabled={coopBusy} onClick={() => chooseLineupSlot(index)} />;
@@ -2604,12 +2621,12 @@ function App() {
                     const selected = selectedBenchSlot === index;
                     const liveRating = displayGame.features.cup.active && player ? getCupPlayerMatchRating(displayGame.features.cup, player.id, cupMatchMinute) : null;
                     const alreadySubbedOut = Boolean(player && displayGame.features.cup.active && displayGame.features.cup.playerExitedAt[player.id]);
-                    return player ? <SquadBenchCard key={player.id} features={displayGame.features} drag={squadDrag} index={index} player={player} selected={selected} incompatible={activeLineupSlot !== null && (!compatible || alreadySubbedOut)} liveRating={liveRating} status={alreadySubbedOut ? "Bereits ausgewechselt" : activeLineupSlot !== null ? compatible ? displayGame.features.cup.active ? "Nur für dieses Spiel einwechseln" : `Auf ${activeLineupPosition} einsetzen` : `Passt nicht auf ${activeLineupPosition}` : displayGame.features.cup.active ? "Auf einen Feldspieler ziehen" : `Bankplatz ${index + 1} · ziehen zum Tauschen`} draggable={!layoutEditMode && !coopBusy} disabled={coopBusy || (!draggingSquadPlayer && activeLineupSlot !== null && (!compatible || alreadySubbedOut || (displayGame.features.cup.active && displayGame.features.cup.substitutionsUsed >= STAR_XI_MAX_SUBSTITUTIONS)))} onClick={() => activeLineupSlot !== null ? void selectStarXIPlayer(player.id) : chooseBenchSlot(index)} /> : <SquadBenchSlot key={`bank-empty-${index}`} drag={squadDrag} index={index} selected={selected} disabled={displayGame.features.cup.active || coopBusy} onClick={() => chooseBenchSlot(index)} />;
+                    return player ? <SquadBenchCard key={player.id} features={displayGame.features} drag={squadDrag} index={index} player={player} selected={selected} incompatible={activeLineupSlot !== null && (!compatible || alreadySubbedOut)} liveRating={liveRating} status={alreadySubbedOut ? "Bereits ausgewechselt" : activeLineupSlot !== null ? compatible ? displayGame.features.cup.active ? "Nur für dieses Spiel einwechseln" : `Auf ${activeLineupPosition} einsetzen` : `Passt nicht auf ${activeLineupPosition}` : displayGame.features.cup.active ? "Auf einen Feldspieler ziehen" : `Bankplatz ${index + 1} · ziehen zum Tauschen`} draggable={!layoutEditMode && !coopBusy} disabled={coopBusy} onClick={() => chooseBenchSlot(index)} /> : <SquadBenchSlot key={`bank-empty-${index}`} drag={squadDrag} index={index} selected={selected} disabled={displayGame.features.cup.active || coopBusy} onClick={() => chooseBenchSlot(index)} />;
                   })}</SquadBenchPanel>
                 <section className="starxi-reserve-panel" aria-label="Reservekader">
                   <div className="starxi-subheading"><div><span className="eyebrow">KADER / RESERVE</span><h4>Weitere Spieler</h4></div><strong>{reserveStarXIPlayers.length}</strong></div>
                   <div className="starxi-reserve-controls"><div className="starxi-filter-tools"><input className="starxi-search" value={starSearch} onChange={(event) => { setStarSearch(event.target.value); setReservePage(0); }} placeholder="Spieler suchen" aria-label="Spieler im Reservekader suchen" /><select className="starxi-position-filter" value={starPositionFilter} onChange={(event) => { setStarPositionFilter(event.target.value); setReservePage(0); }} aria-label="Position im Reservekader filtern"><option value="all">Alle Positionen</option>{STAR_POSITIONS.map((position) => <option value={position} key={`reserve-position-${position}`}>{position}</option>)}</select></div><div className="starxi-filter-row" role="group" aria-label="Ratingfilter">{STAR_RATING_FILTERS.map((filter) => <button type="button" className={starRatingFilter === filter.id ? "active" : ""} key={filter.id} onClick={() => { setStarRatingFilter(filter.id); setReservePage(0); }} aria-pressed={starRatingFilter === filter.id}>{filter.label}</button>)}</div></div>
-                  <div className="starxi-reserve-list">{filteredReserveStarXIPlayers.length ? visibleReserveStarXIPlayers.map((player) => { const compatible = activeLineupSlot === null || canStarXIPlayerFillSlot(player.id, activeLineupSlot, activeFormationPositions); const suspended = suspendedStarIds.includes(player.id); const dragSource: SquadDragSource = { playerId: player.id, area: "reserve", index: null }; return <button type="button" className={`starxi-player-card reserve${activeLineupSlot !== null && !compatible ? " incompatible" : ""}${suspended ? " red-carded" : ""}${draggingSquadPlayer?.playerId === player.id ? " squad-dragging" : ""}`} key={player.id} onClick={() => suspended ? showToast(`${player.name} ist für die nächste Partie gesperrt.`) : selectedBenchSlot !== null ? void selectStarXIBenchPlayer(player.id, selectedBenchSlot) : void selectStarXIPlayer(player.id)} disabled={displayGame.features.cup.active || coopBusy || suspended || (activeLineupSlot !== null && !compatible)} draggable={!layoutEditMode && !displayGame.features.cup.active && !coopBusy && !suspended} onDragStart={(event) => squadDrag.handleSquadDragStart(event, dragSource)} onDragEnd={squadDrag.handleSquadDragEnd}>{suspended ? <span style={{ color: player.accent }}>🟥</span> : <StarXIPositionBadges player={player} variant="compact" />}<div><strong>{player.name}</strong><CareerPlayerBadge features={displayGame.features} player={player} /><small>{suspended ? "ROTE KARTE · NICHT AUF DIE BANK" : selectedBenchSlot !== null ? `Auf Bankplatz ${selectedBenchSlot + 1}` : activeLineupSlot !== null ? compatible ? `Auf ${activeLineupPosition} einsetzen` : `Kann nicht ${activeLineupPosition}` : "Auf Startelf oder Bank ziehen"}</small></div><b>{getCareerCard(displayGame.features.career, player).rating}</b></button>; }) : <div className="starxi-empty">Keine Spieler passen zu diesem Filter.</div>}</div>
+                  <div className="starxi-reserve-list">{filteredReserveStarXIPlayers.length ? visibleReserveStarXIPlayers.map((player) => { const compatible = activeLineupSlot === null || canStarXIPlayerFillSlot(player.id, activeLineupSlot, activeFormationPositions); const suspended = suspendedStarIds.includes(player.id); const dragSource: SquadDragSource = { playerId: player.id, area: "reserve", index: null }; return <button type="button" className={`starxi-player-card reserve${activeLineupSlot !== null && !compatible ? " incompatible" : ""}${suspended ? " red-carded" : ""}${selectedReserveId === player.id ? " selected" : ""}${draggingSquadPlayer?.playerId === player.id ? " squad-dragging" : ""}`} key={player.id} aria-pressed={selectedReserveId === player.id} onClick={() => suspended ? showToast(`${player.name} ist für die nächste Partie gesperrt.`) : chooseReservePlayer(player.id)} disabled={displayGame.features.cup.active || coopBusy || suspended} draggable={!layoutEditMode && !displayGame.features.cup.active && !coopBusy && !suspended} onDragStart={(event) => squadDrag.handleSquadDragStart(event, dragSource)} onDragEnd={squadDrag.handleSquadDragEnd}>{suspended ? <span style={{ color: player.accent }}>🟥</span> : <StarXIPositionBadges player={player} variant="compact" />}<div><strong>{player.name}</strong><CareerPlayerBadge features={displayGame.features} player={player} /><small>{suspended ? "ROTE KARTE · NICHT AUF DIE BANK" : selectedReserveId === player.id ? "Gewählt · jetzt Platz antippen" : selectedBenchSlot !== null ? `Auf Bankplatz ${selectedBenchSlot + 1}` : activeLineupSlot !== null ? compatible ? `Auf ${activeLineupPosition} einsetzen` : `Kann nicht ${activeLineupPosition}` : "Antippen oder auf Startelf und Bank ziehen"}</small></div><b>{getCareerCard(displayGame.features.career, player).rating}</b></button>; }) : <div className="starxi-empty">Keine Spieler passen zu diesem Filter.</div>}</div>
                   {filteredReserveStarXIPlayers.length > 0 && <nav className="starxi-pagination" aria-label="Seiten im Reservekader"><button type="button" onClick={() => setReservePage(Math.max(0, activeReservePage - 1))} disabled={activeReservePage === 0}>← Zurück</button><span><strong>Seite {activeReservePage + 1} von {reservePageCount}</strong><small>{activeReservePage * RESERVE_PAGE_SIZE + 1} bis {Math.min((activeReservePage + 1) * RESERVE_PAGE_SIZE, filteredReserveStarXIPlayers.length)} von {filteredReserveStarXIPlayers.length}</small></span><button type="button" onClick={() => setReservePage(Math.min(reservePageCount - 1, activeReservePage + 1))} disabled={activeReservePage >= reservePageCount - 1}>Weiter →</button></nav>}
                 </section>
               </div>

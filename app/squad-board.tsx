@@ -26,7 +26,30 @@ type SquadDragOptions = {
   onDrop: (source: SquadDragSource, target: SquadDropTarget) => void | Promise<void>;
   onBlocked?: () => void;
   locked?: (source: SquadDragSource) => boolean;
+  /** The player picked by a first tap; its possible targets light up like during a drag. */
+  picked?: () => SquadDragSource | null;
 };
+
+/** A tapped spot: the player on it (if any) and the place itself as a drop target (reserve cards have none). */
+export type SquadPick = { source: SquadDragSource | null; target: SquadDropTarget | null };
+
+const samePick = (a: SquadPick, b: SquadPick) => a.target && b.target
+  ? a.target.area === b.target.area && a.target.index === b.target.index
+  : !a.target && !b.target && a.source?.playerId === b.source?.playerId;
+
+/**
+ * Two taps instead of a drag, like in MADFUT: the first tap picks a player or a place, the second moves
+ * or swaps them when that is allowed (in either direction). Otherwise the second tap becomes the new pick,
+ * and tapping the picked spot again clears it.
+ */
+export function resolveSquadTap(picked: SquadPick | null, tapped: SquadPick, canDrop: SquadDragOptions['canDrop']): { move: [SquadDragSource, SquadDropTarget] } | { pick: SquadPick | null } {
+  if (picked) {
+    if (samePick(picked, tapped)) return { pick: null };
+    if (picked.source && tapped.target && canDrop(picked.source, tapped.target)) return { move: [picked.source, tapped.target] };
+    if (tapped.source && picked.target && canDrop(tapped.source, picked.target)) return { move: [tapped.source, picked.target] };
+  }
+  return { pick: tapped };
+}
 
 function dropTargetAt(x: number, y: number): SquadDropTarget | null {
   const element = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-squad-area]');
@@ -34,7 +57,7 @@ function dropTargetAt(x: number, y: number): SquadDropTarget | null {
   return (area === 'lineup' || area === 'bench') && Number.isInteger(index) ? { area, index } : null;
 }
 
-export function useSquadDrag({ canDrop, onDrop, onBlocked, locked }: SquadDragOptions) {
+export function useSquadDrag({ canDrop, onDrop, onBlocked, locked, picked }: SquadDragOptions) {
   const [dragging, setDragging] = useState<SquadDragSource | null>(null);
   const [dropTarget, setDropTarget] = useState<SquadDropTarget | null>(null);
   // The ref sees the source at once; the state only after a render, which a busy live match view can delay
@@ -95,9 +118,11 @@ export function useSquadDrag({ canDrop, onDrop, onBlocked, locked }: SquadDragOp
   }
 
   function squadDropClass(area: SquadDropTarget['area'], index: number) {
-    if (!dragging) return '';
+    const source = dragging ?? picked?.() ?? null;
+    if (!source) return '';
     const target = { area, index } as SquadDropTarget;
-    if (!canDrop(dragging, target)) return ' squad-drop-blocked';
+    if (!dragging && source.area === area && source.index === index) return '';
+    if (!canDrop(source, target)) return ' squad-drop-blocked';
     const active = dropTarget?.area === area && dropTarget.index === index;
     return ` squad-drop-ready${active ? ' squad-drop-active' : ''}`;
   }
