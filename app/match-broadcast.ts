@@ -13,9 +13,9 @@ export type BroadcastKind = 'build-up' | 'counter' | 'wide' | 'combination' | 's
 export type ShotOutcome = 'save' | 'wide' | 'blocked';
 export type MatchRosterPlayer = { id:string; sourceId:string; name:string; position:StarPosition; number:number; rating:number; slot:number };
 export type BroadcastEvent = { passSnapshot?: OffsideSnapshot; id:string; kind:BroadcastKind; side:BroadcastSide; minute:number; at:number; playerId:string; player:string; secondaryId?:string; keeperId?:string; outcome?:ShotOutcome; style:'ground'|'lofted'|'through'|'cross'|'header'|'long-range'|'one-touch'|'penalty'|'clearance'; lane:number; seed:number };
-export type BroadcastStatistics = { shots:number; onTarget:number; saves:number; corners:number; freeKicks:number; throwIns:number; yellowCards:number; possessionSeconds:number; offsides?:number };
+export type BroadcastStatistics = { shots:number; onTarget:number; saves:number; corners:number; freeKicks:number; throwIns:number; yellowCards:number; possessionSeconds:number; offsides?:number; /** Expected goals, summed over the shots. */ xg?:number };
 export type MatchBroadcast = { version:1; clubFormation:string; opponentFormation:string; opponentXI:MatchRosterPlayer[]; slots:Record<string,number>; shirtNumbers:Record<string,number>; fitness:Record<string,number>; fitnessMinute:number; events:BroadcastEvent[]; processedScene:number; possessionSecond:number; clubStats:BroadcastStatistics; opponentStats:BroadcastStatistics };
-export const emptyMatchStats = ():BroadcastStatistics=>({shots:0,onTarget:0,saves:0,corners:0,freeKicks:0,throwIns:0,yellowCards:0,possessionSeconds:0,offsides:0});
+export const emptyMatchStats = ():BroadcastStatistics=>({shots:0,onTarget:0,saves:0,corners:0,freeKicks:0,throwIns:0,yellowCards:0,possessionSeconds:0,offsides:0,xg:0});
 export const broadcastSeed=(s:string)=>{let h=2166136261;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619);h=Math.imul(h^(h>>>16),0x85ebca6b);h=Math.imul(h^(h>>>13),0xc2b2ae35);return ((h^(h>>>16))>>>0)/4294967296;};
 const clamp=(n:number,a:number,b:number)=>Math.max(a,Math.min(b,n));
 
@@ -131,7 +131,7 @@ export function normalizeMatchBroadcast(value:unknown):MatchBroadcast|undefined 
  const v=value as MatchBroadcast;
  if(v.version!==1||!Array.isArray(v.opponentXI)||v.opponentXI.length!==11||!STAR_FORMATIONS.some(f=>f.id===v.opponentFormation))return undefined;
  if(!v.opponentXI.every((p,i)=>p&&typeof p.name==='string'&&p.id===`opponent-${i}`&&getStarXIPlayer(p.sourceId)&&Number.isFinite(p.number)&&Number.isFinite(p.rating)&&Number.isInteger(p.slot)&&p.slot===i))return undefined;
- const record=(x:unknown,min:number,max:number)=>Object.fromEntries(Object.entries(x&&typeof x==='object'?x:{}).filter(([id,n])=>(getStarXIPlayer(id)||/^opponent-([0-9]|10)$/.test(id))&&Number.isFinite(n)).map(([id,n])=>[id,clamp(Number(n),min,max)]));
+ const record=(x:unknown,min:number,max:number)=>Object.fromEntries(Object.entries(x&&typeof x==='object'?x:{}).filter(([id,n])=>(getStarXIPlayer(id)||/^opponent-([0-9]|10|sub-[1-3])$/.test(id))&&Number.isFinite(n)).map(([id,n])=>[id,clamp(Number(n),min,max)]));
  const stats=(x:BroadcastStatistics)=>Object.fromEntries(Object.keys(emptyMatchStats()).map(k=>[k,clamp(Number(x?.[k as keyof BroadcastStatistics])||0,0,10000)])) as BroadcastStatistics;
  const kinds:BroadcastKind[]=['build-up','counter','wide','combination','shot','corner','free-kick','throw-in','yellow','substitution','offside'];
  const events=(Array.isArray(v.events)?v.events:[]).filter(e=>e&&typeof e.id==='string'&&kinds.includes(e.kind)&&['club','opponent'].includes(e.side)&&Number.isFinite(e.at)&&e.at>0&&Number.isFinite(e.minute)&&e.minute>=1&&e.minute<=120&&Number.isFinite(e.lane)&&Number.isFinite(e.seed)&&typeof e.playerId==='string'&&typeof e.player==='string'&&(!e.outcome||['save','wide','blocked'].includes(e.outcome))).slice(-180).map(e=>({...e,id:e.id.slice(0,220),player:e.player.slice(0,100),lane:clamp(e.lane,1,67)}));

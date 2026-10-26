@@ -1,5 +1,5 @@
 import { readInteractiveFrame } from './interactive-frame-data';
-import { getStarFormation, getStarXIPlayer, getCupRegularDurationMs } from './feature-data';
+import { canStarXIPlayerPlayPosition, getStarFormation, getStarXIPlayer, getCupRegularDurationMs, STAR_XI_ACTIVE_PLAYERS } from './feature-data';
 import type { CupState, CupStrategyId, StarPosition, StarXIPlayer } from './feature-data';
 import { createMatchBroadcast } from './match-broadcast';
 import { attackedGoal, carrierOptions, chooseOption, decisionTemperature, flightSeconds, inBox, insidePitch, laneThreats, movePlayersToward, PITCH, progressOf, roleOf, runSpeed, shapeTargets, SIM_SECONDS_PER_VISUAL_SECOND, xFromProgress } from './match-ai';
@@ -11,10 +11,14 @@ export type SimCheckpoint = { time:number; rng:number; sequence:number; players:
  /** Dead ball awarded to the side in possession; `setPieceReady` once the taker stands at the ball. */
  setPiece?:SetPiece; setPieceReady?:boolean; setPieceSpot?:SimPoint;
  /** Players already cautioned in this match: a second yellow card is a red card. */
- booked?:string[] };
+ booked?:string[];
+ /** Substitutions the opponent's coach has made so far. */
+ opponentSubs?:number };
 /** One authoritative play. The ball moves from `from` to `to` during [start,end]; `after.ball` always equals `to`.
  * For fouls and cards (`foul`, `yellow`, `red`, `injury`) `actor` is the fouled ball carrier and `target` the offender. */
-export type SimAction = { id:string; kind:'pass'|'carry'|'cross'|'interception'|'tackle'|'shot'|'restart'|'red'|'yellow'|'injury'|'foul'; start:number; end:number; side:'club'|'opponent'; actor:string; target?:string; from:SimPoint; to:SimPoint; outcome:'success'|'lost'|'save'|'wide'|'blocked'|'goal'; assist?:string; style?:PassStyle|'dribble'|'hold'|'save'|'parry'; setPiece?:SetPiece; note?:string; before:SimCheckpoint; after:SimCheckpoint };
+export type SimAction = { id:string; kind:'pass'|'carry'|'cross'|'interception'|'tackle'|'shot'|'restart'|'red'|'yellow'|'injury'|'foul'; start:number; end:number; side:'club'|'opponent'; actor:string; target?:string; from:SimPoint; to:SimPoint; outcome:'success'|'lost'|'save'|'wide'|'blocked'|'goal'; assist?:string; style?:PassStyle|'dribble'|'hold'|'save'|'parry'; setPiece?:SetPiece; note?:string;
+ /** Expected goals of a shot: the chance it had to go in. */
+ xg?:number; before:SimCheckpoint; after:SimCheckpoint };
 export type InteractiveMatch = { version:2; id:string; seed:number; time:number; committed:SimCheckpoint; buffer:SimAction[]; recent:SimAction[]; generation:number; status:'running'|'editing'|'halftime'|'completed'; halftimeDone:boolean; pauseRequested:boolean; clubFormation:string; opponentFormation:string; strategy:CupStrategyId; opponentStrategy:CupStrategyId };
 const clamp=(v:number,a:number,b:number)=>Math.max(a,Math.min(b,v));
 const dist=(a:SimPoint,b:SimPoint)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -43,9 +47,16 @@ function kickoff(c:SimCheckpoint,side:SimPlayer['side']) {
  const taker=c.players.filter(p=>p.active&&p.side===side&&p.role!=='TW').sort((a,b)=>Math.abs(a.x-52.5)-Math.abs(b.x-52.5))[0];
  if(taker){taker.x=52.5;taker.y=34;c.owner=taker.id;}
 }
+/** Rating points the home side gets from its own ground and crowd; a neutral final gives nobody an edge. */
+export const HOME_ADVANTAGE=1.5;
+export function homeAdvantage(cup:Pick<CupState,'fixture'>,side:SimPlayer['side']) {
+ if(cup.fixture?.neutral)return 0;
+ return (side==='club')===!cup.fixture?.away?HOME_ADVANTAGE:0;
+}
 export function createInteractiveMatch(cup:CupState,ids:readonly string[],formation:string):InteractiveMatch {
  const b=cup.broadcast??createMatchBroadcast(cup),id=cup.careerMatchId??`${cup.matchStartedAt}:${cup.opponent}`,seed=seedHash(id),direction=cup.fixture?.away?-1:1;
- const players=[...ids.flatMap((id,i)=>{const p=getStarXIPlayer(id);return p?[player(id,p.name,getStarFormation(formation).slots[i].position,i,'club',i+1,p.rating,p,formation,direction,cup.careerBonuses?.[id])]:[];}),...b.opponentXI.map(p=>player(p.id,p.name,p.position,p.slot,'opponent',p.number,cup.opponentRating,getStarXIPlayer(p.sourceId),b.opponentFormation,direction))];
+ const clubHome=homeAdvantage(cup,'club'),opponentHome=homeAdvantage(cup,'opponent');
+ const players=[...ids.flatMap((id,i)=>{const p=getStarXIPlayer(id);return p?[player(id,p.name,getStarFormation(formation).slots[i].position,i,'club',i+1,p.rating+clubHome,p,formation,direction,cup.careerBonuses?.[id])]:[];}),...b.opponentXI.map(p=>player(p.id,p.name,p.position,p.slot,'opponent',p.number,cup.opponentRating+opponentHome,getStarXIPlayer(p.sourceId),b.opponentFormation,direction))];
  const c:SimCheckpoint={time:0,rng:seed,sequence:0,players,ball:{x:52.5,y:34},owner:'',possession:'club',chain:0,restart:true,direction};kickoff(c,'club');
  const sim:InteractiveMatch={version:2,id,seed,time:0,committed:c,buffer:[],recent:[],generation:0,status:'running',halftimeDone:false,pauseRequested:false,clubFormation:formation,opponentFormation:b.opponentFormation,strategy:cup.strategyId,opponentStrategy:cup.opponentStrategyId};refill(sim);return sim;
 }
@@ -88,7 +99,7 @@ function nearestTaker(c:SimCheckpoint,side:SimPlayer['side'],spot:SimPoint,prefe
  return candidates.sort((a,b)=>dist(a,spot)-(preferWide&&roleOf(a)==='wide'?6:0)-(dist(b,spot)-(preferWide&&roleOf(b)==='wide'?6:0)))[0]??activeOf(c,side)[0];
 }
 function award(c:SimCheckpoint,a:Award){c.setPiece=a.setPiece;c.setPieceReady=false;c.setPieceSpot={...a.spot};c.possession=a.side;c.owner=a.taker.id;c.ball={...a.ball};c.lastPass=undefined;c.chain=0;}
-type Play={kind:SimAction['kind'];outcome:SimAction['outcome'];to:SimPoint;duration:number;target?:SimPlayer;assist?:string;style?:SimAction['style'];setPiece?:SetPiece;note?:string;offsideId?:string;fixed:Set<string>;celebration?:boolean};
+type Play={kind:SimAction['kind'];outcome:SimAction['outcome'];to:SimPoint;duration:number;target?:SimPlayer;assist?:string;style?:SimAction['style'];setPiece?:SetPiece;note?:string;offsideId?:string;fixed:Set<string>;celebration?:boolean;xg?:number};
 /** Kick-off at the start of a half or after a goal (with the celebration in front of it). */
 function kickoffPlay(c:SimCheckpoint,actor:SimPlayer):Play{
  c.restart=false;c.setPiece=undefined;c.setPieceReady=false;c.setPieceSpot=undefined;
@@ -243,8 +254,29 @@ function resolveCarry(c:SimCheckpoint,actor:SimPlayer,option:Extract<CarrierOpti
  moveOffBall(c,challenger,contactDuration/SIM_SECONDS_PER_VISUAL_SECOND,fixed);
  return {kind:'tackle',outcome:'lost',to:{...contact},duration:contactDuration,target:challenger,fixed};
 }
+/** Minutes (in match seconds) from which the opponent's coach makes his three changes. */
+const OPPONENT_SUB_TIMES=[3600,4200,4800];
+/**
+ * At a dead ball after the hour, the opponent's coach brings on a fresh player for his most tired outfield
+ * player in the same position. Part of the deterministic simulation: the same checkpoint always makes the
+ * same change, so speculation and the committed match agree.
+ */
+function opponentSubstitution(c:SimCheckpoint){
+ const used=c.opponentSubs??0;
+ if(used>=OPPONENT_SUB_TIMES.length||c.time<OPPONENT_SUB_TIMES[used]||!c.setPiece||c.setPieceReady||c.setPiece==='penalty')return;
+ const tired=c.players.filter(p=>p.side==='opponent'&&p.active&&p.role!=='TW'&&p.id!==c.owner).sort((a,b)=>a.fitness-b.fitness||a.slot-b.slot)[0];
+ if(!tired)return;
+ const taken=new Set(c.players.map(p=>p.name));
+ const pool=STAR_XI_ACTIVE_PLAYERS.filter(p=>!p.isCustom&&!p.benchOnly&&!taken.has(p.name)&&canStarXIPlayerPlayPosition(p,tired.role)).sort((a,b)=>Math.abs(a.rating-tired.rating)-Math.abs(b.rating-tired.rating)||a.id.localeCompare(b.id)).slice(0,12);
+ const source=pool[Math.floor(random(c)*pool.length)];
+ if(!source)return;
+ // The newcomer plays at the opponent's level, whoever he is in the card pool, and is fresh.
+ c.players[c.players.indexOf(tired)]={...tired,id:`opponent-sub-${used+1}`,name:source.name,number:12+used,fitness:100,active:true};
+ c.opponentSubs=used+1;
+}
 function prepare(sim:InteractiveMatch,start:SimCheckpoint):SimAction {
  const before=structuredClone(start),c=structuredClone(start);
+ opponentSubstitution(c);
  let actor=activeOf(c).find(p=>p.id===c.owner)??activeOf(c,c.possession)[0];
  if(!actor)throw new Error('Kein aktiver Ballbesitzer');
  c.owner=actor.id;c.possession=actor.side;
@@ -260,7 +292,7 @@ function prepare(sim:InteractiveMatch,start:SimCheckpoint):SimAction {
    // Too little time before the whistle for this play: the carrier shields the ball instead.
    const fixed=new Set([actor.id]);moveOffBall(c,actor,remaining/SIM_SECONDS_PER_VISUAL_SECOND,fixed);
    play={kind:'carry',outcome:'success',to:point(actor),duration:remaining,style:'hold',fixed};
-  } else if(option.kind==='shot')play=resolveShot(c,actor,option.quality,setPiece==='penalty');
+  } else if(option.kind==='shot'){play=resolveShot(c,actor,option.quality,setPiece==='penalty');play.xg=option.quality;}
   else if(option.kind==='pass')play=resolvePass(c,actor,option);
   else if(option.kind==='carry')play=resolveCarry(c,actor,option,remaining);
   else {const fixed=new Set([actor.id]);c.setPiece=undefined;c.setPieceReady=false;c.setPieceSpot=undefined;moveOffBall(c,actor,1,fixed);play={kind:'carry',outcome:'success',to:point(actor),duration:simSeconds(1),style:'hold',fixed};}
@@ -272,7 +304,7 @@ function prepare(sim:InteractiveMatch,start:SimCheckpoint):SimAction {
  const id=`${sim.id}:a${c.sequence++}`,end=c.time+duration;c.time=end;
  if(!activeOf(c).some(p=>p.id===c.owner))c.owner=(activeOf(c,c.possession).find(p=>roleOf(p)!=='keeper')??activeOf(c)[0]).id;
  actor=before.players.find(p=>p.id===actor.id)??actor;
- return {id,kind:play.kind,start:before.time,end,side:actor.side,actor:actor.id,target:play.target?.id,from:point(before.ball),to:point(c.ball),outcome:play.outcome,assist:play.assist,style:play.style,setPiece:play.setPiece,note:play.offsideId?`offside:${play.offsideId}`:play.note,before,after:c};
+ return {id,kind:play.kind,start:before.time,end,side:actor.side,actor:actor.id,target:play.target?.id,from:point(before.ball),to:point(c.ball),outcome:play.outcome,assist:play.assist,style:play.style,setPiece:play.setPiece,note:play.offsideId?`offside:${play.offsideId}`:play.note,...(play.xg!==undefined?{xg:play.xg}:{}),before,after:c};
 }
 export function refill(sim:InteractiveMatch){let tail=sim.buffer.at(-1)?.after??sim.committed;while(tail.time<Math.min(sim.time+75,sim.time<2700?2700:sim.time<5400?5400:7200)){const action=prepare(sim,tail);sim.buffer.push(action);tail=action.after;}}
 export function advanceInteractive(cup:CupState,now:number):CupState {
@@ -287,8 +319,13 @@ export function advanceInteractive(cup:CupState,now:number):CupState {
   const at=next.matchStartedAt+a.end/secondsPerMs,minute=Math.max(1,Math.min(120,Math.ceil(a.end/60))),actor=a.before.players.find(p=>p.id===a.actor)!;
   const stats=a.side==='club'?next.broadcast.clubStats:next.broadcast.opponentStats,other=a.side==='club'?next.broadcast.opponentStats:next.broadcast.clubStats;
   stats.possessionSeconds+=(a.kind==='restart'?Math.min(a.end-a.start,18):a.end-a.start)/15;
+  // A change by the opponent's coach shows up in the ticker (the starting roster itself stays as it was).
+  for(const incoming of a.after.players)if(incoming.side==='opponent'&&!a.before.players.some(p=>p.id===incoming.id)){
+   const outgoing=a.before.players.find(p=>p.side==='opponent'&&p.slot===incoming.slot&&!a.after.players.some(q=>q.id===p.id));
+   next.broadcast.events.push({id:`${a.id}:${incoming.id}`,kind:'substitution',side:'opponent',minute:Math.max(1,Math.ceil(a.start/60)),at:next.matchStartedAt+a.start/secondsPerMs,playerId:incoming.id,player:incoming.name,secondaryId:outgoing?.id,style:'ground',lane:34,seed:0});
+  }
   if(a.kind==='shot'){
-   stats.shots++;if(a.outcome==='goal'||a.outcome==='save')stats.onTarget++;if(a.outcome==='save')other.saves++;
+   stats.shots++;stats.xg=(stats.xg??0)+(a.xg??0);if(a.outcome==='goal'||a.outcome==='save')stats.onTarget++;if(a.outcome==='save')other.saves++;
    if(a.outcome==='goal'){
     if(a.side==='club')next.homeScore++;else next.awayScore++;
     const assist=a.assist?a.before.players.find(p=>p.id===a.assist&&p.active&&p.side===a.side):undefined;

@@ -24,7 +24,7 @@ test('100 complete matches: valid actors, score/event parity, variation, bounds 
  let goals=0,draws=0,zeros=0,shots=0,onTarget=0;const scores=new Set(),kinds=new Set();
  for(let i=1;i<=100;i++){const f=fixture(i,STAR_FORMATIONS[i%STAR_FORMATIONS.length].id);f.cup.opponentRating=[65,90,99][i%3];f.cup.simulation=createInteractiveMatch(f.cup,f.starXI.lineupIds,f.starXI.formationId);complete(f);const c=f.cup;goals+=c.homeScore+c.awayScore;draws+=Number(c.homeScore===c.awayScore);zeros+=Number(c.homeScore+c.awayScore===0);scores.add(`${c.homeScore}:${c.awayScore}`);
   assert.equal(c.homeScore,c.matchEvents.filter(e=>e.side==='home').length);assert.equal(c.awayScore,c.matchEvents.filter(e=>e.side==='away').length);assert.equal(new Set(c.matchEvents.map(e=>e.id)).size,c.matchEvents.length);
-  for(const e of c.matchEvents){assert.ok(e.scorerId);assert.ok(c.simulation!.committed.players.some(p=>p.id===e.scorerId));if(e.assistId)assert.notEqual(e.assistId,e.scorerId);}
+  for(const e of c.matchEvents){assert.ok(e.scorerId);assert.ok(c.simulation!.committed.players.some(p=>p.id===e.scorerId)||(e.side==='away'&&/^opponent-/.test(e.scorerId)),'scorer is on the pitch or an opponent who was substituted');if(e.assistId)assert.notEqual(e.assistId,e.scorerId);}
   const p=c.simulation!.committed.players;assert.equal(new Set(p.map(p=>p.id)).size,p.length);p.forEach(p=>{assert.ok(p.x>=0&&p.x<=105&&p.y>=0&&p.y<=68);assert.ok(Number.isFinite(p.fitness));});
   for(const stats of [c.broadcast!.clubStats,c.broadcast!.opponentStats]){shots+=stats.shots;onTarget+=stats.onTarget;Object.values(stats).forEach(n=>assert.ok(Number.isFinite(n)&&n>=0));assert.ok(stats.onTarget<=stats.shots);}
   c.simulation!.recent.forEach(a=>kinds.add(a.kind));
@@ -55,7 +55,7 @@ test('atomic multiple substitutions, cancellation and tactical invalidation',()=
  for(let slot=0;slot<11&&out.length<2;slot++){const incoming=f.starXI.benchIds.find(id=>id&&!d.lineup.includes(id)&&getStarXIPlayer(id)?.positions.includes(f.starXI.formationPositions[slot]));if(incoming){out.push(d.lineup[slot]);d.lineup[slot]=incoming;}}
  assert.equal(out.length,2);assert.equal('strategy' in d,false);const bad={...d,lineup:[...d.lineup]};bad.lineup[1]=bad.lineup[0];const snapshot=JSON.stringify(f);assert.ok(confirmMatchDraft(f,bad,f.cup.lastTickAt+9000).error);assert.equal(JSON.stringify(f),snapshot);
  const result=confirmMatchDraft(f,d,f.cup.lastTickAt+9000);assert.equal(result.error,'');assert.equal(result.features.cup.substitutionsUsed,2);assert.equal(result.features.cup.strategyId,f.cup.strategyId);assert.ok(result.features.cup.simulation!.generation>0);
- f=result.features;const minute=Math.ceil(f.cup.simulation!.time/60);complete(f);for(const a of f.cup.simulation!.recent)assert.ok(!out.includes(a.actor));for(const e of f.cup.matchEvents.filter(e=>e.minute>minute))assert.ok(!out.includes(e.scorerId!));assert.equal(f.cup.broadcast!.events.filter(e=>e.kind==='substitution').length,2);
+ f=result.features;const minute=Math.ceil(f.cup.simulation!.time/60);complete(f);for(const a of f.cup.simulation!.recent)assert.ok(!out.includes(a.actor));for(const e of f.cup.matchEvents.filter(e=>e.minute>minute))assert.ok(!out.includes(e.scorerId!));assert.equal(f.cup.broadcast!.events.filter(e=>e.kind==='substitution'&&e.side==='club').length,2);
 });
 test('completion/retries and career finalization are idempotent',()=>{
  const f=complete(fixture(500));const original=JSON.stringify(f.cup);assert.equal(JSON.stringify(advanceCupMatch(f.cup,90,f.cup.matchEndsAt+10000).cup),original);
@@ -141,4 +141,34 @@ test('worker drawing continues through a real one-second main-thread stall',asyn
   const advanced=Number(after.frames)-Number(before.frames);assert.ok(advanced>=10,`${advanced} independently drawn frames`);assert.notDeepEqual(after.lastBall,before.lastBall);
   console.log('Worker stall test:',advanced,'frames drawn while main thread was blocked for 1.1 seconds');
  }finally{await worker.terminate();}
+});
+
+test('xG adds up the chance of every shot, and over many matches it matches the goals', async () => {
+ const { homeAdvantage, HOME_ADVANTAGE } = await import('../app/interactive-match');
+ let goals = 0, xg = 0, subs = 0;
+ for (let seed = 901; seed <= 940; seed++) {
+  const f = complete(fixture(seed)), b = f.cup.broadcast!;
+  assert.ok((b.clubStats.xg ?? 0) >= 0 && (b.opponentStats.xg ?? 0) >= 0);
+  if (b.clubStats.shots + b.opponentStats.shots > 0) assert.ok((b.clubStats.xg ?? 0) + (b.opponentStats.xg ?? 0) > 0);
+  goals += f.cup.homeScore + f.cup.awayScore; xg += (b.clubStats.xg ?? 0) + (b.opponentStats.xg ?? 0);
+  // The opponent's coach makes his changes after the hour, each a fresh player with a new shirt.
+  const changes = b.events.filter(e => e.kind === 'substitution' && e.side === 'opponent');
+  assert.ok(changes.length <= 3);
+  for (const e of changes) { assert.ok(e.minute > 60, `change in minute ${e.minute}`); assert.match(e.playerId, /^opponent-sub-[1-3]$/); assert.ok(e.secondaryId); }
+  subs += changes.length;
+  const opponents = f.cup.simulation!.committed.players.filter(p => p.side === 'opponent');
+  assert.equal(new Set(opponents.map(p => p.name)).size, opponents.length, 'no player twice on the pitch');
+ }
+ assert.ok(Math.abs(goals - xg) / goals < .25, `goals ${goals} vs xG ${xg.toFixed(1)}`);
+ assert.ok(subs >= 80, `opponent changes ${subs} in 40 matches`);
+ // The home side gets the edge, the visitors and both sides of a neutral final do not.
+ assert.equal(homeAdvantage({ fixture: undefined }, 'club'), HOME_ADVANTAGE);
+ assert.equal(homeAdvantage({ fixture: { id: 'a', away: true, venue: {} as never, opponentId: 'x' } }, 'opponent'), HOME_ADVANTAGE);
+ assert.equal(homeAdvantage({ fixture: { id: 'a', away: true, venue: {} as never, opponentId: 'x' } }, 'club'), 0);
+ assert.equal(homeAdvantage({ fixture: { id: 'a', away: false, neutral: true, venue: {} as never, opponentId: 'x' } }, 'club'), 0);
+ const home = fixture(950), away = fixture(950);
+ away.cup.fixture = { id: 'a', away: true, venue: {} as never, opponentId: 'x' };
+ const rating = (f: ReturnType<typeof fixture>, side: 'club' | 'opponent') => createInteractiveMatch(f.cup, f.starXI.lineupIds, f.starXI.formationId).committed.players.filter(p => p.side === side).reduce((n, p) => n + p.rating, 0);
+ assert.ok(rating(home, 'club') > rating(away, 'club'));
+ assert.ok(rating(away, 'opponent') > rating(home, 'opponent'));
 });
