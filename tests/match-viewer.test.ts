@@ -177,3 +177,16 @@ test('injury resume retains match minute, remaining duration, fitness and record
  f.cup.matchEvents=[{id:'paused-goal',side:'home',scorerId:f.starXI.lineupIds[10],scorer:'Player',minute:19,createdAt:1076000,homeScore:1,awayScore:0,ratingImpacts:{}}];
  const restored=pauseGameFeatureTimers(f,20000,1100000);assert.equal(restored.cup.matchEvents[0].createdAt,1096000);assert.equal(restored.cup.matchEvents[0].minute,19);
 });
+
+test("statistics table puts the home team left and the away team right, like the scoreboard", async () => {
+  const { MatchStatistics } = await import('../app/match-viewer.tsx');
+  const f = initialGameFeatures(1_000_000);
+  const cup = { ...beginSeasonCupMatch(f.cup, f.seasonMode, 1_000_000), opponent: "FC Gast", homeScore: 2, awayScore: 1 };
+  const columns = (away: boolean) => {
+    const features = { ...f, cup: { ...cup, fixture: { ...cup.fixture, away } as typeof cup.fixture } };
+    const html = renderToStaticMarkup(createElement(MatchStatistics, { features, clubName: "Mein Club" }));
+    return [...html.matchAll(/<th>([^<]*)<\/th>/g)].slice(0, 3).map(m => m[1]).concat(html.match(/<td>(\d+)<\/td><th>Tore<\/th><td>(\d+)<\/td>/)!.slice(1));
+  };
+  assert.deepEqual(columns(false), ["Mein Club", "Statistik", "FC Gast", "2", "1"]);
+  assert.deepEqual(columns(true), ["FC Gast", "Statistik", "Mein Club", "1", "2"]);
+});
