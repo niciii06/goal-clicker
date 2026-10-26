@@ -35,6 +35,10 @@ const SEAT_FIELDS = {
 };
 export type RoomSeats = { [K in keyof typeof SEAT_FIELDS]: RoomRow[K] };
 
+/** A cloud save without the save itself, for writes that already have it. */
+const { saveJson: _saveColumn, ...SAVE_META_FIELDS } = getTableColumns(cloudSaves);
+void _saveColumn;
+
 type RoomConditions = {
   sharedStateVersion?: number;
   lastPassiveAt?: string;
@@ -59,7 +63,8 @@ function createDatabase() {
     );
   }
   // Supabase's transaction pooler (port 6543) does not keep prepared statements between queries.
-  connection = postgres(url, { prepare: false, max: Number(process.env.DATABASE_POOL_MAX) || 5, idle_timeout: 20 });
+  // No array columns, so the type lookup every new connection would run is skipped.
+  connection = postgres(url, { prepare: false, fetch_types: false, max: Number(process.env.DATABASE_POOL_MAX) || 5, idle_timeout: 20 });
   return drizzle(connection, { schema });
 }
 
@@ -216,15 +221,16 @@ export class GoalClickerDatabase {
 
   /**
    * Stores a save only on top of the version the device loaded (0: no save yet). Two devices that loaded the
-   * same version cannot both write; the second gets the current save back as a conflict.
+   * same version cannot both write; the second gets the current save back as a conflict. A successful write
+   * does not send the save back, the caller already has it.
    */
   async putCloudSave(userId: string, saveJson: string, baseVersion: number, now: string, active = true): Promise<{ save: CloudSave; conflict?: undefined } | { save?: undefined; conflict: CloudSave | null }> {
     if (baseVersion === 0) {
-      const [created] = await this.client.insert(cloudSaves).values({ userId, saveJson, version: 1, active, updatedAt: now }).onConflictDoNothing().returning();
-      if (created) return { save: created };
+      const [created] = await this.client.insert(cloudSaves).values({ userId, saveJson, version: 1, active, updatedAt: now }).onConflictDoNothing().returning(SAVE_META_FIELDS);
+      if (created) return { save: { ...created, saveJson } };
     } else {
-      const [updated] = await this.client.update(cloudSaves).set({ saveJson, version: increment(cloudSaves.version, 1), active, updatedAt: now }).where(and(eq(cloudSaves.userId, userId), eq(cloudSaves.version, baseVersion))).returning();
-      if (updated) return { save: updated };
+      const [updated] = await this.client.update(cloudSaves).set({ saveJson, version: increment(cloudSaves.version, 1), active, updatedAt: now }).where(and(eq(cloudSaves.userId, userId), eq(cloudSaves.version, baseVersion))).returning(SAVE_META_FIELDS);
+      if (updated) return { save: { ...updated, saveJson } };
     }
     return { conflict: await this.getCloudSave(userId) };
   }

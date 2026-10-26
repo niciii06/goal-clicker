@@ -205,6 +205,29 @@ test('two devices saving on the same cloud version: one wins, the other gets the
   assert.equal((await db.getCloudSave(user))!.saveJson, next.find((r) => r.save)!.save!.saveJson);
 });
 
+test('a cloud save that went through is not sent back from the database', { skip }, async () => {
+  const { GoalClickerDatabase } = await import('../db/index.ts');
+  const schema = await import('../db/schema.ts');
+  const queries: string[] = [];
+  const watched = postgres(url!, { max: 1, prepare: false, fetch_types: false, onnotice: () => {}, debug: (_c, query) => { queries.push(query); } });
+  const spy = new GoalClickerDatabase(() => drizzle(watched, { schema }));
+  const user = '00000000-0000-4000-8000-000000000302';
+  const big = JSON.stringify({ save: 'x'.repeat(50_000) });
+  try {
+    const created = await spy.putCloudSave(user, big, 0, iso());
+    const updated = await spy.putCloudSave(user, `${big} `, 1, iso());
+    assert.equal(created.save!.version, 1);
+    assert.equal(updated.save!.version, 2);
+    assert.equal(updated.save!.saveJson, `${big} `, 'the caller still gets the save it wrote');
+    assert.equal((await db.getCloudSave(user))!.saveJson, `${big} `);
+    const writes = queries.filter((q) => /^(insert|update)/.test(q));
+    assert.equal(writes.length, 2);
+    for (const q of writes) assert.doesNotMatch(q.slice(q.indexOf('returning')), /save_json/);
+  } finally {
+    await watched.end();
+  }
+});
+
 test('deleting an account removes profile, cloud save and link but keeps shared worlds', { skip }, async () => {
   const user = '00000000-0000-4000-8000-000000000401';
   await db.linkAccount(user, 'deleted-player-id', 'gone@example.com');
