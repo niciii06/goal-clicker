@@ -1851,7 +1851,11 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .section-navigation button .svg-icon { flex: none; width: 20px; height: 20px; }
 .section-navigation button:hover { color: var(--text); background: var(--fill); }
 .section-navigation button.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
-.section-navigation button.live .tab-label-full::after, .section-navigation button.live .tab-label-short::after { display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: #ff3b30; content: ""; vertical-align: middle; }
+.section-navigation .tab-icon { position: relative; display: inline-flex; }
+.section-navigation .tab-label-full { display: inline-flex; align-items: center; }
+/* A running match: a LIVE capsule next to the label on wide screens, a badge on the symbol in the phone tab bar. */
+.section-navigation .tab-live-badge { display: inline-flex; align-items: center; margin-left: var(--space-2); padding: 2px 6px; border-radius: 6px; color: #fff; background: #ff3b30; font-size: var(--text-caption2); font-weight: 700; letter-spacing: .04em; line-height: 1.2; }
+.section-navigation .tab-live-dot { display: none; position: absolute; top: -1px; right: -3px; width: 9px; height: 9px; border: 2px solid var(--surface-raised); border-radius: 50%; background: #ff3b30; box-sizing: content-box; }
 .section-navigation .tab-label-short { display: none; }
 
 @media (max-width: 780px) {
@@ -1862,7 +1866,7 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
   .section-navigation button:hover { background: transparent; }
   .section-navigation .tab-label-full { display: none; }
   .section-navigation .tab-label-short { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-  .section-navigation button.live .tab-label-short::after { position: absolute; margin: 0 0 0 2px; }
+  .section-navigation .tab-live-dot { display: block; }
 }
 
 /* Header: a quiet glass bar. On phones brand and actions share one row and the balance sits below. */
