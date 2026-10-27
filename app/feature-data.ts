@@ -2950,17 +2950,6 @@ export function getTransferBonuses(ownedIds: string[]) {
   }, { clickBonus: 0, passiveBonus: 0, incomeBonus: 0 });
 }
 
-export function getFreshTransferOffers(ownedIds: string[], random = Math.random) {
-  const available = TRANSFER_PLAYERS.filter((player) => !ownedIds.includes(player.id));
-  const pool = available.length >= 3 ? available : TRANSFER_PLAYERS;
-  const result: string[] = [];
-  while (result.length < Math.min(3, pool.length)) {
-    const player = pool[Math.floor(random() * pool.length)];
-    if (player && !result.includes(player.id)) result.push(player.id);
-  }
-  return result;
-}
-
 export function getMissionProgress(mission: CoopMission, source: MissionProgressSource) {
   if (mission.kind === "goals") return Math.floor(source.seasonGoals);
   if (mission.kind === "clicks") return Math.floor(source.clicks);

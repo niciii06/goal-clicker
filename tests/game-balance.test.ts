@@ -4,7 +4,7 @@ import { FC27_OFFICIAL_POSITION_COUNT, FC27_POSITION_BY_SOURCE_ID } from "../app
 import { FC27_OFFICIAL_RATING_COUNT, FC27_RATING_BY_SOURCE_ID, FC27_UNAVAILABLE_SOURCE_IDS } from "../app/fc27-ratings.ts";
 import { transferClubsForRating } from "../app/features/news-data.ts";
 import { activatePendingTransferLoans, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, canStarXIPlayerPlayPosition, completeTournamentRun, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupMatchStrength, getCupPlayerMatchRating, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarXIEffectiveMatchRating, getStarXIPlayerMatchRating, getStarXISelection, getStarXIFragmentCompensation, getTournamentGoalBoostMultiplier, getTournamentOpponentSchedule, getTransferDeadlineEventDelay, getTransferEventDelay, getUnavailableStarXIPlayerIds, initialGameFeatures, initialSeasonMode, isTransferDeadlineDay, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, playSeasonModeMatch, recordSeasonModeMatch, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, startTournamentGoalBoost, REWARD_PACKS, getRewardPackOdds, getStarXIPlayer, STAR_PACKS, STAR_XI_ACTIVE_PLAYERS, STAR_XI_BENCH_SIZE, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE, TOURNAMENTS, TOURNAMENT_COOLDOWN_MS, TOURNAMENT_OPPONENT_MULTIPLIER, TOURNAMENT_GOAL_BOOST_DURATION_MS, TRANSFER_DEADLINE_LOAN_CHANCE, TRANSFER_LOAN_CHANCE, TRANSFER_PAID_SALE_CHANCE, TRANSFER_SALE_CHANCE, YB_FC26_SOURCE_IDS } from "../app/feature-data.ts";
-import { getPackUnlockLeague, getSeasonPath } from "../app/season-progression.ts";
+import { getPackUnlockLeague } from "../app/season-progression.ts";
 import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../app/upgrade-purchase.ts";
 
 function seededRandom(seed = 246813579) {
@@ -264,15 +264,6 @@ test("all 136 FC 27 Icons are in the game with FC 27 ratings", () => {
   assert.equal(getStarXIPlayer("icon-ronaldo")?.rating, 94);
   assert.equal(getStarXIPlayer("icon-yaya-toure")?.retired, undefined);
   assert.equal(getStarXIPlayer("icon-christine-sinclair")?.countryCode, "CA");
-});
-
-test("late season targets keep growing instead of collapsing into ten second seasons", () => {
-  const seasonNine = getSeasonPath(Number.MAX_SAFE_INTEGER, 8).target;
-  const seasonFifteen = getSeasonPath(Number.MAX_SAFE_INTEGER, 14).target;
-  const finalSeason = getSeasonPath(Number.MAX_SAFE_INTEGER, 19).target;
-  assert.equal(seasonNine, 64000000);
-  assert.ok(seasonFifteen > 1000000000);
-  assert.ok(finalSeason > 10000000000);
 });
 
 test("legacy tactics no longer modify squad or opponent strength", () => {

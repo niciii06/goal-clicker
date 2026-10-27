@@ -150,22 +150,6 @@ export function getSeasonMilestone(season: number) {
   return SEASON_MILESTONES.find((milestone) => milestone.season === normalized) ?? SEASON_MILESTONES[SEASON_MILESTONES.length - 1];
 }
 
-export function getSeasonPath(currentGoals: number, completedSeasons: number) {
-  const goals = Math.max(0, Number.isFinite(currentGoals) ? currentGoals : 0);
-  const completed = Math.max(0, Math.floor(Number.isFinite(completedSeasons) ? completedSeasons : 0));
-  const earlyTarget = 250000 * 2 ** Math.min(completed, 8);
-  const target = completed <= 8 ? earlyTarget : earlyTarget * 1.6 ** (completed - 8);
-  const baseReward = Math.max(1, Math.min(1, Math.floor(Math.sqrt(goals / target))));
-  const reward = getCurrentSeason(completed) + 1 === MAX_CAREER_SEASON ? baseReward + 1 : baseReward;
-
-  return {
-    target,
-    progress: Math.max(0, Math.min(100, (goals / target) * 100)),
-    canAdvance: goals >= target,
-    reward,
-  };
-}
-
 /** Formations for the picker: available ones first in catalogue order, locked ones after them
  * in the order they unlock (Liga 15 is the entry, so Liga 14 comes before Liga 13). */
 export function sortFormationsForPicker<T extends { id: string }>(formations: readonly T[], isUnlocked: (formation: T) => boolean) {
