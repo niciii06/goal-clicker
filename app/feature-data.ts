@@ -64,8 +64,12 @@ export type { StarPosition } from "./fc26-player-pool";
 
 
 
+/** One played match of the running season, ours or between two other clubs; `matchday` counts from 1. */
+export type SeasonResult = { matchday: number; homeId: string; awayId: string; homeScore: number; awayScore: number };
+
 export type SeasonModeState = {
   fixtures?: SeasonFixture[];
+  results?: SeasonResult[];
   division: number;
   highestDivision: number;
   matchday: number;
@@ -653,7 +657,7 @@ function normalizeSeasonTable(raw: unknown, division: number, clubName: string) 
   });
 }
 
-function sortSeasonTable(table: readonly SeasonTableRow[]) {
+export function sortSeasonTable(table: readonly SeasonTableRow[]) {
   return [...table].sort((first, second) => second.points - first.points
     || (second.goalsFor - second.goalsAgainst) - (first.goalsFor - first.goalsAgainst)
     || second.goalsFor - first.goalsFor
@@ -665,6 +669,28 @@ export function seasonBackgroundPairings(day:number) {
  for(let n=0;n<day%5;n++)teams.splice(1,0,teams.pop()!);
  return [[teams[1],teams[4]],[teams[2],teams[3]]];
 }
+/** Which club of a background pairing plays at home: they take turns from one matchday to the next. */
+function seasonPairingHomeFirst(day:number) { return day%2===0; }
+
+export type SeasonScheduleMatch = { homeId: string; awayId: string; home: string; away: string; homeScore?: number; awayScore?: number; club: boolean };
+/** The whole season: every matchday with our match and the two others, with the score once it is played. */
+export function getSeasonSchedule(state: SeasonModeState): { matchday: number; played: boolean; matches: SeasonScheduleMatch[] }[] {
+  const name = (id: string) => state.table.find((team) => team.id === id)?.name ?? "Unbekannt";
+  return Array.from({ length: SEASON_MODE_MATCHES_PER_SEASON }, (_, day) => {
+    const fixture = state.fixtures?.[day], opponentId = fixture?.opponentId ?? `season-opponent-${day % (SEASON_MODE_TABLE_SIZE - 1) + 1}`;
+    const clubAway = fixture?.away ?? day % 2 === 1;
+    const pairs: [string, string, boolean][] = [[clubAway ? opponentId : "club", clubAway ? "club" : opponentId, true], ...seasonBackgroundPairings(day).map(([first, second]): [string, string, boolean] => seasonPairingHomeFirst(day) ? [first, second, false] : [second, first, false])];
+    // Saves from before results were stored still know the club's own scores from the match history.
+    const history = day < state.matchday ? state.history.slice(-state.matchday).find((entry) => entry.matchday === day + 1 && !entry.completedSeason) : undefined;
+    const matches = pairs.map(([homeId, awayId, club]) => {
+      const result = state.results?.find((entry) => entry.matchday === day + 1 && entry.homeId === homeId && entry.awayId === awayId)
+        ?? (club && history ? { homeScore: clubAway ? history.opponentScore : history.clubScore, awayScore: clubAway ? history.clubScore : history.opponentScore } : undefined);
+      return { homeId, awayId, home: name(homeId), away: name(awayId), club, ...(result ? { homeScore: result.homeScore, awayScore: result.awayScore } : {}) };
+    });
+    return { matchday: day + 1, played: day < state.matchday, matches };
+  });
+}
+
 export function createSeasonFixtures(table:SeasonTableRow[]):SeasonFixture[] {
  return Array.from({length:10},(_,day)=>{const o=table.find(t=>t.id===`season-opponent-${day%5+1}`)!;return {opponentId:o.id,clubId:o.clubId??o.id,away:day%2===1,venue:day%2===1?o.venue!:HOME_VENUE};});
 }
@@ -715,8 +741,17 @@ export function normalizeSeasonModeState(value: unknown, clubName = "FC Goal", l
   const lastTable = normalizeSeasonTable(source.lastTable, division, clubName);
   const generated=createSeasonFixtures(table);
   const fixtures=generated.map((fallback,index)=>{const raw=asRecord((Array.isArray(source.fixtures)?source.fixtures:[])[index]);return raw.opponentId===fallback.opponentId&&typeof raw.away==='boolean'?{...fallback,away:raw.away,venue:raw.away?(table.find(t=>t.id===raw.opponentId)?.venue??fallback.venue):HOME_VENUE}:fallback;});
+  const teamIds = new Set(table.map((team) => team.id));
+  const results = (Array.isArray(source.results) ? source.results : []).map(asRecord).filter((item) => typeof item.homeId === "string" && typeof item.awayId === "string" && teamIds.has(item.homeId) && teamIds.has(item.awayId) && item.homeId !== item.awayId).map((item): SeasonResult => ({
+    matchday: Math.max(1, Math.min(SEASON_MODE_MATCHES_PER_SEASON, Math.floor(Number(item.matchday) || 1))),
+    homeId: String(item.homeId),
+    awayId: String(item.awayId),
+    homeScore: Math.max(0, Math.min(20, Math.floor(Number(item.homeScore) || 0))),
+    awayScore: Math.max(0, Math.min(20, Math.floor(Number(item.awayScore) || 0))),
+  })).slice(-SEASON_MODE_MATCHES_PER_SEASON * 3);
   return {
     fixtures,
+    results,
     division,
     highestDivision,
     matchday: Math.max(0, Math.min(SEASON_MODE_MATCHES_PER_SEASON - 1, Math.floor(Number(source.matchday) || 0))),
@@ -778,11 +813,16 @@ export function recordSeasonModeMatch(value: unknown, clubScore: number, opponen
   const safeOpponentScore = Math.max(0, Math.min(20, Math.floor(Number(opponentScore) || 0)));
   const opponentRating = opponent?.rating ?? nextOpponent.rating;
   const outcome: SeasonMatchHistoryEntry["outcome"] = safeClubScore > safeOpponentScore ? "win" : safeClubScore === safeOpponentScore ? "draw" : "loss";
+  const clubAway = state.fixtures?.[state.matchday]?.away ?? state.matchday % 2 === 1, opponentRowId = opponent?.id ?? nextOpponent.id;
+  const results: SeasonResult[] = [clubAway
+    ? { matchday, homeId: opponentRowId, awayId: "club", homeScore: safeOpponentScore, awayScore: safeClubScore }
+    : { matchday, homeId: "club", awayId: opponentRowId, homeScore: safeClubScore, awayScore: safeOpponentScore }];
   let table = state.table.map((team) => team.id === "club" ? updateSeasonTableRow({ ...team, name: clubName || team.name }, safeClubScore, safeOpponentScore) : team.id === opponent?.id ? updateSeasonTableRow(team, safeOpponentScore, safeClubScore) : team);
   for(const [firstId,secondId] of seasonBackgroundPairings(state.matchday)) {
     const first=table.find(t=>t.id===firstId)!,second=table.find(t=>t.id===secondId)!;
     const firstScore=rollSeasonScore(first.rating-second.rating+1,random),secondScore=rollSeasonScore(second.rating-first.rating-1,random);
     table=table.map(team=>team.id===first.id?updateSeasonTableRow(team,firstScore,secondScore):team.id===second.id?updateSeasonTableRow(team,secondScore,firstScore):team);
+    results.push(seasonPairingHomeFirst(state.matchday)?{matchday,homeId:first.id,awayId:second.id,homeScore:firstScore,awayScore:secondScore}:{matchday,homeId:second.id,awayId:first.id,homeScore:secondScore,awayScore:firstScore});
   }
   const lastTable = sortSeasonTable(table);
   const completedSeason = matchday >= SEASON_MODE_MATCHES_PER_SEASON;
@@ -832,6 +872,8 @@ export function recordSeasonModeMatch(value: unknown, clubScore: number, opponen
     matchday: completedSeason ? 0 : matchday,
     table: completedSeason && !hallOfFame ? createSeasonTable(nextDivision, clubName) : lastTable,
     fixtures: completedSeason && !hallOfFame ? createSeasonFixtures(createSeasonTable(nextDivision,clubName)) : state.fixtures,
+    // A new season starts without results; the finished one stays visible through lastTable.
+    results: completedSeason && !hallOfFame ? [] : [...(state.results ?? []), ...results],
     lastTable,
     lastResult,
     lastMatchAt: now,

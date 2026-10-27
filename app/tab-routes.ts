@@ -1,7 +1,7 @@
 // One address per main tab and sub tab, e.g. /kader or /club/missionen. All of them serve the single
 // game page (see the rewrites in next.config.ts), so switching tabs never reloads or remounts the game.
 export const TAB_PATHS = {
-  home: '/home', cup: '/spiele', squad: '/kader', career: '/karriere', packs: '/packs', album: '/packs/album',
+  home: '/home', cup: '/spiele', season: '/saison', squad: '/kader', career: '/karriere', packs: '/packs', album: '/packs/album',
   club: '/club', fabrizio: '/club/fabrizio', missions: '/club/missionen', leaderboard: '/club/rangliste', history: '/club/verlauf',
 } as const;
 

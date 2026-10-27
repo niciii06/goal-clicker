@@ -257,6 +257,53 @@
 .history-row strong { color: var(--text); font-size: var(--text-footnote); }
 .history-row small { margin-top: 3px; color: var(--muted); font-size: var(--text-footnote); }
 .history-row em { color: var(--muted); font-size: var(--text-footnote); font-style: normal; white-space: nowrap; }
+.season-hub { display: grid; gap: 16px; }
+.season-hub-table-wrap { overflow-x: auto; }
+.season-hub-table { width: 100%; border-collapse: separate; border-spacing: 0 4px; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.season-hub-table caption { margin-bottom: 4px; color: var(--muted); font-size: var(--text-footnote); font-weight: 800; letter-spacing: .08em; text-align: left; text-transform: uppercase; }
+.season-hub-table thead th { padding: 0 6px 2px; color: var(--muted); font-size: var(--text-footnote); font-weight: 800; text-align: right; }
+.season-hub-table thead th:nth-child(2) { text-align: left; }
+.season-hub-table td, .season-hub-table tbody th { padding: 9px 6px; color: var(--soft); background: var(--surface-raised); text-align: right; white-space: nowrap; }
+.season-hub-table tbody th { overflow: hidden; max-width: 0; width: 100%; color: var(--text); font-weight: 700; text-align: left; text-overflow: ellipsis; }
+.season-hub-table tbody td:first-child { width: 28px; border-left: 3px solid transparent; border-radius: 9px 0 0 9px; text-align: center; font-weight: 800; }
+.season-hub-table tbody td:last-child { border-radius: 0 9px 9px 0; }
+.season-hub-table tbody td:last-child b { color: var(--text); }
+.season-hub-table tr.promotion td:first-child, .season-hub-table tr.hall-of-fame td:first-child { border-left-color: #22a447; }
+.season-hub-table tr.relegation td:first-child { border-left-color: #e5484d; }
+.season-hub-table tr.club td, .season-hub-table tr.club th { background: color-mix(in srgb, var(--accent) 11%, var(--surface-raised)); }
+.season-hub-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 6px 0 0; color: var(--muted); font-size: var(--text-footnote); }
+.season-hub-legend span::before { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 3px; background: #22a447; content: ""; }
+.season-hub-legend span.relegation::before { background: #e5484d; }
+.season-hub-last summary, .season-hub-day-card summary { cursor: pointer; color: var(--soft); font-size: var(--fs-sm); font-weight: 700; }
+.season-hub-last summary { min-height: 44px; display: flex; align-items: center; }
+.season-hub-section h4 { margin: 0 0 8px; color: var(--text); font-size: 16px; font-weight: 740; letter-spacing: -.03em; }
+.season-hub-next { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.season-hub-next li { display: grid; grid-template-columns: auto minmax(0,1fr) auto auto; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line-soft); border-radius: 12px; background: var(--surface-raised); }
+.season-hub-next li.upcoming { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-raised)); }
+.season-hub-next strong { overflow: hidden; color: var(--text); font-size: var(--fs-sm); text-overflow: ellipsis; white-space: nowrap; }
+.season-hub-day { color: var(--muted); font-size: var(--text-footnote); font-weight: 750; white-space: nowrap; }
+.season-hub-venue { padding: 3px 8px; border-radius: var(--radius-pill); font-size: var(--text-footnote); font-weight: 800; }
+.season-hub-venue.home { color: color-mix(in oklab, #116c49, var(--text) var(--tone-mix)); background: color-mix(in srgb, #22c36d 14%, var(--surface-raised)); }
+.season-hub-venue.away { color: var(--soft); background: var(--surface-soft); }
+.season-hub-rating { color: var(--muted); font-size: var(--text-footnote); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.season-hub-empty { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+.season-hub-days { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); align-items: start; gap: 8px; }
+.season-hub-day-card { padding: 4px 12px 8px; border: 1px solid var(--line-soft); border-radius: 12px; background: var(--surface-raised); }
+.season-hub-day-card summary { display: flex; align-items: center; justify-content: space-between; min-height: 40px; }
+.season-hub-day-card summary small { color: var(--muted); font-size: var(--text-footnote); font-weight: 600; }
+.season-hub-day-card ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.season-hub-day-card li { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 8px; padding: 6px 4px; border-radius: 8px; color: var(--soft); font-size: var(--text-footnote); }
+.season-hub-day-card li.club { background: color-mix(in srgb, var(--accent) 9%, var(--surface-raised)); }
+.season-hub-day-card li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.season-hub-day-card li span:last-child { text-align: right; }
+.season-hub-day-card li span.own { color: var(--text); font-weight: 800; }
+.season-hub-day-card li b { min-width: 34px; color: var(--text); font-variant-numeric: tabular-nums; text-align: center; }
+@media (max-width: 540px) {
+  .season-hub-table thead th:nth-child(4), .season-hub-table thead th:nth-child(5), .season-hub-table thead th:nth-child(6),
+  .season-hub-table td:nth-child(4), .season-hub-table td:nth-child(5), .season-hub-table td:nth-child(6) { display: none; }
+  .season-hub-next li { grid-template-columns: minmax(0,1fr) auto; }
+  .season-hub-next .season-hub-day { grid-column: 1 / -1; }
+}
 .leaderboard-note { margin: 8px 0 0; color: var(--muted); font-size: var(--text-footnote); }
 .leaderboard-sorts { display: inline-flex; gap: 4px; margin-top: 14px; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface-soft); }
 .leaderboard-sorts button { min-height: 44px; padding: 0 16px; border: 0; border-radius: var(--radius-pill); color: var(--soft); cursor: pointer; background: transparent; font-size: var(--fs-sm); font-weight: 700; }

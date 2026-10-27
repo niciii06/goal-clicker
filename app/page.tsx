@@ -42,6 +42,7 @@ import { UPGRADES } from "./game/upgrades";
 import { TransferOfferActions } from "./transfer-offer-actions";
 import { pronounText } from "./player-pronouns";
 import { LeaderboardPanel } from "./leaderboard-panel";
+import { SeasonPanel } from "./season-panel";
 import { expectedHomeCrowd, getTicketIncome, recordTicketIncome } from "./ticket-income";
 import { directionLabel, formatCountdown, formatGoalDifference, formatHistoryTime, formatNumber, formatPackChance, getRandomCrossbarHeight, getRandomMatchPrediction, getRandomPenaltyDirection, heightLabel, predictionLabel } from "./game/format";
 import { getCurrentTime, getTravelTime, syncTravelClock } from "./game/clock";
@@ -2509,7 +2510,7 @@ function App() {
   const featureMissions = displayGame.features.missions;
   const featureHistory = [...displayGame.features.history].reverse();
   // short: the label in the phone tab bar; the button keeps the full label as its accessible name.
-  const primaryTabs: { id: FeatureTab; label: string; text?: string; short: string; icon: IconName }[] = [{id:'home',label:'Home',short:'Home',icon:'home'},{id:'cup',label:displayGame.features.cup.active?'Spiele · LIVE':'Spiele',text:'Spiele',short:'Spiele',icon:'trophy'},{id:'squad',label:'Kader',short:'Kader',icon:'squad'},{id:'career',label:'Karriere',short:'Karriere',icon:'career'},{id:'packs',label:'Packs & Album',short:'Packs',icon:'cards'},{id:'club',label:'Club & Mehr',short:'Club',icon:'shield'}];
+  const primaryTabs: { id: FeatureTab; label: string; text?: string; short: string; icon: IconName }[] = [{id:'home',label:'Home',short:'Home',icon:'home'},{id:'cup',label:displayGame.features.cup.active?'Spiele · LIVE':'Spiele',text:'Spiele',short:'Spiele',icon:'trophy'},{id:'season',label:'Saison',short:'Saison',icon:'table'},{id:'squad',label:'Kader',short:'Kader',icon:'squad'},{id:'career',label:'Karriere',short:'Karriere',icon:'career'},{id:'packs',label:'Packs & Album',short:'Packs',icon:'cards'},{id:'club',label:'Club & Mehr',short:'Club',icon:'shield'}];
   const featureTabs: {id:FeatureTab;label:string}[] = ['packs','album'].includes(featureTab) ? [{id:'packs',label:'Packshop'},{id:'album',label:'Sammelalbum'}] : ['club','fabrizio','missions','leaderboard','history'].includes(featureTab) ? [{id:'club',label:'Clubprofil'},{ id: "fabrizio", label: "Fabrizio" },{id:'missions',label:'Missionen'},{id:'leaderboard',label:'Rangliste'},{id:'history',label:'Verlauf'}] : [];
   const primarySection = featureTab === 'album' ? 'packs' : ['fabrizio','missions','leaderboard','history'].includes(featureTab) ? 'club' : featureTab;
 
@@ -2590,6 +2591,7 @@ function App() {
             </div>
           </div>}
 
+          {featureTab === "season" && <SeasonPanel features={displayGame.features} />}
           {featureTab === "cup" && <div className="feature-panel cup-panel">
             {!displayGame.features.cup.active && <div className="post-match-extras">
       {seasonStandingsAnnouncement && seasonStandingsEntry && <div className={`inline-standings ${seasonStandingsEntry.outcome}`}  aria-label="Aktuelle Saisonrangliste">
