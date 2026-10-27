@@ -2559,7 +2559,8 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
   const nextTournamentAt = Math.max(0, Math.floor(Number(cup.nextTournamentAt) || 0));
   const loanedPlayerIds = transferSaga.loans.map((loan) => loan.playerId);
   const savedLock = normalizeSquadLock(source.squadLock ?? asRecord(asRecord(source.travel).journey).squadLock);
-  const normalizedStarXI = removeStarXIPlayersFromSquad(normalizeStarXIState({...starXI, lockedPlayerIds:savedLock?.playerIds}, loanedPlayerIds), [...new Set([...suspendedPlayerIds, ...Object.keys(injuredPlayerIds)])], !active);
+  // The matchday squad is only fixed while the match runs; on the way there the lineup may still change.
+  const normalizedStarXI = removeStarXIPlayersFromSquad(normalizeStarXIState({...starXI, lockedPlayerIds:active?savedLock?.playerIds:undefined}, loanedPlayerIds), [...new Set([...suspendedPlayerIds, ...Object.keys(injuredPlayerIds)])], !active);
   const normalizeSavedSquadSlots = (value: unknown, size: number) => {
     const slots = Array.isArray(value) ? value : [];
     return Array.from({ length: size }, (_, index) => {
@@ -2622,7 +2623,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     squadLock: normalizeSquadLock(source.squadLock ?? asRecord(asRecord(source.travel).journey).squadLock),
     career: normalizeCareerState(source.career, [...normalizedStarXI.ownedIds, ...loans.map(loan => loan.playerId)], { ...defaults.cup, ...cup, allTimeScorers, allTimeAppearances, playerEnteredAt, matchEvents, active } as CupState),
     transferMarket: { offerIds: offerIds.length ? offerIds : defaults.transferMarket.offerIds, ownedIds: [...new Set(ownedIds)] },
-    starXI: { ...normalizedStarXI, lockedPlayerIds: normalizeSquadLock(source.squadLock ?? asRecord(asRecord(source.travel).journey).squadLock)?.playerIds },
+    starXI: { ...normalizedStarXI, lockedPlayerIds: active ? savedLock?.playerIds : undefined },
     club: { name: clubName, badge: CLUB_BADGES.includes(String(club.badge)) ? String(club.badge) : defaults.club.badge, color: CLUB_COLORS.includes(String(club.color)) ? String(club.color) : defaults.club.color },
     cup: { simulation: normalizeInteractive(cup.simulation), restartAt:Number.isFinite(cup.restartAt)?Number(cup.restartAt):undefined, restartSide:cup.restartSide==='opponent'?'opponent':'club', regularDurationMs: Number(cup.regularDurationMs)>=180000&&Number(cup.regularDurationMs)<=300000?Number(cup.regularDurationMs):undefined, halftimeTaken:cup.halftimeTaken===true, timedPause:normalizeTimedPause(cup.timedPause), subWindowsUsed: Math.min(3,Math.max(0,Math.floor(Number(cup.subWindowsUsed)||0))), pendingSubstitutions: normalizePendingSubstitutions(cup.pendingSubstitutions), broadcast: normalizeMatchBroadcast(cup.broadcast), fixture: cup.fixture && typeof cup.fixture==='object' ? cup.fixture as CupState['fixture'] : undefined, drawSeed: isDrawSeed(cup.drawSeed) ? cup.drawSeed : legacyTournamentDrawSeed(cup), careerRatingSeed: Number.isFinite(Number(cup.careerRatingSeed)) && Number(cup.careerRatingSeed) > 0 ? Number(cup.careerRatingSeed) : matchStartedAt, careerMatchId: typeof cup.careerMatchId === "string" ? cup.careerMatchId.slice(0, 200) : undefined, careerBonuses: Object.fromEntries(Object.entries(asRecord(cup.careerBonuses)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Number(value), -2 - TRANSFER_UNHAPPY_PENALTY, 5)])), active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && (Boolean(lastInjury) || Boolean(cup.simulation)), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
     seasonMode: normalizedSeasonMode,
@@ -2794,7 +2795,7 @@ export function getLoanedStarXIPlayerIds(features: GameFeatures) {
 
 export function getUnavailableStarXIPlayerIds(features: GameFeatures) {
   const injuredIds = Object.entries(features.cup.injuredPlayerIds ?? {}).filter(([, matches]) => Number(matches) > 0).map(([playerId]) => playerId);
-  return [...new Set([...features.cup.suspendedPlayerIds, ...injuredIds, ...getLoanedStarXIPlayerIds(features), ...(features.squadLock?features.starXI.ownedIds.filter(id=>!features.squadLock!.playerIds.includes(id)):[])])];
+  return [...new Set([...features.cup.suspendedPlayerIds, ...injuredIds, ...getLoanedStarXIPlayerIds(features), ...(features.squadLock&&features.cup.active?features.starXI.ownedIds.filter(id=>!features.squadLock!.playerIds.includes(id)):[])])];
 }
 
 /** Players the automatic best eleven must leave out: unavailable ones plus players banned
@@ -3125,7 +3126,7 @@ function normalizeSquadLock(value: unknown): GameFeatures['squadLock'] {
 export function lockMatchSquad(features: GameFeatures, fixtureId: string, now: number) {
   if (features.squadLock) return;
   features.squadLock = {fixtureId, playerIds: [...new Set([...features.starXI.lineupIds,...features.starXI.benchIds].filter(Boolean))], startedAt:now, transferRemaining:Math.max(0,features.transferSaga.nextAt-now), eventRemaining:Math.max(0,features.nextEventAt-now), varRemaining:Math.max(0,features.nextVarAt-now), offerRemaining:transferOfferRemaining(features, now)};
-  features.starXI.lockedPlayerIds = [...features.squadLock.playerIds];
+  // The lock freezes the Fabrizio and event clocks; the squad itself stays open until kick-off.
 }
 export function releaseMatchSquad(features: GameFeatures, now: number) {
   const lock = features.squadLock;

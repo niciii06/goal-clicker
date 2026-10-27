@@ -175,7 +175,6 @@ export function eligibilityError(features:GameFeatures,mode:'season'|'tournament
  if(features.cup.suspendedPlayerIds.some(id=>features.starXI.lineupIds.includes(id)||features.starXI.benchIds.includes(id)))return 'Ersetze zuerst die gesperrten Spieler.';
  const banned=squadBanError(features,competitionFor(mode,tournamentId));if(banned)return banned;
  if([...features.starXI.lineupIds,...features.starXI.benchIds].some(id=>Number(features.cup.injuredPlayerIds[id])>0))return 'Ersetze zuerst die verletzten Spieler.';
- if(features.squadLock&&[...features.starXI.lineupIds,...features.starXI.benchIds].some(id=>id&&!features.squadLock!.playerIds.includes(id)))return 'Dieser Spieler gehört nicht zum Reisekader.';
  if(mode==='tournament'&&getStarXIRating(features.starXI.ownedIds,features.starXI.lineupIds)<getTournament(tournamentId)!.minimumRating)return 'Die Teamstärke reicht für dieses Turnier noch nicht.';
  return null;
 }
@@ -192,5 +191,7 @@ export function travelGate(features:GameFeatures,fixture:TravelFixture,now:numbe
  if(now<current.endsAt)return 'Die Mannschaft ist noch unterwegs.';
  return null;
 }
-export function consumeTravel(features:GameFeatures,fixture:TravelFixture) { features.cup.careerMatchId=`career:${fixture.id}`; features.cup.fixture={id:fixture.id,away:fixture.away,neutral:fixture.neutral,venue:fixture.venue,opponentId:fixture.opponentId}; if(features.travel.journey?.fixture.id===fixture.id)features.travel.journey.consumed=true; }
+export function consumeTravel(features:GameFeatures,fixture:TravelFixture) {
+ // Kick-off: whoever stands in the lineup and on the bench now is the matchday squad.
+ if(features.squadLock)features.squadLock={...features.squadLock,playerIds:[...new Set([...features.starXI.lineupIds,...features.starXI.benchIds].filter(Boolean))]}; features.cup.careerMatchId=`career:${fixture.id}`; features.cup.fixture={id:fixture.id,away:fixture.away,neutral:fixture.neutral,venue:fixture.venue,opponentId:fixture.opponentId}; if(features.travel.journey?.fixture.id===fixture.id)features.travel.journey.consumed=true; }
 export {HOME_VENUE,REGION_LABELS};

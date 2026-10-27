@@ -902,7 +902,7 @@ export async function POST(request: Request) {
     }
 
     if (action === "star-lineup") {
-      if(game.features.squadLock && !game.features.squadLock.playerIds.includes(String(payload.starPlayerId))) return jsonError('Dieser Spieler gehört nicht zum Reisekader.',409);
+      if(game.features.cup.active && game.features.squadLock && !game.features.squadLock.playerIds.includes(String(payload.starPlayerId))) return jsonError('Dieser Spieler gehört nicht zum Spieltagskader.',409);
       if(game.features.cup.active&&game.features.cup.simulation)return jsonError('Nutze Wechsel in der Matchansicht.',409);
       const lineupIndex = Number(payload.lineupIndex);
       const starPlayerId = typeof payload.starPlayerId === "string" ? payload.starPlayerId : "";
@@ -949,7 +949,7 @@ export async function POST(request: Request) {
     }
 
     if (action === "star-bench") {
-      if(game.features.squadLock && !game.features.squadLock.playerIds.includes(String(payload.starPlayerId))) return jsonError('Dieser Spieler gehört nicht zum Reisekader.',409);
+      if(game.features.cup.active && game.features.squadLock && !game.features.squadLock.playerIds.includes(String(payload.starPlayerId))) return jsonError('Dieser Spieler gehört nicht zum Spieltagskader.',409);
       const benchIndex = Number(payload.benchIndex);
       const starPlayerId = typeof payload.starPlayerId === "string" ? payload.starPlayerId : "";
       const starPlayer = getStarXIPlayer(starPlayerId);

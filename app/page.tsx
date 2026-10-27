@@ -399,7 +399,7 @@ function App() {
         const j={...serverJourney,consumed:old.journey!.consumed};
         const counted=(old.journey as Journey & {counted?:boolean}).counted, finesPaid=old.journey!.finesPaid;
         const travel=settleTravel({...old,journey:{...j,counted,finesPaid} as Journey},serverNow);
-        return {...current,features:{...current.features,travel,squadLock:serverJourney.squadLock,starXI:{...current.features.starXI,lockedPlayerIds:serverJourney.squadLock?.playerIds}}};
+        return {...current,features:{...current.features,travel,squadLock:serverJourney.squadLock}};
       });
     }catch{ /* Last authoritative clock continues; kickoff always revalidates. */ }};
     void sync();const timer=window.setInterval(()=>{const j=gameRef.current.features.travel.journey;if(j&&!journeyView(j,getTravelTime()).arrived)void sync();},5000);
@@ -1511,7 +1511,7 @@ function App() {
     if(displayGame.features.cup.active){await confirmMatchChanges([{playerId,slot:lineupIndex}]);return;}
     const player = getStarXIPlayer(playerId);
     if (!player || !Number.isInteger(lineupIndex) || lineupIndex < 0 || lineupIndex >= STAR_XI_SQUAD_SIZE || !displayGame.features.starXI.ownedIds.includes(playerId)) return;
-    if (displayGame.features.squadLock && !displayGame.features.squadLock.playerIds.includes(playerId)) { showToast('Dieser Spieler gehört nicht zum Reisekader.'); return; }
+    if (displayGame.features.cup.active && displayGame.features.squadLock && !displayGame.features.squadLock.playerIds.includes(playerId)) { showToast('Dieser Spieler gehört nicht zum Spieltagskader.'); return; }
     if (suspendedStarIds.includes(playerId)) {
       showToast(`${player.name} ist nach der Roten Karte für die nächste Partie gesperrt.`);
       return;
@@ -1594,13 +1594,18 @@ function App() {
 
   async function autoPickBestStarXI() {
     if (displayGame.features.cup.active) {
-      showToast("Während eines Pokalspiels kann die Startelf nicht automatisch geändert werden.");
+      showToast("Während eines Spiels ist die Startelf gesperrt. Wechsle im Spiel über «Wechsel».");
       return;
     }
     const preview = setBestStarXI(displayGame.features.starXI, getBestXIUnavailablePlayerIds(displayGame.features), { career: displayGame.features.career, cup: displayGame.features.cup });
     const selectedCount = preview.lineupIds.filter(Boolean).length;
     if (!selectedCount) {
       showToast("Du hast noch keine passenden Spieler im Kader.");
+      return;
+    }
+    const unchanged = preview.lineupIds.join() === displayGame.features.starXI.lineupIds.join() && preview.benchIds.join() === displayGame.features.starXI.benchIds.join();
+    if (unchanged) {
+      showToast("Das ist schon deine beste Startelf.");
       return;
     }
     if (isCoopLive) {
@@ -1610,6 +1615,7 @@ function App() {
         setSelectedLineupSlot(null);
         setSelectedBenchSlot(null);
         setCoopMessage(`Beste Startelf aufgestellt · ${selectedCount} von ${STAR_XI_SQUAD_SIZE} Plätzen besetzt.`);
+        showToast(`Beste Startelf · ${selectedCount} von ${STAR_XI_SQUAD_SIZE}`);
       }
       setCoopBusy(false);
       return;
@@ -1629,7 +1635,7 @@ function App() {
   async function selectStarXIBenchPlayer(playerId: string, benchIndex: number) {
     const player = getStarXIPlayer(playerId);
     if (!player || displayGame.features.cup.active || !displayGame.features.starXI.ownedIds.includes(playerId) || displayGame.features.starXI.lineupIds.includes(playerId)) return;
-    if (displayGame.features.squadLock && !displayGame.features.squadLock.playerIds.includes(playerId)) { showToast('Dieser Spieler gehört nicht zum Reisekader.'); return; }
+    if (displayGame.features.cup.active && displayGame.features.squadLock && !displayGame.features.squadLock.playerIds.includes(playerId)) { showToast('Dieser Spieler gehört nicht zum Spieltagskader.'); return; }
     if (suspendedStarIds.includes(playerId)) {
       showToast(`${player.name} darf nach einer Roten Karte nicht auf die Bank.`);
       return;
@@ -1769,7 +1775,7 @@ function App() {
         const old=current.features.travel, same=old.journey?.id===data.journey!.id, counted=same?(old.journey as Journey & {counted?:boolean}).counted:false, finesPaid=same?old.journey!.finesPaid:false;
         const travel=settleTravel({...old,journey:{...data.journey!,consumed:false,counted,finesPaid} as Journey},data.serverNow!);
         travel.journey!.consumed=false;
-        return {...current,features:{...current.features,travel,squadLock:data.journey!.squadLock,starXI:{...current.features.starXI,lockedPlayerIds:data.journey!.squadLock?.playerIds}}};
+        return {...current,features:{...current.features,travel,squadLock:data.journey!.squadLock}};
       });
       openFeatureTab('cup');
       return action==='start'?data.journey.fixture:null;
@@ -2661,7 +2667,7 @@ function App() {
           {featureTab === "squad" && <div className="feature-panel">{displayGame.features.cup.active ? <div className="career-empty"><p>Auswechslungen steuerst du im laufenden Match.</p><button className="mode-primary" onClick={()=>openFeatureTab('cup')}>Zum Live-Match</button></div> : <>
             <div className="starxi-lineup-heading"><span>DEINE ELF / {activeFormation.label}</span><small>Spieler ziehen oder zwei Spieler nacheinander antippen zum Tauschen</small></div>
             <div className="starxi-squad-layout">
-              <SquadPitchPanel status={activeLineupSlot === null ? "Startplatz wählen" : `Platz ${activeLineupSlot + 1} · ${activeLineupPosition}`} controls={<div className="starxi-formation-picker"><span><strong>FORMATION WÄHLEN</strong><small>{displayGame.features.cup.active ? "Während des Spiels gesperrt" : `${unlockedFormationCount} von ${STAR_FORMATIONS.length} Formationen freigeschaltet`}</small></span><div className="starxi-formation-actions"><select value={activeFormation.id} disabled={displayGame.features.cup.active || coopBusy} onChange={(event) => void changeStarXIFormation(event.target.value as StarFormationId)} aria-label="Formation wählen">{pickerFormations.map((formation) => { const unlockLeague = getFormationUnlockLeague(formation.id); const unlocked = isFormationAvailable(formation); return <option value={formation.id} key={formation.id} disabled={!unlocked}>{formation.label}{unlocked ? "" : ` · ab Liga ${unlockLeague}`}</option>; })}</select><button type="button" className="starxi-best-button" onClick={() => void autoPickBestStarXI()} disabled={displayGame.features.cup.active || coopBusy || ownedStarXIPlayers.length === 0}>★ Beste Startelf</button></div></div>} help={displayGame.features.cup.active ? `Live Wechsel: Bankspieler auf den passenden Feldspieler ziehen oder zwei Spieler nacheinander antippen. Maximal ${STAR_XI_MAX_SUBSTITUTIONS} Wechsel, ${displayGame.features.cup.substitutionsUsed} bereits genutzt.` : activeLineupSlot !== null ? `Für ${activeLineupPosition} werden nur passende Spieler angezeigt. Du kannst sie auch direkt hierher ziehen.` : selectedBenchSlot !== null ? `Bankplatz ${selectedBenchSlot + 1} gewählt. Klicke einen Spieler an oder ziehe ihn auf den Bankplatz.` : selectedReserveId !== null ? `${getStarXIPlayer(selectedReserveId)?.name ?? "Spieler"} gewählt. Tippe einen passenden Platz auf dem Feld oder der Bank an.` : `Ziehe Spieler zwischen Feld, Bank und Reserve oder tippe zwei Spieler nacheinander an, um sie zu tauschen.`}>{activeFormation.slots.map((slot, index) => {
+              <SquadPitchPanel status={activeLineupSlot === null ? "Startplatz wählen" : `Platz ${activeLineupSlot + 1} · ${activeLineupPosition}`} controls={<div className="starxi-formation-picker"><span><strong>FORMATION WÄHLEN</strong><small>{displayGame.features.cup.active ? "Während des Spiels gesperrt" : `${unlockedFormationCount} von ${STAR_FORMATIONS.length} Formationen freigeschaltet`}</small></span><div className="starxi-formation-actions"><select value={activeFormation.id} disabled={displayGame.features.cup.active || coopBusy} onChange={(event) => void changeStarXIFormation(event.target.value as StarFormationId)} aria-label="Formation wählen">{pickerFormations.map((formation) => { const unlockLeague = getFormationUnlockLeague(formation.id); const unlocked = isFormationAvailable(formation); return <option value={formation.id} key={formation.id} disabled={!unlocked}>{formation.label}{unlocked ? "" : ` · ab Liga ${unlockLeague}`}</option>; })}</select><button type="button" className="starxi-best-button" onClick={() => void autoPickBestStarXI()} disabled={coopBusy || ownedStarXIPlayers.length === 0} aria-disabled={displayGame.features.cup.active || undefined} title={displayGame.features.cup.active ? "Während eines Spiels gesperrt" : undefined}>★ Beste Startelf</button></div></div>} help={displayGame.features.cup.active ? `Live Wechsel: Bankspieler auf den passenden Feldspieler ziehen oder zwei Spieler nacheinander antippen. Maximal ${STAR_XI_MAX_SUBSTITUTIONS} Wechsel, ${displayGame.features.cup.substitutionsUsed} bereits genutzt.` : activeLineupSlot !== null ? `Für ${activeLineupPosition} werden nur passende Spieler angezeigt. Du kannst sie auch direkt hierher ziehen.` : selectedBenchSlot !== null ? `Bankplatz ${selectedBenchSlot + 1} gewählt. Klicke einen Spieler an oder ziehe ihn auf den Bankplatz.` : selectedReserveId !== null ? `${getStarXIPlayer(selectedReserveId)?.name ?? "Spieler"} gewählt. Tippe einen passenden Platz auf dem Feld oder der Bank an.` : `Ziehe Spieler zwischen Feld, Bank und Reserve oder tippe zwei Spieler nacheinander an, um sie zu tauschen.`}>{activeFormation.slots.map((slot, index) => {
                   const player = startingStarXIPlayers[index];
                   const liveRating = displayGame.features.cup.active && player ? getCupPlayerMatchRating(displayGame.features.cup, player.id, cupMatchMinute) : null;
                   return <SquadPitchSlot key={`${activeFormation.id}-${index}`} features={displayGame.features} drag={squadDrag} index={index} position={activeFormationPositions[index]} x={slot.x} y={slot.y} player={player} selected={activeLineupSlot === index} liveRating={liveRating} draggable={!layoutEditMode && !coopBusy} disabled={coopBusy} onClick={() => chooseLineupSlot(index)} />;

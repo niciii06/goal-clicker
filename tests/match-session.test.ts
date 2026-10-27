@@ -1,7 +1,7 @@
 import test from 'node:test';
 import { getWalkoutPresentation } from '../app/walkout-data';
 import assert from 'node:assert/strict';
-import { initialGameFeatures, setBestStarXI, STAR_XI_PLAYERS, TOURNAMENTS, getStarXIPlayer, getStarXIPositions, setStarXIStarter, setStarXIBenchPlayer, normalizeGameFeatures, lockMatchSquad, releaseMatchSquad, resolveTransferInsiderEvent, beginCupMatch, getStarXISelection, drawRandomStarXICustomCard, getCupPlayerMatchRating, canStarXIPlayerFillSlot } from '../app/feature-data.ts';
+import { initialGameFeatures, setBestStarXI, STAR_XI_PLAYERS, TOURNAMENTS, getStarXIPlayer, getStarXIPositions, setStarXIStarter, setStarXIBenchPlayer, normalizeGameFeatures, lockMatchSquad, releaseMatchSquad, resolveTransferInsiderEvent, beginCupMatch, getStarXISelection, drawRandomStarXICustomCard, getCupPlayerMatchRating, canStarXIPlayerFillSlot, getUnavailableStarXIPlayerIds } from '../app/feature-data.ts';
 import { fixtureFor } from '../app/travel-data.ts';
 import { baseActors } from '../app/match-viewer.tsx';
 function ready(){const f=initialGameFeatures();f.starXI=setBestStarXI({...f.starXI,ownedIds:STAR_XI_PLAYERS.map(p=>p.id)});return f;}
@@ -28,12 +28,17 @@ test('Pfuschi is positionless, bench-only, excluded from ratings/automatic XI an
  // Both remain reachable in the existing custom-card draw, with no automatic grant.
  for(const id of [p.id,di.id]){let found=false;for(let i=0;i<STAR_XI_PLAYERS.filter(p=>p.isCustom).length;i++){const n=STAR_XI_PLAYERS.filter(p=>p.isCustom).length;const result=drawRandomStarXICustomCard({...initialGameFeatures().starXI,fragments:25000},()=> (i+.5)/n);if(result.player?.id===id)found=true;}assert.ok(found);}
 });
-test('departure snapshot and exact timer remainders survive reload; newcomers remain collection-only',()=>{
- const f=ready(),outsider=STAR_XI_PLAYERS.find(p=>!f.starXI.lineupIds.includes(p.id)&&!f.starXI.benchIds.includes(p.id))!;
+test('timer remainders survive reload on the way; the squad stays open until kick-off and is fixed from then on',()=>{
+ const f=ready(),outsider=STAR_XI_PLAYERS.find(p=>!f.starXI.lineupIds.includes(p.id)&&!f.starXI.benchIds.includes(p.id)&&canStarXIPlayerFillSlot(p.id,0,f.starXI.formationPositions))!;
  f.transferSaga.nextAt=9000;f.nextEventAt=7000;f.nextVarAt=8000;lockMatchSquad(f,'fixture',1000);
  const n=normalizeGameFeatures(JSON.parse(JSON.stringify(f)));assert.deepEqual(n.squadLock,f.squadLock);
- assert.deepEqual(setStarXIStarter(n.starXI,0,outsider.id).lineupIds,n.starXI.lineupIds);
- assert.ok(!setBestStarXI(n.starXI).lineupIds.includes(outsider.id));
+ // Between cup rounds and on the journey a reserve may still come in.
+ assert.equal(n.starXI.lockedPlayerIds,undefined);
+ assert.ok(!getUnavailableStarXIPlayerIds(n).includes(outsider.id));
+ assert.equal(setStarXIStarter(n.starXI,0,outsider.id).lineupIds[0],outsider.id);
+ // Once the match runs, only the squad that kicked off counts.
+ const live=normalizeGameFeatures(JSON.parse(JSON.stringify(n)));live.cup.active=true;
+ assert.ok(getUnavailableStarXIPlayerIds(live).includes(outsider.id));
  const blocked=resolveTransferInsiderEvent(n,()=>0,100000);assert.equal(blocked.goalDelta,0);assert.equal(blocked.event,null);assert.equal(blocked.features.transferSaga.nextAt,9000);
  releaseMatchSquad(n,20000);assert.equal(n.transferSaga.nextAt,28000);assert.equal(n.nextEventAt,26000);assert.equal(n.squadLock,undefined);
  releaseMatchSquad(n,30000);assert.equal(n.transferSaga.nextAt,28000);
