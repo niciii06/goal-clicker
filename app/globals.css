@@ -1667,6 +1667,8 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .gc-interactive-match .gc-score-scorers { overflow-wrap:anywhere; }
 @media(max-width:600px) { .gc-interactive-controls button{ flex:1 1 40%; } .gc-interactive-match .gc-viewer-scoreboard{ min-width:0; }}
 .summary-match-stats,.summary-goals { display:flex; flex-wrap:wrap; gap:8px 18px; margin:12px 0; font-size: var(--text-footnote); }
+.summary-motm { margin: 10px 0 0; color: var(--soft); font-size: var(--text-footnote); }
+.summary-motm strong { color: var(--text); }
 .summary-tickets { width: fit-content; max-width: 100%; margin: 10px 0 0; padding: 6px 12px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: var(--radius-pill); background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised)); color: var(--text); font-size: var(--text-footnote); font-weight: 750; }
 /* Readable text in the interactive match editor: the pause bar is light, the tactic buttons are dark green. */
 .gc-interactive-pause { color:#183c32; }

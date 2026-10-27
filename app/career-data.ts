@@ -1,15 +1,15 @@
 import { createInteractiveMatch } from './interactive-match';
 import { goalLabel } from './match-goals';
 import { recordedActionRating } from './match-broadcast';
-import { addHistory, TRANSFER_UNHAPPY_PENALTY, transferUnhappyMatches, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, removeStarXIPlayersFromSquad, STAR_XI_ACTIVE_PLAYERS, SCRAP_PLAYERS } from './feature-data';
+import { addHistory, getMatchScoreImpact, TRANSFER_UNHAPPY_PENALTY, transferUnhappyMatches, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, removeStarXIPlayersFromSquad, STAR_XI_ACTIVE_PLAYERS, SCRAP_PLAYERS } from './feature-data';
 import { getBannedPlayerIds, nextCompetition, processMatchDiscipline, suspensionLabel } from './discipline';
-import type { CupState, GameFeatures, SeasonMatchHistoryEntry, StarXIPlayer } from './feature-data';
+import type { CupState, GameFeatures, SeasonMatchHistoryEntry, StarPosition, StarXIPlayer } from './feature-data';
 
 export type PlayerCareerStats = { appearances: number; minutes: number; goals: number; assists: number; ratingTotal: number; ratedMatches: number; motm: number; subAppearances: number; subRatingTotal: number; subMinutes: number; recent: number[] };
 export type RatingReason = { label: string; value: number };
 export type PlayerMatchReport = { playerId: string; rating: number; minutes: number; goals: number; assists: number; substitute: boolean; reasons: RatingReason[] };
 export type ArchivedMatchEvent = { id: string; minute: number; label: string };
-export type CareerMatchReport = { away?: boolean; tickets?: { attendance: number; capacity: number; income: number }; competition?: string; events?: ArchivedMatchEvent[]; penaltyScore?: string; startingIds?: string[]; benchIds?: string[]; id: string; opponent: string; homeScore: number; awayScore: number; mode: 'season' | 'tournament'; createdAt: number; motmId: string | null; derby: boolean; derbyReward: number; players: PlayerMatchReport[] };
+export type CareerMatchReport = { away?: boolean; opponentMotm?: { name: string; rating: number; goals: number }; tickets?: { attendance: number; capacity: number; income: number }; competition?: string; events?: ArchivedMatchEvent[]; penaltyScore?: string; startingIds?: string[]; benchIds?: string[]; id: string; opponent: string; homeScore: number; awayScore: number; mode: 'season' | 'tournament'; createdAt: number; motmId: string | null; derby: boolean; derbyReward: number; players: PlayerMatchReport[] };
 export type AwardWinner = { playerId: string; value: string } | null;
 export type SeasonAwards = { id: string; division: number; seasonNumber: number; matchesTracked: number; createdAt: number; best: AwardWinner; scorer: AwardWinner; joker: AwardWinner; disappointment: AwardWinner };
 export type Rivalry = { opponent: string; played: number; wins: number; draws: number; losses: number; goalsFor: number; goalsAgainst: number; closeGames: number; active: boolean; lastResults: string[]; lastPlayedAt: number };
@@ -123,8 +123,8 @@ export function normalizeCareerState(value: unknown, knownIds: readonly string[]
       const p = object(rawPlayer), playerId = text(p.playerId);
       return { playerId, rating: Math.max(4.5, number(p.rating, 10)), minutes: integer(p.minutes, 120), goals: integer(p.goals, 40), assists: integer(p.assists, 40), substitute: p.substitute === true, reasons: (Array.isArray(p.reasons) ? p.reasons : []).slice(0, 12).map(rawReason => { const reason = object(rawReason), n = Number(reason.value); return { label: text(reason.label, 100), value: Number.isFinite(n) ? Math.max(-10, Math.min(10, n)) : 0 }; }) };
     }).filter(p => getStarXIPlayer(p.playerId));
-    const tickets = object(r.tickets);
-    return { away: typeof r.away === 'boolean' ? r.away : undefined, ...(r.tickets ? { tickets: { attendance: integer(tickets.attendance, 200000), capacity: integer(tickets.capacity, 200000), income: number(tickets.income, 1e18) } } : {}), competition: text(r.competition, 120) || undefined, penaltyScore: text(r.penaltyScore, 30) || undefined, startingIds: Array.isArray(r.startingIds) ? validIds(r.startingIds) : undefined, benchIds: Array.isArray(r.benchIds) ? validIds(r.benchIds) : undefined, events: Array.isArray(r.events) ? r.events.slice(-200).map(raw => { const e = object(raw); return { id: text(e.id,200), minute: integer(e.minute,120), label: text(e.label,240) }; }).filter(e => e.id) : undefined, id: text(r.id, 200), opponent: text(r.opponent, 80), homeScore: integer(r.homeScore, 40), awayScore: integer(r.awayScore, 40), mode: r.mode === 'season' ? 'season' as const : 'tournament' as const, createdAt: number(r.createdAt, 1e15), motmId: typeof r.motmId === 'string' && players.some(p => p.playerId === r.motmId) ? r.motmId : null, derby: r.derby === true, derbyReward: integer(r.derbyReward, 400), players };
+    const tickets = object(r.tickets), opponentMotm = object(r.opponentMotm);
+    return { away: typeof r.away === 'boolean' ? r.away : undefined, ...(typeof opponentMotm.name === 'string' && opponentMotm.name ? { opponentMotm: { name: text(opponentMotm.name, 60), rating: Math.max(4.5, number(opponentMotm.rating, 10)), goals: integer(opponentMotm.goals, 20) } } : {}), ...(r.tickets ? { tickets: { attendance: integer(tickets.attendance, 200000), capacity: integer(tickets.capacity, 200000), income: number(tickets.income, 1e18) } } : {}), competition: text(r.competition, 120) || undefined, penaltyScore: text(r.penaltyScore, 30) || undefined, startingIds: Array.isArray(r.startingIds) ? validIds(r.startingIds) : undefined, benchIds: Array.isArray(r.benchIds) ? validIds(r.benchIds) : undefined, events: Array.isArray(r.events) ? r.events.slice(-200).map(raw => { const e = object(raw); return { id: text(e.id,200), minute: integer(e.minute,120), label: text(e.label,240) }; }).filter(e => e.id) : undefined, id: text(r.id, 200), opponent: text(r.opponent, 80), homeScore: integer(r.homeScore, 40), awayScore: integer(r.awayScore, 40), mode: r.mode === 'season' ? 'season' as const : 'tournament' as const, createdAt: number(r.createdAt, 1e15), motmId: typeof r.motmId === 'string' && players.some(p => p.playerId === r.motmId) ? r.motmId : null, derby: r.derby === true, derbyReward: integer(r.derbyReward, 400), players };
   }).filter(r => r.id);
   return next;
 }
@@ -172,9 +172,12 @@ export function getMatchRatingBreakdown(cup: CupState, playerId: string, minute:
   if (assists) reasons.push({ label: `${assists} ${assists === 1 ? 'Vorlage' : 'Vorlagen'}`, value: assistValue });
   if (faultValue) reasons.push({ label: 'Beteiligung an Gegentoren', value: faultValue });
   if (cleanValue) reasons.push({ label: 'Ohne Gegentor auf dem Platz', value: cleanValue });
+  const score = getMatchScoreImpact(cup, entered, end, position);
+  if (score.team) reasons.push({ label: 'Spielstand: Tore und Gegentore auf dem Platz', value: score.team });
+  if (score.conceded) reasons.push({ label: 'Gegentore als Torhüter oder Verteidiger', value: score.conceded });
   const actions=recordedActionRating(cup,playerId,end);
   if(actions)reasons.push({label:'Erfasste Aktionen: Zuspiele, Schüsse, Paraden und Karten',value:actions});
-  const rounding = rating - base - goalValue - assistValue - faultValue - cleanValue - actions;
+  const rounding = rating - base - goalValue - assistValue - faultValue - cleanValue - score.team - score.conceded - actions;
   if (Math.abs(rounding) > .00001) reasons.push({ label: 'Rundung und Notengrenzen (4.5 bis 10)', value: rounding });
   if (cup.cardEvents.some(e => e.playerId === playerId)) reasons.push({ label: 'Rote Karte: Team geschwächt, Einsatz beendet', value: 0 });
   if (cup.injuryEvents.some(e => e.playerId === playerId)) reasons.push({ label: 'Verletzungsbedingtes Einsatzende', value: 0 });
@@ -183,6 +186,32 @@ export function getMatchRatingBreakdown(cup: CupState, playerId: string, minute:
 function addStats(current: PlayerCareerStats | undefined, report: PlayerMatchReport, motm: boolean): PlayerCareerStats {
   const s = current ?? emptyPlayerStats();
   return { appearances: s.appearances+1, minutes: s.minutes+report.minutes, goals: s.goals+report.goals, assists: s.assists+report.assists, ratingTotal: s.ratingTotal+report.rating, ratedMatches: s.ratedMatches+1, motm: s.motm+Number(motm), subAppearances: s.subAppearances+Number(report.substitute), subRatingTotal: s.subRatingTotal+(report.substitute ? report.rating : 0), subMinutes: s.subMinutes+(report.substitute ? report.minutes : 0), recent: report.minutes >= 15 ? [...s.recent,report.rating].slice(-5) : s.recent };
+}
+/**
+ * Ratings of the opponent's players by the same rules as the club's (day form, goals, assists, the score while on
+ * the pitch, conceded goals by role, clean sheet, saves and recorded actions), so the award can go to either side.
+ */
+export function getOpponentMatchRatings(cup: CupState, minute: number): { id: string; name: string; rating: number; goals: number; assists: number }[] {
+  const roster = cup.broadcast?.opponentXI ?? [];
+  if (!roster.length) return [];
+  // Seen from the opponent, our goals are the ones they conceded.
+  const mirrored = { matchEvents: cup.matchEvents.map(e => ({ ...e, side: e.side === 'home' ? 'away' as const : 'home' as const, ratingImpacts: {} })) };
+  const players = new Map<string, { name: string; position?: StarPosition; entered: number }>(roster.map(p => [p.id, { name: p.name, position: p.position, entered: 1 }]));
+  // Substitutes only appear through their goals and assists; they are rated from their first involvement.
+  for (const e of cup.matchEvents) if (e.side === 'away') {
+    if (e.scorerId && !players.has(e.scorerId)) players.set(e.scorerId, { name: e.scorer, entered: e.minute });
+    if (e.assistId && e.assistName && !players.has(e.assistId)) players.set(e.assistId, { name: e.assistName, entered: e.minute });
+  }
+  const seed = cup.careerRatingSeed ?? cup.matchStartedAt;
+  return [...players.entries()].map(([id, p]) => {
+    const own = cup.matchEvents.filter(e => e.side === 'away' && e.minute >= p.entered && e.minute <= minute);
+    const goals = own.filter(e => e.scorerId === id).length, assists = own.filter(e => e.assistId === id && e.scorerId !== id).length;
+    const score = getMatchScoreImpact(mirrored, p.entered, minute, p.position);
+    const clean = !cup.matchEvents.some(e => e.side === 'home' && e.minute >= p.entered && e.minute <= minute);
+    const cleanValue = clean ? Math.min(1, (minute - p.entered + 1) / 90) * (p.position === 'TW' ? .42 : ['IV','LV','LAV','RV','RAV'].includes(p.position ?? '') ? .3 : p.position === 'ZDM' ? .14 : 0) : 0;
+    const impact = goals * .7 + assists * .25 + score.team + score.conceded + cleanValue + recordedActionRating(cup, id, minute);
+    return { id, name: p.name, rating: getStarXIPlayerMatchRating(id, seed, minute, 0, p.entered, impact, p.position), goals, assists };
+  });
 }
 export function recordCareerMatch(features: GameFeatures, now = Date.now(), seasonEntry?: SeasonMatchHistoryEntry | null) {
   const c = features.cup, career = features.career;
@@ -200,11 +229,15 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
   const minute = c.phase === "extra-time" || c.phase === "penalties" ? 120 : 90;
   const players = Object.keys(c.playerEnteredAt).map(playerId => getMatchRatingBreakdown(c,playerId,minute)).filter((p): p is PlayerMatchReport => Boolean(p));
   const ranked = [...players].filter(p => p.minutes >= 15).sort((a,b) => b.rating-a.rating || b.goals-a.goals || b.assists-a.assists || a.playerId.localeCompare(b.playerId));
-  const motmId = ranked[0]?.playerId ?? null;
   const key = rivalryKey(c.opponent);
   const old = career.rivals[key] ?? { opponent: c.opponent, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, closeGames: 0, active: false, lastResults: [], lastPlayedAt: 0 };
   const draw = c.homeScore === c.awayScore && !c.penaltyEvents.length;
   const won = c.homeScore > c.awayScore || (c.homeScore === c.awayScore && c.penaltyHomeScore > c.penaltyAwayScore);
+  // Like Sofascore: the best rated player of the whole match, from either side and whatever the result.
+  const ownBest = ranked[0], opponentBest = getOpponentMatchRatings(c, minute).sort((a,b) => b.rating-a.rating || b.goals-a.goals || b.assists-a.assists)[0];
+  const opponentWins = Boolean(opponentBest && (!ownBest || opponentBest.rating > ownBest.rating || (opponentBest.rating === ownBest.rating && opponentBest.goals > ownBest.goals)));
+  const motmId = opponentWins ? null : ownBest?.playerId ?? null;
+  const opponentMotm = opponentWins && opponentBest ? { name: opponentBest.name.slice(0, 60), rating: opponentBest.rating, goals: opponentBest.goals } : null;
   const derbyReward = old.active ? won ? 400 : draw ? 150 : 0 : 0;
   const played = old.played+1, closeGames = old.closeGames + Number(Math.abs(c.homeScore-c.awayScore) <= 1);
   const active = old.active || (played >= 3 && closeGames >= 2) || played >= 5;
@@ -229,7 +262,7 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
     ...c.injuryEvents.map(e => ({ id:e.id, minute:e.minute, label:`🩹 ${e.player} · ${e.reason}` })),
     ...(c.broadcast?.events ?? []).filter(e => ['substitution','yellow','var'].includes(e.kind)).map(e => ({id:e.id, minute:e.minute, label:`${e.kind} · ${e.player}`})),
   ].sort((a,b)=>a.minute-b.minute);
-  career.reports = [...career.reports,{ away:c.fixture?.away, competition:c.mode === 'season' ? `Saison ${career.seasonNumber}` : getTournament(c.tournamentId)?.label, penaltyScore:c.penaltyEvents.length ? `${c.penaltyHomeScore}:${c.penaltyAwayScore}` : undefined, startingIds:[...c.originalLineupIds], benchIds:[...c.originalBenchIds], events, id, opponent: c.opponent, homeScore: c.homeScore, awayScore: c.awayScore, mode: c.mode, createdAt: now, motmId, derby: old.active, derbyReward, players }].slice(-10);
+  career.reports = [...career.reports,{ away:c.fixture?.away, competition:c.mode === 'season' ? `Saison ${career.seasonNumber}` : getTournament(c.tournamentId)?.label, penaltyScore:c.penaltyEvents.length ? `${c.penaltyHomeScore}:${c.penaltyAwayScore}` : undefined, startingIds:[...c.originalLineupIds], benchIds:[...c.originalBenchIds], events, id, opponent: c.opponent, homeScore: c.homeScore, awayScore: c.awayScore, mode: c.mode, createdAt: now, motmId, ...(opponentMotm ? { opponentMotm } : {}), derby: old.active, derbyReward, players }].slice(-10);
   career.processedMatchIds = [...career.processedMatchIds,id].slice(-100);
   if (c.mode === 'season') {
     career.seasonMatches += 1;

@@ -1361,7 +1361,8 @@ function getMatchSeed(playerId: string, matchStartedAt: number, salt: number) {
 
 export function getStarXIPlayerMatchRating(playerId: string, matchStartedAt: number, minute: number, goals = 0, enteredAtMinute = 1, performanceImpact = 0, position?: StarPosition) {
   const dayForm = (getMatchSeed(playerId, matchStartedAt, 1) + getMatchSeed(playerId, matchStartedAt, 2) + getMatchSeed(playerId, matchStartedAt, 3)) / 3;
-  const targetRating = 5.7 + dayForm * 2.2;
+  // Day form only sets the tone; goals, conceded goals and actions decide the rest.
+  const targetRating = 5.9 + dayForm * 1.6;
   const openingRating = 6.35 + (getMatchSeed(playerId, matchStartedAt, 4) - 0.5) * 0.45;
   const playedMinutes = Math.max(0, minute - enteredAtMinute + 1);
   const progress = clamp(playedMinutes / 75, 0, 1);
@@ -1370,6 +1371,22 @@ export function getStarXIPlayerMatchRating(playerId: string, matchStartedAt: num
   const goalBoost = Math.min(1.8, Math.max(0, goals) * 0.6);
   const roleStability = position === "TW" || position === "IV" ? 0.04 : 0;
   return Math.round(clamp(openingRating + (targetRating - openingRating) * revealCurve + gentleDrift + goalBoost + performanceImpact + roleStability, 4.5, 10) * 10) / 10;
+}
+
+/**
+ * What the score did to a player while he was on the pitch: every goal of his team lifts everyone a little,
+ * every goal conceded costs everyone, the keeper and the defence most. Engines that already blame single
+ * players for a goal (`ratingImpacts` below zero) keep that instead of the role penalty.
+ */
+export function getMatchScoreImpact(cup: Pick<CupState, "matchEvents">, from: number, to: number, position?: StarPosition | null) {
+  const defence = position === "TW" ? .3 : position === "IV" || position === "LV" || position === "LAV" || position === "RV" || position === "RAV" ? .22 : position === "ZDM" ? .12 : 0;
+  let team = 0, conceded = 0;
+  for (const event of cup.matchEvents) {
+    if (event.minute < from || event.minute > to) continue;
+    if (event.side === "home") team += .1;
+    else { team -= .12; if (!Object.values(event.ratingImpacts).some((impact) => impact < 0)) conceded -= defence; }
+  }
+  return { team, conceded };
 }
 
 export function getCupPlayerMatchRating(cup: CupState, playerId: string, minute: number) {
@@ -1386,7 +1403,8 @@ export function getCupPlayerMatchRating(cup: CupState, playerId: string, minute:
   const cleanSheetBoost = concededWhilePlaying === 0
     ? playedProgress * (position === "TW" ? 0.42 : position === "IV" || position === "LV" || position === "LAV" || position === "RV" || position === "RAV" ? 0.3 : position === "ZDM" ? 0.14 : 0)
     : 0;
-  return getStarXIPlayerMatchRating(playerId, cup.careerRatingSeed ?? cup.matchStartedAt, effectiveMinute, 0, enteredAtMinute, eventImpact + cleanSheetBoost + recordedActionRating(cup,playerId,effectiveMinute), position);
+  const score = getMatchScoreImpact(cup, enteredAtMinute, effectiveMinute, position);
+  return getStarXIPlayerMatchRating(playerId, cup.careerRatingSeed ?? cup.matchStartedAt, effectiveMinute, 0, enteredAtMinute, eventImpact + cleanSheetBoost + score.team + score.conceded + recordedActionRating(cup,playerId,effectiveMinute), position);
 }
 
 

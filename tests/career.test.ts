@@ -3,6 +3,9 @@ import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beginSeasonCupMatch, initialGameFeatures, normalizeGameFeatures, pauseGameFeatureTimers, setBestStarXI, STAR_XI_PLAYERS, getStarXISelection, advanceCupMatch, getStarXIEffectiveMatchRating, recordSeasonModeMatch, startSeasonPrestige, resumeCupMatch } from '../app/feature-data.ts';
+import { getMatchScoreImpact } from '../app/feature-data.ts';
+import { getOpponentMatchRatings } from '../app/career-data.ts';
+import { createMatchBroadcast } from '../app/match-broadcast.ts';
 import { claimAlbumReward, emptyPlayerStats, getAlbumGroups, getCareerCard, getMatchRatingBreakdown, getPlayerForm, getPlayerMilestones, normalizeCareerState, prepareCareerMatch, recordCareerMatch, rivalryKey } from '../app/career-data.ts';
 import { AlbumPanel, CareerPanel, MatchRatingsPanel } from '../app/career-panels.tsx';
 
@@ -115,7 +118,7 @@ test('real match engine completion survives normalization and generates a single
  assert.equal(result.finished,true);f.cup=result.cup;
  const season=recordSeasonModeMatch(f.seasonMode,f.cup.homeScore,f.cup.awayScore,f.club.name,f.cup.matchEndsAt,()=>.5,f.cup.opponentIds[0]);
  recordCareerMatch(f,f.cup.matchEndsAt,season.entry);
- const restored=normalizeGameFeatures(JSON.parse(JSON.stringify(f)));assert.equal(restored.career.reports.length,1);assert.equal(restored.career.reports[0].players.length,11);assert.ok(restored.career.reports[0].motmId);
+ const restored=normalizeGameFeatures(JSON.parse(JSON.stringify(f)));assert.equal(restored.career.reports.length,1);assert.equal(restored.career.reports[0].players.length,11);assert.ok(restored.career.reports[0].motmId||restored.career.reports[0].opponentMotm);
 });
 test('legacy match engine without simulation keeps the timed halftime and completes once',()=>{
  const f=fixture();f.cup={...f.cup,simulation:undefined};f.cup.homeScore=1;
@@ -125,7 +128,7 @@ test('legacy match engine without simulation keeps the timed halftime and comple
  assert.equal(result.finished,true);f.cup=result.cup;
  const season=recordSeasonModeMatch(f.seasonMode,f.cup.homeScore,f.cup.awayScore,f.club.name,f.cup.matchEndsAt,()=>.5,f.cup.opponentIds[0]);
  recordCareerMatch(f,f.cup.matchEndsAt,season.entry);
- const restored=normalizeGameFeatures(JSON.parse(JSON.stringify(f)));assert.equal(restored.career.reports.length,1);assert.equal(restored.career.reports[0].players.length,11);assert.ok(restored.career.reports[0].motmId);
+ const restored=normalizeGameFeatures(JSON.parse(JSON.stringify(f)));assert.equal(restored.career.reports.length,1);assert.equal(restored.career.reports[0].players.length,11);assert.ok(restored.career.reports[0].motmId||restored.career.reports[0].opponentMotm);
 });
 test('offline pause retains the match rating seed and all rating explanations',()=>{
  const f=fixture();finishFixture(f,2);f.cup.active=true;
@@ -174,4 +177,42 @@ test('the match summary shows the opponent that was played, even when the cup al
  const score=html.match(/<div class="summary-score"><strong>([^<]*)<\/strong><b>([^<]*)<\/b><strong>([^<]*)<\/strong>/)!;
  assert.deepEqual(score.slice(1),[f.club.name,'3 : 0','FC Gestern']);
  assert.doesNotMatch(html,/FC Luzerne/);
+});
+test('conceded goals cost the keeper and the defence most',()=>{
+ const f=fixture();finishFixture(f,1);
+ const away=(i:number,minute:number,scorer:string,ratingImpacts:Record<string,number>={})=>({id:`away-${i}`,side:'away' as const,scorerId:null,scorer,minute,createdAt:1000000+90000+i,homeScore:1,awayScore:i+1,ratingImpacts});
+ f.cup.matchEvents=[...f.cup.matchEvents,away(0,50,'A. Ramsei'),away(1,80,'B. Bosporus'),away(2,85,'A. Ramsei')];f.cup.awayScore=3;
+ const keeper=getMatchScoreImpact(f.cup,1,90,'TW'),back=getMatchScoreImpact(f.cup,1,90,'IV'),striker=getMatchScoreImpact(f.cup,1,90,'ST');
+ assert.ok(keeper.conceded<back.conceded&&back.conceded<striker.conceded,'the keeper pays most, a striker nothing extra');
+ assert.equal(striker.conceded,0);
+ assert.ok(Math.abs(striker.team-(.1-3*.12))<1e-9,'one goal scored, three conceded');
+ // A goal an engine already blamed on single players carries no extra role penalty.
+ f.cup.matchEvents[1]={...f.cup.matchEvents[1],ratingImpacts:{x:-.3}};
+ assert.ok(getMatchScoreImpact(f.cup,1,90,'IV').conceded>back.conceded);
+ // Only minutes on the pitch count.
+ assert.equal(getMatchScoreImpact(f.cup,86,90,'IV').conceded,0);
+});
+test('like Sofascore the best rated player of the whole match gets the award, from either side',()=>{
+ const f=fixture();finishFixture(f,1);
+ f.cup.broadcast??=createMatchBroadcast(f.cup);
+ const roster=f.cup.broadcast.opponentXI;assert.equal(roster.length,11);
+ const star=roster.find(p=>p.position!=='TW')!;
+ // Their striker scores three: he outplays everyone, so the award goes to the opponent.
+ f.cup.matchEvents=[...f.cup.matchEvents,...[50,60,70].map((minute,i)=>({id:`away-${i}`,side:'away' as const,scorerId:star.id,scorer:star.name,minute,createdAt:1000000+90000+i,homeScore:1,awayScore:i+1,ratingImpacts:{}}))];f.cup.awayScore=3;
+ const ratings=getOpponentMatchRatings(f.cup,90);
+ assert.equal(ratings.length,11);
+ assert.equal(ratings.find(p=>p.id===star.id)?.goals,3);
+ assert.ok(ratings.every(p=>p.rating>=4.5&&p.rating<=10));
+ recordCareerMatch(f,2000000);
+ const report=f.career.reports.at(-1)!;
+ assert.equal(report.motmId,null);
+ assert.equal(report.opponentMotm?.name,star.name);
+ assert.ok(!Object.values(f.career.players).some(p=>p.motm>0),'no award counted for the club');
+ assert.deepEqual(normalizeCareerState(JSON.parse(JSON.stringify(f.career))).reports.at(-1)?.opponentMotm,report.opponentMotm);
+ assert.match(renderToStaticMarkup(React.createElement(MatchRatingsPanel,{features:f})),new RegExp(`Spieler des Spiels: ${star.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}`));
+});
+test('after a win the award stays with the club',()=>{
+ const f=fixture();finishFixture(f,2);recordCareerMatch(f,2000000);
+ const report=f.career.reports.at(-1)!;
+ assert.ok(report.motmId);assert.equal(report.opponentMotm,undefined);
 });
