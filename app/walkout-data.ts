@@ -21,6 +21,9 @@ export type WalkoutPresentation = {
   kitPrimary: string;
   kitSecondary: string;
   boots: string;
+  /** Accessories from a reference photo, drawn over the head. */
+  glasses?: boolean;
+  cap?: "backwards";
 };
 
 type RawProfile = readonly [
@@ -456,7 +459,7 @@ const SPECIAL_PROFILE_BY_PLAYER_ID: Record<string, WalkoutPresentation> = {
   },
 };
 
-type WalkoutBodyProfile = Pick<WalkoutPresentation, "skin" | "hair" | "hairColor" | "beard" | "face" | "height" | "build" | "celebration">;
+type WalkoutBodyProfile = Pick<WalkoutPresentation, "skin" | "hair" | "hairColor" | "beard" | "face" | "height" | "build" | "celebration" | "glasses" | "cap">;
 
 // Di Santo's body is fixed from the supplied reference, while the kit remains
 // the regular in-game country kit instead of copying the reference clothing.
@@ -470,6 +473,19 @@ const SPECIAL_BODY_PROFILE_BY_PLAYER_ID: Record<string, WalkoutBodyProfile> = {
     height: 1.04,
     build: 1.02,
     celebration: "arms",
+  },
+  // From the supplied photo: light skin, dark brown hair under a black cap worn backwards, glasses, stocky build.
+  "star-di-certo": {
+    skin: S1,
+    hair: "crop",
+    hairColor: BROWN,
+    beard: "stubble",
+    face: "round",
+    height: 1.01,
+    build: 1.12,
+    celebration: "fist",
+    glasses: true,
+    cap: "backwards",
   },
 };
 

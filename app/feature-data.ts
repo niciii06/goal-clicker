@@ -202,8 +202,8 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
   { id: "star-pfuschi", name: "Pfuschi", isCustom: true, benchOnly: true,
     position: null, positions: [], rating: 67, price: 1000, accent: "#64748b",
     cardType: "legendary", symbol: "☠️", packWeight: .04, originalAttributes: specialAttributes(1) },
-  { id: "star-di-certo", name: "Di Certo", isCustom: true, position: "ZM",
-    positions: ["ZM", "ZDM"], rating: 100, price: 5000000000, accent: "#c69214",
+  { id: "star-di-certo", name: "Di Certo", isCustom: true, countryCode: "CH", position: "LV",
+    positions: ["LV", "RV"], rating: 100, price: 5000000000, accent: "#c69214",
     cardType: "legendary", packWeight: .02, originalAttributes: specialAttributes(100) },
   {
     id: "star-goat-nicu",

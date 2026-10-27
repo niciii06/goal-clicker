@@ -1134,6 +1134,14 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .avatar-eye.left { left: 11px; }.avatar-eye.right { right: 11px; }
 .avatar-nose { position: absolute; top: 38px; left: 50%; width: 6px; height: 11px; border-right: 2px solid rgba(88,38,20,.26); border-bottom: 2px solid rgba(88,38,20,.2); border-radius: 0 0 5px; transform: translateX(-50%); }
 .avatar-mouth { position: absolute; bottom: 10px; left: 50%; width: 16px; height: 5px; border-bottom: 2px solid rgba(87,25,25,.56); border-radius: 50%; transform: translateX(-50%); }
+.avatar-glasses { position: absolute; z-index: 3; top: 31px; right: 4px; left: 4px; height: 12px; background: linear-gradient(#2a2a2a,#2a2a2a) center 4px / 8px 2px no-repeat; }
+.avatar-glasses::before, .avatar-glasses::after { position: absolute; top: 0; width: 18px; height: 11px; border: 2px solid #2a2a2a; border-radius: 4px; background: rgba(200,220,255,.18); box-sizing: border-box; content: ""; }
+.avatar-glasses::before { left: 0; }.avatar-glasses::after { right: 0; }
+.avatar-cap { position: absolute; z-index: 4; top: -10px; right: -3px; left: -3px; height: 24px; border-radius: 28px 28px 7px 7px; background: #141414; box-shadow: inset 0 -3px 0 rgba(255,255,255,.08); }
+/* Worn backwards: the strap opening sits over the forehead and the brim points to the back. */
+.avatar-cap::before { position: absolute; bottom: 1px; left: 50%; width: 16px; height: 8px; border: 2px solid #3a3a3a; border-bottom: 0; border-radius: 9px 9px 0 0; background: var(--walkout-hair); transform: translateX(-50%); content: ""; }
+.avatar-cap::after { position: absolute; top: 9px; right: -9px; width: 14px; height: 6px; border-radius: 0 7px 7px 0; background: #0c0c0c; content: ""; }
+.with-cap .avatar-hair { top: 6px; height: 12px; }
 .avatar-hair { position: absolute; z-index: 2; top: -8px; right: -2px; left: -2px; height: 25px; border-radius: 23px 23px 9px 9px; background: var(--walkout-hair); }
 .hair-bald .avatar-hair { display: none; }
 .hair-buzz .avatar-hair { top: -3px; height: 14px; opacity: .92; }

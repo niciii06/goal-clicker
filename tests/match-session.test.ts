@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { getWalkoutPresentation } from '../app/walkout-data';
 import assert from 'node:assert/strict';
 import { initialGameFeatures, setBestStarXI, STAR_XI_PLAYERS, TOURNAMENTS, getStarXIPlayer, getStarXIPositions, setStarXIStarter, setStarXIBenchPlayer, normalizeGameFeatures, lockMatchSquad, releaseMatchSquad, resolveTransferInsiderEvent, beginCupMatch, getStarXISelection, drawRandomStarXICustomCard, getCupPlayerMatchRating, canStarXIPlayerFillSlot } from '../app/feature-data.ts';
 import { fixtureFor } from '../app/travel-data.ts';
@@ -22,7 +23,8 @@ test('Pfuschi is positionless, bench-only, excluded from ratings/automatic XI an
  assert.ok(!setBestStarXI(f.starXI).lineupIds.includes(p.id));
  f.cup=beginCupMatch(f.cup,1000,'stadium',getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds));
  assert.equal(getCupPlayerMatchRating(f.cup,p.id,90),null);assert.ok(!baseActors(f,f.cup,1,true).some(a=>a.id===p.id));
- const di=getStarXIPlayer('star-di-certo')!;assert.equal(di.rating,100);assert.deepEqual(getStarXIPositions(di),['ZM','ZDM']);
+ const di=getStarXIPlayer('star-di-certo')!;assert.equal(di.rating,100);assert.deepEqual(getStarXIPositions(di),['LV','RV']);assert.equal(di.countryCode,'CH');
+ const look=getWalkoutPresentation(di);assert.equal(look.countryCode,'CH');assert.equal(look.glasses,true);assert.equal(look.cap,'backwards');
  // Both remain reachable in the existing custom-card draw, with no automatic grant.
  for(const id of [p.id,di.id]){let found=false;for(let i=0;i<STAR_XI_PLAYERS.filter(p=>p.isCustom).length;i++){const n=STAR_XI_PLAYERS.filter(p=>p.isCustom).length;const result=drawRandomStarXICustomCard({...initialGameFeatures().starXI,fragments:25000},()=> (i+.5)/n);if(result.player?.id===id)found=true;}assert.ok(found);}
 });

@@ -12,7 +12,7 @@ Site project: `appgprj_6a70b280862c8191b97f48b9b21cefb9`.
 - Only the final of the highest-ranked Cup uses neutral Wembley (51.5560, -0.2795).
 - Existing league scheduling and active/historical fixture snapshots are preserved.
 - Pfuschi (`star-pfuschi`): rating 67 (since the gameplay update of 2026-10-19), all existing attributes 1, no position; bench eligible only. Excluded from starting XI, automatic pickers, substitutions, active actors and match rating.
-- Di Certo (`star-di-certo`): rating 100, primary ZM, secondary ZDM; uses the normal active-player system and existing special-card draw.
+- Di Certo (`star-di-certo`): rating 100, primary LV, secondary RV, Switzerland (since October 2026; before ZM/ZDM); walkout with glasses and a cap worn backwards; uses the normal active-player system and existing special-card draw.
 - Opponent red cards persist by roster ID. Remaining actors rebalance into defensive lines; emergency goalkeeper coverage and further dismissals are supported. No replacement actor is added.
 - Goal overlay: exactly 4000 ms after the visual shot lead; clock/engine freeze and automatic kickoff by the conceding team.
 - Halftime: exactly 10000 ms at minute 45; automatic restart, with substitutions available.
