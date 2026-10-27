@@ -51,7 +51,7 @@ export const GOLD_CONFETTI = ["#ffe28d", "#f6c94c", "#fff4bd", "#d49b19"];
 
 export const SILVER_CONFETTI = ["#ffffff", "#dfe5ec", "#aeb7c2", "#f5f7fa"];
 // A lost response for these actions may hide a purchase that the server already applied.
-export const NETWORK_RETRY_UNSAFE_COOP_ACTIONS = new Set(["buy", "star-pack", "star-custom-draw", "star-custom-buy"]);
+export const NETWORK_RETRY_UNSAFE_COOP_ACTIONS = new Set(["buy", "star-pack", "star-custom-draw", "star-custom-buy", "transfer-accept", "transfer-decline"]);
 export const ACHIEVEMENTS: { id: string; icon: IconName; name: string; description: string; threshold: number }[] = [
   { id: "first", icon: "ball", name: "Ankick", description: "Das erste Tor", threshold: 1 },
   { id: "hundred", icon: "number", name: "Hunderterclub", description: "100 Tore insgesamt", threshold: 100 },

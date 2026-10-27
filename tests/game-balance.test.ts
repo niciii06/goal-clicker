@@ -3,9 +3,10 @@ import test from "node:test";
 import { FC27_OFFICIAL_POSITION_COUNT, FC27_POSITION_BY_SOURCE_ID } from "../app/fc27-positions.ts";
 import { FC27_OFFICIAL_RATING_COUNT, FC27_RATING_BY_SOURCE_ID, FC27_UNAVAILABLE_SOURCE_IDS } from "../app/fc27-ratings.ts";
 import { transferClubsForRating } from "../app/features/news-data.ts";
-import { activatePendingTransferLoans, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, canStarXIPlayerPlayPosition, completeTournamentRun, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupMatchStrength, getCupPlayerMatchRating, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarXIEffectiveMatchRating, getStarXIPlayerMatchRating, getStarXISelection, getStarXIFragmentCompensation, getTournamentGoalBoostMultiplier, getTournamentOpponentSchedule, getTransferDeadlineEventDelay, getTransferEventDelay, getUnavailableStarXIPlayerIds, initialGameFeatures, initialSeasonMode, isTransferDeadlineDay, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, playSeasonModeMatch, recordSeasonModeMatch, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, startTournamentGoalBoost, REWARD_PACKS, getRewardPackOdds, getStarXIPlayer, STAR_PACKS, STAR_XI_ACTIVE_PLAYERS, STAR_XI_BENCH_SIZE, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE, TOURNAMENTS, TOURNAMENT_COOLDOWN_MS, TOURNAMENT_OPPONENT_MULTIPLIER, TOURNAMENT_GOAL_BOOST_DURATION_MS, TRANSFER_DEADLINE_LOAN_CHANCE, TRANSFER_LOAN_CHANCE, TRANSFER_PAID_SALE_CHANCE, TRANSFER_SALE_CHANCE, YB_FC26_SOURCE_IDS } from "../app/feature-data.ts";
+import { acceptTransferOffer, declineTransferOffer, expireTransferOffer, lockMatchSquad, releaseMatchSquad, transferUnhappyMatches, TRANSFER_OFFER_DURATION_MS, TRANSFER_UNHAPPY_MATCHES, TRANSFER_UNHAPPY_PENALTY, activatePendingTransferLoans, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, canStarXIPlayerPlayPosition, completeTournamentRun, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupMatchStrength, getCupPlayerMatchRating, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarXIEffectiveMatchRating, getStarXIPlayerMatchRating, getStarXISelection, getStarXIFragmentCompensation, getTournamentGoalBoostMultiplier, getTournamentOpponentSchedule, getTransferDeadlineEventDelay, getTransferEventDelay, getUnavailableStarXIPlayerIds, initialGameFeatures, initialSeasonMode, isTransferDeadlineDay, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, playSeasonModeMatch, recordSeasonModeMatch, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, startTournamentGoalBoost, REWARD_PACKS, getRewardPackOdds, getStarXIPlayer, STAR_PACKS, STAR_XI_ACTIVE_PLAYERS, STAR_XI_BENCH_SIZE, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE, TOURNAMENTS, TOURNAMENT_COOLDOWN_MS, TOURNAMENT_OPPONENT_MULTIPLIER, TOURNAMENT_GOAL_BOOST_DURATION_MS, TRANSFER_DEADLINE_LOAN_CHANCE, TRANSFER_LOAN_CHANCE, TRANSFER_PAID_SALE_CHANCE, TRANSFER_SALE_CHANCE, YB_FC26_SOURCE_IDS } from "../app/feature-data.ts";
 import { getPackUnlockLeague } from "../app/season-progression.ts";
 import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../app/upgrade-purchase.ts";
+import { prepareCareerMatch, recordCareerMatch } from "../app/career-data.ts";
 
 function seededRandom(seed = 246813579) {
   let state = seed >>> 0;
@@ -735,7 +736,8 @@ test("transfer insider timing and outcome probabilities stay exact", () => {
   const sale = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.30, 0, 0, 0, 0]), 2000);
   const failed = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.40, 0, 0, 0, 0]), 2000);
   assert.equal(loan.event!.outcome, "loan");
-  assert.equal(sale.event!.outcome, "sale");
+  // A sale is an offer the player answers.
+  assert.equal(sale.event!.outcome, "offer");
   assert.equal(failed.event!.outcome, "failed");
 });
 
@@ -785,7 +787,7 @@ test("every completed tournament starts a five-minute Deadline Day and publishes
   const loan = resolveTransferInsiderEvent(completed, sequenceRandom([0.599999, 0, 0, 0]), now + 10000);
   const sale = resolveTransferInsiderEvent(completed, sequenceRandom([0.60, 0, 0, 0, 0]), now + 10000);
   assert.equal(loan.event!.outcome, "loan");
-  assert.equal(sale.event!.outcome, "sale");
+  assert.equal(sale.event!.outcome, "offer");
 });
 
 test("pack trolls stay rare and only target real walkout cards", () => {
@@ -845,19 +847,107 @@ test("a transfer from the bench leaves a manual vacancy until a reserve is selec
   assert.equal(getOpenTransferSquadVacancies(manuallyFilled).length, 0);
 });
 
-test("sales pay the card value sixty percent of the time and can be free", () => {
-  const paid = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.31, 0, 0, 0.599999, 0]), 2000);
-  const paidPlayer = STAR_XI_PLAYERS.find((player) => player.id === paid.event!.playerId)!;
+test("sale offers pay the card value sixty percent of the time and can be free", () => {
+  const offered = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.31, 0, 0, 0.599999, 0]), 2000);
+  const paidPlayer = STAR_XI_PLAYERS.find((player) => player.id === offered.event!.playerId)!;
+  assert.equal(offered.event!.outcome, "offer");
+  assert.equal(offered.goalDelta, 0);
+  // Nothing happens to the squad until the offer is answered.
+  assert.equal(offered.features.starXI.ownedIds.includes(paidPlayer.id), true);
+  assert.equal(getOpenTransferSquadVacancies(offered.features).length, 0);
+  assert.equal(offered.features.transferSaga.pendingOffer?.fee, paidPlayer.price);
+  assert.equal(offered.features.transferSaga.pendingOffer?.expiresAt, 2000 + TRANSFER_OFFER_DURATION_MS);
+  assert.equal(offered.features.transferSaga.archive.length, 0);
+
+  const paid = acceptTransferOffer(offered.features, 3000);
   assert.equal(paid.event!.outcome, "sale");
   assert.equal(paid.goalDelta, paidPlayer.price);
   assert.equal(paid.event!.fee, paidPlayer.price);
   assert.equal(paid.features.starXI.ownedIds.includes(paidPlayer.id), false);
+  assert.equal(paid.features.starXI.lineupIds.includes(paidPlayer.id), false);
+  assert.equal(getOpenTransferSquadVacancies(paid.features).length, 1);
+  assert.equal(paid.features.transferSaga.pendingOffer, null);
+  assert.equal(paid.features.transferSaga.archive.at(-1)?.outcome, "sale");
 
-  const free = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.31, 0, 0, 0.6, 0]), 2000);
+  const freeOffer = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.31, 0, 0, 0.6, 0]), 2000);
+  assert.equal(freeOffer.event!.outcome, "offer");
+  assert.equal(freeOffer.event!.fee, 0);
+  const free = acceptTransferOffer(freeOffer.features, 3000);
   assert.equal(free.event!.outcome, "sale");
   assert.equal(free.goalDelta, 0);
-  assert.equal(free.event!.fee, 0);
   assert.match(free.event!.message, /ablösefrei/i);
+});
+
+test("keeping a player who wanted to leave makes him weaker for three matches", () => {
+  const offered = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.31, 0, 0, 0, 0]), 2000);
+  const playerId = offered.event!.playerId!;
+  const kept = declineTransferOffer(offered.features, 3000);
+  assert.equal(kept.event!.outcome, "declined");
+  assert.equal(kept.goalDelta, 0);
+  assert.equal(kept.features.starXI.ownedIds.includes(playerId), true);
+  assert.equal(kept.features.starXI.lineupIds.includes(playerId), true);
+  assert.equal(kept.features.transferSaga.pendingOffer, null);
+  assert.equal(transferUnhappyMatches(kept.features, playerId), TRANSFER_UNHAPPY_MATCHES);
+  assert.equal(kept.features.transferSaga.archive.at(-1)?.outcome, "declined");
+  // The penalty survives a reload and goes into the match strength.
+  const reloaded = normalizeGameFeatures(JSON.parse(JSON.stringify(kept.features)));
+  assert.equal(transferUnhappyMatches(reloaded, playerId), TRANSFER_UNHAPPY_MATCHES);
+  reloaded.cup.matchStartedAt = 5000;
+  prepareCareerMatch(reloaded);
+  assert.equal(reloaded.cup.careerBonuses?.[playerId], -TRANSFER_UNHAPPY_PENALTY);
+  assert.equal(normalizeGameFeatures(reloaded).cup.careerBonuses?.[playerId], -TRANSFER_UNHAPPY_PENALTY);
+  // While the offer is open no new rumour comes, afterwards Fabrizio carries on.
+  assert.equal(resolveTransferInsiderEvent(offered.features, sequenceRandom([0.1, 0, 0, 0]), 4000).event, null);
+  assert.notEqual(resolveTransferInsiderEvent(kept.features, sequenceRandom([0.1, 0, 0, 0]), 4000).event, null);
+});
+
+test("unhappiness wears off after three recorded matches", () => {
+  const offered = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.31, 0, 0, 0, 0]), 2000);
+  const playerId = offered.event!.playerId!;
+  let features = declineTransferOffer(offered.features, 3000).features;
+  for (let match = 1; match <= TRANSFER_UNHAPPY_MATCHES; match++) {
+    features.cup.active = false;
+    features.cup.matchStartedAt = 10000 * match;
+    features.cup.careerMatchId = `career:test-${match}`;
+    features = recordCareerMatch(features, 10000 * match + 1);
+    assert.equal(transferUnhappyMatches(features, playerId), TRANSFER_UNHAPPY_MATCHES - match);
+  }
+  assert.ok(features.history.some((entry) => /wieder zufrieden/.test(entry.title)));
+  // The same match counted twice does not wear it off faster.
+  const again = declineTransferOffer(resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.31, 0, 0, 0, 0]), 2000).features, 3000).features;
+  again.cup.matchStartedAt = 7000; again.cup.careerMatchId = "career:same";
+  recordCareerMatch(again, 7001); recordCareerMatch(again, 7002);
+  assert.equal(transferUnhappyMatches(again, playerId), TRANSFER_UNHAPPY_MATCHES - 1);
+});
+
+test("an unanswered offer runs out as declined, but its clock stops for matches, journeys and closed tabs", () => {
+  const offered = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.31, 0, 0, 0, 0]), 2000).features;
+  const expiresAt = offered.transferSaga.pendingOffer!.expiresAt;
+  assert.equal(expireTransferOffer(offered, expiresAt - 1).event, null);
+  const expired = expireTransferOffer(offered, expiresAt);
+  assert.equal(expired.event?.outcome, "declined");
+  assert.equal(expired.event?.headline, "Angebot verfallen");
+  assert.equal(transferUnhappyMatches(expired.features, expired.event!.playerId!), TRANSFER_UNHAPPY_MATCHES);
+
+  // A closed tab adds its time to the offer.
+  assert.equal(pauseGameFeatureTimers(offered, 60000).transferSaga.pendingOffer!.expiresAt, expiresAt + 60000);
+
+  // A match keeps the remaining time and blocks selling, keeping stays possible.
+  const locked = normalizeGameFeatures(offered);
+  lockMatchSquad(locked, "fixture-1", 62000);
+  assert.equal(expireTransferOffer(locked, expiresAt + 999999).event, null);
+  assert.match(acceptTransferOffer(locked, 63000).error ?? "", /Spiels oder einer Reise/);
+  releaseMatchSquad(locked, 500000);
+  assert.equal(locked.transferSaga.pendingOffer!.expiresAt, 500000 + (expiresAt - 62000));
+});
+
+test("selling a player who already left the club only clears the offer", () => {
+  const offered = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.31, 0, 0, 0, 0]), 2000).features;
+  const offer = offered.transferSaga.pendingOffer!;
+  offered.starXI.ownedIds = offered.starXI.ownedIds.filter((id) => id !== offer.playerId);
+  offered.starXI.lineupIds = offered.starXI.lineupIds.map((id) => id === offer.playerId ? "" : id);
+  // Loading the save drops an offer for a player the club no longer owns.
+  assert.equal(normalizeGameFeatures(offered).transferSaga.pendingOffer, null);
 });
 
 test("failed Fabrizio Romario reports never repeat the previous reason", () => {

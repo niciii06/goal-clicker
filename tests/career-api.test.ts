@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { getTableColumns } from 'drizzle-orm';
 import { coopRooms } from '../db/schema.ts';
-import { initialGameFeatures, normalizeGameFeatures, setBestStarXI, STAR_XI_PLAYERS } from '../app/feature-data.ts';
+import { initialGameFeatures, normalizeGameFeatures, resolveTransferInsiderEvent, setBestStarXI, STAR_XI_PLAYERS, TRANSFER_OFFER_DURATION_MS } from '../app/feature-data.ts';
 import { beginSeasonCupMatch, getStarXISelection, getStarXIPlayer } from '../app/feature-data';
 import { draftMatch } from '../app/match-commands';
 import { prepareCareerMatch } from '../app/career-data';
@@ -139,4 +139,32 @@ test('API season home match pays the ticket income once and records it on the re
  const again=await action('cup-tick');assert.equal(again.status,200);
  assert.ok(row.sharedCoins-coins<tickets.income);
  assert.equal(again.data.room.game.features.history.filter(e=>e.title==='Ticketeinnahmen').length,1);
+});
+function offerFeatures(now=Date.now()) {
+ let f=initialGameFeatures(now);f.starXI=setBestStarXI({...f.starXI,ownedIds:STAR_XI_PLAYERS.slice(0,60).map(p=>p.id)});f=normalizeGameFeatures(f);
+ const values=[0.31,0,0,0,0];let index=0;
+ return resolveTransferInsiderEvent(f,()=>values[index++]??0.5,now).features;
+}
+test('API sale offers are answered once by whoever is first in the world',async()=>{
+ const f=offerFeatures();const offer=f.transferSaga.pendingOffer!;assert.ok(offer.fee>0);
+ setup(f);const before=row.sharedCoins;
+ const sold=await action('transfer-accept');assert.equal(sold.status,200,JSON.stringify(sold.data));
+ const saved=sold.data.room.game.features;
+ assert.equal(saved.transferSaga.pendingOffer,null);
+ assert.equal(saved.starXI.ownedIds.includes(offer.playerId!),false);
+ assert.ok(row.sharedCoins-before>=offer.fee);
+ const late=await action('transfer-decline',{},'guest-player-123');assert.equal(late.status,409);
+ assert.equal(JSON.parse(row.sharedFeaturesJson).transferSaga.unhappy.length,0);
+});
+test('API keeping the player makes him unhappy, and an unanswered offer runs out',async()=>{
+ setup(offerFeatures());
+ const kept=await action('transfer-decline',{},'guest-player-123');assert.equal(kept.status,200,JSON.stringify(kept.data));
+ assert.equal(kept.data.room.game.features.transferSaga.unhappy.length,1);
+ assert.equal(kept.data.room.game.features.transferSaga.latestEvent?.outcome,'declined');
+ const f=offerFeatures(Date.now()-TRANSFER_OFFER_DURATION_MS-1000);setup(f);
+ const expired=await action('transfer-insider-event');assert.equal(expired.status,200);
+ assert.equal(expired.data.room.game.features.transferSaga.pendingOffer,null);
+ assert.equal(expired.data.room.game.features.transferSaga.latestEvent?.headline,'Angebot verfallen');
+ setup(offerFeatures());const open=await action('transfer-insider-event');
+ assert.ok(open.data.room.game.features.transferSaga.pendingOffer,'an open offer stays open');
 });

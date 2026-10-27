@@ -3,7 +3,7 @@
 import { goalLabel } from './match-goals';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { getStarXIPlayer, getStarXIPositions, getUnavailableStarXIPlayerIds, STAR_POSITIONS, STAR_XI_PLAYERS } from './feature-data';
+import { getStarXIPlayer, getStarXIPositions, getUnavailableStarXIPlayerIds, STAR_POSITIONS, STAR_XI_PLAYERS, TRANSFER_UNHAPPY_PENALTY, transferUnhappyMatches } from './feature-data';
 import type { GameFeatures, StarXIPlayer } from './feature-data';
 import { CAREER_MILESTONES, getPlayerMilestones, MILESTONE_METRIC_LABELS, emptyPlayerStats, getAlbumGroups, getCareerCard, getPlayerForm } from './career-data';
 import type { AwardWinner, PlayerMatchReport } from './career-data';
@@ -16,11 +16,13 @@ const signed = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}`;
 const nationName = (code: string) => { try { return new Intl.DisplayNames(['de-CH'], { type: 'region' }).of(code) || code; } catch { return code; } };
 
 export function CareerPlayerBadge({ features, player, compact = false }: { features: GameFeatures; player: StarXIPlayer; compact?: boolean }) {
-  const form = getPlayerForm(features.career, player.id), card = getCareerCard(features.career, player);
-  if (compact) return <>{form.matches || card.milestone ? <span className={`career-pitch-badge ${card.milestone ? 'special' : ''}`} title={`${card.milestone?.label ?? 'Basiskarte'} · ${form.label} · Form ${signed(form.bonus)} OVR`} style={{ '--career-accent': card.milestone?.accent ?? '#edf3fa' } as CSSProperties}>{card.milestone ? '★ ' : ''}{form.matches ? signed(form.bonus) : ''}</span> : null}<DisciplineTags features={features} playerId={player.id} compact /></>;
+  const form = getPlayerForm(features.career, player.id), card = getCareerCard(features.career, player), unhappy = transferUnhappyMatches(features, player.id);
+  const unhappyLabel = `Unzufrieden · −${TRANSFER_UNHAPPY_PENALTY} OVR · noch ${unhappy} ${unhappy === 1 ? 'Spiel' : 'Spiele'}`;
+  if (compact) return <>{form.matches || card.milestone || unhappy ? <span className={`career-pitch-badge ${card.milestone ? 'special' : ''}${unhappy ? ' unhappy' : ''}`} title={`${card.milestone?.label ?? 'Basiskarte'} · ${form.label} · Form ${signed(form.bonus)} OVR${unhappy ? ` · ${unhappyLabel}` : ''}`} style={{ '--career-accent': card.milestone?.accent ?? '#edf3fa' } as CSSProperties}>{unhappy ? '😠 ' : ''}{card.milestone ? '★ ' : ''}{form.matches ? signed(form.bonus) : ''}</span> : null}<DisciplineTags features={features} playerId={player.id} compact /></>;
   return <span className="career-player-badges">
     {card.milestone && <span className="career-special-tag" style={{ '--career-accent': card.milestone.accent } as CSSProperties}>★ {card.milestone.label} · OVR {card.rating}</span>}
     {form.matches > 0 && <span className={`career-form-tag ${form.bonus >= .5 ? 'up' : form.bonus <= -.5 ? 'down' : ''}`}>{form.label} · {signed(form.bonus)}</span>}
+    {unhappy > 0 && <span className="career-form-tag down">😠 {unhappyLabel}</span>}
     <DisciplineTags features={features} playerId={player.id} />
   </span>;
 }

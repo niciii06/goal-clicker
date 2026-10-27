@@ -1,7 +1,7 @@
 import { createInteractiveMatch } from './interactive-match';
 import { goalLabel } from './match-goals';
 import { recordedActionRating } from './match-broadcast';
-import { addHistory, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, removeStarXIPlayersFromSquad, STAR_XI_ACTIVE_PLAYERS, SCRAP_PLAYERS } from './feature-data';
+import { addHistory, TRANSFER_UNHAPPY_PENALTY, transferUnhappyMatches, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, removeStarXIPlayersFromSquad, STAR_XI_ACTIVE_PLAYERS, SCRAP_PLAYERS } from './feature-data';
 import { getBannedPlayerIds, nextCompetition, processMatchDiscipline, suspensionLabel } from './discipline';
 import type { CupState, GameFeatures, SeasonMatchHistoryEntry, StarXIPlayer } from './feature-data';
 
@@ -141,7 +141,8 @@ export function getCareerCard(career: CareerState, player: StarXIPlayer) {
 }
 export function prepareCareerMatch(features: GameFeatures) {
   const bonuses: Record<string, number> = {};
-  for (const id of features.starXI.ownedIds) { const p = getStarXIPlayer(id); if (p) bonuses[id] = getPlayerForm(features.career, id).bonus + getCareerCard(features.career, p).bonus; }
+  // A player kept against his wish after a sale offer plays weaker for a few matches.
+  for (const id of features.starXI.ownedIds) { const p = getStarXIPlayer(id); if (p) bonuses[id] = getPlayerForm(features.career, id).bonus + getCareerCard(features.career, p).bonus - (transferUnhappyMatches(features, id) ? TRANSFER_UNHAPPY_PENALTY : 0); }
   features.cup.careerBonuses = bonuses;
   features.cup.careerRatingSeed = features.cup.matchStartedAt;
   features.cup.careerMatchId = `career-${features.cup.matchStartedAt}-${features.cup.mode}-${features.cup.opponent}`;
@@ -194,6 +195,8 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
   const bannedNext = getBannedPlayerIds(features, nextCompetition(features));
   if (bannedNext.length) features.starXI = removeStarXIPlayersFromSquad(features.starXI, bannedNext);
   if (career.processedMatchIds.includes(id)) return features;
+  for (const entry of features.transferSaga.unhappy) if (entry.matchesLeft <= 1) addHistory(features, { title: `${getStarXIPlayer(entry.playerId)?.name ?? 'Spieler'} ist wieder zufrieden`, detail: `Der geplatzte Wechsel zu ${entry.club} ist vergessen.`, tone: 'positive' });
+  features.transferSaga.unhappy = features.transferSaga.unhappy.map(entry => ({ ...entry, matchesLeft: entry.matchesLeft - 1 })).filter(entry => entry.matchesLeft > 0);
   const minute = c.phase === "extra-time" || c.phase === "penalties" ? 120 : 90;
   const players = Object.keys(c.playerEnteredAt).map(playerId => getMatchRatingBreakdown(c,playerId,minute)).filter((p): p is PlayerMatchReport => Boolean(p));
   const ranked = [...players].filter(p => p.minutes >= 15).sort((a,b) => b.rating-a.rating || b.goals-a.goals || b.assists-a.assists || a.playerId.localeCompare(b.playerId));

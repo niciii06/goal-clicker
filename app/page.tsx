@@ -10,7 +10,7 @@ import type { MatchDraft } from "./match-commands";
 import { ACHIEVEMENTS, BALANCE_VERSION, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, COMBO_MAX_COUNT, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, STAR_RATING_FILTERS, VIBRATION_STORAGE_KEY } from "./game/constants";
 import { AL, AR, AT, AU, AZ, BA, BE, BF, BG, BR, CA, CD, CH, CI, CL, CM, CN, CO, CR, CZ, DE, DK, DZ, EC, EG, ES, FI, FR, GB_ENG, GB_NIR, GB_SCT, GB_WLS, GE, GH, GM, GN, GR, GT, HR, HT, HU, IE, IL, IS, IT, JM, JP, KN, KR, MA, ME, ML, MW, MX, NG, NL, NO, NZ, PA, PH, PL, PT, PY, RO, RS, RU, SE, SI, SK, SN, SR, TR, UA, US, UY, VE, XK, ZA, ZM } from "country-flag-icons/react/3x2";
 import { AlbumPanel, CareerPanel, CareerPlayerBadge, MatchRatingsPanel, PostMatchSummary } from "./career-panels";
-import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, SPECIAL_CARD_PACK, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_SQUAD_SIZE, STAR_XI_TOTAL_CARD_COUNT, TOURNAMENTS, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, applyPendingMatchChanges, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, getSpecialCardPackOdds, purchaseSpecialCardPack, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getRewardPackOdds, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXIRating, getStarXISelection, getTournament, getTournamentRewardPack, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, isRewardPack, isTransferDeadlineDay, normalizeGameFeatures, openEarnedPack, openStarPack, pauseGameFeatureTimers, queueMatchChanges, recordSeasonModeMatch, releaseMatchSquad, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige } from "./feature-data";
+import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, SPECIAL_CARD_PACK, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_SQUAD_SIZE, STAR_XI_TOTAL_CARD_COUNT, TOURNAMENTS, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, applyPendingMatchChanges, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, getSpecialCardPackOdds, purchaseSpecialCardPack, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getRewardPackOdds, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXIRating, getStarXISelection, getTournament, getTournamentRewardPack, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, isRewardPack, isTransferDeadlineDay, normalizeGameFeatures, openEarnedPack, openStarPack, pauseGameFeatureTimers, queueMatchChanges, recordSeasonModeMatch, releaseMatchSquad, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, TRANSFER_UNHAPPY_MATCHES, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige } from "./feature-data";
 import { DailyRewardCard } from "./daily-reward-panel";
 import { FootballGraphic, GameErrorBoundary, Icon, StarXIPositionBadges } from "./game/ui";
 import { LiveMatchViewer } from "./match-viewer";
@@ -39,6 +39,7 @@ import { consumeTravel, eligibilityError, fixtureFor, journeyView, settleTravel,
 import { coopRoleLabel, isCoopRole, multiplayerUrl, notifyCoopOffline, occupiedCoopPlayers, readCoopResponse, upsertSavedRoom } from "./game/coop";
 import { createClickResult, decayComboCount, formatComboMultiplier, getBaseClickPower, getBasePassivePower, getBulkPurchase, getClickPower, getComboLevel, getComboProgress, getCost, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades } from "./game/economy";
 import { UPGRADES } from "./game/upgrades";
+import { TransferOfferActions } from "./transfer-offer-actions";
 import { expectedHomeCrowd, getTicketIncome, recordTicketIncome } from "./ticket-income";
 import { directionLabel, formatCountdown, formatGoalDifference, formatHistoryTime, formatNumber, formatPackChance, getRandomCrossbarHeight, getRandomMatchPrediction, getRandomPenaltyDirection, heightLabel, predictionLabel } from "./game/format";
 import { getCurrentTime, getTravelTime, syncTravelClock } from "./game/clock";
@@ -463,6 +464,7 @@ function App() {
   const loanedStarIds = useMemo(() => displayGame.features.transferSaga.loans.map((loan) => loan.playerId), [displayGame.features.transferSaga.loans]);
   const currentTransferLoans = displayGame.features.transferSaga.loans.map((loan) => ({ loan, player: getStarXIPlayer(loan.playerId) })).filter((entry): entry is { loan: typeof entry.loan; player: NonNullable<ReturnType<typeof getStarXIPlayer>> } => Boolean(entry.player));
   const transferArchive = [...displayGame.features.transferSaga.archive].reverse();
+  const pendingTransferOffer = displayGame.features.transferSaga.pendingOffer;
   const reserveStarXICount = useMemo(() => {const assigned=new Set([...lineupStarIds,...benchStarIds,...loanedStarIds]);return ownedStarIds.filter(id=>!assigned.has(id)).length;},[ownedStarIds,lineupStarIds,benchStarIds,loanedStarIds]);
   const reserveStarXIPlayers = useMemo(() => featureTab!=="squad" || displayGame.features.cup.active ? [] : ownedStarXIPlayers.filter((player) => !lineupStarIds.includes(player.id) && !benchStarIds.includes(player.id) && !loanedStarIds.includes(player.id)), [benchStarIds, lineupStarIds, loanedStarIds, ownedStarXIPlayers, featureTab, displayGame.features.cup.active]);
   const suspendedStarIds = displayGame.features.cup.suspendedPlayerIds;
@@ -1291,15 +1293,39 @@ function App() {
     window.setTimeout(() => { eventLockRef.current = false; }, 1200);
   }
 
+  /** An offer nobody answered in time counts as declined. */
+  function expireLocalTransferOffer() {
+    const result = expireTransferOffer(gameRef.current.features, getCurrentTime());
+    if (result.event) setGame((current) => ({ ...current, features: result.features }));
+  }
+
+  function answerTransferOffer(accept: boolean) {
+    setTransferAnnouncement(null);
+    if (appMode === "coop" && isCoopLive) { void sendCoopAction(accept ? "transfer-accept" : "transfer-decline"); return; }
+    const now = getCurrentTime();
+    const result = accept ? acceptTransferOffer(gameRef.current.features, now) : declineTransferOffer(gameRef.current.features, now);
+    if (result.error) { showToast(result.error); if (!result.features.transferSaga.pendingOffer) setGame((current) => ({ ...current, features: result.features })); return; }
+    setGame((current) => ({
+      ...current,
+      goals: current.goals + result.goalDelta,
+      seasonGoals: current.seasonGoals + result.goalDelta,
+      totalGoals: current.totalGoals + result.goalDelta,
+      features: result.features,
+    }));
+  }
+
   useEffect(() => {
     if (!hydrated) return;
     const timer = window.setInterval(() => {
+      const coopOffer = displayGame.features.transferSaga.pendingOffer, localOffer = gameRef.current.features.transferSaga.pendingOffer;
       if (appMode === "coop" && isCoopLive) {
-        if (!displayGame.features.squadLock && !displayGame.features.cup.active && displayGame.features.transferSaga.nextAt <= getCurrentTime()) void sendCoopAction("transfer-insider-event");
+        if (!displayGame.features.squadLock && coopOffer && coopOffer.expiresAt <= getCurrentTime()) void sendCoopAction("transfer-insider-event");
+        else if (!displayGame.features.squadLock && !coopOffer && !displayGame.features.cup.active && displayGame.features.transferSaga.nextAt <= getCurrentTime()) void sendCoopAction("transfer-insider-event");
         else if (!displayGame.features.squadLock && displayGame.features.nextVarAt <= getCurrentTime()) void sendCoopAction("var-event");
         else if (!displayGame.features.squadLock && displayGame.features.nextEventAt <= getCurrentTime()) void sendCoopAction("event");
       } else if (appMode === "single") {
-        if (!gameRef.current.features.squadLock && !gameRef.current.features.cup.active && gameRef.current.features.transferSaga.nextAt <= getCurrentTime()) triggerTransferInsiderEvent();
+        if (!gameRef.current.features.squadLock && localOffer && localOffer.expiresAt <= getCurrentTime()) expireLocalTransferOffer();
+        else if (!gameRef.current.features.squadLock && !localOffer && !gameRef.current.features.cup.active && gameRef.current.features.transferSaga.nextAt <= getCurrentTime()) triggerTransferInsiderEvent();
         else if (!gameRef.current.features.squadLock && gameRef.current.features.nextVarAt <= getCurrentTime()) triggerVarEvent();
         else if (!gameRef.current.features.squadLock && gameRef.current.features.nextEventAt <= getCurrentTime()) triggerRandomEvent();
       }
@@ -1307,7 +1333,7 @@ function App() {
     return () => window.clearInterval(timer);
     // These handlers intentionally stay out of the dependency list so the five-second clock is not restarted on every click.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appMode, displayGame.features.nextEventAt, displayGame.features.nextVarAt, displayGame.features.transferSaga.nextAt, hydrated, isCoopLive]);
+  }, [appMode, displayGame.features.nextEventAt, displayGame.features.nextVarAt, displayGame.features.transferSaga.nextAt, displayGame.features.transferSaga.pendingOffer?.expiresAt, hydrated, isCoopLive]);
 
   async function saveClubProfile() {
     const profile = {
@@ -2533,12 +2559,13 @@ function App() {
           {featureTab === "album" && <AlbumPanel features={displayGame.features} busy={coopBusy} onClaim={(id) => void collectAlbumReward(id)} />}
 
           {featureTab === "fabrizio" && <div className="transfer-saga-dashboard">
-            <div className="transfer-match-lock"><span>MARKT ZU</span><strong>Keine Spielerkäufe bei Fabrizio</strong><small>Der Transfermarkt ist geschlossen. Fabrizio Romario bleibt aktiv und meldet weiterhin Leihen, Verkäufe und Rückkehrer.</small></div>
+            <div className="transfer-match-lock"><span>MARKT ZU</span><strong>Keine Spielerkäufe bei Fabrizio</strong><small>Der Transfermarkt ist geschlossen. Fabrizio Romario meldet Leihen und Rückkehrer und bringt Verkaufsangebote, die du annehmen oder ablehnen kannst.</small></div>
+            {pendingTransferOffer && <section className="transfer-offer-card" aria-live="polite"><div><span>OFFENES ANGEBOT</span><strong>{pendingTransferOffer.playerName} · {pendingTransferOffer.club}</strong><small>{pendingTransferOffer.message}</small></div><TransferOfferActions offer={pendingTransferOffer} now={countdownNow} busy={coopBusy} onAnswer={answerTransferOffer} /></section>}
             {deadlineDayActive && <section className="deadline-day-banner" aria-live="polite"><div><span>DEADLINE DAY / ROMARIO LIVE</span><strong>Das Transferfenster dreht durch.</strong><small>Mehr Leihangebote bis das nächste Turnier wieder freigegeben wird.</small></div><b>{deadlineDayLabel}</b></section>}
             {displayGame.features.cup.active && <div className="transfer-match-lock"><span>SPIEL LÄUFT</span><strong>Keine Abgänge bis zum Abpfiff</strong><small>Fällige Romario Meldungen werden direkt nach dem Saisonspiel ausgeführt.</small></div>}
             <div className="transfer-ledger-grid">
               <section className="transfer-ledger-card"><div className="transfer-ledger-heading"><div><p className="eyebrow">LEIHSTATIONEN / LIVE</p><h4>Aktuell verliehen</h4></div><span>{currentTransferLoans.length}</span></div>{currentTransferLoans.length ? <div className="transfer-ledger-list">{currentTransferLoans.map(({ loan, player }) => <article key={`loan-${loan.playerId}`}><span>{player?.name.slice(0, 1) ?? "?"}</span><div><strong>{player?.name ?? "Unbekannter Spieler"}</strong><small>{loan.club} · {loan.status === "active" ? "kehrt nach dem laufenden Saisonspiel zurück" : "fehlt in der nächsten kompletten Saisonpartie"}</small></div><b>LEIHE</b></article>)}</div> : <div className="transfer-ledger-empty">Zurzeit ist niemand ausgeliehen.</div>}</section>
-              <section className="transfer-ledger-card"><div className="transfer-ledger-heading"><div><p className="eyebrow">CLUBARCHIV / ABGÄNGE</p><h4>Transferhistorie</h4></div><span>{transferArchive.length}</span></div>{transferArchive.length ? <div className="transfer-ledger-list archive">{transferArchive.slice(0, 12).map((event) => <article key={`archive-${event.id}`}><span>{event.outcome === "sale" ? "↗" : event.outcome === "return" ? "↙" : "⇄"}</span><div><strong>{event.playerName ?? "Mehrere Spieler"}</strong><small>{event.outcome === "return" ? `Zurück von ${event.club}` : `${event.outcome === "sale" ? "Verkauft" : "Verliehen"} an ${event.club}${event.fee > 0 ? ` · ${formatNumber(event.fee)} Goals` : event.outcome === "sale" ? " · ablösefrei" : ""}`}</small></div><b>{formatHistoryTime(event.createdAt)}</b></article>)}</div> : <div className="transfer-ledger-empty">Noch keine Abgänge. Romario prüft sein Handy.</div>}</section>
+              <section className="transfer-ledger-card"><div className="transfer-ledger-heading"><div><p className="eyebrow">CLUBARCHIV / ABGÄNGE</p><h4>Transferhistorie</h4></div><span>{transferArchive.length}</span></div>{transferArchive.length ? <div className="transfer-ledger-list archive">{transferArchive.slice(0, 12).map((event) => <article key={`archive-${event.id}`}><span>{event.outcome === "sale" ? "↗" : event.outcome === "return" ? "↙" : event.outcome === "declined" ? "✋" : "⇄"}</span><div><strong>{event.playerName ?? "Mehrere Spieler"}</strong><small>{event.outcome === "return" ? `Zurück von ${event.club}` : event.outcome === "declined" ? `Behalten · wollte zu ${event.club}` : `${event.outcome === "sale" ? "Verkauft" : "Verliehen"} an ${event.club}${event.fee > 0 ? ` · ${formatNumber(event.fee)} Goals` : event.outcome === "sale" ? " · ablösefrei" : ""}`}</small></div><b>{formatHistoryTime(event.createdAt)}</b></article>)}</div> : <div className="transfer-ledger-empty">Noch keine Abgänge. Romario prüft sein Handy.</div>}</section>
             </div>
           </div>}
 
@@ -2720,7 +2747,7 @@ function App() {
 
       {cupCardAnnouncement && <div className="gc-notification card-notification" role="status"><span>🟥</span><div><strong>{cupCardAnnouncement.minute}′ · {cupCardAnnouncement.player}</strong><p>{cupCardAnnouncement.reason}. Vom Platz gestellt und für die nächste Partie gesperrt.</p></div></div>}
 
-      {transferAnnouncement && !gazetteAnnouncement && <div className={`transfer-insider-takeover ${transferAnnouncement.outcome}`} role="dialog" aria-modal="true" aria-label={`Transfermeldung: ${transferAnnouncement.headline}`}><div className="transfer-insider-card"><span className="transfer-insider-kicker">TRANSFER INSIDER / EXKLUSIV</span><div className="transfer-insider-reporter"><span aria-hidden="true">FR</span><div><strong>Fabrizio Romario</strong><small>@romario_transfers · gerade eben</small></div><b>LIVE</b></div><h2>{transferAnnouncement.headline}</h2><p>{transferAnnouncement.message}</p><span className="transfer-insider-result">{transferAnnouncement.outcome === "sale" ? transferAnnouncement.fee > 0 ? `+${formatNumber(transferAnnouncement.fee)} GOALS ABLÖSE` : "ABLÖSEFREI · 0 GOALS" : transferAnnouncement.outcome === "loan" ? displayGame.features.cup.mode === "season" ? "IN DER NÄCHSTEN SAISONPARTIE NICHT IM TEAM" : "IM NÄCHSTEN TURNIER NICHT IM TEAM" : transferAnnouncement.outcome === "return" ? "WIEDER IM TEAM" : "KEIN TRANSFER"}</span><button className="event-takeover-dismiss" onClick={dismissTransferAnnouncement}>Weiter</button></div></div>}
+      {transferAnnouncement && !gazetteAnnouncement && <div className={`transfer-insider-takeover ${transferAnnouncement.outcome}`} role="dialog" aria-modal="true" aria-label={`Transfermeldung: ${transferAnnouncement.headline}`}><div className="transfer-insider-card"><span className="transfer-insider-kicker">TRANSFER INSIDER / EXKLUSIV</span><div className="transfer-insider-reporter"><span aria-hidden="true">FR</span><div><strong>Fabrizio Romario</strong><small>@romario_transfers · gerade eben</small></div><b>LIVE</b></div><h2>{transferAnnouncement.headline}</h2><p>{transferAnnouncement.message}</p><span className="transfer-insider-result">{transferAnnouncement.outcome === "offer" ? transferAnnouncement.fee > 0 ? `ANGEBOT · ${formatNumber(transferAnnouncement.fee)} GOALS` : "WECHSELWUNSCH · ABLÖSEFREI" : transferAnnouncement.outcome === "declined" ? `BLEIBT · ${TRANSFER_UNHAPPY_MATCHES} SPIELE UNZUFRIEDEN` : transferAnnouncement.outcome === "sale" ? transferAnnouncement.fee > 0 ? `+${formatNumber(transferAnnouncement.fee)} GOALS ABLÖSE` : "ABLÖSEFREI · 0 GOALS" : transferAnnouncement.outcome === "loan" ? displayGame.features.cup.mode === "season" ? "IN DER NÄCHSTEN SAISONPARTIE NICHT IM TEAM" : "IM NÄCHSTEN TURNIER NICHT IM TEAM" : transferAnnouncement.outcome === "return" ? "WIEDER IM TEAM" : "KEIN TRANSFER"}</span>{transferAnnouncement.outcome === "offer" && pendingTransferOffer?.id === transferAnnouncement.id ? <TransferOfferActions offer={pendingTransferOffer} now={countdownNow} busy={coopBusy} onAnswer={answerTransferOffer} onLater={dismissTransferAnnouncement} /> : <button className="event-takeover-dismiss" onClick={dismissTransferAnnouncement}>Weiter</button>}</div></div>}
       {starReveal && <div className={`star-reveal${starRevealIsWalkout ? " walkout-active" : ""}${starRevealIsRare ? " rare-active" : ""}`} role="dialog" aria-modal="true" aria-label={starRevealIsCustomDraw ? "Spezialkarte gezogen" : "Star Pack geöffnet"}>
         <div className={`star-reveal-card${starRevealIsWalkout ? " star-reveal-walkout" : ""}${starWalkoutIsTop ? " star-reveal-top-walkout" : ""}${starRevealIsIconic ? " star-reveal-iconic" : ""}${starRevealIsLegendary ? " star-reveal-legendary" : ""}${starRevealIsRare ? " star-reveal-rare" : ""}`} style={{ borderColor: `${starReveal.player.accent}55` }}>
           {starRevealIsWalkout ? <>

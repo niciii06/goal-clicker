@@ -97,7 +97,7 @@ export function createJourney(fixture:TravelFixture,now:number,random=Math.rando
   const player=players.length?players[Math.min(players.length-1,Math.floor(random()*players.length))]:null;
   events.push({id:e.id,template:e.text,playerId:player?.id,text:e.text.replace('{player}',player?.name??'Die Mannschaft'),at,delta:0});
  }}
- return {squadLock:features?{fixtureId:fixture.id,playerIds:[...new Set([...features.starXI.lineupIds,...features.starXI.benchIds].filter(Boolean))],startedAt:now,transferRemaining:Math.max(0,features.transferSaga.nextAt-now),eventRemaining:Math.max(0,features.nextEventAt-now),varRemaining:Math.max(0,features.nextVarAt-now)}:undefined,plan:timing.plan,id:fixture.id,origin:HOME_VENUE,fixture:{...fixture,region:timing.category},startedAt:now,baseMs:timing.baseMs,endsAt:now+timing.baseMs,transport:timing.transport,km:timing.km,events,consumed:false};
+ return {squadLock:features?{fixtureId:fixture.id,playerIds:[...new Set([...features.starXI.lineupIds,...features.starXI.benchIds].filter(Boolean))],startedAt:now,transferRemaining:Math.max(0,features.transferSaga.nextAt-now),eventRemaining:Math.max(0,features.nextEventAt-now),varRemaining:Math.max(0,features.nextVarAt-now),offerRemaining:features.transferSaga.pendingOffer?Math.max(0,features.transferSaga.pendingOffer.expiresAt-now):0}:undefined,plan:timing.plan,id:fixture.id,origin:HOME_VENUE,fixture:{...fixture,region:timing.category},startedAt:now,baseMs:timing.baseMs,endsAt:now+timing.baseMs,transport:timing.transport,km:timing.km,events,consumed:false};
 }
 export function journeyView(j: Journey, now:number,features?:GameFeatures) {
  const elapsed=Math.max(0,now-j.startedAt);let end=j.baseMs,start=0,progress=0;

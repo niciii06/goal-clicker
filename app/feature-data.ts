@@ -1,7 +1,7 @@
 import { competitionOfCup, emptyDiscipline, getBannedPlayerIds, nextCompetition, normalizeDiscipline } from './discipline';
 import type { DisciplineState } from './discipline';
 import type { CareerState } from "./career-data";
-import type { ClubProfile, CoopMission, CupCardEvent, CupGoalEvent, CupInjuryEvent, CupMatchMode, CupMatchPhase, CupPenaltyEvent, CupState, CupStrategyId, CupSubstitutionImpact, EarnedPack, GoalBoostState, IconSeed, MatchChange, MatchHistoryEntry, MissionProgressSource, PenaltyDirection, RandomEvent, RewardPackId, SeasonFixture, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationId, StarPackDefinition, StarPackId, StarPackOpening, StarPackReveal, StarXIEvaluationContext, StarXIPlayer, StarXIState, TournamentCompletionSummary, TournamentDefinition, TournamentGazetteIssue, TournamentId, TransferInsiderEvent, TransferInsiderOutcome, TransferMarketState, TransferSagaState, TransferSquadVacancy } from "./features/types";
+import type { ClubProfile, CoopMission, CupCardEvent, CupGoalEvent, CupInjuryEvent, CupMatchMode, CupMatchPhase, CupPenaltyEvent, CupState, CupStrategyId, CupSubstitutionImpact, EarnedPack, GoalBoostState, IconSeed, MatchChange, MatchHistoryEntry, MissionProgressSource, PenaltyDirection, RandomEvent, RewardPackId, SeasonFixture, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationId, StarPackDefinition, StarPackId, StarPackOpening, StarPackReveal, StarXIEvaluationContext, StarXIPlayer, StarXIState, TournamentCompletionSummary, TournamentDefinition, TournamentGazetteIssue, TournamentId, TransferInsiderEvent, TransferInsiderOutcome, TransferMarketState, TransferOffer, TransferSagaState, TransferSquadVacancy, TransferUnhappyPlayer } from "./features/types";
 import type { DailyRewardState } from "./daily-reward";
 import type { GoalPattern } from "./match-broadcast";
 import type { PressState } from "./press-conference";
@@ -22,7 +22,7 @@ import { getCareerCard, getPlayerForm, initialCareerState, normalizeCareerState 
 import { getFunnyPlayerName } from "./funny-player-names";
 import { normalizeDailyRewards } from "./daily-reward";
 import { normalizePress } from "./press-conference";
-export type { ClubProfile, CoopMission, CupCardEvent, CupGoalEvent, CupInjuryEvent, CupMatchMode, CupMatchPhase, CupPenaltyEvent, CupState, CupStrategyId, CupSubstitutionImpact, EarnedPack, GoalBoostState, HistoryTone, MatchChange, MatchHistoryEntry, MissionKind, MissionProgressSource, PenaltyDirection, RandomEvent, RewardPackId, SeasonFixture, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationDefinition, StarFormationId, StarFormationSlot, StarPackDefinition, StarPackId, StarPackOdds, StarPackOpening, StarPackReveal, StarXIEvaluationContext, StarXIPlayer, StarXIState, TournamentCompletionSummary, TournamentDefinition, TournamentGazetteIssue, TournamentId, TournamentOpponent, TransferInsiderEvent, TransferInsiderOutcome, TransferLoan, TransferMarketState, TransferPlayer, TransferSagaState, TransferSquadVacancy } from "./features/types";
+export type { ClubProfile, CoopMission, CupCardEvent, CupGoalEvent, CupInjuryEvent, CupMatchMode, CupMatchPhase, CupPenaltyEvent, CupState, CupStrategyId, CupSubstitutionImpact, EarnedPack, GoalBoostState, HistoryTone, MatchChange, MatchHistoryEntry, MissionKind, MissionProgressSource, PenaltyDirection, RandomEvent, RewardPackId, SeasonFixture, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationDefinition, StarFormationId, StarFormationSlot, StarPackDefinition, StarPackId, StarPackOdds, StarPackOpening, StarPackReveal, StarXIEvaluationContext, StarXIPlayer, StarXIState, TournamentCompletionSummary, TournamentDefinition, TournamentGazetteIssue, TournamentId, TournamentOpponent, TransferInsiderEvent, TransferInsiderOutcome, TransferLoan, TransferMarketState, TransferPlayer, TransferOffer, TransferSagaState, TransferSquadVacancy, TransferUnhappyPlayer } from "./features/types";
 export { STAR_FORMATIONS, STAR_POSITIONS, STAR_POSITION_NAMES, STAR_XI_FORMATION_POSITIONS, TOURNAMENTS, TOURNAMENT_OPPONENT_MULTIPLIER, TRANSFER_PLAYERS, YB_FC26_SOURCE_IDS, getStarFormation } from "./features/catalog";
 
 export type { StarPosition } from "./fc26-player-pool";
@@ -87,7 +87,7 @@ export type GameFeatures = {
   starXI: StarXIState;
   club: ClubProfile;
   cup: CupState;
-  squadLock?: { fixtureId: string; playerIds: string[]; startedAt: number; transferRemaining: number; eventRemaining: number; varRemaining: number };
+  squadLock?: { fixtureId: string; playerIds: string[]; startedAt: number; transferRemaining: number; eventRemaining: number; varRemaining: number; offerRemaining?: number };
   seasonMode: SeasonModeState;
   goalBoost: GoalBoostState;
   missions: CoopMission[];
@@ -161,6 +161,11 @@ export const TRANSFER_EVENT_MAX_DELAY_MS = 720000;
 export const TRANSFER_LOAN_CHANCE = 0.30;
 export const TRANSFER_SALE_CHANCE = 0.10;
 export const TRANSFER_PAID_SALE_CHANCE = 0.60;
+/** How long a sale offer waits for an answer (active play time; it pauses like the other Fabrizio timers). */
+export const TRANSFER_OFFER_DURATION_MS = 3 * 60 * 1000;
+/** A kept player who wanted to leave plays this many matches this much weaker. */
+export const TRANSFER_UNHAPPY_MATCHES = 3;
+export const TRANSFER_UNHAPPY_PENALTY = 2;
 export const TRANSFER_DEADLINE_LOAN_CHANCE = 0.60;
 export const TRANSFER_DEADLINE_EVENT_MIN_DELAY_MS = 45000;
 export const TRANSFER_DEADLINE_EVENT_MAX_DELAY_MS = 75000;
@@ -2276,7 +2281,7 @@ export function initialGameFeatures(now = Date.now()): GameFeatures {
     starPackReveal: null,
     purchaseReceipts: [],
     discipline: emptyDiscipline(),
-    transferSaga: { loans: [], vacancies: [], archive: [], latestEvent: null, lastFailedReason: "", nextAt: now + getTransferEventDelay(), deadlineDayStartedAt: 0, deadlineDayEndsAt: 0 },
+    transferSaga: { pendingOffer: null, unhappy: [], loans: [], vacancies: [], archive: [], latestEvent: null, lastFailedReason: "", nextAt: now + getTransferEventDelay(), deadlineDayStartedAt: 0, deadlineDayEndsAt: 0 },
     gazetteIssues: [],
     dailyRewards: {},
     press: normalizePress(undefined),
@@ -2295,7 +2300,7 @@ function safeString(value: unknown, fallback: string) {
 
 function normalizeTransferInsiderEvent(value: unknown): TransferInsiderEvent | null {
   const source = asRecord(value);
-  const outcome: TransferInsiderOutcome | null = source.outcome === "loan" || source.outcome === "sale" || source.outcome === "failed" || source.outcome === "return" ? source.outcome : null;
+  const outcome: TransferInsiderOutcome | null = source.outcome === "loan" || source.outcome === "sale" || source.outcome === "failed" || source.outcome === "return" || source.outcome === "offer" || source.outcome === "declined" ? source.outcome : null;
   const createdAt = Math.floor(Number(source.createdAt) || 0);
   if (!outcome || createdAt <= 0) return null;
   const playerId = typeof source.playerId === "string" && (getStarXIPlayer(source.playerId) || source.side === "away" && /^opponent-([0-9]|10)$/.test(source.playerId)) ? source.playerId : null;
@@ -2446,7 +2451,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
   const archiveIds = new Set<string>();
   const transferArchive = (Array.isArray(transferSagaSource.archive) ? transferSagaSource.archive : [])
     .map(normalizeTransferInsiderEvent)
-    .filter((event): event is TransferInsiderEvent => event !== null && event.outcome !== "failed")
+    .filter((event): event is TransferInsiderEvent => event !== null && event.outcome !== "failed" && event.outcome !== "offer")
     .filter((event) => {
       if (archiveIds.has(event.id)) return false;
       archiveIds.add(event.id);
@@ -2455,7 +2460,20 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     .slice(-30);
   const deadlineDayStartedAt = Math.max(0, Math.floor(Number(transferSagaSource.deadlineDayStartedAt) || 0));
   const deadlineDayEndsAt = Math.max(deadlineDayStartedAt, Math.floor(Number(transferSagaSource.deadlineDayEndsAt) || 0));
+  const offerSource = asRecord(transferSagaSource.pendingOffer);
+  const offerEvent = normalizeTransferInsiderEvent(offerSource);
+  const pendingOffer: TransferOffer | null = offerEvent?.outcome === "offer" && offerEvent.playerId && knownStarOwnedIds.includes(offerEvent.playerId) && Number(offerSource.expiresAt) > 0
+    ? { ...offerEvent, expiresAt: Number(offerSource.expiresAt) }
+    : null;
+  const seenUnhappyIds = new Set<string>();
+  const unhappy: TransferUnhappyPlayer[] = (Array.isArray(transferSagaSource.unhappy) ? transferSagaSource.unhappy : [])
+    .map((item) => asRecord(item))
+    .filter((item) => typeof item.playerId === "string" && knownStarOwnedIds.includes(item.playerId) && !seenUnhappyIds.has(item.playerId) && Boolean(seenUnhappyIds.add(item.playerId)))
+    .map((item) => ({ playerId: String(item.playerId), club: safeString(item.club, "Auswärtiger Club").slice(0, 42), matchesLeft: Math.max(0, Math.min(TRANSFER_UNHAPPY_MATCHES, Math.floor(Number(item.matchesLeft) || 0))) }))
+    .filter((item) => item.matchesLeft > 0);
   const transferSaga: TransferSagaState = {
+    pendingOffer,
+    unhappy,
     loans,
     vacancies: (Array.isArray(transferSagaSource.vacancies) ? transferSagaSource.vacancies : []).map((item) => asRecord(item)).filter((item) => item.area === "lineup" || item.area === "bench").map((item) => ({
       area: item.area as TransferSquadVacancy["area"],
@@ -2601,7 +2619,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     transferMarket: { offerIds: offerIds.length ? offerIds : defaults.transferMarket.offerIds, ownedIds: [...new Set(ownedIds)] },
     starXI: { ...normalizedStarXI, lockedPlayerIds: normalizeSquadLock(source.squadLock ?? asRecord(asRecord(source.travel).journey).squadLock)?.playerIds },
     club: { name: clubName, badge: CLUB_BADGES.includes(String(club.badge)) ? String(club.badge) : defaults.club.badge, color: CLUB_COLORS.includes(String(club.color)) ? String(club.color) : defaults.club.color },
-    cup: { simulation: normalizeInteractive(cup.simulation), restartAt:Number.isFinite(cup.restartAt)?Number(cup.restartAt):undefined, restartSide:cup.restartSide==='opponent'?'opponent':'club', regularDurationMs: Number(cup.regularDurationMs)>=180000&&Number(cup.regularDurationMs)<=300000?Number(cup.regularDurationMs):undefined, halftimeTaken:cup.halftimeTaken===true, timedPause:normalizeTimedPause(cup.timedPause), subWindowsUsed: Math.min(3,Math.max(0,Math.floor(Number(cup.subWindowsUsed)||0))), pendingSubstitutions: normalizePendingSubstitutions(cup.pendingSubstitutions), broadcast: normalizeMatchBroadcast(cup.broadcast), fixture: cup.fixture && typeof cup.fixture==='object' ? cup.fixture as CupState['fixture'] : undefined, drawSeed: isDrawSeed(cup.drawSeed) ? cup.drawSeed : legacyTournamentDrawSeed(cup), careerRatingSeed: Number.isFinite(Number(cup.careerRatingSeed)) && Number(cup.careerRatingSeed) > 0 ? Number(cup.careerRatingSeed) : matchStartedAt, careerMatchId: typeof cup.careerMatchId === "string" ? cup.careerMatchId.slice(0, 200) : undefined, careerBonuses: Object.fromEntries(Object.entries(asRecord(cup.careerBonuses)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Number(value), -2, 5)])), active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && (Boolean(lastInjury) || Boolean(cup.simulation)), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
+    cup: { simulation: normalizeInteractive(cup.simulation), restartAt:Number.isFinite(cup.restartAt)?Number(cup.restartAt):undefined, restartSide:cup.restartSide==='opponent'?'opponent':'club', regularDurationMs: Number(cup.regularDurationMs)>=180000&&Number(cup.regularDurationMs)<=300000?Number(cup.regularDurationMs):undefined, halftimeTaken:cup.halftimeTaken===true, timedPause:normalizeTimedPause(cup.timedPause), subWindowsUsed: Math.min(3,Math.max(0,Math.floor(Number(cup.subWindowsUsed)||0))), pendingSubstitutions: normalizePendingSubstitutions(cup.pendingSubstitutions), broadcast: normalizeMatchBroadcast(cup.broadcast), fixture: cup.fixture && typeof cup.fixture==='object' ? cup.fixture as CupState['fixture'] : undefined, drawSeed: isDrawSeed(cup.drawSeed) ? cup.drawSeed : legacyTournamentDrawSeed(cup), careerRatingSeed: Number.isFinite(Number(cup.careerRatingSeed)) && Number(cup.careerRatingSeed) > 0 ? Number(cup.careerRatingSeed) : matchStartedAt, careerMatchId: typeof cup.careerMatchId === "string" ? cup.careerMatchId.slice(0, 200) : undefined, careerBonuses: Object.fromEntries(Object.entries(asRecord(cup.careerBonuses)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Number(value), -2 - TRANSFER_UNHAPPY_PENALTY, 5)])), active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && (Boolean(lastInjury) || Boolean(cup.simulation)), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
     seasonMode: normalizedSeasonMode,
     goalBoost,
     missions,
@@ -2626,6 +2644,7 @@ export function pauseGameFeatureTimers(value: unknown, pausedMs: number, now = D
   features.nextEventAt += duration;
   features.nextVarAt += duration;
   features.transferSaga.nextAt += duration;
+  if (features.transferSaga.pendingOffer) features.transferSaga.pendingOffer.expiresAt += duration;
   if (features.cup.active && (!features.cup.simulation || features.cup.matchPaused)) {
     features.cup = shiftCupTimeline(features.cup, duration);
   }
@@ -2696,7 +2715,7 @@ function getNextTransferFailureReason(previousReason: string, random: () => numb
 }
 
 function appendTransferArchive(features: GameFeatures, event: TransferInsiderEvent) {
-  if (event.outcome === "failed") return;
+  if (event.outcome === "failed" || event.outcome === "offer") return;
   features.transferSaga.archive = [...features.transferSaga.archive.filter((item) => item.id !== event.id), event].slice(-30);
 }
 
@@ -2821,7 +2840,8 @@ export function finishActiveTransferLoans(value: GameFeatures, now = Date.now())
 
 export function resolveTransferInsiderEvent(value: GameFeatures, random: () => number = Math.random, now = Date.now()) {
   const features = normalizeGameFeatures(value);
-  if (features.squadLock) return { features, event: null, goalDelta: 0 };
+  // While an offer waits for an answer, Fabrizio brings no new rumours.
+  if (features.squadLock || features.transferSaga.pendingOffer) return { features, event: null, goalDelta: 0 };
   const deadlineDay = isTransferDeadlineDay(features, now);
   const loanChance = deadlineDay ? TRANSFER_DEADLINE_LOAN_CHANCE : TRANSFER_LOAN_CHANCE;
   const eventRoll = clamp(random(), 0, 0.999999);
@@ -2842,7 +2862,8 @@ export function resolveTransferInsiderEvent(value: GameFeatures, random: () => n
   const club = clubs[transferRandomIndex(clubs.length, random)] ?? clubs[0];
   const outcome = requestedOutcome !== "failed" && player && !matchInProgress ? requestedOutcome : "failed";
   let event: TransferInsiderEvent;
-  let goalDelta = 0;
+  // Sales are offers now; their fee arrives with acceptTransferOffer.
+  const goalDelta = 0;
 
   if (outcome === "loan" && player) {
     const lineupIndex = features.starXI.lineupIds.indexOf(player.id);
@@ -2874,37 +2895,24 @@ export function resolveTransferInsiderEvent(value: GameFeatures, random: () => n
       createdAt: now,
     };
   } else if (outcome === "sale" && player) {
-    const lineupIndex = features.starXI.lineupIds.indexOf(player.id);
-    const benchIndex = features.starXI.benchIds.indexOf(player.id);
-    const requiredPlayers = features.starXI.lineupIds.filter(Boolean).length + features.starXI.benchIds.filter(Boolean).length;
-    const vacancy: TransferSquadVacancy = lineupIndex >= 0
-      ? { area: "lineup", index: lineupIndex, requiredPlayers, createdAt: now }
-      : { area: "bench", index: benchIndex, requiredPlayers, createdAt: now };
-    features.transferSaga.vacancies = [...getOpenTransferSquadVacancies(features), vacancy].slice(-20);
+    // A sale is an offer the player answers: sell for the fee, or keep a player who then is unhappy.
     const paidSale = clamp(random(), 0, 0.999999) < TRANSFER_PAID_SALE_CHANCE;
     const fee = paidSale ? Math.max(0, Math.floor(player.price)) : 0;
-    goalDelta = fee;
-    const soldState = {
-      ...features.starXI,
-      ownedIds: features.starXI.ownedIds.filter((playerId) => playerId !== player.id),
-      lineupIds: features.starXI.lineupIds.map((playerId) => playerId === player.id ? "" : playerId),
-      benchIds: features.starXI.benchIds.map((playerId) => playerId === player.id ? "" : playerId),
-    };
-    features.starXI = normalizeStarXIState(soldState, getUnavailableStarXIPlayerIds(features));
     event = {
-      id: `transfer-sale-${now}-${player.id}`,
-      outcome,
+      id: `transfer-offer-${now}-${player.id}`,
+      outcome: "offer",
       playerId: player.id,
       playerName: player.name,
       club,
-      headline: paidSale ? "HERE WE GOAL" : "Ablösefreier Abgang",
+      headline: paidSale ? "Angebot auf dem Tisch" : "Er will ablösefrei weg",
       message: paidSale
-        ? `Fabrizio Romario meldet: ${player.name} wechselt dauerhaft zu ${club}. Dein Club erhält ${fee.toLocaleString("de-CH")} Goals Ablöse.`
-        : `Fabrizio Romario meldet: ${player.name} wechselt dauerhaft und ablösefrei zu ${club}. Dein Club erhält keine Goals.`,
-      reason: paidSale ? "Verkauf mit Ablöse" : "Ablösefreier Wechsel",
+        ? `Fabrizio Romario meldet: ${club} bietet ${fee.toLocaleString("de-CH")} Goals für ${player.name}. Verkaufen oder behalten?`
+        : `Fabrizio Romario meldet: ${player.name} will ablösefrei zu ${club}. Lässt du ihn gehen oder behältst du ihn?`,
+      reason: paidSale ? "Kaufangebot" : "Wechselwunsch ohne Ablöse",
       fee,
       createdAt: now,
     };
+    features.transferSaga.pendingOffer = { ...event, expiresAt: now + TRANSFER_OFFER_DURATION_MS };
   } else {
     const reason = getNextTransferFailureReason(features.transferSaga.lastFailedReason, random);
     const playerName = player?.name ?? "einem angefragten Spieler";
@@ -2936,6 +2944,100 @@ export function resolveTransferInsiderEvent(value: GameFeatures, random: () => n
     tone: event.outcome === "sale" ? "negative" : event.outcome === "loan" ? "neutral" : "neutral",
   }, now);
   return { features, event, goalDelta };
+}
+
+/** Time left on an open offer, kept while a match or journey locks the squad. */
+function transferOfferRemaining(features: GameFeatures, now: number) {
+  const offer = features.transferSaga.pendingOffer;
+  return offer ? Math.max(0, offer.expiresAt - now) : 0;
+}
+
+/** Sells the player of the open offer: he leaves for good, his squad place stays open, the fee goes to the goals. */
+export function acceptTransferOffer(value: GameFeatures, now = Date.now()): { features: GameFeatures; event: TransferInsiderEvent | null; goalDelta: number; error?: string } {
+  const features = normalizeGameFeatures(value);
+  const offer = features.transferSaga.pendingOffer;
+  if (!offer) return { features, event: null, goalDelta: 0, error: "Es liegt kein Angebot vor." };
+  if (features.squadLock || features.cup.active) return { features, event: null, goalDelta: 0, error: "Während eines Spiels oder einer Reise kannst du nicht verkaufen." };
+  const player = offer.playerId ? getStarXIPlayer(offer.playerId) : undefined;
+  features.transferSaga.pendingOffer = null;
+  if (!player || !features.starXI.ownedIds.includes(player.id)) return { features, event: null, goalDelta: 0, error: "Der Spieler ist nicht mehr im Club." };
+  const lineupIndex = features.starXI.lineupIds.indexOf(player.id);
+  const benchIndex = features.starXI.benchIds.indexOf(player.id);
+  // A player who moved to the reserves meanwhile leaves no gap in the matchday squad.
+  if (lineupIndex >= 0 || benchIndex >= 0) {
+    const requiredPlayers = features.starXI.lineupIds.filter(Boolean).length + features.starXI.benchIds.filter(Boolean).length;
+    const vacancy: TransferSquadVacancy = lineupIndex >= 0
+      ? { area: "lineup", index: lineupIndex, requiredPlayers, createdAt: now }
+      : { area: "bench", index: benchIndex, requiredPlayers, createdAt: now };
+    features.transferSaga.vacancies = [...getOpenTransferSquadVacancies(features), vacancy].slice(-20);
+  }
+  const paidSale = offer.fee > 0;
+  const fee = offer.fee;
+  const soldState = {
+    ...features.starXI,
+    ownedIds: features.starXI.ownedIds.filter((playerId) => playerId !== player.id),
+    lineupIds: features.starXI.lineupIds.map((playerId) => playerId === player.id ? "" : playerId),
+    benchIds: features.starXI.benchIds.map((playerId) => playerId === player.id ? "" : playerId),
+  };
+  features.transferSaga.unhappy = features.transferSaga.unhappy.filter((entry) => entry.playerId !== player.id);
+  features.starXI = normalizeStarXIState(soldState, getUnavailableStarXIPlayerIds(features));
+  const event: TransferInsiderEvent = {
+    id: `transfer-sale-${now}-${player.id}`,
+    outcome: "sale",
+    playerId: player.id,
+    playerName: player.name,
+    club: offer.club,
+    headline: paidSale ? "HERE WE GOAL" : "Ablösefreier Abgang",
+    message: paidSale
+      ? `Fabrizio Romario meldet: ${player.name} wechselt dauerhaft zu ${offer.club}. Dein Club erhält ${fee.toLocaleString("de-CH")} Goals Ablöse.`
+      : `Fabrizio Romario meldet: ${player.name} wechselt dauerhaft und ablösefrei zu ${offer.club}. Dein Club erhält keine Goals.`,
+    reason: paidSale ? "Verkauf mit Ablöse" : "Ablösefreier Wechsel",
+    fee,
+    createdAt: now,
+  };
+  features.transferSaga.latestEvent = event;
+  appendTransferArchive(features, event);
+  addHistory(features, { title: `Fabrizio Romario · ${event.headline}`, detail: event.message, tone: "negative" }, now);
+  return { features, event, goalDelta: fee };
+}
+
+/** Keeps the player of the open offer; he wanted to leave and plays weaker for the next matches. */
+export function declineTransferOffer(value: GameFeatures, now = Date.now(), expired = false): { features: GameFeatures; event: TransferInsiderEvent | null; goalDelta: number; error?: string } {
+  const features = normalizeGameFeatures(value);
+  const offer = features.transferSaga.pendingOffer;
+  if (!offer) return { features, event: null, goalDelta: 0, error: "Es liegt kein Angebot vor." };
+  features.transferSaga.pendingOffer = null;
+  const player = offer.playerId ? getStarXIPlayer(offer.playerId) : undefined;
+  if (!player || !features.starXI.ownedIds.includes(player.id)) return { features, event: null, goalDelta: 0 };
+  features.transferSaga.unhappy = [...features.transferSaga.unhappy.filter((entry) => entry.playerId !== player.id), { playerId: player.id, club: offer.club, matchesLeft: TRANSFER_UNHAPPY_MATCHES }];
+  const event: TransferInsiderEvent = {
+    id: `transfer-declined-${now}-${player.id}`,
+    outcome: "declined",
+    playerId: player.id,
+    playerName: player.name,
+    club: offer.club,
+    headline: expired ? "Angebot verfallen" : "Angebot abgelehnt",
+    message: `${expired ? `Das Angebot von ${offer.club} ist verfallen.` : `Du hast ${offer.club} abgesagt.`} ${player.name} bleibt, ist aber unzufrieden und spielt die nächsten ${TRANSFER_UNHAPPY_MATCHES} Spiele mit −${TRANSFER_UNHAPPY_PENALTY} OVR.`,
+    reason: expired ? "Keine Antwort auf das Angebot" : "Spieler behalten",
+    fee: 0,
+    createdAt: now,
+  };
+  features.transferSaga.latestEvent = event;
+  appendTransferArchive(features, event);
+  addHistory(features, { title: `Fabrizio Romario · ${event.headline}`, detail: event.message, tone: "negative" }, now);
+  return { features, event, goalDelta: 0 };
+}
+
+/** An offer nobody answered in time counts as declined; matches and journeys stop its clock. */
+export function expireTransferOffer(value: GameFeatures, now = Date.now()) {
+  const offer = value.transferSaga.pendingOffer;
+  if (!offer || value.squadLock || now < offer.expiresAt) return { features: value, event: null, goalDelta: 0 };
+  return declineTransferOffer(value, now, true);
+}
+
+/** Matches an unhappy player still plays weaker, or 0. */
+export function transferUnhappyMatches(features: Pick<GameFeatures, "transferSaga">, playerId: string) {
+  return features.transferSaga.unhappy.find((entry) => entry.playerId === playerId)?.matchesLeft ?? 0;
 }
 
 export function getTransferPlayer(id: string) {
@@ -3011,17 +3113,19 @@ function normalizeSquadLock(value: unknown): GameFeatures['squadLock'] {
   const v = asRecord(value);
   if (typeof v.fixtureId !== 'string' || !Array.isArray(v.playerIds) || !Number.isFinite(v.startedAt)) return undefined;
   const finite = (n: unknown) => Math.max(0, Number.isFinite(Number(n)) ? Number(n) : 0);
-  return { fixtureId: v.fixtureId, playerIds: uniqueKnownStarIds(v.playerIds), startedAt: Number(v.startedAt), transferRemaining: finite(v.transferRemaining), eventRemaining: finite(v.eventRemaining), varRemaining: finite(v.varRemaining) };
+  return { fixtureId: v.fixtureId, playerIds: uniqueKnownStarIds(v.playerIds), startedAt: Number(v.startedAt), transferRemaining: finite(v.transferRemaining), eventRemaining: finite(v.eventRemaining), varRemaining: finite(v.varRemaining), offerRemaining: v.offerRemaining === undefined ? undefined : finite(v.offerRemaining) };
 }
 export function lockMatchSquad(features: GameFeatures, fixtureId: string, now: number) {
   if (features.squadLock) return;
-  features.squadLock = {fixtureId, playerIds: [...new Set([...features.starXI.lineupIds,...features.starXI.benchIds].filter(Boolean))], startedAt:now, transferRemaining:Math.max(0,features.transferSaga.nextAt-now), eventRemaining:Math.max(0,features.nextEventAt-now), varRemaining:Math.max(0,features.nextVarAt-now)};
+  features.squadLock = {fixtureId, playerIds: [...new Set([...features.starXI.lineupIds,...features.starXI.benchIds].filter(Boolean))], startedAt:now, transferRemaining:Math.max(0,features.transferSaga.nextAt-now), eventRemaining:Math.max(0,features.nextEventAt-now), varRemaining:Math.max(0,features.nextVarAt-now), offerRemaining:transferOfferRemaining(features, now)};
   features.starXI.lockedPlayerIds = [...features.squadLock.playerIds];
 }
 export function releaseMatchSquad(features: GameFeatures, now: number) {
   const lock = features.squadLock;
   if (!lock) return;
   features.transferSaga.nextAt = now + lock.transferRemaining;
+  // An open offer waits through the match and the journey like every other Fabrizio timer.
+  if (features.transferSaga.pendingOffer) features.transferSaga.pendingOffer.expiresAt = now + (lock.offerRemaining ?? TRANSFER_OFFER_DURATION_MS);
   features.nextEventAt = now + lock.eventRemaining;
   features.nextVarAt = now + lock.varRemaining;
   delete features.squadLock;

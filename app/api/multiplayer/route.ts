@@ -10,7 +10,7 @@ import { getDb } from "../../../db";
 import { nameRecoveryAllowed, resolvePlayer } from "../../auth/player";
 import type { LightRoomRow, RoomRow, RoomSeats, RoomUpdate } from "../../../db";
 import { createHash } from "node:crypto";
-import { SPECIAL_CARD_PACK, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
+import { SPECIAL_CARD_PACK, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
 import type { GameFeatures, PenaltyDirection, StarFormationId, StarPackReveal } from "../../feature-data";
 import { isSupportedMultiplayerProtocol, MULTIPLAYER_UPDATE_MESSAGE } from "../../multiplayer-protocol";
 import { getFormationUnlockLeague, getPackUnlockLeague, getReachedLeague, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked, MAX_CAREER_SEASON } from "../../season-progression";
@@ -769,9 +769,30 @@ export async function POST(request: Request) {
 
     if (action === "transfer-insider-event") {
       const transferNow = Date.now();
+      // An unanswered offer runs out first; while it is open Fabrizio brings nothing new.
+      const offer = game.features.transferSaga.pendingOffer;
+      if (offer) {
+        const expired = expireTransferOffer(game.features, transferNow);
+        if (!expired.event) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
+        game.features = expired.features;
+        return persistGameResponse(db, room, game, timestamp, playerId, role);
+      }
       if (game.features.transferSaga.nextAt > transferNow) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
       if (game.features.squadLock || game.features.cup.active) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
       const result = resolveTransferInsiderEvent(game.features, Math.random, transferNow);
+      game.features = result.features;
+      game.goals += result.goalDelta;
+      game.seasonGoals += result.goalDelta;
+      game.totalGoals += result.goalDelta;
+      return persistGameResponse(db, room, game, timestamp, playerId, role);
+    }
+
+    if (action === "transfer-accept" || action === "transfer-decline") {
+      // Anyone in the world may answer; the version check on saving lets only the first answer count.
+      const hadOffer = Boolean(game.features.transferSaga.pendingOffer);
+      const result = action === "transfer-accept" ? acceptTransferOffer(game.features, Date.now()) : declineTransferOffer(game.features, Date.now());
+      // Still open (match running) or already answered by someone else: nothing to save.
+      if (!hadOffer || result.features.transferSaga.pendingOffer) return jsonError(result.error ?? "Es liegt kein Angebot vor.", 409);
       game.features = result.features;
       game.goals += result.goalDelta;
       game.seasonGoals += result.goalDelta;

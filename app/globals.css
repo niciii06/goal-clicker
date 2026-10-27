@@ -308,6 +308,17 @@
 .transfer-insider-result { display: inline-block; margin-top: 21px; padding: 9px 12px; border: 1px solid rgba(91,236,142,.3); border-radius: 980px; color: #a8f8c4; background: rgba(91,236,142,.1); font-size: var(--text-caption2); font-weight: 900; letter-spacing: .08em; }
 .transfer-insider-takeover.sale .transfer-insider-result { border-color: rgba(255,111,137,.32); color: #ffadc0; background: rgba(255,111,137,.11); }
 .transfer-insider-takeover.failed .transfer-insider-result { border-color: rgba(255,202,82,.3); color: #ffe19a; background: rgba(255,202,82,.1); }
+.transfer-insider-takeover.offer .transfer-insider-card { border-color: rgba(255,202,82,.42); background: linear-gradient(150deg,#2f2410,#0e0b06 74%); }
+.transfer-insider-takeover.offer .transfer-insider-result { border-color: rgba(255,202,82,.34); color: #ffe19a; background: rgba(255,202,82,.12); }
+.transfer-insider-takeover.declined .transfer-insider-result { border-color: rgba(255,111,137,.32); color: #ffadc0; background: rgba(255,111,137,.11); }
+.transfer-offer-actions { display: grid; gap: 12px; margin-top: 18px; }
+.transfer-offer-actions p { margin: 0; color: var(--muted); font-size: var(--text-footnote); line-height: 1.45; }
+.transfer-offer-actions > div { display: flex; flex-wrap: wrap; gap: 10px; }
+.transfer-offer-actions > div button { flex: 1 1 160px; min-height: 44px; }
+.transfer-offer-later { justify-self: center; min-height: 44px; padding: 0 14px; border: 0; color: inherit; cursor: pointer; background: transparent; font-size: var(--text-footnote); font-weight: 750; text-decoration: underline; text-underline-offset: 3px; }
+.transfer-insider-card .transfer-offer-actions p { color: rgba(255,255,255,.72); }
+.transfer-insider-card .transfer-offer-actions .mode-secondary { border-color: rgba(255,255,255,.4); color: #fff; background: rgba(255,255,255,.08); }
+.transfer-insider-card .transfer-offer-later { color: rgba(255,255,255,.8); }
 @media (max-width: 1200px) { .feature-card { grid-column: 1 / -1; } }
 @media (max-width: 780px) { .feature-card { padding: 17px; border-radius: 21px; }.feature-card-heading { gap: 12px; }.feature-card-heading h2 { font-size: 25px; }.feature-panel-heading { display: block; }.feature-panel-heading .feature-stat { display: inline-block; margin-top: 9px; }.transfer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.cup-start { display: block; }.cup-start .mode-primary { width: 100%; margin-top: 13px; }.strategy-grid { grid-template-columns: 1fr; }.mission-row { grid-template-columns: 1fr; }.mission-row .feature-buy-button { width: 100%; }.event-takeover,.transfer-insider-takeover { padding: 15px; }.event-takeover-card { padding: 42px 22px 28px; border-radius: 23px; }.event-takeover-card h2 { font-size: clamp(46px, 13vw, 76px); }.event-takeover-card p { font-size: var(--text-footnote); }.transfer-insider-card { padding: 24px 20px 26px; border-radius: 22px; }.transfer-insider-card h2 { font-size: 43px; }.transfer-insider-card p { font-size: var(--text-footnote); } }
 @media (max-width: 540px) { .transfer-grid { grid-template-columns: 1fr; }.owned-strip { align-items: flex-start; flex-direction: column; }.owned-strip > div { justify-content: flex-start; }.event-takeover-card h2 { font-size: 48px; } }
@@ -1284,6 +1295,11 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .transfer-match-lock > span { grid-row: 1 / 3; padding: 6px 8px; border-radius: 8px; color: var(--on-accent); background: var(--accent); font-size: var(--text-footnote); font-weight: 900; letter-spacing: .1em; }
 .transfer-match-lock strong { color: var(--text); font-size: var(--text-footnote); }
 .transfer-match-lock small { color: var(--muted); font-size: var(--text-footnote); }
+.transfer-offer-card { padding: 14px 16px; border: 1px solid color-mix(in srgb, #e6a800 40%, transparent); border-radius: 15px; background: color-mix(in srgb, #e6a800 9%, var(--surface-raised)); }
+.transfer-offer-card > div:first-child span, .transfer-offer-card > div:first-child strong, .transfer-offer-card > div:first-child small { display: block; }
+.transfer-offer-card > div:first-child span { color: color-mix(in oklab, #8a6100, var(--text) var(--tone-mix)); font-size: var(--text-caption2); font-weight: 900; letter-spacing: .14em; }
+.transfer-offer-card > div:first-child strong { margin-top: 4px; color: var(--text); font-size: var(--text-subhead); }
+.transfer-offer-card > div:first-child small { margin-top: 4px; color: var(--muted); font-size: var(--text-footnote); }
 .transfer-ledger-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
 .transfer-ledger-card { min-width: 0; padding: 14px; border: 1px solid var(--line-soft); border-radius: 16px; background: color-mix(in srgb, var(--surface-raised) 78%, transparent); }
 .transfer-ledger-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
@@ -1446,6 +1462,7 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 
 .career-pitch-badge { position: absolute; right: -5px; top: -7px; padding: 2px 4px; border-radius: 5px; background: color-mix(in srgb, var(--accent) 7%, var(--surface-raised)); color: color-mix(in oklab, #253144, var(--text) var(--tone-mix)); font-size: var(--text-footnote); font-weight: 800; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,.15); }
 .career-pitch-badge.special { background: var(--career-accent); }
+.career-pitch-badge.unhappy { background: color-mix(in srgb, #e60022 14%, var(--surface-raised)); }
 .career-player-badges:empty { display: none; }
 
 .travel-panel { margin: 18px 0; padding: 22px; border: 1px solid color-mix(in srgb, #2269c3 17%, var(--surface-raised)); border-radius: 18px; background: color-mix(in srgb, var(--accent) 3%, var(--surface-raised)); min-width: 0; }

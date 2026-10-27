@@ -293,7 +293,8 @@ export type RandomEvent = {
   createdAt: number;
 };
 
-export type TransferInsiderOutcome = "loan" | "sale" | "failed" | "return";
+// "offer" waits for the player to sell or keep; "declined" is a kept player after an offer.
+export type TransferInsiderOutcome = "loan" | "sale" | "failed" | "return" | "offer" | "declined";
 export type TransferLoan = {
   playerId: string;
   club: string;
@@ -322,7 +323,14 @@ export type TransferInsiderEvent = {
   createdAt: number;
 };
 
+/** A sale offer Fabrizio brought in; it counts as declined once `expiresAt` has passed. */
+export type TransferOffer = TransferInsiderEvent & { expiresAt: number };
+/** A player who wanted to leave and was kept plays weaker for a few matches. */
+export type TransferUnhappyPlayer = { playerId: string; club: string; matchesLeft: number };
+
 export type TransferSagaState = {
+  pendingOffer: TransferOffer | null;
+  unhappy: TransferUnhappyPlayer[];
   loans: TransferLoan[];
   vacancies: TransferSquadVacancy[];
   archive: TransferInsiderEvent[];
