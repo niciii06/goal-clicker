@@ -3,7 +3,7 @@
 import { HOME_VENUE } from './travel-geography';
 import { distanceKm, routePoints } from './travel-geography';
 import type { GeoPoint } from './travel-geography';
-import { segmentAt } from './journey-routing';
+import { journeyClock, segmentAt } from './journey-routing';
 import type { Journey } from './travel-data';
 
 export type MapPoint = { x: number; y: number };
@@ -72,7 +72,8 @@ function bearingAt(route: ProjectedRoute, distance: number) {
 
 /** Vehicle position for an elapsed game time. Uses the stored plan, so it is identical after a reload. */
 export function vehicleAt(routes: ProjectedRoute[], journey: Journey, now: number, progress: number): VehicleState {
-  const stage = journey.plan ? segmentAt(journey.plan, (now - journey.startedAt) / 1000) : null;
+  // The event clock stops the vehicle in a jam and speeds it up after a saving, so it arrives at the arrival time.
+  const stage = journey.plan ? segmentAt(journey.plan, (now >= journey.endsAt ? journey.baseMs : journeyClock(journey, now)) / 1000) : null;
   const index = stage?.index ?? 0, route = routes[index] ?? routes[0], time = stage?.fraction ?? progress;
   const plane = route.mode === 'plane';
   const distance = route.length * (plane ? flightDistanceFraction(time) : Math.max(0, Math.min(1, time)));

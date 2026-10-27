@@ -35,7 +35,7 @@ import { claimAlbumReward, claimAllAlbumRewards, getCareerCard, prepareCareerMat
 import { competitionFor, squadBanError, suspensionLabel } from "./discipline";
 import { claimDailyReward } from "./daily-reward";
 import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
-import { consumeTravel, eligibilityError, fixtureFor, journeyView, settleTravel, travelTiming } from "./travel-data";
+import { consumeTravel, eligibilityError, fixtureFor, journeyView, payTravelFines, settleTravel, travelTiming } from "./travel-data";
 import { coopRoleLabel, isCoopRole, multiplayerUrl, notifyCoopOffline, occupiedCoopPlayers, readCoopResponse, upsertSavedRoom } from "./game/coop";
 import { createClickResult, decayComboCount, formatComboMultiplier, getBaseClickPower, getBasePassivePower, getBulkPurchase, getClickPower, getComboLevel, getComboProgress, getCost, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades } from "./game/economy";
 import { UPGRADES } from "./game/upgrades";
@@ -396,8 +396,8 @@ function App() {
         if(current.features.travel.journey?.id!==soloJourneyId)return current;
         const old=current.features.travel;
         const j={...serverJourney,consumed:old.journey!.consumed};
-        const counted=(old.journey as Journey & {counted?:boolean}).counted;
-        const travel=settleTravel({...old,journey:{...j,counted} as Journey},serverNow);
+        const counted=(old.journey as Journey & {counted?:boolean}).counted, finesPaid=old.journey!.finesPaid;
+        const travel=settleTravel({...old,journey:{...j,counted,finesPaid} as Journey},serverNow);
         return {...current,features:{...current.features,travel,squadLock:serverJourney.squadLock,starXI:{...current.features.starXI,lockedPlayerIds:serverJourney.squadLock?.playerIds}}};
       });
     }catch{ /* Last authoritative clock continues; kickoff always revalidates. */ }};
@@ -406,6 +406,19 @@ function App() {
     document.addEventListener('visibilitychange',visible);
     return ()=>{stopped=true;clearInterval(timer);document.removeEventListener('visibilitychange',visible);};
   },[hydrated,playerId,soloJourneyId]);
+  // Fines from the journey (speeding, parking) are paid once the team has arrived.
+  const soloJourney = !isCoopLive ? game.features.travel.journey : null;
+  const soloFinesDue = Boolean(soloJourney && !soloJourney.finesPaid && soloJourney.events.some((event) => event.fine) && countdownNow >= soloJourney.endsAt);
+  useEffect(() => {
+    if (!hydrated || !soloFinesDue) return;
+    setGame((current) => {
+      const features = { ...current.features };
+      const fine = payTravelFines(features, current.goals, getBasePassivePower(current.upgrades, current.stars, current.features), getTravelTime());
+      if (!features.travel.journey?.finesPaid) return current;
+      return { ...current, features, goals: current.goals - fine, seasonGoals: Math.max(0, current.seasonGoals - fine) };
+    });
+    // countdownNow re-runs it each second, because the travel clock may reach the arrival a moment later.
+  }, [hydrated, soloFinesDue, countdownNow]);
   const sharedRandomEvent = isCoopLive ? displayGame.features.randomEvent : null;
   const visibleTransferEvent = displayGame.features.transferSaga.latestEvent;
   const visibleGazetteIssue = displayGame.features.gazetteIssues.at(-1) ?? null;
@@ -1752,8 +1765,8 @@ function App() {
       if(!response.ok||!data.journey){showToast(data.error||'Reise konnte nicht gespeichert werden.');return null;}
       syncTravelClock(data.serverNow);
       setGame(current=>{
-        const old=current.features.travel, counted=old.journey?.id===data.journey!.id?(old.journey as Journey & {counted?:boolean}).counted:false;
-        const travel=settleTravel({...old,journey:{...data.journey!,consumed:false,counted} as Journey},data.serverNow!);
+        const old=current.features.travel, same=old.journey?.id===data.journey!.id, counted=same?(old.journey as Journey & {counted?:boolean}).counted:false, finesPaid=same?old.journey!.finesPaid:false;
+        const travel=settleTravel({...old,journey:{...data.journey!,consumed:false,counted,finesPaid} as Journey},data.serverNow!);
         travel.journey!.consumed=false;
         return {...current,features:{...current.features,travel,squadLock:data.journey!.squadLock,starXI:{...current.features.starXI,lockedPlayerIds:data.journey!.squadLock?.playerIds}}};
       });

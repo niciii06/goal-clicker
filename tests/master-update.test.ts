@@ -25,7 +25,7 @@ test('legacy active standings, completed results, players and travel snapshots s
 });
 test('fifteen unchanged tiers, geographic classification, deterministic duration, zero home wait',()=>{
  assert.deepEqual(TRAVEL_RANGES,[[5,10],[10,20],[15,25],[20,30],[20,35],[30,45],[35,50],[40,55],[45,60],[60,90],[75,110],[90,130],[110,150],[130,170],[150,180]]);
- const f=ready();for(const c of SEASON_CLUBS){const fx={...fixtureFor(f,'season'),away:true,venue:c.venue,region:classifyDestination(c.venue)};const t=travelTiming(fx);assert.ok(t.baseMs>0);assert.equal(t.baseMs,Math.round(t.plan!.realSeconds/60*1000));assert.deepEqual(travelTiming(fx),t);const j=createJourney(fx,1000,random(),f);assert.equal(j.endsAt,j.startedAt+t.baseMs);assert.ok(normalizeTravel({journey:j,stats:f.travel.stats}).journey);}
+ const f=ready();for(const c of SEASON_CLUBS){const fx={...fixtureFor(f,'season'),away:true,venue:c.venue,region:classifyDestination(c.venue)};const t=travelTiming(fx);assert.ok(t.baseMs>0);assert.equal(t.baseMs,Math.round(t.plan!.realSeconds/60*1000));assert.deepEqual(travelTiming(fx),t);const j=createJourney(fx,1000,random(),f);assert.equal(j.endsAt,j.startedAt+t.baseMs+j.events.reduce((total,e)=>total+e.delta,0));assert.ok(normalizeTravel({journey:j,stats:f.travel.stats}).journey);}
  assert.equal(travelTiming(fixtureFor(f,'season')).baseMs,0);assert.throws(()=>createJourney(fixtureFor(f,'season'),0));
  assert.equal(classifyDestination(VENUES.tokyo),14);assert.equal(classifyDestination(VENUES.miami),13);assert.equal(classifyDestination(VENUES.barcelona),11);assert.equal(classifyDestination(VENUES.madrid,true),12);
  assert.equal(distanceKm(HOME_VENUE,HOME_VENUE),0);

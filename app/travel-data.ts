@@ -1,21 +1,23 @@
 import { competitionFor, squadBanError } from './discipline';
-import { getSeasonModeNextOpponent, getTournament, getTournamentOpponentSchedule, getStarXISelection, getOpenTransferSquadVacancies, getStarXIRating, getEligibleEventPlayers, TOURNAMENTS, lockMatchSquad } from './feature-data';
+import { addHistory, getSeasonModeNextOpponent, getTournament, getTournamentOpponentSchedule, getStarXISelection, getOpenTransferSquadVacancies, getStarXIRating, getEligibleEventPlayers, TOURNAMENTS, lockMatchSquad } from './feature-data';
 import type { GameFeatures, TournamentId } from './feature-data';
 import { HOME_VENUE, REGION_LABELS, distanceKm, seasonGeography, tournamentVenue, classifyDestination, VENUES, currentVenue } from './travel-geography';
 import type { Venue } from './travel-geography';
-import { planJourney, gameSeconds, segmentAt } from './journey-routing';
+import { planJourney, gameSeconds, segmentAt, journeyClock } from './journey-routing';
+export { journeyClock };
 import type { JourneyPlan } from './journey-routing';
 export type TravelFixture = { id: string; mode: 'season'|'tournament'; tournamentId: TournamentId; opponentId: string; opponent: string; away: boolean; neutral?: boolean; region: number; venue: Venue; schedule: string[] };
-export type TravelEvent = { id: string; text: string; template?: string; playerId?:string; at: number; delta: number };
-export type Journey = { squadLock?: GameFeatures['squadLock']; plan?: JourneyPlan; origin?: Venue; id: string; fixture: TravelFixture; startedAt: number; baseMs: number; endsAt: number; transport: 'walk'|'bike'|'car'|'bus'|'train'|'plane'; km: number; events: TravelEvent[]; consumed: boolean; counted?: boolean };
+// `delta` changes the arrival in game ms (a jam adds, a fast driver saves); `fine` costs that many seconds of passive income on arrival.
+export type TravelEvent = { id: string; text: string; template?: string; playerId?:string; at: number; delta: number; fine?: number };
+export type Journey = { squadLock?: GameFeatures['squadLock']; plan?: JourneyPlan; origin?: Venue; id: string; fixture: TravelFixture; startedAt: number; baseMs: number; endsAt: number; transport: 'walk'|'bike'|'car'|'bus'|'train'|'plane'; km: number; events: TravelEvent[]; consumed: boolean; counted?: boolean; finesPaid?: boolean };
 export type TravelStats = { recentEvents?: string[]; trips: number; km: number; countries: string[]; furthest: { opponent: string; km: number } | null; opponents: Record<string,{name:string;trips:number}> };
 export type TravelState = { journey: Journey|null; stats: TravelStats };
 export const emptyTravel = (): TravelState => ({journey:null,stats:{trips:0,km:0,countries:[],furthest:null,opponents:{}}});
 export function normalizeTravel(value: unknown): TravelState {
  const src=value && typeof value==='object' ? value as TravelState : emptyTravel();
  const j=src.journey;
- const valid=Boolean(j && typeof j.id==='string' && j.fixture && typeof j.fixture.id==='string' && j.fixture.venue && Number.isFinite(j.fixture.venue.lat) && Math.abs(j.fixture.venue.lat)<=85 && Number.isFinite(j.fixture.venue.lon) && Math.abs(j.fixture.venue.lon)<=180 && typeof j.fixture.opponent==='string' && typeof j.fixture.venue.city==='string' && ['walk','bike','car','bus','train','plane'].includes(j.transport) && Number.isFinite(j.startedAt) && Number.isFinite(j.baseMs) && j.baseMs>0 && Number.isFinite(j.endsAt) && j.endsAt>j.startedAt && Array.isArray(j.events) && j.events.length<=2 && j.events.every(e=>Number.isFinite(e.at)&&e.at>=0&&Number.isFinite(e.delta)&&Math.abs(e.delta)<=15000));
- const planValid=!j?.plan || validPlan(j.plan,j.baseMs)&&Math.abs(j.endsAt-j.startedAt-j.baseMs)<2;
+ const valid=Boolean(j && typeof j.id==='string' && j.fixture && typeof j.fixture.id==='string' && j.fixture.venue && Number.isFinite(j.fixture.venue.lat) && Math.abs(j.fixture.venue.lat)<=85 && Number.isFinite(j.fixture.venue.lon) && Math.abs(j.fixture.venue.lon)<=180 && typeof j.fixture.opponent==='string' && typeof j.fixture.venue.city==='string' && ['walk','bike','car','bus','train','plane'].includes(j.transport) && Number.isFinite(j.startedAt) && Number.isFinite(j.baseMs) && j.baseMs>0 && Number.isFinite(j.endsAt) && j.endsAt>j.startedAt && Array.isArray(j.events) && j.events.length<=2 && j.events.every(e=>Number.isFinite(e.at)&&e.at>=0&&Number.isFinite(e.delta)&&Math.abs(e.delta)<=Math.max(15000,j.baseMs*MAX_EVENT_SHARE)&&(e.fine===undefined||Number.isFinite(e.fine)&&e.fine>=0&&e.fine<=MAX_EVENT_FINE_SECONDS)));
+ const planValid=!j?.plan || validPlan(j.plan,j.baseMs)&&Math.abs(j.endsAt-j.startedAt-j.baseMs-j.events.reduce((total,e)=>total+e.delta,0))<2;
  const s=src.stats, n=(v:unknown)=>Math.max(0,Number.isFinite(Number(v))?Number(v):0);
  return {journey: valid && planValid ? structuredClone(j) : null, stats: s ? {recentEvents:Array.isArray(s.recentEvents)?s.recentEvents.filter(e=>typeof e==='string').slice(-8):[],trips:Math.floor(n(s.trips)),km:n(s.km),countries:Array.isArray(s.countries)?[...new Set(s.countries.filter(c=>typeof c==='string').slice(0,80))]:[],furthest:s.furthest&&typeof s.furthest.opponent==='string'?{opponent:s.furthest.opponent.slice(0,100),km:n(s.furthest.km)}:null,opponents:Object.fromEntries(Object.entries(s.opponents||{}).slice(0,200).filter(([,v])=>v&&typeof v.name==='string').map(([k,v])=>[k,{name:v.name.slice(0,100),trips:Math.floor(n(v.trips))}]))} : emptyTravel().stats};
 }
@@ -53,41 +55,55 @@ export function travelTiming(fixture:TravelFixture) {
  const transport:Journey['transport']=plan.segments.some(s=>s.mode==='plane')?'plane':plan.segments.some(s=>s.mode==='train')?'train':'bus';
  return {km,transport,baseMs:Math.round(gameSeconds(plan.realSeconds,plan.acceleration)*1000),category,plan};
 }
-const EVENTS: readonly {id:string;text:string;delta:number;modes:readonly Journey['transport'][];phase?:'airport'|'station'|'arrival'}[] = [
- {id:'shoelace',text:'Die Mannschaft bindet synchron die Schuhe.',delta:0,modes:['walk','bike','car']},
- {id:'route',text:'Der Trainer erklärt den kürzesten Weg zur taktischen Meisterleistung.',delta:0,modes:['walk','bike','car']},
- {id:'bundesrat',text:'Der Bundesrat hat den Teambus zugeparkt.',delta:8,modes:['bus']},
- {id:'pass',phase:'airport',text:'{player} hat den Reisepass vergessen.',delta:12,modes:['plane']},
- {id:'shortcut',text:'Der Busfahrer kennt eine Abkürzung.',delta:-10,modes:['bus']},
- {id:'mikeboy',text:'{player} schläft im Gepäckfach.',delta:0,modes:['bus','train','plane']},
- {id:'olten',text:'Die Mannschaft nimmt versehentlich den Zug nach Olten.',delta:15,modes:['train']},
- {id:'pilot',text:'Der Pilot ist YB-Fan und gibt Vollgas.',delta:-10,modes:['plane']},
- {id:'kebab',phase:'airport',text:'Die Mannschaft bestellt 47 Döner am Flughafen.',delta:5,modes:['plane']},
- {id:'walking',text:'Der Trainer hat Google Maps auf Fussweg gestellt.',delta:8,modes:['bus','train']},
- {id:'var',phase:'airport',text:'Das Flughafenpersonal verlangt einen VAR-Check beim Boarding.',delta:0,modes:['plane']},
- {id:'ticket',text:'{player} diskutiert mit dem Kontrolleur über die Taktik.',delta:5,modes:['train']},
- {id:'green',text:'Alle Ampeln sind grün. Der Chauffeur fühlt sich wie ein Rennfahrer.',delta:-5,modes:['bus']},
- {id:'snacks',text:'{player} hat sämtliche Snacks schon vor der Abfahrt gegessen.',delta:0,modes:['bus','train','plane']},
- {id:'express',text:'Der Lokführer erklärt den Zug spontan zum AZB-Express.',delta:-8,modes:['train']},
- {id:'roadworks',text:'Eine Baustelle zwingt den Teambus auf eine kleine Umleitung.',delta:0,modes:['bus','car']},
- {id:'exit',text:'Der Chauffeur nimmt fast die falsche Ausfahrt. Der Trainer rettet die Route.',delta:0,modes:['bus','car']},
- {id:'playlist',text:'{player} verteidigt seine Playlist gegen den Rest der Mannschaft.',delta:0,modes:['bus','train','plane']},
- {id:'headphones',text:'{player} merkt, dass die Kopfhörer noch zuhause liegen.',delta:0,modes:['bus','train','plane']},
- {id:'crowded',text:'Der Zug ist voll. Die Mannschaft verteilt sich auf zwei Wagen.',delta:0,modes:['train']},
- {id:'platform',text:'Gleisänderung: Die Mannschaft wechselt rechtzeitig das Perron.',delta:0,modes:['train'],phase:'station'},
- {id:'connection',text:'Der Anschlusszug wartet bereits. Alle finden ihren Wagen.',delta:0,modes:['train'],phase:'station'},
- {id:'security',text:'Bei der Sicherheitskontrolle bildet sich eine kurze Schlange.',delta:0,modes:['plane'],phase:'airport'},
- {id:'gate',text:'Gateänderung: Die Mannschaft folgt der neuen Anzeige.',delta:0,modes:['plane'],phase:'airport'},
- {id:'baggage',text:'{player} verwechselt kurz seine Tasche mit dem Materialkoffer.',delta:0,modes:['plane'],phase:'airport'},
- {id:'parking',text:'Der Ordner zeigt dem Teambus den richtigen Stadionparkplatz.',delta:0,modes:['bus','car','train','plane'],phase:'arrival'},
- {id:'fans',text:'Ein paar Fans begrüssen die Mannschaft vor dem Stadion.',delta:0,modes:['bus','car','train','plane'],phase:'arrival'},
- {id:'entrance',text:'Der Trainer findet nach kurzer Suche den Spielereingang.',delta:0,modes:['bus','car','train','plane'],phase:'arrival'},
+/** Longest delay or saving one event may cause, as a share of the planned trip. */
+const MAX_EVENT_SHARE=.4;
+const MAX_EVENT_FINE_SECONDS=300;
+// `share` moves the arrival by that part of the planned trip (negative is earlier); `fine` is paid on arrival.
+const EVENTS: readonly {id:string;text:string;share:number;fine?:number;modes:readonly Journey['transport'][];phase?:'airport'|'station'|'arrival'}[] = [
+ {id:'shoelace',text:'Die Mannschaft bindet synchron die Schuhe.',share:0,modes:['walk','bike','car']},
+ {id:'route',text:'Der Trainer erklärt den kürzesten Weg zur taktischen Meisterleistung.',share:0,modes:['walk','bike','car']},
+ {id:'bundesrat',text:'Der Bundesrat hat den Teambus zugeparkt.',share:.08,modes:['bus']},
+ {id:'pass',phase:'airport',text:'{player} hat den Reisepass vergessen.',share:.12,modes:['plane']},
+ {id:'shortcut',text:'Der Busfahrer kennt eine Abkürzung.',share:-.1,modes:['bus']},
+ {id:'mikeboy',text:'{player} schläft im Gepäckfach.',share:0,modes:['bus','train','plane']},
+ {id:'olten',text:'Die Mannschaft nimmt versehentlich den Zug nach Olten.',share:.15,modes:['train']},
+ {id:'pilot',text:'Der Pilot ist YB-Fan und gibt Vollgas.',share:-.08,modes:['plane']},
+ {id:'kebab',phase:'airport',text:'Die Mannschaft bestellt 47 Döner am Flughafen.',share:.05,modes:['plane']},
+ {id:'walking',text:'Der Trainer hat Google Maps auf Fussweg gestellt.',share:.08,modes:['bus','train']},
+ {id:'var',phase:'airport',text:'Das Flughafenpersonal verlangt einen VAR-Check beim Boarding.',share:0,modes:['plane']},
+ {id:'ticket',text:'{player} diskutiert mit dem Kontrolleur über die Taktik.',share:.04,modes:['train']},
+ {id:'green',text:'Alle Ampeln sind grün. Der Chauffeur fühlt sich wie ein Rennfahrer.',share:-.05,modes:['bus']},
+ {id:'snacks',text:'{player} hat sämtliche Snacks schon vor der Abfahrt gegessen.',share:0,modes:['bus','train','plane']},
+ {id:'express',text:'Der Lokführer erklärt den Zug spontan zum AZB-Express.',share:-.08,modes:['train']},
+ {id:'roadworks',text:'Eine Baustelle zwingt den Teambus auf eine kleine Umleitung.',share:.06,modes:['bus','car']},
+ {id:'exit',text:'Der Chauffeur nimmt fast die falsche Ausfahrt. Der Trainer rettet die Route.',share:0,modes:['bus','car']},
+ {id:'playlist',text:'{player} verteidigt seine Playlist gegen den Rest der Mannschaft.',share:0,modes:['bus','train','plane']},
+ {id:'headphones',text:'{player} merkt, dass die Kopfhörer noch zuhause liegen.',share:0,modes:['bus','train','plane']},
+ {id:'crowded',text:'Der Zug ist voll. Die Mannschaft verteilt sich auf zwei Wagen.',share:0,modes:['train']},
+ {id:'platform',text:'Gleisänderung: Die Mannschaft wechselt rechtzeitig das Perron.',share:0,modes:['train'],phase:'station'},
+ {id:'connection',text:'Der Anschlusszug wartet bereits. Alle finden ihren Wagen.',share:0,modes:['train'],phase:'station'},
+ {id:'security',text:'Bei der Sicherheitskontrolle bildet sich eine kurze Schlange.',share:.04,modes:['plane'],phase:'airport'},
+ {id:'gate',text:'Gateänderung: Die Mannschaft folgt der neuen Anzeige.',share:0,modes:['plane'],phase:'airport'},
+ {id:'baggage',text:'{player} verwechselt kurz seine Tasche mit dem Materialkoffer.',share:0,modes:['plane'],phase:'airport'},
+ {id:'parking',text:'Der Ordner zeigt dem Teambus den richtigen Stadionparkplatz.',share:0,modes:['bus','car','train','plane'],phase:'arrival'},
+ {id:'fans',text:'Ein paar Fans begrüssen die Mannschaft vor dem Stadion.',share:0,modes:['bus','car','train','plane'],phase:'arrival'},
+ {id:'entrance',text:'Der Trainer findet nach kurzer Suche den Spielereingang.',share:0,modes:['bus','car','train','plane'],phase:'arrival'},
+ {id:'jam',text:'Stau vor dem Tunnel. Die Mannschaft steht und spielt Karten.',share:.2,modes:['bus','car']},
+ {id:'breakdown',text:'Reifenpanne! Der Teambus wartet am Pannenstreifen auf den Pannendienst.',share:.25,modes:['bus']},
+ {id:'speeding',text:'Der Busfahrer fährt deutlich zu schnell. Ihr seid früher da, aber die Radarfalle hat geblitzt: Busse.',share:-.15,fine:60,modes:['bus','car']},
+ {id:'police',text:'Polizeikontrolle an der Grenze. Alle Pässe werden einzeln geprüft.',share:.1,modes:['bus','car']},
+ {id:'signal',text:'Stellwerkstörung: Der Zug steht auf offener Strecke.',share:.18,modes:['train']},
+ {id:'fare-dodger',text:'{player} hat kein gültiges Billett und kassiert eine Busse.',share:0,fine:20,modes:['train']},
+ {id:'storm',text:'Gewitter über den Alpen: Der Flieger nimmt einen Umweg.',share:.15,modes:['plane']},
+ {id:'tailwind',text:'Starker Rückenwind: Der Pilot meldet eine frühere Ankunft.',share:-.1,modes:['plane']},
+ {id:'boarding',text:'Verspätetes Boarding: Die Crew ist noch nicht an Bord.',share:.12,modes:['plane'],phase:'airport'},
+ {id:'no-parking',text:'Der Teambus steht im Halteverbot. Die Polizei verteilt eine Parkbusse.',share:0,fine:20,modes:['bus','car'],phase:'arrival'},
 ];
 export function createJourney(fixture:TravelFixture,now:number,random=Math.random,features?:GameFeatures):Journey {
  if(!fixture.away)throw new Error('Für Heimspiele ist keine Reise nötig.');
  const timing=travelTiming(fixture),events:TravelEvent[]=[],players=features?getEligibleEventPlayers(features):[];
  const recent=features?.travel.stats.recentEvents??[];
- if(random()<.5){const count=timing.baseMs>30000&&random()<.15?2:1;for(let i=0;i<count;i++){
+ if(random()<TRAVEL_EVENT_CHANCE){const count=timing.baseMs>30000&&random()<TRAVEL_SECOND_EVENT_CHANCE?2:1;for(let i=0;i<count;i++){
   const at=Math.round(timing.baseMs*(i===0?.3:.9)),stage=timing.plan?segmentAt(timing.plan,at/1000):null;
   const mode=stage?.segment.mode==='wait'?timing.transport:stage?.segment.mode??timing.transport;
   const phase=stage?.segment.mode==='wait'?(timing.transport==='plane'?'airport':'station'):stage&&stage.index===(timing.plan?.segments.length??0)-1&&stage.fraction>.6?'arrival':undefined;
@@ -95,16 +111,21 @@ export function createJourney(fixture:TravelFixture,now:number,random=Math.rando
   const fresh=candidates.filter(e=>!recent.includes(e.id)),pool=fresh.length?fresh:candidates;if(!pool.length)continue;
   const e=pool[Math.min(pool.length-1,Math.floor(random()*pool.length))];
   const player=players.length?players[Math.min(players.length-1,Math.floor(random()*players.length))]:null;
-  events.push({id:e.id,template:e.text,playerId:player?.id,text:e.text.replace('{player}',player?.name??'Die Mannschaft'),at,delta:0});
+  const delta=Math.round(timing.baseMs*Math.max(-MAX_EVENT_SHARE,Math.min(MAX_EVENT_SHARE,e.share)));
+  events.push({id:e.id,template:e.text,playerId:player?.id,text:e.text.replace('{player}',player?.name??'Die Mannschaft'),at,delta,...(e.fine?{fine:e.fine}:{})});
  }}
- return {squadLock:features?{fixtureId:fixture.id,playerIds:[...new Set([...features.starXI.lineupIds,...features.starXI.benchIds].filter(Boolean))],startedAt:now,transferRemaining:Math.max(0,features.transferSaga.nextAt-now),eventRemaining:Math.max(0,features.nextEventAt-now),varRemaining:Math.max(0,features.nextVarAt-now),offerRemaining:features.transferSaga.pendingOffer?Math.max(0,features.transferSaga.pendingOffer.expiresAt-now):0}:undefined,plan:timing.plan,id:fixture.id,origin:HOME_VENUE,fixture:{...fixture,region:timing.category},startedAt:now,baseMs:timing.baseMs,endsAt:now+timing.baseMs,transport:timing.transport,km:timing.km,events,consumed:false};
+ return {squadLock:features?{fixtureId:fixture.id,playerIds:[...new Set([...features.starXI.lineupIds,...features.starXI.benchIds].filter(Boolean))],startedAt:now,transferRemaining:Math.max(0,features.transferSaga.nextAt-now),eventRemaining:Math.max(0,features.nextEventAt-now),varRemaining:Math.max(0,features.nextVarAt-now),offerRemaining:features.transferSaga.pendingOffer?Math.max(0,features.transferSaga.pendingOffer.expiresAt-now):0}:undefined,plan:timing.plan,id:fixture.id,origin:HOME_VENUE,fixture:{...fixture,region:timing.category},startedAt:now,baseMs:timing.baseMs,endsAt:now+timing.baseMs+events.reduce((total,e)=>total+e.delta,0),transport:timing.transport,km:timing.km,events,consumed:false};
 }
+export const TRAVEL_EVENT_CHANCE=.7;
+export const TRAVEL_SECOND_EVENT_CHANCE=.3;
+
 export function journeyView(j: Journey, now:number,features?:GameFeatures) {
  const elapsed=Math.max(0,now-j.startedAt);let end=j.baseMs,start=0,progress=0;
  for(const e of j.events){if(elapsed<e.at)break;progress+=(1-progress)*(e.at-start)/Math.max(1,end-start);start=e.at;end+=e.delta;}
  progress=Math.max(0,Math.min(1,progress+(1-progress)*(elapsed-start)/Math.max(1,end-start)));
- if(j.plan){progress=Math.max(0,Math.min(1,elapsed/(j.endsAt-j.startedAt)));end=j.endsAt-j.startedAt;}
- return {stage:j.plan?segmentAt(j.plan,elapsed/1000):null,arrived:now>=j.endsAt,progress,remaining:Math.max(0,j.startedAt+end-now),events:j.events.filter(e=>elapsed>=e.at).map(e=>{
+ const clock=j.plan?(now>=j.endsAt?j.baseMs:journeyClock(j,now)):elapsed;
+ if(j.plan){progress=Math.max(0,Math.min(1,clock/j.baseMs));end=j.endsAt-j.startedAt;}
+ return {stage:j.plan?segmentAt(j.plan,clock/1000):null,arrived:now>=j.endsAt,progress,remaining:Math.max(0,j.startedAt+end-now),events:j.events.filter(e=>clock>=e.at).map(e=>{
   const template=e.template??EVENTS.find(def=>def.id===e.id)?.text;
   if(!template||!features)return e;
   if(!template.includes('{player}'))return {...e,text:template};
@@ -121,6 +142,27 @@ export function settleTravel(state: TravelState, now:number): TravelState {
  if(!stats.furthest||j.km>stats.furthest.km)stats.furthest={opponent:j.fixture.opponent,km:j.km};
  const o=stats.opponents[`${j.fixture.venue.id}:${j.fixture.opponent}`]||{name:j.fixture.opponent,trips:0};stats.opponents[`${j.fixture.venue.id}:${j.fixture.opponent}`]={name:o.name,trips:o.trips+1};
  return {journey:{...j,counted:true} as Journey,stats};
+}
+/** Fines of an arrived journey, once: the seconds of passive income to pay and the journey marked as paid. */
+export function collectTravelFines(state: TravelState, now:number): { travel: TravelState; fineSeconds: number } {
+ const j=state.journey;
+ if(!j||now<j.endsAt||j.finesPaid)return {travel:state,fineSeconds:0};
+ const fineSeconds=j.events.reduce((total,e)=>total+(e.fine??0),0);
+ if(!fineSeconds)return {travel:state,fineSeconds:0};
+ return {travel:{...state,journey:{...j,finesPaid:true}},fineSeconds};
+}
+/** A fine in goals: the fined seconds of passive income, at least 5 goals per fined second. */
+export function travelFineGoals(fineSeconds:number,passivePerSecond:number) {
+ return Math.floor(fineSeconds*Math.max(5,Number.isFinite(passivePerSecond)?passivePerSecond:0));
+}
+/** Charges the fines of an arrived journey once: returns the goals to take (never more than `goals`) and logs it. */
+export function payTravelFines(features:GameFeatures,goals:number,passivePerSecond:number,now:number) {
+ const {travel,fineSeconds}=collectTravelFines(features.travel,now);
+ if(!fineSeconds)return 0;
+ features.travel=travel;
+ const fine=Math.min(Math.max(0,goals),travelFineGoals(fineSeconds,passivePerSecond));
+ addHistory(features,{title:'Reisebusse bezahlt',detail:`Unterwegs gab es eine Busse: -${fine.toLocaleString('de-CH')} Tore.`,tone:'negative'},now);
+ return fine;
 }
 export function eligibilityError(features:GameFeatures,mode:'season'|'tournament',tournamentId:TournamentId,now:number) {
  if(features.cup.active)return 'Es läuft bereits ein Match.';

@@ -3,7 +3,7 @@ export const revalidate = 0;
 
 import { requestMatchEdit, confirmMatchDraft } from '../../match-commands';
 import type { MatchDraft } from '../../match-commands';
-import { fixtureFor, travelGate, consumeTravel, eligibilityError, settleTravel } from '../../travel-data';
+import { fixtureFor, travelGate, consumeTravel, eligibilityError, payTravelFines, settleTravel } from '../../travel-data';
 import { claimAllAlbumRewards, claimAlbumReward, prepareCareerMatch, recordCareerMatch } from "../../career-data";
 import { competitionFor, squadBanError } from "../../discipline";
 import { getDb } from "../../../db";
@@ -305,6 +305,10 @@ async function persistGameResponse(
   responseExtras: Record<string, unknown> = {},
 ) {
   game.features.travel = settleTravel(game.features.travel, Date.now());
+  // Fines from the journey (speeding, parking) are paid once the team has arrived.
+  const travelFine = payTravelFines(game.features, game.goals, getBasePassivePower(game.upgrades, game.stars, game.features), Date.now());
+  game.goals -= travelFine;
+  game.seasonGoals = Math.max(0, game.seasonGoals - travelFine);
   const updated = await db.updateRoom(
     room.code,
     { ...gameColumns(game, timestamp, room.sharedStateVersion), ...extraColumns },

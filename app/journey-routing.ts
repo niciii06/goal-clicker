@@ -150,3 +150,19 @@ export function segmentAt(plan:JourneyPlan,elapsedGameSeconds:number) {
  }
  return null;
 }
+
+/**
+ * How far along the planned route the team is, in planned game ms (0 to baseMs). A delay stops the vehicle at its
+ * event for `delta` ms (jam, breakdown); a saving makes the rest of the trip faster, so it ends `delta` ms earlier.
+ */
+export function journeyClock(j: { startedAt: number; baseMs: number; events: readonly { at: number; delta: number }[] }, now: number) {
+ let real=Math.max(0,now-j.startedAt),base=0,speed=1;
+ for(const e of [...j.events].sort((a,b)=>a.at-b.at)){
+  const toEvent=Math.max(0,e.at-base)/speed;
+  if(real<toEvent)return Math.min(j.baseMs,base+real*speed);
+  real-=toEvent;base=Math.max(base,e.at);
+  if(e.delta>0){if(real<e.delta)return base;real-=e.delta;}
+  else if(e.delta<0){const left=j.baseMs-base,leftReal=left/speed;speed=left/Math.max(1,leftReal+e.delta);}
+ }
+ return Math.min(j.baseMs,base+real*speed);
+}

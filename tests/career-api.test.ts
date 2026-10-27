@@ -1,4 +1,5 @@
 import { createJourney, fixtureFor } from '../app/travel-data.ts';
+import { SEASON_CLUBS } from '../app/travel-geography.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { getTableColumns } from 'drizzle-orm';
@@ -177,4 +178,18 @@ test('API saves keep the leaderboard columns of the world up to date',async()=>{
  assert.equal(row.sharedTrophies,4);
  assert.equal(row.sharedBestLeague,getReachedLeague(5,6));
  assert.ok(row.sharedBestLeague<15);
+});
+test('API charges travel fines once after the team has arrived',async()=>{
+ let f=initialGameFeatures();f.starXI=setBestStarXI({...f.starXI,ownedIds:STAR_XI_PLAYERS.slice(0,40).map(p=>p.id)});f=normalizeGameFeatures(f);
+ const fixture={...fixtureFor(f,'season'),away:true,venue:SEASON_CLUBS.find(c=>c.name==='BSC Young Boys')!.venue};
+ const journey=createJourney(fixture,Date.now()-600000,()=>.99,f);
+ // Without the squad lock of the journey, so a Fabrizio rumour saves the world here.
+ f.travel.journey={...journey,squadLock:undefined,events:[{id:'speeding',text:'Raser',at:0,delta:0,fine:60}],endsAt:journey.startedAt+journey.baseMs};
+ f.transferSaga.nextAt=1;setup(f);row.sharedCoins=1e6;
+ const first=await action('transfer-insider-event');assert.equal(first.status,200,JSON.stringify(first.data));
+ assert.equal(first.data.room.game.features.travel.journey?.finesPaid,true);
+ assert.equal(row.sharedCoins,1e6-300);
+ assert.ok(first.data.room.game.features.history.some(e=>e.title==='Reisebusse bezahlt'));
+ const coins=row.sharedCoins;row.sharedFeaturesJson=JSON.stringify({...JSON.parse(row.sharedFeaturesJson),transferSaga:{...JSON.parse(row.sharedFeaturesJson).transferSaga,nextAt:1}});
+ await action('transfer-insider-event');assert.equal(row.sharedCoins,coins,'paid only once');
 });

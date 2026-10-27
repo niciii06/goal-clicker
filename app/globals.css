@@ -1503,6 +1503,8 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .travel-events { margin: 16px 0; min-height: 38px; }
 .travel-events p { margin: 8px 0; padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised)); font-size: var(--text-footnote); line-height: 1.7; overflow-wrap: anywhere; animation: travel-event-in .25s ease-out; }
 .travel-events b { white-space: nowrap; font-size: var(--text-footnote); color: var(--accent); margin-left: 6px; }
+.travel-events p.later { background: color-mix(in srgb, #e60022 8%, var(--surface-raised)); }
+.travel-events p.later b { color: color-mix(in oklab, #b3122d, var(--text) var(--tone-mix)); }
 .travel-start { width: 100%; min-height: 48px; }
 .travel-stats { padding: 18px; border: 1px solid color-mix(in srgb, #2269c3 17%, var(--surface-raised)); border-radius: 14px; margin: 18px 0; }
 .travel-stats div { display: flex; flex-wrap: wrap; gap: 14px 24px; font-size: var(--text-footnote); margin: 12px 0; }
