@@ -1,4 +1,5 @@
 import { competitionFor, squadBanError } from './discipline';
+import { pronounText } from './player-pronouns';
 import { addHistory, getSeasonModeNextOpponent, getTournament, getTournamentOpponentSchedule, getStarXISelection, getOpenTransferSquadVacancies, getStarXIRating, getEligibleEventPlayers, TOURNAMENTS, lockMatchSquad } from './feature-data';
 import type { GameFeatures, TournamentId } from './feature-data';
 import { HOME_VENUE, REGION_LABELS, distanceKm, seasonGeography, tournamentVenue, classifyDestination, VENUES, currentVenue } from './travel-geography';
@@ -77,14 +78,14 @@ const EVENTS: readonly {id:string;text:string;share:number;fine?:number;modes:re
  {id:'express',text:'Der Lokführer erklärt den Zug spontan zum AZB-Express.',share:-.08,modes:['train']},
  {id:'roadworks',text:'Eine Baustelle zwingt den Teambus auf eine kleine Umleitung.',share:.06,modes:['bus','car']},
  {id:'exit',text:'Der Chauffeur nimmt fast die falsche Ausfahrt. Der Trainer rettet die Route.',share:0,modes:['bus','car']},
- {id:'playlist',text:'{player} verteidigt seine Playlist gegen den Rest der Mannschaft.',share:0,modes:['bus','train','plane']},
+ {id:'playlist',text:'{player} verteidigt {seine} Playlist gegen den Rest der Mannschaft.',share:0,modes:['bus','train','plane']},
  {id:'headphones',text:'{player} merkt, dass die Kopfhörer noch zuhause liegen.',share:0,modes:['bus','train','plane']},
  {id:'crowded',text:'Der Zug ist voll. Die Mannschaft verteilt sich auf zwei Wagen.',share:0,modes:['train']},
  {id:'platform',text:'Gleisänderung: Die Mannschaft wechselt rechtzeitig das Perron.',share:0,modes:['train'],phase:'station'},
  {id:'connection',text:'Der Anschlusszug wartet bereits. Alle finden ihren Wagen.',share:0,modes:['train'],phase:'station'},
  {id:'security',text:'Bei der Sicherheitskontrolle bildet sich eine kurze Schlange.',share:.04,modes:['plane'],phase:'airport'},
  {id:'gate',text:'Gateänderung: Die Mannschaft folgt der neuen Anzeige.',share:0,modes:['plane'],phase:'airport'},
- {id:'baggage',text:'{player} verwechselt kurz seine Tasche mit dem Materialkoffer.',share:0,modes:['plane'],phase:'airport'},
+ {id:'baggage',text:'{player} verwechselt kurz {seine} Tasche mit dem Materialkoffer.',share:0,modes:['plane'],phase:'airport'},
  {id:'parking',text:'Der Ordner zeigt dem Teambus den richtigen Stadionparkplatz.',share:0,modes:['bus','car','train','plane'],phase:'arrival'},
  {id:'fans',text:'Ein paar Fans begrüssen die Mannschaft vor dem Stadion.',share:0,modes:['bus','car','train','plane'],phase:'arrival'},
  {id:'entrance',text:'Der Trainer findet nach kurzer Suche den Spielereingang.',share:0,modes:['bus','car','train','plane'],phase:'arrival'},
@@ -112,7 +113,7 @@ export function createJourney(fixture:TravelFixture,now:number,random=Math.rando
   const e=pool[Math.min(pool.length-1,Math.floor(random()*pool.length))];
   const player=players.length?players[Math.min(players.length-1,Math.floor(random()*players.length))]:null;
   const delta=Math.round(timing.baseMs*Math.max(-MAX_EVENT_SHARE,Math.min(MAX_EVENT_SHARE,e.share)));
-  events.push({id:e.id,template:e.text,playerId:player?.id,text:e.text.replace('{player}',player?.name??'Die Mannschaft'),at,delta,...(e.fine?{fine:e.fine}:{})});
+  events.push({id:e.id,template:e.text,playerId:player?.id,text:pronounText(e.text.replace('{player}',player?.name??'Die Mannschaft'),player),at,delta,...(e.fine?{fine:e.fine}:{})});
  }}
  return {squadLock:features?{fixtureId:fixture.id,playerIds:[...new Set([...features.starXI.lineupIds,...features.starXI.benchIds].filter(Boolean))],startedAt:now,transferRemaining:Math.max(0,features.transferSaga.nextAt-now),eventRemaining:Math.max(0,features.nextEventAt-now),varRemaining:Math.max(0,features.nextVarAt-now),offerRemaining:features.transferSaga.pendingOffer?Math.max(0,features.transferSaga.pendingOffer.expiresAt-now):0}:undefined,plan:timing.plan,id:fixture.id,origin:HOME_VENUE,fixture:{...fixture,region:timing.category},startedAt:now,baseMs:timing.baseMs,endsAt:now+timing.baseMs+events.reduce((total,e)=>total+e.delta,0),transport:timing.transport,km:timing.km,events,consumed:false};
 }
@@ -128,9 +129,9 @@ export function journeyView(j: Journey, now:number,features?:GameFeatures) {
  return {stage:j.plan?segmentAt(j.plan,clock/1000):null,arrived:now>=j.endsAt,progress,remaining:Math.max(0,j.startedAt+end-now),events:j.events.filter(e=>clock>=e.at).map(e=>{
   const template=e.template??EVENTS.find(def=>def.id===e.id)?.text;
   if(!template||!features)return e;
-  if(!template.includes('{player}'))return {...e,text:template};
+  if(!template.includes('{player}'))return {...e,text:pronounText(template,null)};
   const players=getEligibleEventPlayers(features),player=players.find(p=>p.id===e.playerId)??players[0];
-  return {...e,text:player?template.replace('{player}',player.name):'Die Mannschaft bespricht die Taktik.'};
+  return {...e,text:player?pronounText(template.replace('{player}',player.name),player):'Die Mannschaft bespricht die Taktik.'};
  })};
 }
 export function settleTravel(state: TravelState, now:number): TravelState {

@@ -1,4 +1,6 @@
 import type { CupState } from './feature-data';
+import { getStarXIPlayer } from './feature-data';
+import { pronounText } from './player-pronouns';
 
 export type PressContext = 'sieg' | 'hoher-sieg' | 'remis' | 'niederlage' | 'hohe-niederlage' | 'zu-null' | 'elfmeter' | 'turnier' | 'saison' | 'auswaerts' | 'heim' | 'torschuetze' | 'any';
 export type PressAnswer = { text: string; mood: number };
@@ -49,10 +51,10 @@ export const PRESS_QUESTIONS: readonly PressQuestion[] = [
   q('saison-1', ['saison'], 'Wie bewerten Sie die Saison bis hierhin?', ['Wir sind auf einem guten Weg, aber noch lange nicht am Ziel.', 4], ['Ehrlich gesagt erwarte ich noch deutlich mehr.', 3], ['Ich gebe uns eine Sechs. Die Fans geben sich selber eine Sieben.', 7]),
   q('saison-2', ['saison'], 'Aufstieg, Klassenerhalt oder Meistertitel. Was ist das Ziel?', ['Wir schauen von Spiel zu Spiel.', 1], ['Ganz nach oben. Alles andere wäre langweilig.', 6], ['Das Ziel ist, dass niemand vergisst, wer wir sind.', 5]),
   q('saison-3', ['saison', 'sieg'], 'Mit diesem Sieg klettern Sie in der Tabelle. Schauen Sie hin?', ['Nein, die Tabelle schaue ich erst am Schluss an.', 2], ['Jeden Abend vor dem Einschlafen.', 5], ['Ich habe sie als Bildschirmhintergrund.', 6]),
-  q('tor-1', ['torschuetze'], '{torschuetze} hat heute getroffen. Ein Wort zu diesem Spieler?', ['Ein Vorbild im Training und auf dem Platz.', 5], ['Er kann noch viel mehr. Ich werde ihn weiter fordern.', 3], ['Ich habe ihm gesagt, er darf heute das Abendessen aussuchen.', 6]),
-  q('tor-2', ['torschuetze'], 'Wie wichtig ist {torschuetze} für die Mannschaft?', ['Sehr wichtig, aber bei uns zählt das Team.', 4], ['Unverzichtbar. Sein Vertrag sollte ewig laufen.', 6], ['So wichtig, dass ich seinen Namen jetzt richtig schreiben kann.', 3]),
-  q('tor-3', ['torschuetze'], 'Fabrizio Romario meldet Interesse von Topclubs an {torschuetze}. Bleibt er?', ['Er fühlt sich hier wohl. Mehr gibt es nicht zu sagen.', 6], ['Jeder Spieler hat seinen Preis. Aber der ist sehr hoch.', -3], ['Here we go? Nein. Here we stay.', 8]),
-  q('tor-4', ['torschuetze', 'sieg'], 'Der Jubel von {torschuetze} war spektakulär. War der abgesprochen?', ['Das ist seine Sache. Hauptsache, er trifft.', 3], ['Ja, wir haben ihn eine Woche lang geprobt.', 5], ['Ich bin froh, dass er sich dabei nicht verletzt hat.', 4]),
+  q('tor-1', ['torschuetze'], '{torschuetze} hat heute getroffen. Ein Wort zu {diesem Spieler}?', ['Ein Vorbild im Training und auf dem Platz.', 5], ['{Er} kann noch viel mehr. Ich werde {ihn} weiter fordern.', 3], ['Ich habe {ihm} gesagt, {er} darf heute das Abendessen aussuchen.', 6]),
+  q('tor-2', ['torschuetze'], 'Wie wichtig ist {torschuetze} für die Mannschaft?', ['Sehr wichtig, aber bei uns zählt das Team.', 4], ['Unverzichtbar. {Sein} Vertrag sollte ewig laufen.', 6], ['So wichtig, dass ich {seinen} Namen jetzt richtig schreiben kann.', 3]),
+  q('tor-3', ['torschuetze'], 'Fabrizio Romario meldet Interesse von Topclubs an {torschuetze}. Bleibt {er}?', ['{Er} fühlt sich hier wohl. Mehr gibt es nicht zu sagen.', 6], ['Jeder Spieler hat seinen Preis. Aber der ist sehr hoch.', -3], ['Here we go? Nein. Here we stay.', 8]),
+  q('tor-4', ['torschuetze', 'sieg'], 'Der Jubel von {torschuetze} war spektakulär. War der abgesprochen?', ['Das ist {seine} Sache. Hauptsache, {er} trifft.', 3], ['Ja, wir haben ihn eine Woche lang geprobt.', 5], ['Ich bin froh, dass {er} sich dabei nicht verletzt hat.', 4]),
   q('aus-1', ['auswaerts'], 'Die Stimmung im fremden Stadion war hitzig. Hat das beeindruckt?', ['Nein. Wir mögen solche Spiele.', 5], ['Ein bisschen. Die Heimfans waren wirklich laut.', 2], ['Unsere mitgereisten Fans waren lauter. Danke an alle!', 9]),
   q('aus-2', ['auswaerts'], 'Wie wichtig sind die mitgereisten Fans?', ['Unbezahlbar. Sie haben uns getragen.', 9], ['Wichtig, aber auf dem Platz stehen wir.', -2], ['Ich zahle allen ein Getränk. Okay, vielleicht nur die Hälfte.', 6]),
   q('heim-1', ['heim'], 'Wie wichtig ist der Heimvorteil für Ihr Team?', ['Riesig. Zuhause sind wir eine Macht.', 6], ['Er wird überschätzt. Ein Platz ist ein Platz.', -3], ['Wir kennen jedes Loch im Rasen. Das hilft.', 4]),
@@ -109,11 +111,15 @@ export function getPressContexts(cup: CupState): Set<PressContext> {
 function topScorer(cup: CupState) {
   const counts = new Map<string, number>();
   for (const event of cup.matchEvents) if (event.side === 'home' && event.scorer) counts.set(event.scorer, (counts.get(event.scorer) ?? 0) + 1);
-  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
+  const name = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
+  const scorerId = cup.matchEvents.find((event) => event.side === 'home' && event.scorer === name)?.scorerId;
+  return { name, player: scorerId ? getStarXIPlayer(scorerId) : undefined };
 }
 
 function fill(text: string, cup: CupState, clubName: string) {
-  return text.replaceAll('{gegner}', cup.opponent || 'den Gegner').replaceAll('{club}', clubName).replaceAll('{torschuetze}', topScorer(cup)).replaceAll('{resultat}', `${cup.homeScore}:${cup.awayScore}`);
+  const scorer = topScorer(cup);
+  // Questions about the scorer say "sie" and "ihr" for a woman player.
+  return pronounText(text, scorer.player).replaceAll('{gegner}', cup.opponent || 'den Gegner').replaceAll('{club}', clubName).replaceAll('{torschuetze}', scorer.name).replaceAll('{resultat}', `${cup.homeScore}:${cup.awayScore}`);
 }
 
 /** Deterministic per match, so every coop player sees the same question. Recent questions are skipped. */

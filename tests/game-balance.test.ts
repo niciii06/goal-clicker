@@ -235,8 +235,15 @@ test("FC 27 full-backs cover wing-back slots and strikers cover centre-forward",
   assert.ok(!canStarXIPlayerPlayPosition(striker, "LAV"));
 });
 
+test("the women among the Icons are marked as women, the men are not", () => {
+  const womenIcons = STAR_XI_PLAYERS.filter((player) => player.cardType === "icon" && player.isWomen).map((player) => player.id);
+  assert.equal(womenIcons.length, 20);
+  assert.ok(womenIcons.includes("icon-mia-hamm") && womenIcons.includes("icon-alex-morgan"));
+  assert.equal(getStarXIPlayer("icon-ronaldo")?.isWomen, undefined);
+});
+
 test("all FC 27 women rated 70+ are base cards with official ratings and nations", () => {
-  const women = STAR_XI_PLAYERS.filter((player) => player.isWomen);
+  const women = STAR_XI_PLAYERS.filter((player) => player.isWomen && player.cardType !== "icon");
   assert.equal(women.length, 1220);
   assert.equal(new Set(women.map((player) => player.sourceId)).size, 1220);
   women.forEach((player) => {

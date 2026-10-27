@@ -5,6 +5,7 @@
 // The yellow card events of the match engine stay the only source; a match is processed once.
 import { getStarXIPlayer, getTournament } from './feature-data';
 import type { CupState, GameFeatures, TournamentId } from './feature-data';
+import { pronounText } from './player-pronouns';
 
 export const LEAGUE_YELLOW_LIMIT = 3;
 export const TOURNAMENT_YELLOW_LIMIT = 2;
@@ -84,7 +85,7 @@ export function squadBanError(features: GameFeatures, competition: Competition) 
   const conflicts = getSquadBanConflicts(features, competition);
   if (!conflicts.length) return null;
   const names = conflicts.map(id => getStarXIPlayer(id)?.name ?? 'Ein Spieler').join(', ');
-  return `${names} ${conflicts.length === 1 ? 'ist' : 'sind'} nach Gelben Karten für dieses Spiel gesperrt. Ersetze ${conflicts.length === 1 ? 'ihn' : 'sie'} in Startelf und Bank.`;
+  return `${names} ${conflicts.length === 1 ? 'ist' : 'sind'} nach Gelben Karten für dieses Spiel gesperrt. Ersetze ${conflicts.length === 1 ? pronounText('{ihn}', getStarXIPlayer(conflicts[0])) : 'sie'} in Startelf und Bank.`;
 }
 
 /** Short German label, for example "Gesperrt – 1 Spiel (3 Gelbe Karten) · Liga". */

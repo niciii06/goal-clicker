@@ -22,6 +22,7 @@ import { getCareerCard, getPlayerForm, initialCareerState, normalizeCareerState 
 import { getFunnyPlayerName } from "./funny-player-names";
 import { normalizeDailyRewards } from "./daily-reward";
 import { normalizePress } from "./press-conference";
+import { pronounText } from "./player-pronouns";
 export type { ClubProfile, CoopMission, CupCardEvent, CupGoalEvent, CupInjuryEvent, CupMatchMode, CupMatchPhase, CupPenaltyEvent, CupState, CupStrategyId, CupSubstitutionImpact, EarnedPack, GoalBoostState, HistoryTone, MatchChange, MatchHistoryEntry, MissionKind, MissionProgressSource, PenaltyDirection, RandomEvent, RewardPackId, SeasonFixture, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationDefinition, StarFormationId, StarFormationSlot, StarPackDefinition, StarPackId, StarPackOdds, StarPackOpening, StarPackReveal, StarXIEvaluationContext, StarXIPlayer, StarXIState, TournamentCompletionSummary, TournamentDefinition, TournamentGazetteIssue, TournamentId, TournamentOpponent, TransferInsiderEvent, TransferInsiderOutcome, TransferLoan, TransferMarketState, TransferPlayer, TransferOffer, TransferSagaState, TransferSquadVacancy, TransferUnhappyPlayer } from "./features/types";
 export { STAR_FORMATIONS, STAR_POSITIONS, STAR_POSITION_NAMES, STAR_XI_FORMATION_POSITIONS, TOURNAMENTS, TOURNAMENT_OPPONENT_MULTIPLIER, TRANSFER_PLAYERS, YB_FC26_SOURCE_IDS, getStarFormation } from "./features/catalog";
 
@@ -459,6 +460,9 @@ const RETIRED_FC26_ICON_DATA = [
   ["juan-sebastian-veron", "Juan Sebastián Verónn", 86, "AR", ["ZM", "ZOM"]],
 ] as const satisfies readonly IconSeed[];
 
+// Icons who played in women's football; texts and walkouts treat them like the FC 27 women.
+const WOMEN_ICON_IDS = new Set(["mia-hamm", "nadine-angerer", "birgit-prinz", "christine-sinclair", "alex-morgan", "homare-sawa", "camille-abily", "julie-foudy", "aya-miyama", "lotta-schelin", "caroline-seger", "formiga", "hege-riise", "tobin-heath", "kelly-smith", "steffi-jones", "marinette-pichon", "sissi", "ellen-white", "yuki-nagasato"]);
+
 function toIconPlayer([id, name, rating, countryCode, positions]: IconSeed, retired = false): StarXIPlayer {
   return {
     id: `icon-${id}`,
@@ -472,6 +476,7 @@ function toIconPlayer([id, name, rating, countryCode, positions]: IconSeed, reti
     cardType: "icon",
     packWeight: 0.015,
     ...(retired ? { retired: true } : {}),
+    ...(WOMEN_ICON_IDS.has(id) ? { isWomen: true } : {}),
   };
 }
 
@@ -2663,7 +2668,7 @@ const TRANSFER_FAILURE_REASONS = [
   "die Unterlagen zu spät eingereicht wurden",
   "der Berater plötzlich nicht mehr erreichbar war",
   "sich die Clubs bei den Bonuszahlungen nicht einigen konnten",
-  "der Spieler beim Club bleiben wollte",
+  "{der Spieler} beim Club bleiben wollte",
   "auf dem Vertrag die falsche Unterschrift stand",
   "der Flug zum Medizincheck annulliert wurde",
   "die Dokumente beim falschen Club landeten",
@@ -2674,32 +2679,32 @@ const TRANSFER_FAILURE_REASONS = [
   "eine Rückkaufklausel den Abschluss blockierte",
   "das Faxgerät statt des Vertrags nur die Mittagskarte übertragen hat",
   "der Vertrag im Drucker stecken blieb und anschliessend als Konfetti herauskam",
-  "der Spieler am Flughafen aus Versehen in den Ferienflieger nach Mallorca stieg",
+  "{der Spieler} am Flughafen aus Versehen in den Ferienflieger nach Mallorca stieg",
   "der Berater sein Handy in einem Fondue versenkt hat",
   "Google Maps den Spieler zum Stadion des Erzrivalen geschickt hat",
   "die Vereinskatze über die Tastatur lief und drei Nullen zur Ablöse hinzufügte",
   "der neue Club nur mit Panini Stickern bezahlen wollte",
   "die gewünschte Rückennummer bereits dem Maskottchen gehörte",
-  "der Spieler beim Fototermin das Trikot des falschen Clubs anzog",
+  "{der Spieler} beim Fototermin das Trikot des falschen Clubs anzog",
   "der Präsident beim Unterschreiben einen Stift ohne Tinte erwischte",
   "die Präsentationsdrohne mit dem unterschriebenen Vertrag davongeflogen ist",
   "der Übersetzer Leihe mit Leier verwechselt hat",
-  "der Spieler im falschen Gruppenchat schrieb, dass er eigentlich gar nicht wechseln wolle",
+  "{der Spieler} im falschen Gruppenchat schrieb, dass {er} eigentlich gar nicht wechseln wolle",
   "beim Medizincheck eine Kontaktlinse verloren ging und dadurch die Deadline verpasst wurde",
   "der Transferchef sein Passwort Transfer123 vergessen hat",
   "die Unterschrift versehentlich auf einer Pizzaschachtel statt auf dem Vertrag landete",
   "das Navi den Berater drei Stunden lang im Kreisverkehr festhielt",
   "der Club beim Videoanruf den Katzenfilter nicht mehr ausschalten konnte",
-  "der Spieler glaubte, der Medizincheck sei ein Quiz, und nur Fussballfragen gelernt hatte",
+  "{der Spieler} glaubte, der Medizincheck sei ein Quiz, und nur Fussballfragen gelernt hatte",
   "das Vereinsmaskottchen den Vertrag gefressen hat",
   "die Siegespizza schon vor der Unterschrift geliefert wurde und alle die Deadline vergassen",
   "der Transfer im letzten Moment an einer fehlenden Büroklammer scheiterte",
-  "der Spieler nur zugesagt hätte, wenn er Kapitän, Elfmeterspezialist und DJ wird",
+  "{der Spieler} nur zugesagt hätte, wenn {er} Kapitän, Elfmeterspezialist und DJ wird",
   "der Präsident die Ablöse versehentlich in Schweizer Franken statt in Goals eingetragen hat",
   "der Scanner den Vertrag spiegelverkehrt gespeichert hat",
   "die Clublegende aus Versehen auf Ablehnen statt auf Annehmen klickte",
   "das neue Trikot beim Waschen auf Kindergrösse schrumpfte",
-  "der Spieler beim Verhandlungstermin in einem Escape Room eingeschlossen war",
+  "{der Spieler} beim Verhandlungstermin in einem Escape Room eingeschlossen war",
 ] as const;
 
 
@@ -2889,7 +2894,7 @@ export function resolveTransferInsiderEvent(value: GameFeatures, random: () => n
       headline: "Leihe bestätigt",
       message: joinsCurrentTournament
         ? `Fabrizio Romario meldet: ${player.name} wechselt auf Leihbasis zu ${club}, fehlt für den Rest ${competition.current} und kehrt danach zurück.`
-        : `Fabrizio Romario meldet: ${player.name} wechselt auf Leihbasis zu ${club} und fehlt deinem Club in ${competition.next}. Danach kehrt er zurück.`,
+        : `Fabrizio Romario meldet: ${player.name} wechselt auf Leihbasis zu ${club} und fehlt deinem Club in ${competition.next}. Danach kehrt ${pronounText("{er}", player)} zurück.`,
       reason: joinsCurrentTournament ? `Leihe für den Rest ${competition.current}` : `Leihe für ${competition.article}`,
       fee: 0,
       createdAt: now,
@@ -2904,17 +2909,19 @@ export function resolveTransferInsiderEvent(value: GameFeatures, random: () => n
       playerId: player.id,
       playerName: player.name,
       club,
-      headline: paidSale ? "Angebot auf dem Tisch" : "Er will ablösefrei weg",
+      headline: paidSale ? "Angebot auf dem Tisch" : pronounText("{Er} will ablösefrei weg", player),
       message: paidSale
         ? `Fabrizio Romario meldet: ${club} bietet ${fee.toLocaleString("de-CH")} Goals für ${player.name}. Verkaufen oder behalten?`
-        : `Fabrizio Romario meldet: ${player.name} will ablösefrei zu ${club}. Lässt du ihn gehen oder behältst du ihn?`,
+        : `Fabrizio Romario meldet: ${player.name} will ablösefrei zu ${club}. ${pronounText("Lässt du {ihn} gehen oder behältst du {ihn}?", player)}`,
       reason: paidSale ? "Kaufangebot" : "Wechselwunsch ohne Ablöse",
       fee,
       createdAt: now,
     };
     features.transferSaga.pendingOffer = { ...event, expiresAt: now + TRANSFER_OFFER_DURATION_MS };
   } else {
-    const reason = getNextTransferFailureReason(features.transferSaga.lastFailedReason, random);
+    // The stored reason keeps its {der Spieler} tokens, so the next one is never the same; texts say "die Spielerin" for women.
+    const reasonTemplate = getNextTransferFailureReason(features.transferSaga.lastFailedReason, random);
+    const reason = pronounText(reasonTemplate, player);
     const playerName = player?.name ?? "einem angefragten Spieler";
     event = {
       id: `transfer-failed-${now}-${player?.id ?? "none"}`,
@@ -2928,7 +2935,7 @@ export function resolveTransferInsiderEvent(value: GameFeatures, random: () => n
       fee: 0,
       createdAt: now,
     };
-    features.transferSaga.lastFailedReason = reason;
+    features.transferSaga.lastFailedReason = reasonTemplate;
   }
 
   features.transferSaga.latestEvent = event;
