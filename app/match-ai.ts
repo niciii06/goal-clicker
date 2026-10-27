@@ -311,6 +311,7 @@ export function shapeTargets(c: SimCheckpoint, carrier: SimPlayer, fixed: Readon
 
 /** Moves players toward their targets within their running range and keeps them apart. */
 export function movePlayersToward(c: SimCheckpoint, targets: ReadonlyMap<string, SimPoint>, visualSeconds: number, fixed: ReadonlySet<string>) {
+  const start = new Map(c.players.map((p) => [p.id, { x: p.x, y: p.y }]));
   for (const p of c.players) {
     if (!p.active || fixed.has(p.id)) continue;
     const target = targets.get(p.id);
@@ -328,5 +329,12 @@ export function movePlayersToward(c: SimCheckpoint, targets: ReadonlyMap<string,
     }
     const inside = insidePitch(p, 1.2);
     p.x = inside.x; p.y = inside.y;
+  }
+  // Making room never outruns a player: in a short play (just before a whistle) bodies may stay close instead.
+  for (const p of c.players) {
+    const from = start.get(p.id);
+    if (!from || !p.active || fixed.has(p.id)) continue;
+    const moved = dist(from, p), limit = runSpeed(p) * visualSeconds;
+    if (moved > limit) { p.x = from.x + (p.x - from.x) * limit / moved; p.y = from.y + (p.y - from.y) * limit / moved; }
   }
 }
