@@ -475,11 +475,6 @@
 .starxi-pitch-slot[draggable="true"], .starxi-player-card[draggable="true"] { cursor: grab; }
 .starxi-pitch-slot[draggable="true"]:active, .starxi-player-card[draggable="true"]:active { cursor: grabbing; }
 .starxi-pitch-slot.squad-dragging, .starxi-player-card.squad-dragging { opacity: .38; filter: saturate(.55); }
-.starxi-pitch-slot.squad-drop-ready, .starxi-player-card.squad-drop-ready, .starxi-bank-slot.squad-drop-ready { border-color: rgba(52,199,89,.88); box-shadow: 0 0 0 3px rgba(52,199,89,.18), 0 10px 24px rgba(18,105,52,.18); }
-.starxi-pitch-slot.squad-drop-ready { background: rgba(35,126,73,.8); }
-.starxi-pitch-slot.squad-drop-active { border-color: #fff; background: #218553; box-shadow: 0 0 0 4px rgba(52,199,89,.32), 0 13px 28px rgba(4,39,28,.34); transform: translate(-50%,calc(-50% - 3px)) scale(1.04); }
-.starxi-player-card.squad-drop-active, .starxi-bank-slot.squad-drop-active { border-style: solid; background: color-mix(in srgb, #22c358 10%, var(--surface-raised)); box-shadow: 0 0 0 4px rgba(52,199,89,.2), 0 12px 26px rgba(18,105,52,.14); transform: translateY(-2px) scale(1.01); }
-.starxi-pitch-slot.squad-drop-blocked, .starxi-player-card.squad-drop-blocked, .starxi-bank-slot.squad-drop-blocked { opacity: .5; filter: grayscale(.35); }
 .starxi-pitch-slot.squad-touch-drag, .starxi-player-card.squad-touch-drag { touch-action: none; }
 .starxi-pitch-slot.match-poor { border-color: rgba(255,115,115,.72); background: rgba(113,20,27,.48); }
 .starxi-pitch-slot:disabled { cursor: not-allowed; }
@@ -570,6 +565,13 @@
 .injury-warning small { color: color-mix(in oklab, #9a6b32, var(--text) var(--tone-mix)); font-size: var(--text-footnote); line-height: 1.4; }
 .starxi-pitch-slot.injured { border-color: rgba(255,149,0,.9); background: rgba(116,67,8,.8); box-shadow: 0 0 0 2px rgba(255,149,0,.2), 0 5px 16px rgba(0,0,0,.2); }
 .starxi-player-card.red-carded { border-color: rgba(255,59,48,.4); color: color-mix(in oklab, #7b1a23, var(--text) var(--tone-mix)); background: color-mix(in srgb, #e60000 4%, var(--surface-raised)); }
+/* Drop highlights come after the match states (poor rating, red card, injury), so a valid target always lights up. */
+.starxi-pitch-slot.squad-drop-ready, .starxi-player-card.squad-drop-ready, .starxi-bank-slot.squad-drop-ready { border-color: rgba(52,199,89,.88); box-shadow: 0 0 0 3px rgba(52,199,89,.18), 0 10px 24px rgba(18,105,52,.18); }
+.starxi-pitch-slot.squad-drop-ready { background: rgba(35,126,73,.8); }
+.starxi-player-card.squad-drop-ready, .starxi-bank-slot.squad-drop-ready { background: color-mix(in srgb, #22c358 7%, var(--surface-raised)); }
+.starxi-pitch-slot.squad-drop-active { border-color: #fff; background: #218553; box-shadow: 0 0 0 4px rgba(52,199,89,.32), 0 13px 28px rgba(4,39,28,.34); transform: translate(-50%,calc(-50% - 3px)) scale(1.04); }
+.starxi-player-card.squad-drop-active, .starxi-bank-slot.squad-drop-active { border-style: solid; background: color-mix(in srgb, #22c358 10%, var(--surface-raised)); box-shadow: 0 0 0 4px rgba(52,199,89,.2), 0 12px 26px rgba(18,105,52,.14); transform: translateY(-2px) scale(1.01); }
+.starxi-pitch-slot.squad-drop-blocked, .starxi-player-card.squad-drop-blocked, .starxi-bank-slot.squad-drop-blocked { opacity: .5; filter: grayscale(.35); }
 @keyframes goal-overlay-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes goal-card-pop { 0% { opacity: 0; transform: translateY(24px) scale(.84) rotate(-2deg); } 60% { transform: translateY(-5px) scale(1.025) rotate(.4deg); } 100% { opacity: 1; transform: translateY(0) scale(1) rotate(0); } }
 @keyframes goal-text-bounce { 0% { transform: scale(.5) rotate(-7deg); } 58% { transform: scale(1.12) rotate(2deg); } 100% { transform: scale(1) rotate(0); } }

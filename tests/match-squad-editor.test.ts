@@ -7,7 +7,7 @@ import type { GameFeatures } from '../app/feature-data';
 import { getCareerCard, getPlayerMilestones, prepareCareerMatch } from '../app/career-data';
 import { createInteractiveMatch, advanceInteractive } from '../app/interactive-match';
 import { confirmMatchDraft, draftMatch, matchBenchPreview, requestMatchEdit, validateMatchDraft } from '../app/match-commands';
-import { MatchSquadEditor, MatchSubstitutions, lineupChanges, moveInMatchLineup } from '../app/match-substitutions';
+import { MatchSquadEditor, MatchSubstitutions, lineupChanges, matchMoveError, moveInMatchLineup } from '../app/match-substitutions';
 
 function liveMatch(seed = 11) {
   const f = initialGameFeatures(3000000 + seed);
@@ -109,4 +109,14 @@ test('two taps swap or substitute like a drag, in either order, and a third tap 
   assert.deepEqual(resolveSquadTap(slotPick, slotPick, canDrop), { pick: null });
   assert.deepEqual(resolveSquadTap(slotPick, other, () => false), { pick: other });
   assert.deepEqual(resolveSquadTap(null, benchPick, canDrop), { pick: benchPick });
+});
+
+test('a lineup with a problem it already has can still be rearranged, but no move may add a new one', () => {
+  const validate = (lineup: string[]) => lineup.includes('injured') ? 'Ersetze den verletzten Spieler.' : lineup.includes('banned') ? 'Gesperrt.' : '';
+  // Moving other players keeps the old problem: allowed, so their targets light up.
+  assert.equal(matchMoveError(validate, 'Ersetze den verletzten Spieler.', ['injured', 'b', 'c']), '');
+  // Replacing the injured starter solves it.
+  assert.equal(matchMoveError(validate, 'Ersetze den verletzten Spieler.', ['sub', 'b', 'c']), '');
+  // Bringing in a banned player is a new problem.
+  assert.equal(matchMoveError(validate, '', ['banned', 'b', 'c']), 'Gesperrt.');
 });

@@ -26,6 +26,11 @@ export function moveInMatchLineup(lineup:readonly string[],bench:readonly string
  next[source.index]=bench[target.index];return next;
 }
 
+/** Why a move is refused, or ''. A move may not add a problem; one the lineup already has (an injured starter) does not block every other move. */
+export function matchMoveError(validate:(lineup:string[])=>string,currentError:string,next:string[]) {
+ const reason=validate(next);return !reason||reason===currentError?'':reason;
+}
+
 type EditorProps={features:GameFeatures;title:string;intro:string;disabled:boolean;initialSlot?:number|null;validate:(lineup:string[])=>string;confirmBlocked?:boolean;confirmLabel:(changes:number)=>string;onConfirm:(lineup:string[])=>void;onCancel:()=>void};
 
 /** The squad board from the "Kader" tab, in a match: same cards, drag and drop and milestone ratings. */
@@ -39,10 +44,11 @@ export function MatchSquadEditor({features:f,title,intro,disabled,initialSlot=nu
  const changed=lineup.some((id,i)=>id!==f.starXI.lineupIds[i]),error=validate(lineup);
  const minute=f.cup.simulation?Math.max(1,Math.ceil(f.cup.simulation.time/60)):getCupMatchMinute(f.cup,f.cup.lastTickAt);
  const fitness=(id:string)=>{const p=f.cup.simulation?.committed.players.find(x=>x.id===id);return p?`${Math.round(p.fitness)}% Fitness`:'';};
- const canDrop=(source:SquadDragSource,target:SquadDropTarget)=>{const next=moveInMatchLineup(lineup,bench,source,target);return Boolean(next)&&!validate(next!);};
+ const allowed=(next:string[])=>matchMoveError(validate,error,next);
+ const canDrop=(source:SquadDragSource,target:SquadDropTarget)=>{const next=moveInMatchLineup(lineup,bench,source,target);return Boolean(next)&&!allowed(next!);};
  const apply=(source:SquadDragSource,target:SquadDropTarget)=>{
   const next=moveInMatchLineup(lineup,bench,source,target);if(!next)return;
-  const reason=validate(next);setSelectedSlot(null);setSelectedBench(null);
+  const reason=allowed(next);setSelectedSlot(null);setSelectedBench(null);
   if(reason){setMessage(reason);return;}
   setPast(p=>[...p,lineup]);setLineup(next);setMessage('');
  };
