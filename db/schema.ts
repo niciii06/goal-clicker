@@ -39,6 +39,9 @@ export const coopRooms = pgTable("coop_rooms", {
   sharedStars: integer("shared_stars").notNull().default(0),
   sharedSeasons: integer("shared_seasons").notNull().default(0),
   sharedMinigameWins: integer("shared_minigame_wins").notNull().default(0),
+  // Leaderboard values the server derives from the world on every save (league 1 is the top).
+  sharedBestLeague: integer("shared_best_league").notNull().default(15),
+  sharedTrophies: integer("shared_trophies").notNull().default(0),
   sharedMiniGameCooldownsJson: text("shared_minigame_cooldowns_json").notNull().default("{}"),
   sharedFeaturesJson: text("shared_features_json").notNull().default("{}"),
   sharedStateBackupJson: text("shared_state_backup_json").notNull().default("{}"),
@@ -57,6 +60,8 @@ export const coopRooms = pgTable("coop_rooms", {
   index("coop_rooms_guest_player_idx").on(t.guestPlayerId),
   index("coop_rooms_player3_player_idx").on(t.player3PlayerId),
   index("coop_rooms_player4_player_idx").on(t.player4PlayerId),
+  // The leaderboard sorts worlds by their goals.
+  index("coop_rooms_total_goals_idx").on(t.sharedTotalGoals.desc()),
 ]).enableRLS();
 
 // Solo journey receipts use the existing player capability, like shared worlds.

@@ -7,6 +7,7 @@ import { initialGameFeatures, normalizeGameFeatures, resolveTransferInsiderEvent
 import { beginSeasonCupMatch, getStarXISelection, getStarXIPlayer } from '../app/feature-data';
 import { draftMatch } from '../app/match-commands';
 import { prepareCareerMatch } from '../app/career-data';
+import { getReachedLeague } from '../app/season-progression.ts';
 import { emptyPlayerStats, getAlbumGroups } from '../app/career-data.ts';
 import { MULTIPLAYER_PROTOCOL_VERSION } from '../app/multiplayer-protocol.ts';
 import type { GameFeatures } from '../app/feature-data.ts';
@@ -167,4 +168,13 @@ test('API keeping the player makes him unhappy, and an unanswered offer runs out
  assert.equal(expired.data.room.game.features.transferSaga.latestEvent?.headline,'Angebot verfallen');
  setup(offerFeatures());const open=await action('transfer-insider-event');
  assert.ok(open.data.room.game.features.transferSaga.pendingOffer,'an open offer stays open');
+});
+test('API saves keep the leaderboard columns of the world up to date',async()=>{
+ let f=initialGameFeatures();f.starXI=setBestStarXI({...f.starXI,ownedIds:STAR_XI_PLAYERS.slice(0,40).map(p=>p.id)});f=normalizeGameFeatures(f);
+ f.cup.trophies={stadium:2,champions:1,world:1};f.seasonMode.highestDivision=6;f.transferSaga.nextAt=1;
+ setup(f);row.sharedSeasons=5;
+ const saved=await action('transfer-insider-event');assert.equal(saved.status,200,JSON.stringify(saved.data));
+ assert.equal(row.sharedTrophies,4);
+ assert.equal(row.sharedBestLeague,getReachedLeague(5,6));
+ assert.ok(row.sharedBestLeague<15);
 });

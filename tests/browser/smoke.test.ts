@@ -208,6 +208,32 @@ test('the press conference appears after a finished match and accepts one answer
   await page.close();
 });
 
+test('the leaderboard tab lists co-op worlds and marks your own', async () => {
+  const now = Date.now();
+  const { page, problems } = await openWithSave(VIEWPORTS[1], save(richFeatures(now), now));
+  const sorts: string[] = [];
+  // The test server has no database; the API answer is the one leaderboard-api.ts builds.
+  await page.route('**/api/leaderboard?**', (route) => {
+    const sort = new URL(route.request().url()).searchParams.get('sort') ?? 'goals';
+    sorts.push(sort);
+    return route.fulfill({ json: { sort, entries: [
+      { rank: 1, roomName: 'Torfabrik Bümpliz mit einem sehr langen Weltnamen', players: ['Nicolas', 'Silvan', 'Anna', 'Ben'], totalGoals: 9.4e12, bestLeague: 1, trophies: 12, mine: false },
+      { rank: 2, roomName: 'Meine Welt', players: ['Nicolas'], totalGoals: 1.2e9, bestLeague: 6, trophies: 1, mine: true },
+    ] } });
+  });
+  assert.ok(await openTab(page, 'Club & Mehr'));
+  await page.getByRole('tab', { name: 'Rangliste' }).click();
+  assert.equal(new URL(page.url()).pathname, '/club/rangliste');
+  await page.locator('.leaderboard-list li').nth(1).waitFor({ timeout: 10000 });
+  assert.match(await page.locator('.leaderboard-list li.mine').innerText(), /Deine Welt/);
+  await page.getByRole('radio', { name: 'Liga' }).click();
+  await page.locator('.leaderboard-value', { hasText: 'Liga 1' }).waitFor({ timeout: 10000 });
+  assert.deepEqual(sorts, ['goals', 'league']);
+  assert.deepEqual(await layoutProblems(page), []);
+  assert.deepEqual(problems, []);
+  await page.close();
+});
+
 test('every tab has its own address, and switching tabs or going back keeps the game running', async () => {
   const now = Date.now();
   const { page, problems } = await openWithSave(VIEWPORTS[0], save(richFeatures(now), now));

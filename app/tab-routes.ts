@@ -2,7 +2,7 @@
 // game page (see the rewrites in next.config.ts), so switching tabs never reloads or remounts the game.
 export const TAB_PATHS = {
   home: '/home', cup: '/spiele', squad: '/kader', career: '/karriere', packs: '/packs', album: '/packs/album',
-  club: '/club', fabrizio: '/club/fabrizio', missions: '/club/missionen', history: '/club/verlauf',
+  club: '/club', fabrizio: '/club/fabrizio', missions: '/club/missionen', leaderboard: '/club/rangliste', history: '/club/verlauf',
 } as const;
 
 export type RoutedTab = keyof typeof TAB_PATHS;

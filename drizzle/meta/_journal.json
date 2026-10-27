@@ -29,6 +29,13 @@
       "when": 1792662183749,
       "tag": "0003_profile_login_email",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793095417937,
+      "tag": "0004_coop_leaderboard",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,4 @@
-import { and, desc, eq, getTableColumns, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, gt, isNull, lte, or, sql } from "drizzle-orm";
 import type { AnyColumn } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -34,6 +34,18 @@ const SEAT_FIELDS = {
   player4PlayerId: coopRooms.player4PlayerId, player4Name: coopRooms.player4Name, player4LastSeenAt: coopRooms.player4LastSeenAt,
 };
 export type RoomSeats = { [K in keyof typeof SEAT_FIELDS]: RoomRow[K] };
+
+export type LeaderboardSort = "goals" | "league" | "trophies";
+/** Only the small columns a leaderboard row shows, plus the seats to mark the reader's own worlds. */
+const LEADERBOARD_FIELDS = {
+  ...SEAT_FIELDS,
+  roomName: coopRooms.roomName,
+  totalGoals: coopRooms.sharedTotalGoals,
+  bestLeague: coopRooms.sharedBestLeague,
+  trophies: coopRooms.sharedTrophies,
+  updatedAt: coopRooms.updatedAt,
+};
+export type LeaderboardRow = RoomSeats & { roomName: string; totalGoals: number; bestLeague: number; trophies: number; updatedAt: string };
 
 /** A cloud save without the save itself, for writes that already have it. */
 const { saveJson: _saveColumn, ...SAVE_META_FIELDS } = getTableColumns(cloudSaves);
@@ -303,6 +315,21 @@ export class GoalClickerDatabase {
       ))
       .orderBy(desc(coopRooms.updatedAt))
       .limit(12);
+  }
+
+  /** The best worlds by goals, by league reached (1 is the top) or by trophies; ties go to more goals. */
+  async getLeaderboard(sort: LeaderboardSort, limit: number): Promise<LeaderboardRow[]> {
+    const order = sort === "league"
+      ? [asc(coopRooms.sharedBestLeague), desc(coopRooms.sharedTotalGoals)]
+      : sort === "trophies"
+        ? [desc(coopRooms.sharedTrophies), desc(coopRooms.sharedTotalGoals)]
+        : [desc(coopRooms.sharedTotalGoals)];
+    return this.client
+      .select(LEADERBOARD_FIELDS)
+      .from(coopRooms)
+      .where(gt(coopRooms.sharedTotalGoals, 0))
+      .orderBy(...order, asc(coopRooms.code))
+      .limit(Math.max(1, Math.min(100, Math.floor(limit))));
   }
 
   async insertRoom(values: typeof coopRooms.$inferInsert) {

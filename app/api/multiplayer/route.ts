@@ -278,6 +278,8 @@ function gameColumns(game: CoopGameState, timestamp: string, previousRevision = 
     sharedStars: game.stars,
     sharedSeasons: game.seasons,
     sharedMinigameWins: game.minigameWins,
+    sharedBestLeague: getReachedLeague(game.seasons, game.features.seasonMode.highestDivision),
+    sharedTrophies: Object.values(game.features.cup.trophies).reduce((total, count) => total + count, 0),
     sharedMiniGameCooldownsJson: JSON.stringify(game.miniGameCooldowns),
     sharedFeaturesJson: JSON.stringify(game.features),
     sharedStateBackupJson: JSON.stringify(game),

@@ -287,3 +287,19 @@ test('world reads leave the backup copy out and features only where needed', { s
   assert.equal(written.sharedFeaturesJson, '{"a":1}');
   assert.equal((await db.updateRoom('EGR1', { roomName: 'Neu' }))!.sharedFeaturesJson, '{"a":1}');
 });
+
+test('the leaderboard sorts worlds by goals, league and trophies and skips empty worlds', { skip }, async () => {
+  await db.insertRoom({ ...room('LB01'), roomName: 'Torfabrik', sharedTotalGoals: 9e9, sharedBestLeague: 8, sharedTrophies: 1 });
+  await db.insertRoom({ ...room('LB02'), roomName: 'Ligaspitze', sharedTotalGoals: 5e6, sharedBestLeague: 1, sharedTrophies: 2 });
+  await db.insertRoom({ ...room('LB03'), roomName: 'Pokalsammler', sharedTotalGoals: 7e6, sharedBestLeague: 1, sharedTrophies: 9, guestPlayerId: 'guest-LB03', guestName: 'Gast' });
+  await db.insertRoom({ ...room('LB04'), roomName: 'Leer', sharedTotalGoals: 0, sharedBestLeague: 1, sharedTrophies: 99 });
+  const names = async (sort: 'goals' | 'league' | 'trophies') => (await db.getLeaderboard(sort, 25)).filter((row) => row.roomName !== 'Meine Welt').map((row) => row.roomName);
+  assert.deepEqual((await names('goals')).slice(0, 3), ['Torfabrik', 'Pokalsammler', 'Ligaspitze']);
+  // Same league: more goals first.
+  assert.deepEqual((await names('league')).slice(0, 3), ['Pokalsammler', 'Ligaspitze', 'Torfabrik']);
+  assert.deepEqual((await names('trophies')).slice(0, 3), ['Pokalsammler', 'Ligaspitze', 'Torfabrik']);
+  assert.ok(!(await names('goals')).includes('Leer'));
+  const row = (await db.getLeaderboard('trophies', 1))[0];
+  assert.equal(row.guestName, 'Gast');
+  assert.equal('sharedFeaturesJson' in row, false);
+});
