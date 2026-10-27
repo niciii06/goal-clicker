@@ -58,6 +58,17 @@ test('minigame rewards are capped per minigame',async t=>{
  assert.ok(row.sharedCoins-before<=1000,`gained ${row.sharedCoins-before}`);
 });
 
+test('minigame ids that are only object keys are rejected and leave the goals intact',async t=>{
+ const clock=Date.now();t.mock.method(Date,'now',()=>clock);
+ setup({lastPassiveAt:new Date(clock).toISOString()});
+ const before=row.sharedCoins;
+ for(const minigameId of ['constructor','toString','__proto__']){
+  const r=await action('minigame',{minigameId,reward:100});
+  assert.equal(r.status,400,minigameId);
+ }
+ assert.equal(row.sharedCoins,before);
+});
+
 test('oversized request bodies are rejected with 413',async()=>{
  setup();
  const r=await action('join',{nickname:'Nicolas',padding:'x'.repeat(70*1024)},'big-player-123');

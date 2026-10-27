@@ -10,14 +10,16 @@ import { getDb } from "../../../db";
 import { nameRecoveryAllowed, resolvePlayer } from "../../auth/player";
 import type { LightRoomRow, RoomRow, RoomSeats, RoomUpdate } from "../../../db";
 import { createHash } from "node:crypto";
-import { SPECIAL_CARD_PACK, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getTransferBonuses, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
+import { SPECIAL_CARD_PACK, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
 import type { GameFeatures, PenaltyDirection, StarFormationId, StarPackReveal } from "../../feature-data";
 import { isSupportedMultiplayerProtocol, MULTIPLAYER_UPDATE_MESSAGE } from "../../multiplayer-protocol";
 import { getFormationUnlockLeague, getPackUnlockLeague, getReachedLeague, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked, MAX_CAREER_SEASON } from "../../season-progression";
-import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../../upgrade-purchase";
+import { calculateBulkUpgradePurchase } from "../../upgrade-purchase";
 import { MAX_MULTIPLAYER_BODY_BYTES, readJsonBody, RequestBodyTooLargeError } from "../request-body";
 import { claimDailyReward } from "../../daily-reward";
-import { COMBO_LEVELS } from "../../game/constants";
+import { ACHIEVEMENTS, BALANCE_VERSION, COMBO_LEVELS, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_IDS } from "../../game/constants";
+import { getBaseClickPower, getBasePassivePower, getClickPower, getCost, getLevel } from "../../game/economy";
+import { getUpgrade } from "../../game/upgrades";
 
 const MAX_COMBO_MULTIPLIER = Math.max(...COMBO_LEVELS.map((level) => level.multiplier));
 import { answerPressConference, getPressReward } from "../../press-conference";
@@ -25,10 +27,6 @@ import { answerPressConference, getPressReward } from "../../press-conference";
 const MAX_NAME_LENGTH = 18;
 const MAX_ROOM_NAME_LENGTH = 28;
 const MAX_PLAYER_ID_LENGTH = 80;
-const MAX_MULTIPLIER_LEVEL = 8;
-const MAX_SEASON_STARS = 20;
-const BALANCE_VERSION = 4;
-const MINI_GAME_COOLDOWN_SECONDS: Record<string, number> = { penalty: 60, dribble: 75, crossbar: 90, prediction: 120 };
 // Highest reward each client minigame can legitimately produce (see awardMiniGame callers in app/page.tsx).
 const MINI_GAME_MAX_REWARD: Record<string, number> = { penalty: 1000, dribble: 355, crossbar: 275, prediction: 335 };
 // Passive income is additive over time, so it is saved now and then instead of on every poll.
@@ -41,46 +39,6 @@ const PASSIVE_BACKGROUND_GRACE_MS = 24 * 60 * 60 * 1000;
 const TRANSFER_MARKET_CLOSED_MESSAGE = "Der Transfermarkt ist geschlossen. Fabrizio Romario bleibt aktiv.";
 // Temporärer Schalter: auf true setzen, um neue AZB Einlösungen wieder zu erlauben.
 const AZB_CODE_ENABLED = false;
-
-const UPGRADES: Record<string, { name: string; description: string; baseCost: number; scale: number; kind: string }> = {
-  boots: { name: "Schnellere Stiefel", description: "+1 Tor pro Klick", baseCost: 25, scale: 1.22, kind: "click" },
-  ballboy: { name: "Balljunge", description: "+1 Tor pro Sekunde", baseCost: 120, scale: 1.2, kind: "auto" },
-  technique: { name: "Schusstechnik", description: "+3 Tore pro Klick", baseCost: 260, scale: 1.24, kind: "click" },
-  instinct: { name: "Torinstinkt", description: "+5 Tore pro Klick", baseCost: 1400, scale: 1.26, kind: "click" },
-  coach: { name: "Taktiktafel", description: "+15 Tore pro Sekunde", baseCost: 3500, scale: 1.23, kind: "auto" },
-  striker: { name: "Killerstürmer", description: "+10 Tore pro Klick", baseCost: 7500, scale: 1.28, kind: "click" },
-  academy: { name: "Nachwuchsakademie", description: "+60 Tore pro Sekunde", baseCost: 12500, scale: 1.25, kind: "auto" },
-  floodlight: { name: "Flutlichtanlage", description: "+300 Tore pro Sekunde", baseCost: 55000, scale: 1.27, kind: "auto" },
-  longshot: { name: "Distanzschütze", description: "+25 Tore pro Klick", baseCost: 75000, scale: 1.3, kind: "click" },
-  scout: { name: "Talent-Scouting", description: "+1.200 Tore pro Sekunde", baseCost: 200000, scale: 1.29, kind: "auto" },
-  var: { name: "VAR 2.0", description: "+10.000 Tore pro Sekunde", baseCost: 400000, scale: 1.3, kind: "auto" },
-  freekick: { name: "Freistoss-Spezialist", description: "+50 Tore pro Klick", baseCost: 750000, scale: 1.32, kind: "click" },
-  stadium: { name: "Arena-Ausbau", description: "+50.000 Tore pro Sekunde", baseCost: 2000000, scale: 1.32, kind: "auto" },
-  worldclass: { name: "Weltklasse-Abschluss", description: "+100 Tore pro Klick", baseCost: 7500000, scale: 1.34, kind: "click" },
-  broadcast: { name: "Weltweite Übertragung", description: "+250.000 Tore pro Sekunde", baseCost: 8000000, scale: 1.34, kind: "auto" },
-  sponsor: { name: "Globaler Sponsor", description: "+1,2 Millionen Tore pro Sekunde", baseCost: 35000000, scale: 1.36, kind: "auto" },
-  ballondor: { name: "Ballon-d'Or-Angreifer", description: "+250 Tore pro Klick", baseCost: 75000000, scale: 1.38, kind: "click" },
-  superclub: { name: "Superclub-Netzwerk", description: "+6 Millionen Tore pro Sekunde", baseCost: 180000000, scale: 1.38, kind: "auto" },
-  captain: { name: "Kapitänsbinde", description: "+500 Tore pro Klick", baseCost: 350000000, scale: 1.42, kind: "click" },
-  golden: { name: "Goldener Schuh", description: "+10% Klickpower", baseCost: 900000000, scale: 1.58, kind: "multiplier" },
-  legacy: { name: "Vereins-Dynastie", description: "+5% auf alle Einnahmen", baseCost: 6000000000, scale: 1.68, kind: "multiplier" },
-};
-
-const ACHIEVEMENT_THRESHOLDS: Record<string, number> = {
-  first: 1,
-  hundred: 100,
-  thousand: 1000,
-  tenK: 10000,
-  hundredK: 100000,
-  million: 1000000,
-  tenMillion: 10000000,
-  hundredMillion: 100000000,
-  billion: 1000000000,
-  tenBillion: 10000000000,
-  hundredBillion: 100000000000,
-  trillion: 1000000000000,
-  dynasty: 1000000000000000,
-};
 
 type MiniGameCooldowns = Record<string, number>;
 type CoopGameState = {
@@ -249,42 +207,12 @@ function reachedLeagueOf(game: CoopGameState) {
 
 function unlockAchievements(game: CoopGameState) {
   const unlocked = new Set(game.achievements);
-  for (const [id, threshold] of Object.entries(ACHIEVEMENT_THRESHOLDS)) if (game.totalGoals >= threshold) unlocked.add(id);
+  for (const { id, threshold } of ACHIEVEMENTS) if (game.totalGoals >= threshold) unlocked.add(id);
   game.achievements = [...unlocked];
 }
 
-function getLevel(upgrades: Record<string, number>, id: string) {
-  return upgrades[id] ?? 0;
-}
-
-function getCostAtLevel(id: string, level: number) {
-  const upgrade = UPGRADES[id];
-  if (!upgrade) return Infinity;
-  return getUpgradeCostAtLevel(upgrade, level, MAX_MULTIPLIER_LEVEL);
-}
-
-function getIncomeMultiplier(upgrades: Record<string, number>, stars: number) {
-  return (1 + Math.min(MAX_SEASON_STARS, Math.max(0, stars)) * 0.02) * 1.05 ** Math.min(MAX_MULTIPLIER_LEVEL, getLevel(upgrades, "legacy"));
-}
-
-function getBaseClickPower(upgrades: Record<string, number>, stars: number, features: GameFeatures) {
-  const flat = 1 + getLevel(upgrades, "boots") + getLevel(upgrades, "technique") * 3 + getLevel(upgrades, "instinct") * 5 + getLevel(upgrades, "striker") * 10 + getLevel(upgrades, "longshot") * 25 + getLevel(upgrades, "freekick") * 50 + getLevel(upgrades, "worldclass") * 100 + getLevel(upgrades, "ballondor") * 250 + getLevel(upgrades, "captain") * 500;
-  const transfer = getTransferBonuses(features.transferMarket.ownedIds);
-  return (flat + transfer.clickBonus) * 1.1 ** Math.min(MAX_MULTIPLIER_LEVEL, getLevel(upgrades, "golden")) * getIncomeMultiplier(upgrades, stars) * (1 + transfer.incomeBonus);
-}
-
-function getClickPower(upgrades: Record<string, number>, stars: number, features: GameFeatures, now = Date.now()) {
-  return getBaseClickPower(upgrades, stars, features) * getGoalBoostMultiplier(features, now);
-}
-
-function getBasePassivePower(upgrades: Record<string, number>, stars: number, features: GameFeatures) {
-  const base = getLevel(upgrades, "ballboy") + getLevel(upgrades, "coach") * 15 + getLevel(upgrades, "academy") * 60 + getLevel(upgrades, "floodlight") * 300 + getLevel(upgrades, "scout") * 1200 + getLevel(upgrades, "var") * 10000 + getLevel(upgrades, "stadium") * 50000 + getLevel(upgrades, "broadcast") * 250000 + getLevel(upgrades, "sponsor") * 1200000 + getLevel(upgrades, "superclub") * 6000000;
-  const transfer = getTransferBonuses(features.transferMarket.ownedIds);
-  return (base + transfer.passiveBonus) * getIncomeMultiplier(upgrades, stars) * (1 + transfer.incomeBonus);
-}
-
 function getBulkPurchase(id: string, game: CoopGameState, requestedCount: number, unlimitedMoney = false) {
-  const upgrade = UPGRADES[id];
+  const upgrade = getUpgrade(id);
   if (!upgrade) return { count: 0, totalCost: 0 };
   return calculateBulkUpgradePurchase(upgrade, getLevel(game.upgrades, id), game.goals, requestedCount, {
     unlimitedMoney,
@@ -870,7 +798,7 @@ export async function POST(request: Request) {
 
     if (action === "buy") {
       const upgradeId = typeof payload.upgradeId === "string" ? payload.upgradeId : "";
-      if (!UPGRADES[upgradeId]) return jsonError("Dieses Upgrade gibt es nicht.");
+      if (!getUpgrade(upgradeId)) return jsonError("Dieses Upgrade gibt es nicht.");
       const requestedCount = finite(payload.count, 1);
       let purchaseRoom = room;
       for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -879,8 +807,8 @@ export async function POST(request: Request) {
         if (getLevel(purchaseGame.upgrades, upgradeId) === 0 && !isLeagueContentUnlocked(upgradeUnlockLeague, reachedLeagueOf(purchaseGame), testMode)) return jsonError(`Dieses Upgrade wird ab Liga ${upgradeUnlockLeague} freigeschaltet.`, 409);
         const purchase = getBulkPurchase(upgradeId, purchaseGame, requestedCount, testMode);
         if (purchase.count === 0) {
-          const price = getCostAtLevel(upgradeId, getLevel(purchaseGame.upgrades, upgradeId));
-          return jsonError(`${UPGRADES[upgradeId].name} kostet ${price.toLocaleString("de-CH")} Tore.`);
+          const price = getCost(getUpgrade(upgradeId)!, purchaseGame.upgrades);
+          return jsonError(`${getUpgrade(upgradeId)!.name} kostet ${price.toLocaleString("de-CH")} Tore.`);
         }
         if (!testMode) purchaseGame.goals -= purchase.totalCost;
         purchaseGame.upgrades[upgradeId] = getLevel(purchaseGame.upgrades, upgradeId) + purchase.count;
@@ -1237,8 +1165,8 @@ export async function POST(request: Request) {
     }
 
     if (action === "minigame") {
-      const minigameId = typeof payload.minigameId === "string" ? payload.minigameId : "";
-      if (!MINI_GAME_COOLDOWN_SECONDS[minigameId]) return jsonError("Dieses Minigame gibt es nicht.");
+      const minigameId = MINI_GAME_IDS.find((id) => id === payload.minigameId);
+      if (!minigameId) return jsonError("Dieses Minigame gibt es nicht.");
       if (game.miniGameCooldowns[minigameId] > Date.now()) return jsonError("Dieses Minigame ist noch nicht bereit.", 409);
       const reward = Math.max(0, Math.min(MINI_GAME_MAX_REWARD[minigameId] ?? 0, Math.floor(finite(payload.reward))));
       game.goals += reward;
