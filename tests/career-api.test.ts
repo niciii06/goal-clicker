@@ -121,3 +121,22 @@ test('API interactive edits validate atomically and normal completion is persist
  assert.equal(finished.data.room.game.features.cup.active,false);assert.equal(finished.data.room.game.features.career.reports.length,1);
  const again=await action('cup-tick');assert.equal(again.status,200);assert.equal(again.data.room.game.features.career.reports.length,1);assert.equal(again.data.room.game.features.cup.homeScore,finished.data.room.game.features.cup.homeScore);
 });
+test('API season home match pays the ticket income once and records it on the report',async()=>{
+ let f=initialGameFeatures();f.starXI=setBestStarXI({...f.starXI,ownedIds:STAR_XI_PLAYERS.filter(p=>p.rating<90).slice(0,40).map(p=>p.id)});f=normalizeGameFeatures(f);
+ assert.equal(fixtureFor(f,'season').away,false);
+ setup(f);
+ const started=await action('cup-start',{mode:'season'});assert.equal(started.status,200,JSON.stringify(started.data));
+ f=started.data.room.game.features;delete f.cup.simulation;
+ f.cup.homeScore=2;f.cup.awayScore=1;f.cup.lastTickAt=f.cup.matchEndsAt;f.cup.matchStartedAt=Date.now()-180001;f.cup.matchEndsAt=Date.now()-1;row.sharedFeaturesJson=JSON.stringify(f);
+ const before=row.sharedCoins;
+ const finished=await action('cup-tick');assert.equal(finished.status,200,JSON.stringify(finished.data));
+ const tickets=finished.data.room.game.features.career.reports.at(-1)?.tickets;
+ assert.ok(tickets&&tickets.attendance>0&&tickets.income>0,JSON.stringify(tickets));
+ // Passive income may add a little between the requests, the takings arrive in full.
+ assert.ok(row.sharedCoins-before>=tickets.income,`${row.sharedCoins-before} < ${tickets.income}`);
+ assert.ok(finished.data.room.game.features.history.some(e=>e.title==='Ticketeinnahmen'));
+ const coins=row.sharedCoins;
+ const again=await action('cup-tick');assert.equal(again.status,200);
+ assert.ok(row.sharedCoins-coins<tickets.income);
+ assert.equal(again.data.room.game.features.history.filter(e=>e.title==='Ticketeinnahmen').length,1);
+});

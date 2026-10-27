@@ -7,6 +7,7 @@ import { getStarXIPlayer, getStarXIPositions, getUnavailableStarXIPlayerIds, STA
 import type { GameFeatures, StarXIPlayer } from './feature-data';
 import { CAREER_MILESTONES, getPlayerMilestones, MILESTONE_METRIC_LABELS, emptyPlayerStats, getAlbumGroups, getCareerCard, getPlayerForm } from './career-data';
 import type { AwardWinner, PlayerMatchReport } from './career-data';
+import { formatNumber } from './game/format';
 import { leagueForTier } from './season-progression';
 import { getBans, suspensionLabel, yellowCardStatus } from './discipline';
 
@@ -50,6 +51,7 @@ export function MatchRatingsPanel({ features }: { features: GameFeatures; minute
     <div className="career-rating-list">{[...r.players].sort((a,b)=>b.rating-a.rating).map(p=><PlayerReportRow key={p.playerId} report={p} motm={r.motmId===p.playerId}/>)}</div>
     {r.startingIds && <p>Startelf: {r.startingIds.map(name).join(', ')}</p>}{r.benchIds && <p>Bank: {r.benchIds.map(name).join(', ')}</p>}
     {r.events?.length ? <ol className="archive-events">{r.events.map(e=><li key={e.id}>{e.minute}′ · {e.label}</li>)}</ol> : null}
+    {r.tickets&&<small>Ticketeinnahmen: {r.tickets.attendance.toLocaleString('de-CH')} Zuschauer · +{formatNumber(r.tickets.income)} Tore</small>}
     {r.derbyReward>0&&<small>Derbyprämie: {r.derbyReward} Fragmente</small>}</details>)}
   </section>;
 }
@@ -124,10 +126,11 @@ export function PostMatchSummary({features,onCareer,onContinue}:{features:GameFe
   // the summary shows the match that was played, as the report recorded it.
   const opponent=report?.opponent??c.opponent,away=report?.away??Boolean(c.fixture?.away),clubScore=report?.homeScore??c.homeScore,opponentScore=report?.awayScore??c.awayScore;
   const top=[...(report?.players??[])].sort((a,b)=>b.rating-a.rating).slice(0,3);
-  const rewards=features.history.filter(e=>e.timestamp>= (report?.createdAt??c.lastTickAt)-1000 && /prämie|freigeschaltet|gewonnen|aufstieg|turnieraus|derby/i.test(e.title)).slice(-6);
+  const rewards=features.history.filter(e=>e.timestamp>= (report?.createdAt??c.lastTickAt)-1000 && /prämie|einnahmen|freigeschaltet|gewonnen|aufstieg|turnieraus|derby/i.test(e.title)).slice(-6);
   return <section className="post-match-summary" aria-label="Matchabschluss"><p className="eyebrow">ABPFIFF · {report?.competition??(c.mode==='season'?'SAISON':'TURNIER')}</p><div className="summary-score"><strong>{away?opponent:features.club.name}</strong><b>{away?opponentScore:clubScore} : {away?clubScore:opponentScore}</b><strong>{away?features.club.name:opponent}</strong></div>
   <p>{c.lastResult}{c.penaltyEvents.length>0&&` · Elfmeterschiessen ${c.penaltyHomeScore}:${c.penaltyAwayScore}`}</p>
   {c.simulation&&<div className="summary-match-stats"><span>Schüsse: {c.broadcast?.clubStats.shots??0} : {c.broadcast?.opponentStats.shots??0}</span><span>Aufs Tor: {c.broadcast?.clubStats.onTarget??0} : {c.broadcast?.opponentStats.onTarget??0}</span></div>}
+  {report?.tickets&&<p className="summary-tickets">🎟️ {report.tickets.attendance.toLocaleString('de-CH')} Zuschauer · Ticketeinnahmen +{formatNumber(report.tickets.income)} Tore</p>}
   {c.matchEvents.length>0&&<div className="summary-goals">{c.matchEvents.map(e=><span key={e.id}>{goalLabel(e)}</span>)}</div>}
   <div className="summary-performances">{top.map(p=><span key={p.playerId}><strong>{name(p.playerId)}{report?.motmId===p.playerId?' ★':''}</strong><b>{p.rating.toFixed(1)}</b><small>{p.goals} Tore · {p.assists} Vorlagen</small></span>)}</div>
   {report?.events?.length ? <details><summary>Tore und wichtige Ereignisse</summary><ol className="archive-events">{report.events.map(e=><li key={e.id}>{e.minute}′ · {e.label}</li>)}</ol></details> : null}

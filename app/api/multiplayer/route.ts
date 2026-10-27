@@ -20,6 +20,7 @@ import { claimDailyReward } from "../../daily-reward";
 import { ACHIEVEMENTS, BALANCE_VERSION, COMBO_LEVELS, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_IDS } from "../../game/constants";
 import { getBaseClickPower, getBasePassivePower, getClickPower, getCost, getLevel } from "../../game/economy";
 import { getUpgrade } from "../../game/upgrades";
+import { getTicketIncome, recordTicketIncome } from "../../ticket-income";
 
 const MAX_COMBO_MULTIPLIER = Math.max(...COMBO_LEVELS.map((level) => level.multiplier));
 import { answerPressConference, getPressReward } from "../../press-conference";
@@ -244,9 +245,17 @@ function startSeasonCupMatch(game: CoopGameState, now: number) {
 }
 
 function recordMultiplayerSeasonMatch(game: CoopGameState, now: number) {
+  // The stadium and the table still show the match that was played, so the takings are counted first.
+  const tickets = getTicketIncome(game.features, getBasePassivePower(game.upgrades, game.stars, game.features));
   const result = recordSeasonModeMatch(game.features.seasonMode, game.features.cup.homeScore, game.features.cup.awayScore, game.features.club.name, now, Math.random, game.features.cup.opponentIds[0]);
   if (!result.played || !result.entry) return;
   recordCareerMatch(game.features, now, result.entry);
+  if (tickets) {
+    recordTicketIncome(game.features, tickets, now);
+    game.goals += tickets.income;
+    game.seasonGoals += tickets.income;
+    game.totalGoals += tickets.income;
+  }
   game.features.seasonMode = result.state;
   game.features.seasonMode.table = game.features.seasonMode.table.map((team) => team.id === "club" ? { ...team, name: game.features.club.name } : team);
   game.features = finishActiveTransferLoans(game.features, now).features;

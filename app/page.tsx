@@ -39,6 +39,7 @@ import { consumeTravel, eligibilityError, fixtureFor, journeyView, settleTravel,
 import { coopRoleLabel, isCoopRole, multiplayerUrl, notifyCoopOffline, occupiedCoopPlayers, readCoopResponse, upsertSavedRoom } from "./game/coop";
 import { createClickResult, decayComboCount, formatComboMultiplier, getBaseClickPower, getBasePassivePower, getBulkPurchase, getClickPower, getComboLevel, getComboProgress, getCost, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades } from "./game/economy";
 import { UPGRADES } from "./game/upgrades";
+import { expectedHomeCrowd, getTicketIncome, recordTicketIncome } from "./ticket-income";
 import { directionLabel, formatCountdown, formatGoalDifference, formatHistoryTime, formatNumber, formatPackChance, getRandomCrossbarHeight, getRandomMatchPrediction, getRandomPenaltyDirection, heightLabel, predictionLabel } from "./game/format";
 import { getCurrentTime, getTravelTime, syncTravelClock } from "./game/clock";
 import { getStarCardTier, getWalkoutPresentation } from "./walkout-data";
@@ -1841,10 +1842,13 @@ function App() {
   }
 
 
-  function recordFinishedSeasonMatch(features: GameFeatures, now: number) {
+  function recordFinishedSeasonMatch(features: GameFeatures, now: number, passivePerSecond: number) {
+    // The stadium and the table still show the match that was played, so the takings are counted first.
+    const tickets = getTicketIncome(features, passivePerSecond);
     const result = recordSeasonModeMatch(features.seasonMode, features.cup.homeScore, features.cup.awayScore, features.club.name, now, Math.random, features.cup.opponentIds[0]);
-    if (!result.played || !result.entry) return { features, entry: null as typeof result.entry };
+    if (!result.played || !result.entry) return { features, entry: null as typeof result.entry, ticketIncome: 0 };
     features = recordCareerMatch(features, now, result.entry);
+    if (tickets) recordTicketIncome(features, tickets, now);
     features.seasonMode = result.state;
     features.seasonMode.table = features.seasonMode.table.map((team) => team.id === "club" ? { ...team, name: features.club.name } : team);
     features = finishActiveTransferLoans(features, now).features;
@@ -1855,7 +1859,7 @@ function App() {
       tone: result.entry.seasonOutcome === "relegated" || result.entry.outcome === "loss" ? "negative" : result.entry.seasonOutcome === "promoted" || result.entry.seasonOutcome === "hall-of-fame" || result.entry.outcome === "win" ? "positive" : "neutral",
     });
     const seasonReward = result.entry.seasonOutcome === "promoted" ? 1 : result.entry.seasonOutcome === "hall-of-fame" ? 2 : 0;
-    return { features, entry: result.entry, seasonReward };
+    return { features, entry: result.entry, seasonReward, ticketIncome: tickets?.income ?? 0 };
   }
 
   async function takeCupPenalty(direction: CupPenaltyDirection) {
@@ -1882,9 +1886,9 @@ function App() {
       if (result.finished) {
         features.starXI = restoreStarXIAfterMatch(features.starXI, features.cup);
         if (features.cup.mode === "season") {
-          const finished = recordFinishedSeasonMatch(features, cupNow);
+          const finished = recordFinishedSeasonMatch(features, cupNow, getBasePassivePower(current.upgrades, current.stars, current.features));
           features = finished.features;
-          return { ...current, features, seasons: Math.max(current.seasons, features.seasonMode.highestDivision - 1), stars: Math.min(MAX_SEASON_STARS, current.stars + (finished.seasonReward ?? 0)) };
+          return { ...current, features, goals: current.goals + finished.ticketIncome, seasonGoals: current.seasonGoals + finished.ticketIncome, totalGoals: current.totalGoals + finished.ticketIncome, seasons: Math.max(current.seasons, features.seasonMode.highestDivision - 1), stars: Math.min(MAX_SEASON_STARS, current.stars + (finished.seasonReward ?? 0)) };
         } else {
           recordCareerMatch(features, cupNow);
 
@@ -1929,9 +1933,9 @@ function App() {
         features = structuredClone(features);
         features.starXI = restoreStarXIAfterMatch(features.starXI, features.cup);
         if (features.cup.mode === "season") {
-          const finished = recordFinishedSeasonMatch(features, now);
+          const finished = recordFinishedSeasonMatch(features, now, getBasePassivePower(current.upgrades, current.stars, current.features));
           features = finished.features;
-          return { ...current, features, seasons: Math.max(current.seasons, features.seasonMode.highestDivision - 1), stars: Math.min(MAX_SEASON_STARS, current.stars + (finished.seasonReward ?? 0)) };
+          return { ...current, features, goals: current.goals + finished.ticketIncome, seasonGoals: current.seasonGoals + finished.ticketIncome, totalGoals: current.totalGoals + finished.ticketIncome, seasons: Math.max(current.seasons, features.seasonMode.highestDivision - 1), stars: Math.min(MAX_SEASON_STARS, current.stars + (finished.seasonReward ?? 0)) };
         } else {
           recordCareerMatch(features, now);
 
@@ -2573,7 +2577,7 @@ function App() {
                   <p>10 Spieltage · 5 Heimspiele und 5 Auswärtsspiele · {getSeasonModeDivisionLabel(seasonMode.division)}</p>
                   <div className="competition-card-route"><span>{seasonCareerComplete ? "PRESTIGE BEREIT" : `SPIELTAG ${seasonMode.matchday + 1} / ${SEASON_MODE_MATCHES_PER_SEASON}`}</span><strong>{seasonCareerComplete ? "★" : `★ ${displayGame.stars}`}</strong></div>
                   <div className="competition-card-opponent"><strong>{seasonCareerComplete ? "Hall of Fame erreicht" : seasonNextOpponent.name}</strong><small>{seasonCareerComplete ? "Alle Freischaltungen bleiben erhalten." : `${seasonNextOpponent.rating} OVR · Tabellenwertung nach dem Abpfiff`}</small></div>
-                  <span className="travel-home-label">{!fixtureFor(displayGame.features,"season").away ? "Heimspiel · Bümplizstrasse 45, Bern" : `Auswärtsspiel · ${fixtureFor(displayGame.features,"season").venue.stadium}, ${fixtureFor(displayGame.features,"season").venue.city} · ${Math.round(travelTiming(fixtureFor(displayGame.features,"season")).km)} km · ca. ${durationLabel(travelTiming(fixtureFor(displayGame.features,"season")).baseMs/1000)} im Spiel`}</span><button className="mode-primary competition-card-action" onClick={() => void (seasonCareerComplete ? beginSeasonPrestige() : startSeasonCupMatch())} disabled={travelBusy || displayGame.features.cup.pendingNextRound || hasTransferSquadVacancy || suspendedPlayerOnSquad || (!seasonCareerComplete && !starXIComplete) || coopBusy}>{seasonCareerComplete ? "Prestige starten" : travelLabel(fixtureFor(displayGame.features,"season"))}</button>
+                  <span className="travel-home-label">{!fixtureFor(displayGame.features,"season").away ? `Heimspiel · Bümplizstrasse 45, Bern · etwa ${expectedHomeCrowd(displayGame.features).toLocaleString("de-CH")} Fans erwartet` : `Auswärtsspiel · ${fixtureFor(displayGame.features,"season").venue.stadium}, ${fixtureFor(displayGame.features,"season").venue.city} · ${Math.round(travelTiming(fixtureFor(displayGame.features,"season")).km)} km · ca. ${durationLabel(travelTiming(fixtureFor(displayGame.features,"season")).baseMs/1000)} im Spiel`}</span><button className="mode-primary competition-card-action" onClick={() => void (seasonCareerComplete ? beginSeasonPrestige() : startSeasonCupMatch())} disabled={travelBusy || displayGame.features.cup.pendingNextRound || hasTransferSquadVacancy || suspendedPlayerOnSquad || (!seasonCareerComplete && !starXIComplete) || coopBusy}>{seasonCareerComplete ? "Prestige starten" : travelLabel(fixtureFor(displayGame.features,"season"))}</button>
                 </article>
                 {TOURNAMENTS.map((tournament) => {
                   const unlockLeague = getTournamentUnlockLeague(tournament.id);
