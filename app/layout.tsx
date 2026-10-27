@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { PwaRegister } from "./pwa-register";
 import { THEME_BOOT_SCRIPT, THEME_COLORS } from "./theme";
 
 export const dynamic = 'force-dynamic';
@@ -18,8 +19,9 @@ export const metadata: Metadata = {
     type: "website",
   },
   twitter: { card: "summary_large_image" },
+  appleWebApp: { capable: true, title: "Goal Clicker", statusBarStyle: "black-translucent" },
   icons: {
-    icon: "/favicon.svg",
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }, { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
     shortcut: "/favicon.svg",
     apple: "/apple-touch-icon.png",
   },
@@ -47,6 +49,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased">
         {children}
+        <PwaRegister />
       </body>
     </html>
   );

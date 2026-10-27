@@ -46,3 +46,19 @@ test("the account API reports that login is not configured on a server without k
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { configured: false, signedIn: false });
 });
+
+test("the app manifest, its icons, the service worker and the offline page are served", async () => {
+  const html = await (await fetch(BASE)).text();
+  assert.match(html, /<link rel="manifest" href="\/manifest\.webmanifest"/);
+  const response = await fetch(`${BASE}/manifest.webmanifest`);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /manifest\+json/);
+  const manifest = await response.json();
+  assert.equal(manifest.display, "standalone");
+  assert.equal(manifest.start_url, "/home");
+  assert.ok(manifest.icons.some((icon) => icon.purpose === "maskable"));
+  for (const path of [...manifest.icons.map((icon) => icon.src), "/sw.js", "/offline.html"]) {
+    assert.equal((await fetch(`${BASE}${path}`)).status, 200, path);
+  }
+  assert.match((await fetch(`${BASE}/sw.js`)).headers.get("content-type") ?? "", /javascript/);
+});

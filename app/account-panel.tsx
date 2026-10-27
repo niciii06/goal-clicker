@@ -1,7 +1,7 @@
 "use client";
 // The signed in account in the game: the account button in the header with the profile settings, the link
 // between account and player ID, and the save file export/import in the club tab.
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import type { ChangeEvent, FormEvent } from "react";
 import { AccountContext } from "./account-gate";
@@ -10,6 +10,8 @@ import { authErrorMessage, setAccountPassword } from "./auth/browser";
 import { subscribeSyncStatus } from "./cloud-sync";
 import type { SyncStatus } from "./cloud-sync";
 import { resumeLocalPersistence, suspendLocalPersistence } from "./game/storage";
+import { getInstallState, promptInstall, subscribeInstallState } from "./pwa";
+import type { InstallState } from "./pwa";
 import { DISPLAY_NAME_MAX, displayNameError, PASSWORD_MAX, PASSWORD_MIN, passwordError, USERNAME_MAX, usernameError } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
 import { applySaveFile, createSaveFile, parseSaveFile, saveFileName, savedPlayerId } from "./save-file";
@@ -154,6 +156,7 @@ export function AccountButton() {
         <button type="button" className="account-dialog-close" aria-label="Schliessen" onClick={() => setOpen(false)}>×</button>
         <ProfilePanel onMessage={setNotice} />
         <ThemePicker />
+        <InstallAppPanel onMessage={setNotice} />
         {notice && <p className="account-notice" role="status">{notice}</p>}
         <button type="button" className="mode-secondary account-dialog-signout" onClick={() => void account.signOut()}>Abmelden</button>
       </div>
@@ -169,6 +172,18 @@ function ThemePicker() {
     <div role="radiogroup" aria-labelledby="theme-picker-label">
       {THEME_OPTIONS.map((option) => <button key={option.value} type="button" role="radio" aria-checked={theme === option.value} className={theme === option.value ? "active" : ""} onClick={() => { setThemePreference(option.value); setTheme(option.value); }}>{option.label}</button>)}
     </div>
+  </div>;
+}
+
+/** "App installieren": the browser's install prompt, or the share menu hint on iPhone and iPad. */
+function InstallAppPanel({ onMessage }: { onMessage: (text: string) => void }) {
+  const state = useSyncExternalStore(subscribeInstallState, getInstallState, () => "unavailable" as InstallState);
+  if (state === "unavailable") return null;
+  return <div className="install-app">
+    <span>App</span>
+    {state === "installed" && <p>Goal Clicker ist als App installiert.</p>}
+    {state === "prompt" && <button type="button" className="mode-secondary" onClick={() => void promptInstall().then((accepted) => { if (accepted) onMessage("Goal Clicker wird installiert."); })}>App installieren</button>}
+    {state === "ios" && <p>Zum Installieren unten auf Teilen tippen und dann «Zum Home Bildschirm».</p>}
   </div>;
 }
 

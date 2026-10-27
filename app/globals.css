@@ -1827,6 +1827,9 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .theme-picker > div { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface-soft); }
 .theme-picker button { min-height: 36px; padding: 0 12px; border: 0; border-radius: var(--radius-pill); color: var(--soft); cursor: pointer; background: transparent; font-size: var(--fs-sm); font-weight: 700; }
 .theme-picker button.active { color: var(--on-accent); background: var(--accent); }
+.install-app { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+.install-app > span { color: var(--soft); font-size: var(--fs-sm); font-weight: 700; }
+.install-app p { flex: 1 1 200px; margin: 0; color: var(--soft); font-size: var(--fs-sm); text-align: right; }
 
 /* Touch targets: at least 40px everywhere, 44px on touch screens. */
 .icon-button { width: 40px; height: 40px; }
