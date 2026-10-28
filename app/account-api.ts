@@ -5,7 +5,8 @@ import { createClient } from "@supabase/supabase-js";
 import { getDb } from "../db";
 import type { CloudSave, GoalClickerDatabase, Profile } from "../db";
 import { authConfigured, supabasePublishableKey, supabaseUrl } from "./auth/config";
-import { getRequestUser } from "./auth/server";
+import { forgetAccountLink } from "./auth/player";
+import { getRequestUser, requestLoginExists } from "./auth/server";
 import type { RequestUser } from "./auth/server";
 import { readJsonBody, RequestBodyTooLargeError } from "./api/request-body";
 import { cleanCloudSaveKeys, MAX_CLOUD_SAVE_BYTES, serializeCloudSaveKeys } from "./cloud-save-rules";
@@ -19,6 +20,8 @@ export type AccountApiDeps = {
   now: () => Date;
   /** Registers through the Supabase Auth API, where the database cannot create logins itself (local Supabase, tests). */
   signUp: (email: string, password: string) => Promise<string | null>;
+  /** Asks Supabase Auth whether the login still exists; a token stays valid for a while after its account is deleted. */
+  loginExists?: (request: Request) => Promise<boolean>;
 };
 
 async function signUpThroughAuthApi(email: string, password: string) {
@@ -28,7 +31,11 @@ async function signUpThroughAuthApi(email: string, password: string) {
   return data.user?.id ?? null;
 }
 
-const defaults: AccountApiDeps = { getUser: getRequestUser, db: getDb, now: () => new Date(), signUp: signUpThroughAuthApi };
+const defaults: AccountApiDeps = { getUser: getRequestUser, db: getDb, now: () => new Date(), signUp: signUpThroughAuthApi, loginExists: requestLoginExists };
+
+const deletedLogin = () => json({ error: "Dieses Konto gibt es nicht mehr. Bitte melde dich neu an.", errorCode: "LOGIN_REQUIRED" }, 401);
+/** Creating data needs a login that still exists, not only a token that has not expired yet. */
+const loginGone = async (request: Request, deps: AccountApiDeps) => deps.loginExists ? !(await deps.loginExists(request)) : false;
 const noStore = { "cache-control": "no-store" };
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: noStore });
 const MAX_PROFILE_BODY_BYTES = 4096;
@@ -39,15 +46,15 @@ export function publicProfile(profile: Profile): PublicProfile {
 
 /** The save as the browser needs it; `since` leaves the keys out when the device already has that version. */
 function cloudSaveBody(save: CloudSave | null, since = -1) {
-  if (!save) return { version: 0, updatedAt: null, active: false, keys: null };
-  if (save.version <= since) return { version: save.version, updatedAt: save.updatedAt, active: save.active, keys: null, unchanged: true };
+  if (!save) return { version: 0, updatedAt: null, active: false, activeVersion: 0, keys: null };
+  if (save.version <= since) return { version: save.version, updatedAt: save.updatedAt, active: save.active, activeVersion: save.activeVersion, keys: null, unchanged: true };
   let keys: unknown = null;
   try {
     keys = JSON.parse(save.saveJson);
   } catch {
     // A broken stored save counts as none; the next upload replaces it.
   }
-  return { version: save.version, updatedAt: save.updatedAt, active: save.active, keys: cleanCloudSaveKeys(keys) };
+  return { version: save.version, updatedAt: save.updatedAt, active: save.active, activeVersion: save.activeVersion, keys: cleanCloudSaveKeys(keys) };
 }
 
 /** Runs a handler for a verified login and turns unexpected failures into a 503 the client can retry. */
@@ -78,6 +85,7 @@ export function createProfileResponse(request: Request, deps = defaults) {
     const displayName = cleanDisplayName(typeof body.displayName === "string" ? body.displayName : "");
     const invalid = usernameError(username) ?? displayNameError(displayName);
     if (invalid) return json({ error: invalid, errorCode: "INVALID" }, 400);
+    if (await loginGone(request, deps)) return deletedLogin();
     const result = await deps.db().createProfile(user.id, username, displayName, deps.now().toISOString());
     if (result.reason === "taken") return json({ error: "Dieser Benutzername ist schon vergeben.", errorCode: "USERNAME_TAKEN" }, 409);
     if (!result.profile) return json({ error: "Dein Konto hat schon ein Profil.", errorCode: "PROFILE_EXISTS" }, 409);
@@ -120,6 +128,7 @@ export function deleteProfileResponse(request: Request, deps = defaults) {
     const confirm = typeof body.confirm === "string" ? usernameKey(body.confirm) : "";
     if (profile && confirm !== profile.usernameKey) return json({ error: "Zur Bestätigung den Benutzernamen eintippen.", errorCode: "CONFIRM_REQUIRED" }, 400);
     const { loginDeleted } = await store.deleteAccount(user.id);
+    forgetAccountLink(user.id);
     return json({ deleted: true, loginDeleted });
   });
 }
@@ -166,7 +175,14 @@ export function registerResponse(request: Request, deps = defaults) {
     const email = `p-${randomUUID()}@${PASSWORD_LOGIN_DOMAIN}`;
     const userId = await store.createPasswordLogin(email, password) ?? await deps.signUp(email, password);
     if (!userId) return json({ error: "Das Konto konnte nicht erstellt werden." }, 503);
-    const result = await store.createProfile(userId, username, displayName, deps.now().toISOString(), email);
+    let result: Awaited<ReturnType<Store["createProfile"]>>;
+    try {
+      result = await store.createProfile(userId, username, displayName, deps.now().toISOString(), email);
+    } catch (error) {
+      // The login exists but has no profile and no reachable username; remove it before reporting the failure.
+      await store.deleteLogin(userId).catch(() => false);
+      throw error;
+    }
     if (!result.profile) {
       // A parallel registration took the name between the check and now; the new login must not stay behind.
       await store.deleteLogin(userId);
@@ -202,6 +218,8 @@ export function putCloudSaveResponse(request: Request, deps = defaults) {
     if (!Number.isSafeInteger(baseVersion) || baseVersion < 0) return json({ error: "Die Spielstand Version fehlt.", errorCode: "INVALID" }, 400);
     const keys = cleanCloudSaveKeys(body.keys);
     if (!keys) return json({ error: "Der Spielstand ist unvollständig.", errorCode: "INVALID" }, 400);
+    // The first save creates a row; a deleted account must not get one back through its old token.
+    if (baseVersion === 0 && await loginGone(request, deps)) return deletedLogin();
     const result = await deps.db().putCloudSave(user.id, serializeCloudSaveKeys(keys), baseVersion, deps.now().toISOString(), body.active !== false);
     if (result.save) return json({ version: result.save.version, updatedAt: result.save.updatedAt });
     return json({ error: "Auf einem anderen Gerät wurde inzwischen weitergespielt.", errorCode: "SAVE_CONFLICT", ...cloudSaveBody(result.conflict) }, 409);

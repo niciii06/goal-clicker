@@ -59,7 +59,7 @@ function memoryStore() {
     putCloudSave: async (userId: string, saveJson: string, baseVersion: number, now: string, active = true) => {
       const current = saves.get(userId);
       if ((current?.version ?? 0) !== baseVersion) return { conflict: current ?? null };
-      const save = { userId, saveJson, version: baseVersion + 1, active, updatedAt: now };
+      const save = { userId, saveJson, version: baseVersion + 1, active, activeVersion: active ? baseVersion + 1 : current?.activeVersion ?? 0, updatedAt: now };
       saves.set(userId, save);
       return { save };
     },
@@ -170,17 +170,19 @@ test('a rejected profile change changes nothing, not even the display name sent 
 test('a cloud save only replaces the version it was loaded from', async () => {
   const { call } = setup();
   const save = (baseVersion: number, goals: number, active?: boolean) => call(putCloudSaveResponse, 'PUT', { baseVersion, active, keys: { goalClickerSiteSaveV3: game(goals), goalClickerPlayerIdV3: 'never-synced' } }, '/api/save');
-  assert.deepEqual((await call(getCloudSaveResponse, 'GET', undefined, '/api/save')).data, { version: 0, updatedAt: null, active: false, keys: null });
+  assert.deepEqual((await call(getCloudSaveResponse, 'GET', undefined, '/api/save')).data, { version: 0, updatedAt: null, active: false, activeVersion: 0, keys: null });
   assert.equal((await save(0, 10)).data.version, 1);
   assert.equal((await save(1, 20, false)).data.version, 2);
   // A device that already has version 2 only learns that nothing is newer, without the whole save.
-  assert.deepEqual((await call(getCloudSaveResponse, 'GET', undefined, '/api/save?since=2')).data, { version: 2, updatedAt: '2026-10-01T10:00:00.000Z', active: false, keys: null, unchanged: true });
+  assert.deepEqual((await call(getCloudSaveResponse, 'GET', undefined, '/api/save?since=2')).data, { version: 2, updatedAt: '2026-10-01T10:00:00.000Z', active: false, activeVersion: 1, keys: null, unchanged: true });
   // A second device still on version 1 gets the newer save back instead of overwriting it.
   const conflict = await save(1, 15);
   assert.equal(conflict.status, 409);
   assert.equal(conflict.data.errorCode, 'SAVE_CONFLICT');
   assert.equal(conflict.data.version, 2);
   assert.equal(conflict.data.active, false);
+  // Version 2 only collected passive goals; what was played is still version 1.
+  assert.equal(conflict.data.activeVersion, 1);
   assert.deepEqual(conflict.data.keys, { goalClickerSiteSaveV3: game(20) });
   assert.equal((await call(putCloudSaveResponse, 'PUT', { baseVersion: 2, keys: { goalClickerLayoutV3: '[]' } }, '/api/save')).status, 400);
 });
@@ -210,6 +212,10 @@ test('a device keeps its save when it continues the cloud version, otherwise tak
   assert.equal(planInitialSync({ userId: 'u', version: 3, hash: 'changed-since', played: true }, cloud, local), 'use-cloud');
   // Only a cloud save that merely collected passive goals gives way to a device that was played.
   assert.equal(planInitialSync({ userId: 'u', version: 3, hash: 'changed-since', played: true }, { ...cloud, active: false }, local), 'keep-local');
+  // A device that played once and then only collected passive goals still protects what was played there.
+  const playedThenPassive = { ...cloud, version: 5, active: false, activeVersion: 4 };
+  assert.equal(planInitialSync({ userId: 'u', version: 3, hash: 'changed-since', played: true }, playedThenPassive, local), 'use-cloud');
+  assert.equal(planInitialSync({ userId: 'u', version: 4, hash: 'changed-since', played: true }, playedThenPassive, local), 'keep-local');
   assert.equal(planInitialSync(null, cloud, local), 'use-cloud');
   assert.equal(planInitialSync(null, cloud, { ...cloud.keys }), 'use-cloud');
   // An upload sent while the page closed went through without an answer: the device recognises its own save
@@ -231,4 +237,25 @@ test('only the game, layout and vibration keys travel, and device keys stay out 
   const values: Record<string, string> = { goalClickerSiteSaveV3: game(1), goalClickerCloudMetaV1: '{}', goalClickerProfileCacheV1: '{}' };
   const storage = { length: 3, key: (i: number) => Object.keys(values)[i] ?? null, getItem: (key: string) => values[key] ?? null };
   assert.deepEqual(Object.keys(createSaveFile(storage, 'https://x').keys), ['goalClickerSiteSaveV3']);
+});
+
+test('a registration whose profile fails to save removes its new login again', async () => {
+  const { call, store } = setup(null);
+  store.createProfile = async () => { throw new Error('database gone for a moment'); };
+  const response = await call(registerResponse, 'POST', { username: 'Keeper', displayName: 'Goalie', password: 'sicheres-passwort' }, '/api/register');
+  assert.equal(response.status, 503);
+  assert.equal(store.logins.size, 0);
+});
+
+test('a deleted account cannot create a profile or a first cloud save with its old token', async () => {
+  const store = memoryStore();
+  let exists = true;
+  const deps: AccountApiDeps = { getUser: async () => ({ id: 'user-a', email: 'a@example.com' }), db: () => store, now: () => new Date('2026-10-01T10:00:00.000Z'), signUp: async () => null, loginExists: async () => exists };
+  const send = async (handler: (request: Request, deps: AccountApiDeps) => Promise<Response>, method: string, body: unknown, path = '/api/profile') => (await handler(new Request(`http://localhost${path}`, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }), deps)).status;
+  exists = false;
+  assert.equal(await send(createProfileResponse, 'POST', { username: 'Nico_06', displayName: 'Nico' }), 401);
+  assert.equal(await send(putCloudSaveResponse, 'PUT', { baseVersion: 0, keys: { goalClickerSiteSaveV3: game(5) } }, '/api/save'), 401);
+  assert.equal(store.profiles.size + store.saves.size, 0);
+  exists = true;
+  assert.equal(await send(createProfileResponse, 'POST', { username: 'Nico_06', displayName: 'Nico' }), 201);
 });

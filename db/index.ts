@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, getTableColumns, gt, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, gt, isNull, lte, notLike, or, sql } from "drizzle-orm";
 import type { AnyColumn } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -238,10 +238,11 @@ export class GoalClickerDatabase {
    */
   async putCloudSave(userId: string, saveJson: string, baseVersion: number, now: string, active = true): Promise<{ save: CloudSave; conflict?: undefined } | { save?: undefined; conflict: CloudSave | null }> {
     if (baseVersion === 0) {
-      const [created] = await this.client.insert(cloudSaves).values({ userId, saveJson, version: 1, active, updatedAt: now }).onConflictDoNothing().returning(SAVE_META_FIELDS);
+      const [created] = await this.client.insert(cloudSaves).values({ userId, saveJson, version: 1, active, activeVersion: active ? 1 : 0, updatedAt: now }).onConflictDoNothing().returning(SAVE_META_FIELDS);
       if (created) return { save: { ...created, saveJson } };
     } else {
-      const [updated] = await this.client.update(cloudSaves).set({ saveJson, version: increment(cloudSaves.version, 1), active, updatedAt: now }).where(and(eq(cloudSaves.userId, userId), eq(cloudSaves.version, baseVersion))).returning(SAVE_META_FIELDS);
+      // A passive save keeps the version of the last played one, so the played progress stays protected.
+      const [updated] = await this.client.update(cloudSaves).set({ saveJson, version: increment(cloudSaves.version, 1), active, ...(active ? { activeVersion: increment(cloudSaves.version, 1) } : {}), updatedAt: now }).where(and(eq(cloudSaves.userId, userId), eq(cloudSaves.version, baseVersion))).returning(SAVE_META_FIELDS);
       if (updated) return { save: { ...updated, saveJson } };
     }
     return { conflict: await this.getCloudSave(userId) };
@@ -277,12 +278,22 @@ export class GoalClickerDatabase {
    * is deleted by a function only the production database has (see docs/supabase-datenbank.md).
    */
   async deleteAccount(userId: string) {
+    let loginDeleted = false;
+    // One transaction for the game data and the login: if deleting the login fails, the data stays as well and a
+    // retry can finish both, instead of leaving a login whose game is already gone.
     await this.client.transaction(async (tx) => {
       await tx.delete(cloudSaves).where(eq(cloudSaves.userId, userId));
       await tx.delete(profiles).where(eq(profiles.userId, userId));
       await tx.delete(playerAccounts).where(eq(playerAccounts.userId, userId));
+      try {
+        // A savepoint: where the function does not exist (local databases), only that statement is undone.
+        await tx.transaction(async (inner) => { await inner.execute(sql`select goal_clicker_private.delete_user(${userId}::uuid)`); });
+        loginDeleted = true;
+      } catch (error) {
+        if (!isMissingObject(error)) throw error;
+      }
     });
-    return { loginDeleted: await this.deleteLogin(userId) };
+    return { loginDeleted };
   }
 
   async getRoom(code: string): Promise<RoomRow | null> {
@@ -327,7 +338,8 @@ export class GoalClickerDatabase {
     return this.client
       .select(LEADERBOARD_FIELDS)
       .from(coopRooms)
-      .where(gt(coopRooms.sharedTotalGoals, 0))
+      // Worlds with the AZB test code buy everything for free; they do not compete with real worlds.
+      .where(and(gt(coopRooms.sharedTotalGoals, 0), notLike(coopRooms.redeemedBonusCodesJson, '%"AZB"%')))
       .orderBy(...order, asc(coopRooms.code))
       .limit(Math.max(1, Math.min(100, Math.floor(limit))));
   }

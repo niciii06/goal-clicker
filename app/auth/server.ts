@@ -28,6 +28,20 @@ export async function getRequestUser(request: Request): Promise<RequestUser | nu
   return { id: claims.sub, email: typeof claims.email === "string" ? claims.email : null };
 }
 
+/**
+ * Whether the login behind the request still exists. getClaims only checks the token, which stays valid until it
+ * expires even after the account was deleted; this asks Supabase Auth itself, so it is used before creating data.
+ */
+export async function requestLoginExists(request: Request) {
+  if (!authConfigured()) return true;
+  const { client } = supabaseForRequest(request);
+  const { data, error } = await client.auth.getUser();
+  if (!error) return Boolean(data.user);
+  // A deleted or banned login is a 4xx answer; anything else (network, 5xx) is not proof and becomes a retryable error.
+  if (typeof error.status === "number" && error.status >= 400 && error.status < 500) return false;
+  throw error;
+}
+
 /** The address the browser used. Behind Vercel's proxy request.url can name the internal host. */
 export function publicOrigin(request: Request) {
   const url = new URL(request.url);

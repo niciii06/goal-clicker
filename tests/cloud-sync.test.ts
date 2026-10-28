@@ -85,3 +85,12 @@ test('an upload answer that arrives after stop() does not write the cleared acco
   await sync.settle();
   assert.equal(store.get(CLOUD_META_KEY), undefined);
 });
+
+test('the save another account left in this browser is recognised as not this account\'s', async () => {
+  const { holdsOtherAccountSave } = await import('../app/cloud-sync.ts');
+  store.clear();
+  assert.equal(holdsOtherAccountSave('b'), false, 'a save without an account may be taken over');
+  writeCloudMeta({ userId: 'a', version: 3, hash: 'x' });
+  assert.equal(holdsOtherAccountSave('a'), false);
+  assert.equal(holdsOtherAccountSave('b'), true);
+});

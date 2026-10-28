@@ -303,3 +303,52 @@ test('the leaderboard sorts worlds by goals, league and trophies and skips empty
   assert.equal(row.guestName, 'Gast');
   assert.equal('sharedFeaturesJson' in row, false);
 });
+
+test('a passive cloud save keeps the version of the last played one', { skip }, async () => {
+  const user = '00000000-0000-4000-8000-000000000303';
+  assert.equal((await db.putCloudSave(user, '{"a":1}', 0, iso(), true)).save!.activeVersion, 1);
+  assert.equal((await db.putCloudSave(user, '{"a":2}', 1, iso(), false)).save!.activeVersion, 1);
+  assert.equal((await db.putCloudSave(user, '{"a":3}', 2, iso(), true)).save!.activeVersion, 3);
+  assert.equal((await db.getCloudSave(user))!.activeVersion, 3);
+});
+
+test('deleting an account is one transaction with deleting its login', { skip }, async () => {
+  const user = '00000000-0000-4000-8000-000000000402';
+  await db.createProfile(user, 'Retry', 'Retry', iso());
+  await db.putCloudSave(user, '{}', 0, iso());
+  await admin.unsafe(`create schema if not exists goal_clicker_private;
+    create or replace function goal_clicker_private.delete_user(id uuid) returns void language plpgsql as $$ begin raise exception 'auth is down'; end $$;`);
+  try {
+    await assert.rejects(db.deleteAccount(user));
+    assert.ok(await db.getProfile(user), 'the game data stays when the login could not be deleted');
+    assert.ok(await db.getCloudSave(user));
+    await admin.unsafe(`create or replace function goal_clicker_private.delete_user(id uuid) returns void language plpgsql as $$ begin end $$;`);
+    assert.deepEqual(await db.deleteAccount(user), { loginDeleted: true });
+    assert.equal(await db.getProfile(user), null);
+    assert.equal(await db.getCloudSave(user), null);
+  } finally {
+    await admin.unsafe('drop schema goal_clicker_private cascade');
+  }
+});
+
+test('worlds with the AZB test code stay out of the leaderboard', { skip }, async () => {
+  await db.insertRoom({ ...room('LB05'), roomName: 'Testwelt', sharedTotalGoals: 9e15, redeemedBonusCodesJson: '["AZB"]' });
+  await db.insertRoom({ ...room('LB06'), roomName: 'Silvanwelt', sharedTotalGoals: 9e14, redeemedBonusCodesJson: '["SILVAN"]' });
+  const names = (await db.getLeaderboard('goals', 100)).map((row) => row.roomName);
+  assert.ok(!names.includes('Testwelt'));
+  assert.ok(names.includes('Silvanwelt'));
+});
+
+test('the migration fills best league and trophies of worlds saved before those columns existed', { skip }, async () => {
+  const { readFileSync } = await import('node:fs');
+  const backfill = readFileSync('drizzle/0005_active_version_and_leaderboard_backfill.sql', 'utf8').split('--> statement-breakpoint').at(-1)!;
+  await db.insertRoom({ ...room('OLD1'), sharedSeasons: 3, sharedFeaturesJson: JSON.stringify({ seasonMode: { highestDivision: 9 }, cup: { trophies: { stadium: 2, champions: 1, world: 0 } } }) });
+  await db.insertRoom({ ...room('OLD2'), sharedFeaturesJson: '{broken' });
+  await admin.unsafe(backfill);
+  const old = await db.getRoom('OLD1');
+  assert.equal(old!.sharedTrophies, 3);
+  const { getReachedLeague } = await import('../app/season-progression.ts');
+  assert.equal(old!.sharedBestLeague, getReachedLeague(3, 9));
+  assert.equal(old!.sharedBestLeague, 7);
+  assert.equal((await db.getRoom('OLD2'))!.sharedBestLeague, 15);
+});

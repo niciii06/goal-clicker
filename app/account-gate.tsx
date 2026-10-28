@@ -7,7 +7,7 @@ import { createContext, useCallback, useEffect, useMemo, useRef, useState } from
 import type { FormEvent, ReactNode } from "react";
 import { authErrorMessage, browserSupabase, registerWithUsername, signInWithGoogle, signInWithUsername } from "./auth/browser";
 import { authConfigured } from "./auth/config";
-import { adoptOwnUpload, applyCloudSave, clearLocalAccountData, CloudSync, fetchCloudSave, planInitialSync, readCloudMeta, readLocalSaveKeys, writeCloudMeta } from "./cloud-sync";
+import { adoptOwnUpload, applyCloudSave, clearLocalAccountData, CloudSync, fetchCloudSave, holdsOtherAccountSave, planInitialSync, readCloudMeta, readLocalSaveKeys, writeCloudMeta } from "./cloud-sync";
 import type { CloudSaveState } from "./cloud-sync";
 import { PLAYER_NAME_KEY } from "./game/constants";
 import { suspendLocalPersistence } from "./game/storage";
@@ -111,6 +111,8 @@ function RequiredAccount({ children }: { children: ReactNode }) {
       setPhase({ name: "unreachable", message: "Dein Spielstand konnte nicht geladen werden.", user, offlineProfile: readCloudMeta(user.id) ? profile : null });
       return;
     }
+    // Only a save that never belonged to an account may move into this one; another account's save is removed.
+    if (holdsOtherAccountSave(user.id)) clearLocalAccountData();
     // An upload that went through while the page closed is this device's own save, not another device's.
     const own = adoptOwnUpload(readCloudMeta(user.id), cloud);
     if (own) writeCloudMeta(own);

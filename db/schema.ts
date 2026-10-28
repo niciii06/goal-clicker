@@ -103,5 +103,8 @@ export const cloudSaves = pgTable("cloud_saves", {
   saveJson: text("save_json").notNull(),
   version: bigint("version", { mode: "number" }).notNull().default(1),
   active: boolean("active").notNull().default(true),
+  /** The last version a played device stored (not just passive goals). A device may only replace the save
+   * without asking when nothing was played since the version it loaded. */
+  activeVersion: bigint("active_version", { mode: "number" }).notNull().default(0),
   updatedAt: text("updated_at").notNull().default(isoNow),
 }).enableRLS();

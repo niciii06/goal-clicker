@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       forgetAccountLink(user.id);
       if (account && reason) return Response.json({ signedIn: true, email: user.email, playerId: account.playerId, adoptError: reason === "taken" ? "Diese Spieler-ID gehört bereits zu einem anderen Konto." : "Dein Konto hat schon Welten mit einer anderen Spieler-ID. Der Einzelspieler Spielstand wurde trotzdem übernommen." }, { headers: noStore });
     }
-    const playerId = await accountPlayerId(user, claimed);
+    const playerId = await accountPlayerId(user, claimed, undefined, request);
     if (!playerId) return Response.json({ error: "Diese Spieler-ID gehört bereits zu einem anderen Konto.", errorCode: "PLAYER_TAKEN" }, { status: 409, headers: noStore });
     return Response.json({ signedIn: true, email: user.email, playerId }, { headers: noStore });
   } catch (error) {
