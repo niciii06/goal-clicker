@@ -194,6 +194,26 @@ test('a live interactive match draws the 2D pitch with stands and the match tabs
   }
 });
 
+test('a real mouse drag in the live substitution editor lights up the drop targets', async () => {
+  const now = Date.now();
+  const { page, problems } = await openWithSave(VIEWPORTS[0], save(liveMatch(now), now));
+  assert.ok(await openTab(page, 'Spiele · LIVE'), 'live tab missing');
+  await page.getByRole('button', { name: 'Wechsel', exact: true }).first().click();
+  const source = page.locator('.starxi-pitch-slot[draggable="true"]').nth(7);
+  await source.waitFor({ timeout: 10000 });
+  const box = (await source.boundingBox())!;
+  // Chrome fires pointercancel when the native drag starts; the highlight has to survive it.
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  for (let i = 1; i <= 12; i++) { await page.mouse.move(box.x + box.width / 2 + i * 25, box.y + box.height / 2 - i * 8); await page.waitForTimeout(30); }
+  await page.waitForTimeout(300);
+  assert.equal(await page.locator('.squad-dragging').count(), 1);
+  assert.ok(await page.locator('.squad-drop-ready').count() > 0, 'no drop target lit up');
+  await page.mouse.up();
+  assert.deepEqual(problems, []);
+  await page.close();
+});
+
 test('the press conference appears after a finished match and accepts one answer', async () => {
   const now = Date.now();
   const { page, problems } = await openWithSave(VIEWPORTS[1], save(finishedMatch(now), now));

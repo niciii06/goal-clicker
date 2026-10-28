@@ -160,6 +160,8 @@ export function useSquadDrag({ canDrop, onDrop, onBlocked, locked, picked }: Squ
       },
       onPointerCancel: () => {
         touch.current = null;
+        // Chrome cancels the pointer as soon as a native mouse drag starts; that drag keeps its highlight.
+        if (activeSource.current) return;
         setDragging(null);
         setDropTarget(null);
       },
