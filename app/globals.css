@@ -2160,3 +2160,19 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .account-signin-button:hover { filter: brightness(1.06); }
 .account-guest { display: grid; gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); text-align: center; }
 .account-guest .account-hint { margin-top: 0; }
+/* The women's walkout figure: narrower shoulders, a waist, slimmer limbs and a softer face. */
+.body-women .avatar-head { left: 39px; width: 52px; border-radius: 24px 24px 26px 26px / 24px 24px 32px 32px; background: radial-gradient(circle at 24% 66%, rgba(232,110,110,.2) 0 4px, transparent 7px), radial-gradient(circle at 76% 66%, rgba(232,110,110,.2) 0 4px, transparent 7px), var(--walkout-skin); }
+.body-women.face-round .avatar-head { left: 38px; width: 54px; }
+.body-women.face-long .avatar-head { left: 40px; width: 50px; }
+.body-women .avatar-brow { height: 2px; width: 13px; }
+.body-women .avatar-eye { border-top: 2px solid #2a211d; }
+.body-women .avatar-mouth { bottom: 11px; width: 13px; height: 4px; border-bottom: 2px solid rgba(176,62,78,.85); border-radius: 0 0 8px 8px; background: rgba(196,86,100,.3); }
+.body-women .avatar-neck { left: 54px; width: 22px; }
+.body-women .avatar-torso { top: 84px; left: 33px; width: 64px; height: 84px; border-radius: 18px 18px 12px 12px; clip-path: polygon(3% 0, 97% 0, 99% 18%, 88% 58%, 96% 100%, 4% 100%, 12% 58%, 1% 18%); }
+.body-women .avatar-kit-stripe { inset: 0 25px; }
+.body-women .avatar-torso span { font-size: 21px; }
+.body-women .avatar-arm { top: 92px; width: 18px; height: 84px; }
+.body-women .avatar-arm.left { left: 19px; }.body-women .avatar-arm.right { right: 19px; }
+.body-women .avatar-leg { top: 160px; width: 28px; }
+.body-women .avatar-leg.left { left: 34px; }.body-women .avatar-leg.right { right: 34px; }
+.body-women .avatar-leg i { width: 34px; }

@@ -14,6 +14,7 @@ export function WalkoutAvatar({ presentation: p, rating, label, onAnimationEnd }
     p.helmet ? "with-helmet" : "",
     p.tattoo ? `tattoo-${p.tattoo}` : "",
     p.keeper ? "keeper" : "",
+    p.body === "women" ? "body-women" : "",
   ].filter(Boolean).join(" ");
   const style = { "--walkout-headband": p.headband, "--walkout-gloves": p.gloves } as CSSProperties;
   return <div className={classes} style={style} aria-label={label} onAnimationEnd={onAnimationEnd}>

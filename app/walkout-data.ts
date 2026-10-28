@@ -33,6 +33,8 @@ export type WalkoutPresentation = {
   /** Goalkeepers wear a long sleeved keeper kit and gloves. */
   keeper?: boolean;
   gloves?: string;
+  /** Women walk out with a women's figure: narrower shoulders, a waist, a softer face. */
+  body?: "women";
 };
 
 /** Features that only some players have; they make a player recognisable beyond hair and beard. */
@@ -824,11 +826,15 @@ export function getWalkoutPresentation(player: StarXIPlayer) {
   const specialBody = SPECIAL_BODY_PROFILE_BY_PLAYER_ID[player.id];
   if (specialBody) return fromSpecialBody(player, specialBody);
   const iconAppearance = ICON_APPEARANCE_BY_PLAYER_ID[player.id];
-  if (iconAppearance) return asKeeper(player, fromIconAppearance(player, iconAppearance));
+  if (iconAppearance) return withBody(player, asKeeper(player, fromIconAppearance(player, iconAppearance)));
   const womenAppearance = player.isWomen && player.sourceId ? WOMEN_APPEARANCE_BY_SOURCE_ID[player.sourceId] : undefined;
-  if (womenAppearance) return asKeeper(player, fromIconAppearance(player, womenAppearance));
+  if (womenAppearance) return withBody(player, asKeeper(player, fromIconAppearance(player, womenAppearance)));
   const raw = player.sourceId ? PROFILE_BY_SOURCE_ID.get(player.sourceId) : undefined;
-  return asKeeper(player, raw ? fromRaw(raw) : fallbackProfile(player));
+  return withBody(player, asKeeper(player, raw ? fromRaw(raw) : fallbackProfile(player)));
+}
+
+function withBody(player: StarXIPlayer, presentation: WalkoutPresentation): WalkoutPresentation {
+  return player.isWomen ? { ...presentation, body: "women", beard: "clean" } : presentation;
 }
 
 export const AUTHENTIC_WALKOUT_PROFILE_COUNT = RAW_PROFILES.length;

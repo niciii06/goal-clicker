@@ -38,3 +38,15 @@ test('goalkeepers walk out in a keeper kit with gloves, outfield players do not'
   }
   assert.equal(byId('icon-lev-yashin').kitPrimary, '#151515');
 });
+
+test('women walk out with a women\'s figure and never with a beard', () => {
+  const women = walkouts.filter((player) => player.isWomen);
+  assert.ok(women.length >= 59);
+  for (const player of women) {
+    const look = getWalkoutPresentation(player);
+    assert.equal(look.body, 'women', player.name);
+    assert.equal(look.beard, 'clean', player.name);
+  }
+  assert.equal(getWalkoutPresentation(walkouts.find((player) => !player.isWomen && player.cardType === 'icon')!).body, undefined);
+  assert.ok(css.includes('.body-women .avatar-torso'));
+});
