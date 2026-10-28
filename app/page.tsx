@@ -2820,7 +2820,7 @@ function App() {
       </div>}
       {eventAnnouncement && <div key={`${eventAnnouncement.id}:${eventAnnouncement.createdAt}`} className={`gc-notification ${eventAnnouncement.tone}`} role="status" aria-live="polite"><span aria-hidden="true">{eventAnnouncement.id==='var'?'📺':eventAnnouncement.tone==='negative'?'⚠️':'🏟️'}</span><div><strong>{eventAnnouncement.title}</strong><p>{eventAnnouncement.message}</p><small>{eventAnnouncement.amount<0?`−${formatNumber(Math.abs(eventAnnouncement.amount))} TORE`:eventAnnouncement.amount>0?`+${formatNumber(eventAnnouncement.amount)} TORE`:'Keine Kontoänderung'}</small></div></div>}
       {offline && <div className="offline-banner"><span className="offline-mark">Ⅱ</span><p>{offline}</p><button onClick={() => setOffline("")} aria-label="Hinweis schliessen">×</button></div>}
-      <footer className="footer-note">Klick den Ball · Kauf Verstärkungen · Werde Fussballgott · Made by xevihans und AntiNicu67</footer>
+      <footer className="footer-note">Made by xevihans</footer>
       {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   );
