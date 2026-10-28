@@ -358,7 +358,7 @@ test("best XI bench spreads available players across the active roles", () => {
   for (const role of activeRoles) assert.ok(benchRoles.has(role), `bank does not cover ${role}`);
 });
 
-test("best XI bench mirrors a back three without overloading the number ten role", () => {
+test("best XI bench mirrors a back three with one backup per lineup slot", () => {
   const formation = getStarFormation("3412");
   const state = {
     ...initialGameFeatures(1000).starXI,
@@ -369,10 +369,9 @@ test("best XI bench mirrors a back three without overloading the number ten role
   const best = setBestStarXI(state);
   const benchPlayers = best.benchIds.filter(Boolean).map((playerId) => STAR_XI_PLAYERS.find((player) => player.id === playerId)!);
   const centreBacks = benchPlayers.filter((player) => player.positions.includes("IV"));
-  const attackingMidfielders = benchPlayers.filter((player) => player.positions.includes("ZOM"));
 
   assert.ok(centreBacks.length >= 3, `back three only had ${centreBacks.length} centre-back replacements`);
-  assert.ok(attackingMidfielders.length <= 2, `single number ten role produced ${attackingMidfielders.length} replacements`);
+  best.formationPositions.forEach((position, index) => assert.ok(canStarXIPlayerPlayPosition(benchPlayers[index], position), `bench seat ${index + 1} cannot play ${position}`));
   new Set(best.formationPositions).forEach((position) => assert.ok(benchPlayers.some((player) => player.positions.includes(position)), `bank does not cover ${position}`));
 });
 

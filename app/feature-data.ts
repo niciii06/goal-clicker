@@ -1162,10 +1162,6 @@ export function setStarXIBenchPlayer(state: StarXIState, benchIndex: number, pla
   return blockedPlayerIds.length ? removeStarXIPlayersFromSquad(next, blockedPlayerIds, false) : normalizeStarXIState(next);
 }
 
-function compareStarXIPlayers(first: StarXIPlayer, second: StarXIPlayer) {
-  return second.rating - first.rating || first.id.localeCompare(second.id);
-}
-
 function isDedicatedStarXIGoalkeeper(player: StarXIPlayer) {
   const positions = getStarXIPositions(player);
   return positions.length > 0 && positions.every((position) => position === "TW");
@@ -1296,9 +1292,10 @@ export function setBestStarXI(state: StarXIState, blockedPlayerIds: readonly str
 }
 
 /**
- * Builds a substitute bench that mirrors the role demand of the formation.
- * Repeated positions stay repeated, so a back three reserves several centre
- * backs instead of filling the bench with whichever midfielders rate highest.
+ * Builds a substitute bench with one backup for every lineup slot, in lineup
+ * order, chosen like the lineup itself: the best rated assignment of the
+ * remaining players, whatever their main position. The twelfth seat goes to
+ * the best player left who fits the formation.
  */
 export function getBestStarXIBenchSelection(
   ownedIds: string[],
@@ -1307,64 +1304,25 @@ export function getBestStarXIBenchSelection(
   blockedPlayerIds: readonly string[] = [],
   context: StarXIEvaluationContext = {},
 ) {
-  const blocked = new Set(blockedPlayerIds);
-  const used = new Set(lineupIds.filter(Boolean));
-  const requiredPositions = formationPositions.slice(0, STAR_XI_SQUAD_SIZE);
-  const positionDemand = requiredPositions.reduce((counts, position) => {
-    counts[position] = (counts[position] ?? 0) + 1;
-    return counts;
-  }, {} as Partial<Record<StarPosition, number>>);
-  const activePositions = Object.keys(positionDemand) as StarPosition[];
-  const benchCandidates = [...new Set(ownedIds)]
-    .filter((playerId) => !used.has(playerId) && !blocked.has(playerId))
+  const excluded = [...blockedPlayerIds, ...lineupIds.filter(Boolean)];
+  const benchIds = [...getBestStarXISelection(ownedIds, formationPositions, excluded, context), ...Array.from({ length: STAR_XI_BENCH_SIZE - STAR_XI_SQUAD_SIZE }, () => "")];
+  const used = new Set([...excluded, ...benchIds.filter(Boolean)]);
+  const positions = formationPositions.slice(0, STAR_XI_SQUAD_SIZE);
+  const rest = [...new Set(ownedIds)]
+    .filter((playerId) => !used.has(playerId))
     .map((playerId) => getStarXIPlayer(playerId))
-    .filter((player): player is StarXIPlayer => Boolean(player) && requiredPositions.some((position) => canStarXIPlayerPlayPosition(player, position)))
+    .filter((player): player is StarXIPlayer => Boolean(player) && positions.some((position) => canStarXIPlayerPlayPosition(player, position)))
     .sort((a, b) => getStarXISelectionRating(b, context) - getStarXISelectionRating(a, context) || a.id.localeCompare(b.id));
-
-  if (!requiredPositions.length || !benchCandidates.length) return Array.from({ length: STAR_XI_BENCH_SIZE }, () => "");
-  const selectedBenchPlayers: StarXIPlayer[] = [];
-  const selectedIds = new Set<string>();
-  const coverage = Object.fromEntries(activePositions.map((position) => [position, 0])) as Record<StarPosition, number>;
-  const demandOrder = requiredPositions
-    .map((position, index) => ({ position, index }))
-    .sort((first, second) => (positionDemand[first.position] ?? 0) - (positionDemand[second.position] ?? 0)
-      || benchCandidates.filter((player) => canStarXIPlayerPlayPosition(player, first.position)).length - benchCandidates.filter((player) => canStarXIPlayerPlayPosition(player, second.position)).length
-      || first.index - second.index);
-  const candidateScore = (player: StarXIPlayer, assignmentPosition?: StarPosition) => {
-    let score = getStarXISelectionRating(player, context) * 10;
-    for (const position of activePositions) {
-      if (!canStarXIPlayerPlayPosition(player, position)) continue;
-      const demand = Math.max(1, positionDemand[position] ?? 1);
-      if (position !== assignmentPosition && coverage[position] < demand) score += 35 / demand;
-      const excess = coverage[position] + 1 - demand;
-      if (excess > 0) score -= excess * 140;
-    }
-    return score;
-  };
-  const selectPlayer = (player: StarXIPlayer) => {
-    selectedIds.add(player.id);
-    selectedBenchPlayers.push(player);
-    for (const position of activePositions) if (canStarXIPlayerPlayPosition(player, position)) coverage[position] += 1;
-  };
-
-  for (const { position } of demandOrder) {
-    const player = benchCandidates
-      .filter((candidate) => !selectedIds.has(candidate.id) && !(isDedicatedStarXIGoalkeeper(candidate) && selectedBenchPlayers.some(isDedicatedStarXIGoalkeeper)) && canStarXIPlayerPlayPosition(candidate, position))
-      .sort((first, second) => candidateScore(second, position) - candidateScore(first, position) || compareStarXIPlayers(first, second))[0];
-    if (player) selectPlayer(player);
+  // One dedicated substitute goalkeeper is enough; the free seats go to outfield players first.
+  const keeperOnBench = () => benchIds.some((id) => id && isDedicatedStarXIGoalkeeper(getStarXIPlayer(id)!));
+  for (let index = 0; index < benchIds.length; index += 1) {
+    if (benchIds[index]) continue;
+    const pick = rest.find((player) => !keeperOnBench() || !isDedicatedStarXIGoalkeeper(player)) ?? rest[0];
+    if (!pick) break;
+    benchIds[index] = pick.id;
+    rest.splice(rest.indexOf(pick), 1);
   }
-
-  while (selectedBenchPlayers.length < STAR_XI_BENCH_SIZE) {
-    const dedicatedGoalkeeperSelected = selectedBenchPlayers.some(isDedicatedStarXIGoalkeeper);
-    const player = benchCandidates
-      .filter((candidate) => !selectedIds.has(candidate.id) && !(dedicatedGoalkeeperSelected && isDedicatedStarXIGoalkeeper(candidate)))
-      .sort((first, second) => candidateScore(second) - candidateScore(first) || compareStarXIPlayers(first, second))[0];
-    if (!player) break;
-    // Keep the earlier UCL-style rule: one dedicated substitute goalkeeper is enough.
-    selectPlayer(player);
-  }
-
-  return Array.from({ length: STAR_XI_BENCH_SIZE }, (_, index) => selectedBenchPlayers[index]?.id ?? "");
+  return benchIds;
 }
 
 export function restoreStarXIAfterMatch(state: StarXIState, cup: CupState) {

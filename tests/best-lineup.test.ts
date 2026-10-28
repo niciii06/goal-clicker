@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { initialGameFeatures, STAR_XI_PLAYERS, getStarXISelectionRating, setBestStarXI, getStarXIPositions, getBestStarXISelection, normalizeStarXIState } from '../app/feature-data.ts';
+import { initialGameFeatures, STAR_XI_PLAYERS, getStarXISelectionRating, setBestStarXI, getStarXIPositions, getBestStarXISelection, normalizeStarXIState, canStarXIPlayerPlayPosition } from '../app/feature-data.ts';
 import { emptyPlayerStats } from '../app/career-data.ts';
 test('form uses existing bounded bonus and missing data stays neutral', () => {
  const f=initialGameFeatures(), p=STAR_XI_PLAYERS[0];
@@ -55,4 +55,21 @@ test('form changes a close contested slot and secondary positions score equally'
  assert.equal(basic.filter(Boolean).length,formed.filter(Boolean).length);
  const multi=STAR_XI_PLAYERS.find(p=>getStarXIPositions(p).length>=3&& !getStarXIPositions(p).includes('TW'))!;
  for(const pos of getStarXIPositions(multi)) assert.equal(getBestStarXISelection([multi.id],[pos,...Array(10).fill('TW')])[0],multi.id);
+});
+
+test('the bench backs up every lineup slot with the best rated player who can play it, plus the best one left',()=>{
+ const f=initialGameFeatures();f.starXI.ownedIds=STAR_XI_PLAYERS.filter(p=>p.rating<97).slice(0,120).map(p=>p.id);
+ const next=setBestStarXI(f.starXI,[],{career:f.career});
+ const player=(id:string)=>STAR_XI_PLAYERS.find(p=>p.id===id)!;
+ assert.equal(next.benchIds.filter(Boolean).length,12);
+ const squad=new Set([...next.lineupIds,...next.benchIds]);
+ const outside=f.starXI.ownedIds.filter(id=>!squad.has(id)).map(player);
+ next.formationPositions.slice(0,11).forEach((position,i)=>{
+  const backup=player(next.benchIds[i]);
+  assert.ok(canStarXIPlayerPlayPosition(backup,position),`${backup.name} cannot play ${position}`);
+  // A primary centre back who also plays left back counts as a left back.
+  for(const other of [...outside,player(next.benchIds[11])]) if(canStarXIPlayerPlayPosition(other,position)) assert.ok(other.rating<=backup.rating,`${other.name} beats ${backup.name} at ${position}`);
+ });
+ const last=player(next.benchIds[11]);
+ for(const other of outside) if(next.formationPositions.some(position=>canStarXIPlayerPlayPosition(other,position))&&!getStarXIPositions(other).every(pos=>pos==='TW')) assert.ok(other.rating<=last.rating,`${other.name} beats ${last.name} for the last seat`);
 });
