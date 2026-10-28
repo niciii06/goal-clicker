@@ -11,6 +11,8 @@ import { adoptOwnUpload, applyCloudSave, clearLocalAccountData, CloudSync, fetch
 import type { CloudSaveState } from "./cloud-sync";
 import { PLAYER_NAME_KEY } from "./game/constants";
 import { suspendLocalPersistence } from "./game/storage";
+import { IMPORT_PENDING_KEY } from "./game/save-revision";
+import { cleanCloudSaveKeys } from "./cloud-save-rules";
 import { cleanDisplayName, DISPLAY_NAME_MAX, displayNameError, isPasswordLoginEmail, PASSWORD_MAX, PASSWORD_MIN, passwordError, USERNAME_MAX, usernameError } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
 
@@ -112,7 +114,10 @@ function RequiredAccount({ children }: { children: ReactNode }) {
     // An upload that went through while the page closed is this device's own save, not another device's.
     const own = adoptOwnUpload(readCloudMeta(user.id), cloud);
     if (own) writeCloudMeta(own);
-    const plan = planInitialSync(readCloudMeta(user.id), cloud, readLocalSaveKeys());
+    // A save file the player just imported replaces the profile's save, as the import dialog promised.
+    const importedHere = localStorage.getItem(IMPORT_PENDING_KEY) === user.id;
+    localStorage.removeItem(IMPORT_PENDING_KEY);
+    const plan = importedHere && cleanCloudSaveKeys(readLocalSaveKeys()) ? "keep-local" : planInitialSync(readCloudMeta(user.id), cloud, readLocalSaveKeys());
     if (plan === "use-cloud") applyCloudSave(user.id, cloud);
     // The next upload replaces the cloud save on top of its current version.
     else if (plan === "keep-local") writeCloudMeta({ userId: user.id, version: cloud.version, hash: "", played: true });

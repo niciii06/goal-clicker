@@ -25,8 +25,8 @@ test("accepts normal progress and purchases without comparing the spendable bala
 
 test("uses the newest valid snapshot when progress is otherwise identical", () => {
   const selected = selectSafestStoredGame([
-    { key: "backup", raw: save(50000, { goals: 12000, lastSaved: 1000 }) },
     { key: "primary", raw: save(50000, { goals: 18000, lastSaved: 2000 }) },
+    { key: "backup", raw: save(50000, { goals: 12000, lastSaved: 1000 }) },
   ]);
   assert.equal(selected?.key, "primary");
   assert.equal(selected?.saved.goals, 18000);

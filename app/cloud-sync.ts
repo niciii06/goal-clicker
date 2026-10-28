@@ -8,6 +8,7 @@
 import { BACKUP_STORAGE_KEY, COOP_ROOM_KEY, LEGACY_STORAGE_KEYS, PLAYER_NAME_KEY, RECOVERY_STORAGE_KEY } from "./game/constants";
 import { cleanCloudSaveKeys, hashText, hasProgress, serializeCloudSaveKeys, summarizeSave, SYNCED_SAVE_KEYS } from "./cloud-save-rules";
 import type { CloudSaveKeys } from "./cloud-save-rules";
+import { bumpSaveRevision, localSaveFailed } from "./game/save-revision";
 
 /** Which account and save version this browser's localStorage belongs to, and whether it was played since. */
 export const CLOUD_META_KEY = "goalClickerCloudMetaV1";
@@ -18,7 +19,7 @@ export const FLUSH_SAVE_EVENT = "goalclicker:flush-save";
 export type CloudMeta = { userId: string; version: number; hash: string; played?: boolean; pending?: string[] };
 const MAX_PENDING_UPLOADS = 6;
 export type CloudSaveState = { version: number; updatedAt: string | null; active: boolean; keys: CloudSaveKeys | null };
-export type SyncStatus = "saved" | "saving" | "offline";
+export type SyncStatus = "saved" | "saving" | "offline" | "failed";
 
 const UPLOAD_INTERVAL_MS = 15_000;
 // Browsers drop keepalive requests above 64 KB, the limit for the last upload while a page closes.
@@ -59,6 +60,8 @@ export function applyCloudSave(userId: string, save: CloudSaveState) {
   try {
     for (const key of keys) localStorage.removeItem(key);
     if (save.keys) for (const [key, value] of Object.entries(save.keys)) if (value !== undefined) localStorage.setItem(key, value);
+    // Other open tabs still hold the replaced game and must not save it back.
+    bumpSaveRevision(localStorage);
   } catch (error) {
     // Storage full: put the previous game and its recovery copies back before giving up.
     for (const key of keys) localStorage.removeItem(key);
@@ -230,6 +233,11 @@ export class CloudSync {
     if (this.stopped && overwriteVersion === undefined) return false;
     // The game saves every few seconds on its own; the upload must not miss the clicks since then.
     window.dispatchEvent(new Event(FLUSH_SAVE_EVENT));
+    // The browser storage refused the current game: what it still holds is older, so nothing counts as saved.
+    if (localSaveFailed()) {
+      setStatus("failed");
+      return false;
+    }
     const keys = cleanCloudSaveKeys(readLocalSaveKeys());
     // Without a game in this browser there is nothing to save, and an empty save must never replace a real one.
     if (!keys) return true;

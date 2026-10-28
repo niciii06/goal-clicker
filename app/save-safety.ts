@@ -72,7 +72,15 @@ export function compareStoredGameProgress(first: StoredGameLike | null, second: 
   return 0;
 }
 
+/**
+ * Picks the save to load. The first candidate is the main save: when it holds a game with progress it wins, even
+ * against a backup with more players or upgrades, because selling or losing a player is a real, newer change.
+ * Backups only step in when the main save is missing, broken or empty; then the most advanced one is used.
+ */
 export function selectSafestStoredGame(candidates: StoredGameCandidate[]) {
+  const [primary] = candidates;
+  const primarySaved = parseStoredGame(primary?.raw ?? null);
+  if (primary?.raw && primarySaved && hasStoredProgress(primarySaved)) return { key: primary.key, raw: primary.raw, saved: primarySaved };
   let safest: { key: string; raw: string; saved: StoredGameLike } | null = null;
   for (const candidate of candidates) {
     const saved = parseStoredGame(candidate.raw);
@@ -80,6 +88,10 @@ export function selectSafestStoredGame(candidates: StoredGameCandidate[]) {
     if (!safest || compareStoredGameProgress(saved, safest.saved) > 0) safest = { key: candidate.key, raw: candidate.raw, saved };
   }
   return safest;
+}
+
+function hasStoredProgress(value: StoredGameLike) {
+  return Number.isFinite(Number(value.totalGoals)) && (nonNegative(value.totalGoals) > 0 || nonNegative(value.clicks) > 0);
 }
 
 /**

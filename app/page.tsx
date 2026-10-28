@@ -28,7 +28,8 @@ import { MAX_CAREER_SEASON, SEASON_MILESTONES, getFormationUnlockLeague, sortFor
 import { MULTIPLAYER_PROTOCOL_VERSION } from "./multiplayer-protocol";
 import { PressConferencePanel } from "./press-conference-panel";
 import { TravelPanel, TravelStatsPanel, durationLabel } from "./travel-panel";
-import { advanceLocalGameWhileOpen, clearStoredGames, getMiniGameCooldownUntil, initialGame, normalizeAchievements, normalizeLayoutOrder, normalizeNickname, normalizeRuntimeGame, pauseMiniGameCooldowns, persistLocalGame, readStoredGame } from "./game/storage";
+import { advanceLocalGameWhileOpen, claimLocalSave, clearStoredGames, getMiniGameCooldownUntil, initialGame, isLocalSaveWriter, markLocalSaveLoaded, normalizeAchievements, normalizeLayoutOrder, normalizeNickname, normalizeRuntimeGame, pauseMiniGameCooldowns, persistLocalGame, readStoredGame, suspendLocalPersistence } from "./game/storage";
+import type { LocalSaveResult } from "./game/storage";
 import { answerPressConference, getPressReward } from "./press-conference";
 import { canVibrate, readVibrationSetting, setVibrationOn, vibrate, vibrationOn } from "./game/device";
 import { claimAlbumReward, claimAllAlbumRewards, getCareerCard, prepareCareerMatch, recordCareerMatch, rivalryKey } from "./career-data";
@@ -76,6 +77,7 @@ function WalkoutCountryFlag({ code, country, compact = false }: { code: string; 
 
 
 
+const SAVE_FAILED_MESSAGE = "Speichern fehlgeschlagen: Der Browser Speicher ist voll. Lade deinen Spielstand als Datei herunter, bevor du die Seite schliesst.";
 const STAR_WALKOUT_ANIMATION_MS = 9500;
 const STAR_TOP_WALKOUT_ANIMATION_MS = 11500;
 const STAR_WALKOUT_READY_MS = 7500;
@@ -238,6 +240,7 @@ function App() {
   const [pulse, setPulse] = useState(false);
   const [toast, setToast] = useState("");
   const [offline, setOffline] = useState("");
+  const saveFailedRef = useRef(false);
   const [feed, setFeed] = useState<FeedEntry[]>([{ id: 1, icon: "broadcast", text: "Die Fans sind da. Klaus der Torwart auch." }]);
   const gameRef = useRef(game);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -2391,8 +2394,26 @@ function App() {
     showToast("Spielstand zurückgesetzt");
   }
 
+  // What the autosave did: another tab saved meanwhile (load that game), or the browser storage is full.
+  const handleLocalSave = useCallback((result: LocalSaveResult) => {
+    if (result === "stale") {
+      suspendLocalPersistence();
+      window.location.reload();
+      return;
+    }
+    if (result === "failed" && !saveFailedRef.current) {
+      saveFailedRef.current = true;
+      setOffline(SAVE_FAILED_MESSAGE);
+    } else if (result === "saved" && saveFailedRef.current) {
+      saveFailedRef.current = false;
+      setOffline((current) => current === SAVE_FAILED_MESSAGE ? "" : current);
+    }
+  }, []);
+
   useEffect(() => {
     const stored = readStoredGame();
+    markLocalSaveLoaded();
+    if (document.visibilityState === "visible") claimLocalSave();
     if (stored.saved) {
       try {
         const saved = stored.saved;
@@ -2446,10 +2467,10 @@ function App() {
         : { ...gameRef.current, lastSaved: now };
       if (document.hidden) pageInactiveAtRef.current = now;
       gameRef.current = next;
-      persistLocalGame(next);
+      handleLocalSave(persistLocalGame(next));
     }, 2200);
     return () => { window.clearInterval(tick); window.clearInterval(save); };
-  }, [hydrated]);
+  }, [hydrated, handleLocalSave]);
 
   useEffect(() => {
     if (!hydrated || isCoopLive) return;
@@ -2474,7 +2495,13 @@ function App() {
       const next = hiddenAt ? advanceLocalGameWhileOpen(gameRef.current, now - hiddenAt, now) : { ...gameRef.current, lastSaved: now };
       if (hiddenAt) pageInactiveAtRef.current = now;
       gameRef.current = next;
-      persistLocalGame(next);
+      // No reload while the page closes; the next start reads the newest save anyway.
+      const result = persistLocalGame(next);
+      if (result !== "stale") handleLocalSave(result);
+    };
+    // The tab the player uses is the one that saves; an older tab first loads what the other one saved.
+    const claim = () => {
+      if (!isLocalSaveWriter() && claimLocalSave() === "stale") handleLocalSave("stale");
     };
     const onVisibility = () => {
       if (document.hidden) {
@@ -2483,22 +2510,25 @@ function App() {
         persistLocalGame({ ...gameRef.current, lastSaved: hiddenAt });
         return;
       }
+      if (!isLocalSaveWriter() && claimLocalSave() === "stale") { handleLocalSave("stale"); return; }
       const hiddenAt = pageInactiveAtRef.current;
       if (!hiddenAt) return;
       pageInactiveAtRef.current = null;
       const now = Date.now();
       const next = advanceLocalGameWhileOpen(gameRef.current, now - hiddenAt, now);
       gameRef.current = next;
-      persistLocalGame(next);
+      handleLocalSave(persistLocalGame(next));
       setGame(next);
     };
     if (document.hidden) onVisibility();
     window.addEventListener("beforeunload", saveOnExit);
     window.addEventListener("pagehide", saveOnExit);
     window.addEventListener(FLUSH_SAVE_EVENT, saveOnExit);
+    window.addEventListener("pointerdown", claim, { capture: true, passive: true });
+    window.addEventListener("keydown", claim, { capture: true, passive: true });
     document.addEventListener("visibilitychange", onVisibility);
-    return () => { window.removeEventListener("beforeunload", saveOnExit); window.removeEventListener("pagehide", saveOnExit); window.removeEventListener(FLUSH_SAVE_EVENT, saveOnExit); document.removeEventListener("visibilitychange", onVisibility); };
-  }, [hydrated]);
+    return () => { window.removeEventListener("beforeunload", saveOnExit); window.removeEventListener("pagehide", saveOnExit); window.removeEventListener(FLUSH_SAVE_EVENT, saveOnExit); window.removeEventListener("pointerdown", claim, { capture: true }); window.removeEventListener("keydown", claim, { capture: true }); document.removeEventListener("visibilitychange", onVisibility); };
+  }, [hydrated, handleLocalSave]);
 
   const rankRange = nextRank ? nextRank.minimum - currentRank.minimum : 1;
   const rankProgress = nextRank ? Math.max(0, Math.min(100, ((displayGame.totalGoals - currentRank.minimum) / rankRange) * 100)) : 100;

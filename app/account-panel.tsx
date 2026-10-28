@@ -9,17 +9,18 @@ import { useDialogFocus } from "./confirm-dialog";
 import { authErrorMessage, setAccountPassword } from "./auth/browser";
 import { FLUSH_SAVE_EVENT, subscribeSyncStatus } from "./cloud-sync";
 import type { SyncStatus } from "./cloud-sync";
-import { resumeLocalPersistence, suspendLocalPersistence } from "./game/storage";
+import { IMPORT_PENDING_KEY } from "./game/save-revision";
+import { resumeLocalPersistence, storedGameLoads, suspendLocalPersistence } from "./game/storage";
 import { getInstallState, promptInstall, subscribeInstallState } from "./pwa";
 import type { InstallState } from "./pwa";
 import { DISPLAY_NAME_MAX, displayNameError, PASSWORD_MAX, PASSWORD_MIN, passwordError, USERNAME_MAX, usernameError } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
-import { applySaveFile, createSaveFile, parseSaveFile, saveFileName, savedPlayerId } from "./save-file";
+import { applySaveFile, createSaveFile, parseSaveFile, saveFileGameRaw, saveFileName, savedPlayerId } from "./save-file";
 import { readThemePreference, setThemePreference, THEME_OPTIONS } from "./theme";
 import type { ThemePreference } from "./theme";
 
 const ADOPT_AFTER_IMPORT_KEY = "goalClickerAdoptAfterImport";
-const SYNC_LABELS: Record<SyncStatus, string> = { saved: "Gespeichert", saving: "Speichert …", offline: "Offline, wird später gespeichert" };
+const SYNC_LABELS: Record<SyncStatus, string> = { saved: "Gespeichert", saving: "Speichert …", offline: "Offline, wird später gespeichert", failed: "Nicht gespeichert, der Browser Speicher ist voll" };
 
 async function linkAccount(playerId: string, adopt: boolean) {
   const response = await fetch("/api/account", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ playerId, adopt }) });
@@ -222,9 +223,13 @@ export function SaveTransferPanel({ onMessage }: { onMessage: (text: string) => 
     try {
       const parsed = parseSaveFile(await selected.text());
       if (!parsed.ok) { onMessage(parsed.error); return; }
+      // The game must also load, not only parse; otherwise the import would replace a working save with a broken one.
+      if (!storedGameLoads(saveFileGameRaw(parsed.file.keys))) { onMessage("Der Spielstand ist beschädigt."); return; }
       if (!window.confirm("Der aktuelle Spielstand in diesem Browser wird durch die Datei ersetzt. Fortfahren?")) return;
       suspendLocalPersistence();
       applySaveFile(localStorage, parsed.file);
+      // The next start sends the imported game to the profile instead of taking the profile's save.
+      if (account) localStorage.setItem(IMPORT_PENDING_KEY, account.userId);
       const importedPlayerId = savedPlayerId(parsed.file);
       // A signed in account adopts the imported player ID (and its worlds) on the next start, if it has no world yet.
       if (importedPlayerId) localStorage.setItem(ADOPT_AFTER_IMPORT_KEY, importedPlayerId);

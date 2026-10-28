@@ -1861,7 +1861,7 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .save-transfer-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .account-sync.saved { color: color-mix(in oklab, #268b45, var(--text) var(--tone-mix)); background: color-mix(in srgb, #22c340 7%, var(--surface-raised)); }
 .account-sync.saving { color: var(--accent); background: var(--accent-soft); }
-.account-sync.offline, .account-sync.conflict { color: color-mix(in oklab, #9a5b00, var(--text) var(--tone-mix)); background: color-mix(in srgb, #e69400 12%, var(--surface-raised)); }
+.account-sync.failed { color: color-mix(in oklab, #b3261e, var(--text) var(--tone-mix)); background: color-mix(in srgb, #e60000 8%, var(--surface-raised)); }.account-sync.offline, .account-sync.conflict { color: color-mix(in oklab, #9a5b00, var(--text) var(--tone-mix)); background: color-mix(in srgb, #e69400 12%, var(--surface-raised)); }
 
 /* Login, profile setup and the choice between two saves, before the game starts. */
 .account-screen { display: grid; min-height: 100vh; min-height: 100dvh; place-items: center; padding: 24px 16px; background: radial-gradient(circle at 20% 10%, color-mix(in srgb, var(--accent) 9%, var(--surface-raised)), transparent 45%), var(--bg); }
