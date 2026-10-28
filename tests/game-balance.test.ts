@@ -145,7 +145,7 @@ test("FC27 ratings cover every current base card without changing stable player 
   const basePlayers = STAR_XI_PLAYERS.filter((player) => !player.isCustom && !player.cardType);
 
   assert.equal(officialIds.length, FC27_OFFICIAL_RATING_COUNT);
-  assert.equal(FC27_OFFICIAL_RATING_COUNT, 2643);
+  assert.equal(FC27_OFFICIAL_RATING_COUNT, 6289);
   assert.equal(unavailableIds.size, 90);
   assert.deepEqual(officialIds.filter((sourceId) => unavailableIds.has(sourceId)), []);
   assert.equal(new Set(basePlayers.map((player) => player.sourceId)).size, basePlayers.length);
@@ -165,7 +165,7 @@ test("FC27 primary and alternate positions cover the same official base cards", 
   const allowedPositions = new Set(["TW", "LV", "LAV", "IV", "RV", "RAV", "ZDM", "ZM", "ZOM", "LM", "RM", "LF", "RF", "MS", "ST"]);
   const basePlayers = STAR_XI_PLAYERS.filter((player) => !player.isCustom && !player.cardType);
 
-  assert.equal(FC27_OFFICIAL_POSITION_COUNT, 2643);
+  assert.equal(FC27_OFFICIAL_POSITION_COUNT, 6289);
   assert.equal(positionIds.length, FC27_OFFICIAL_POSITION_COUNT);
   assert.deepEqual(positionIds, ratingIds);
   assert.deepEqual(positionIds.filter((sourceId) => unavailableIds.has(sourceId)), []);
@@ -244,8 +244,9 @@ test("the women among the Icons are marked as women, the men are not", () => {
 
 test("all FC 27 women rated 70+ are base cards with official ratings and nations", () => {
   const women = STAR_XI_PLAYERS.filter((player) => player.isWomen && player.cardType !== "icon");
-  assert.equal(women.length, 1220);
-  assert.equal(new Set(women.map((player) => player.sourceId)).size, 1220);
+  // 1220 from the October capture and 238 that EA rated 70+ since.
+  assert.equal(women.length, 1458);
+  assert.equal(new Set(women.map((player) => player.sourceId)).size, 1458);
   women.forEach((player) => {
     assert.ok(player.rating >= 70);
     assert.equal(player.rating, FC27_RATING_BY_SOURCE_ID[player.sourceId!]);
@@ -1000,4 +1001,28 @@ test("Romario only links a player with clubs that would really sign that rating"
   assert.ok(transferClubsForRating(91).includes("Manchester Cité" as never));
   assert.equal(transferClubsForRating(91).includes("FC Aarau Kicker" as never), false);
   for (let rating = 40; rating <= 100; rating++) assert.ok(transferClubsForRating(rating).length >= 7, `no clubs for ${rating}`);
+});
+
+test("every further FC 27 player rated 70+ is a base card with official rating and positions", async () => {
+  const { FC27_ADDED_MEN_SEEDS, FC27_ADDED_WOMEN_SEEDS } = await import("../app/fc27-added-players.ts");
+  assert.equal(FC27_ADDED_MEN_SEEDS.length, 3408);
+  assert.equal(FC27_ADDED_WOMEN_SEEDS.length, 238);
+  for (const [sourceId] of [...FC27_ADDED_MEN_SEEDS, ...FC27_ADDED_WOMEN_SEEDS]) {
+    const player = STAR_XI_PLAYERS.find((candidate) => candidate.sourceId === sourceId && !candidate.cardType)!;
+    assert.ok(player, sourceId);
+    assert.ok(player.rating >= 70, sourceId);
+    assert.equal(player.rating, FC27_RATING_BY_SOURCE_ID[sourceId]);
+    assert.deepEqual(player.positions, FC27_POSITION_BY_SOURCE_ID[sourceId]);
+  }
+  const bright = getStarXIPlayer("star-fc27w-238257")!;
+  assert.equal(bright.rating, 87);
+  assert.equal(bright.countryCode, "EN");
+  assert.equal(bright.name, "M. Brighd");
+  // A new card can come from a pack like any other.
+  let seed = 5;
+  const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  const added = new Set([...FC27_ADDED_MEN_SEEDS, ...FC27_ADDED_WOMEN_SEEDS].map(([sourceId]) => sourceId));
+  let drawn = 0;
+  for (let pull = 0; pull < 2000; pull += 1) if (added.has(openStarPack("scout", [], random).player.sourceId ?? "")) drawn += 1;
+  assert.ok(drawn > 0);
 });

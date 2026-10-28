@@ -10,8 +10,10 @@ import type { TravelState } from "./travel-data";
 import type { Venue } from "./travel-geography";
 import { ASSIST_POSITION_WEIGHTS, DEFENSIVE_FAULT_WEIGHTS, GOAL_POSITION_WEIGHTS, MISSION_TEMPLATES, STAR_FORMATIONS, STAR_POSITIONS, STAR_XI_FORMATION_POSITIONS, TOURNAMENTS, TRANSFER_PLAYERS, YB_FC26_PLAYERS, getStarFormation, specialAttributes } from "./features/catalog";
 import { FC26_STAR_PROFILES } from "./fc26-player-pool";
-import { isFC27Unavailable } from "./fc27-ratings";
+import { FC27_RATING_BY_SOURCE_ID, getFC27CardAccent, isFC27Unavailable } from "./fc27-ratings";
 import { FC27_WOMEN_PROFILES } from "./fc27-women-pool";
+import { FC27_ADDED_MEN_SEEDS, FC27_ADDED_WOMEN_SEEDS } from "./fc27-added-players";
+import { FC27_POSITION_BY_SOURCE_ID } from "./fc27-positions";
 import { FC27_INDIA_PROFILES, SCRAP_RATING_GROUPS, drawScrapPlayer } from "./scrap-pack";
 import { GAZETTE_CHAMPION_HEADLINES, GAZETTE_EXIT_HEADLINES, TRANSFER_INTERESTED_CLUBS, transferClubsForRating } from "./features/news-data";
 import { HOME_VENUE, LEAGUE_LABELS, seasonGeography, venueForClubName } from "./travel-geography";
@@ -517,7 +519,15 @@ const EXISTING_STAR_XI_PLAYERS: StarXIPlayer[] = [
     accent: profile.accent,
     isWomen: true,
   })),
+  // Everyone else EA rates 70+ in FC 27; they draw from packs like the launch pool.
+  ...FC27_ADDED_MEN_SEEDS.map(([sourceId, name]) => addedPlayer(`star-fc27-${sourceId}`, sourceId, name)),
+  ...FC27_ADDED_WOMEN_SEEDS.map(([sourceId, name, countryCode]) => ({ ...addedPlayer(`star-fc27w-${sourceId}`, sourceId, name), countryCode, isWomen: true })),
 ];
+
+function addedPlayer(id: string, sourceId: string, name: string): StarXIPlayer {
+  const rating = FC27_RATING_BY_SOURCE_ID[sourceId], positions = [...FC27_POSITION_BY_SOURCE_ID[sourceId]];
+  return { id, sourceId, name, position: positions[0], positions, rating, price: Math.round(Math.min(1500000000, 5000 * 1.28 ** (rating - 70))), accent: getFC27CardAccent(rating) };
+}
 
 // Reuse existing source IDs; retired fictional cards are removed by save normalization.
 export const SCRAP_PLAYERS: StarXIPlayer[] = FC27_INDIA_PROFILES.map(profile => {

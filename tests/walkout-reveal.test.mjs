@@ -83,12 +83,15 @@ test("every Icon and current 86+ base card has a fixed appearance", async () => 
   assert.deepEqual(baseWalkouts.filter((sourceId) => !fixedBaseProfiles.has(sourceId)), []);
 
   const womenSource = await readFile(new URL("../app/fc27-women-pool.ts", import.meta.url), "utf8");
-  const womenWalkouts = [...womenSource.matchAll(/^  \["(\d+)",/gm)]
+  const addedSource = await readFile(new URL("../app/fc27-added-players.ts", import.meta.url), "utf8");
+  const addedWomen = addedSource.slice(addedSource.indexOf("FC27_ADDED_WOMEN_SEEDS"));
+  const womenWalkouts = [...`${womenSource}\n${addedWomen}`.matchAll(/^  \["(\d+)",/gm)]
     .map((match) => match[1])
     .filter((sourceId) => (officialRatings.get(sourceId) ?? 0) >= 86);
   const womenAppearanceBlock = walkoutSource.match(/const WOMEN_APPEARANCE_BY_SOURCE_ID[^=]*= \{([\s\S]*?)\n\};/)?.[1] ?? "";
   const womenAppearanceIds = [...womenAppearanceBlock.matchAll(/^  "(\d+)":/gm)].map((match) => match[1]);
-  assert.equal(womenWalkouts.length, 38);
+  // 38 from the October capture and Millie Bright, rated 87 since.
+  assert.equal(womenWalkouts.length, 39);
   assert.deepEqual(womenAppearanceIds.sort(), womenWalkouts.sort());
 
   const physicalBlock = walkoutSource.match(/const FC26_PHYSICAL_BY_SOURCE_ID[^=]*= \{([\s\S]*?)\n\};/)?.[1] ?? "";

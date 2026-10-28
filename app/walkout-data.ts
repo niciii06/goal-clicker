@@ -752,6 +752,7 @@ const WOMEN_APPEARANCE_BY_SOURCE_ID: Record<string, IconAppearance> = {
   "243404": [T2, "pony", BROWN, "clean", "oval", .95, .91, "fist"],
   "265239": [T2, "pony", DARK_BROWN, "clean", "oval", .95, .90, "fist", { tattoo: "both" }],
   "265674": [T3, "pony", BLACK, "clean", "oval", .94, .91, "arms"],
+  "238257": [T2, "bun", BLOND, "clean", "square", 1.03, .97, "fist"],
   "231432": [T2, "long", BLOND, "clean", "oval", 1.02, .95, "point"],
   "245879": [T1, "pony", LIGHT_BROWN, "clean", "oval", 1.01, .89, "calm"],
   "257001": [T2, "pony", DARK_BLOND, "clean", "oval", .98, .92, "arms"],
