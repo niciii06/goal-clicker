@@ -7,6 +7,7 @@ import { matchColours } from './match-colours';
 import { goalLabel, goalAssistId } from './match-goals';
 import { MatchSubstitutions } from './match-substitutions';
 import { InteractiveMatchPanel } from "./interactive-match-panel";
+import { useReducedMotion } from './use-reduced-motion';
 import type { InteractivePanelProps } from "./interactive-match-panel";
 import { getVisualFrame, getViewerEvents, eventLabel } from './match-visual-frame';
 import type { Replay } from './match-visual-frame';
@@ -21,7 +22,7 @@ export function LegacyLiveMatchViewer({ features, now, clubName, clubColor, disa
   const [tab, setTab] = useState<Phase>("live");
   const [clock, setClock] = useState(now);
   const [replay, setReplay] = useState<Replay>();
-  const [reducedMotion, setReducedMotion] = useState(false);
+  const reducedMotion = useReducedMotion();
   const [camera,setCamera]=useState<"full"|"follow"|"highlights">("full");
   const [fps,setFps]=useState(0);
   const [selectedPlayer,setSelectedPlayer]=useState<string>();
@@ -36,13 +37,6 @@ export function LegacyLiveMatchViewer({ features, now, clubName, clubColor, disa
     const key=(e:globalThis.KeyboardEvent)=>{if(e.key==='Escape')setExpanded(false);if(e.key==='Tab'){const list=elements(),first=list[0],last=list.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}};
     window.addEventListener('keydown',key);return()=>{window.removeEventListener('keydown',key);document.body.style.overflow=overflow;previous?.focus();};
   },[expanded]);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const change = () => setReducedMotion(media.matches);
-    change(); media.addEventListener("change", change);
-    return () => media.removeEventListener("change", change);
-  }, []);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const offset = now - Date.now();

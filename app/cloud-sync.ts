@@ -145,6 +145,8 @@ export class CloudSync {
   private inputs = 0;
   private inputsAtLastSave = 0;
   private playedMarked = false;
+  // Raised by stop(): an answer that arrives later belongs to a finished sync and must not touch this browser.
+  private generation = 0;
 
   constructor(private readonly userId: string, private readonly handlers: SyncHandlers) {}
 
@@ -162,6 +164,7 @@ export class CloudSync {
 
   stop() {
     this.stopped = true;
+    this.generation += 1;
     if (this.timer) window.clearInterval(this.timer);
     this.timer = null;
     document.removeEventListener("visibilitychange", this.handleVisibility);
@@ -238,6 +241,7 @@ export class CloudSync {
       return true;
     }
     const inputs = this.inputs;
+    const generation = this.generation;
     const active = this.played || meta.played === true;
     const body = JSON.stringify({ baseVersion: overwriteVersion ?? meta.version, keys, active });
     setStatus("saving");
@@ -247,6 +251,7 @@ export class CloudSync {
     try {
       const response = await fetch("/api/save", { method: "PUT", headers: { "content-type": "application/json" }, body, keepalive: keepalive && body.length < KEEPALIVE_LIMIT });
       const data = await response.json() as { version?: number; errorCode?: string } & Partial<CloudSaveState>;
+      if (generation !== this.generation) return response.ok;
       if (response.ok && typeof data.version === "number") {
         this.inputsAtLastSave = inputs;
         this.playedMarked = this.played;
@@ -266,8 +271,13 @@ export class CloudSync {
       setStatus("offline");
       return false;
     } catch {
-      setStatus("offline");
+      if (generation === this.generation) setStatus("offline");
       return false;
     }
+  }
+
+  /** Waits for an upload that is still on its way, for example before the account is deleted. */
+  async settle() {
+    await this.running?.catch(() => false);
   }
 }

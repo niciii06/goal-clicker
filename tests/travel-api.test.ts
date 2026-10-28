@@ -80,3 +80,9 @@ test('server season alternates home/away across all ten matchdays',async t=>{
   }
  }
 });
+test('every kick-off action refuses a squad with a yellow card ban',async()=>{
+ for(const [name,extra] of [['cup-start',{mode:'season'}],['season-match',{}],['season',{}]] as const){
+  const f=setup(0);f.discipline.bans=[{id:'ban-1',playerId:f.starXI.lineupIds[0],competition:'league',matches:1,yellowCards:3,createdAt:0,sourceMatchId:'match-1'}];row.sharedFeaturesJson=JSON.stringify(f);
+  const r=await action(name,extra);assert.equal(r.status,409,name);assert.match(r.data.error??'',/Gelben Karten/);assert.equal(JSON.parse(row.sharedFeaturesJson).cup.active,false);
+ }
+});

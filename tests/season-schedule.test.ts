@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getSeasonSchedule, initialSeasonMode, normalizeSeasonModeState, playSeasonModeMatch, SEASON_MODE_MATCHES_PER_SEASON } from '../app/feature-data.ts';
+import { getSeasonSchedule, initialSeasonMode, normalizeSeasonModeState, playSeasonModeMatch, SEASON_MODE_MATCHES_PER_SEASON, startSeasonPrestige } from '../app/feature-data.ts';
 import type { SeasonModeState } from '../app/feature-data.ts';
 
 function seeded(seed = 11) { return () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; }; }
@@ -55,4 +55,14 @@ test('a save from before results were stored still shows the club scores of this
     const ours = club.homeId === 'club' ? [club.homeScore, club.awayScore] : [club.awayScore, club.homeScore];
     assert.deepEqual(ours, [entry.clubScore, entry.opponentScore]);
   }
+});
+
+test('a prestige season starts without the results of the season before', () => {
+  let state: SeasonModeState = initialSeasonMode('FC Test');
+  const random = seeded(5);
+  for (let day = 0; day < 4; day++) state = playSeasonModeMatch(state, 90, 'FC Test', 1000 + day, random).state;
+  assert.ok((state.results ?? []).length > 0);
+  const prestige = startSeasonPrestige({ ...state, hallOfFame: true }, 'FC Test', 9000);
+  assert.deepEqual(prestige.results, []);
+  assert.ok(getSeasonSchedule(prestige).every((day) => day.matches.every((match) => match.homeScore === undefined && match.awayScore === undefined)));
 });

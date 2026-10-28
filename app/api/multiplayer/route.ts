@@ -233,6 +233,9 @@ function startSeasonCupMatch(game: CoopGameState, now: number) {
   if (getStarXISelection(game.features.starXI.ownedIds, game.features.starXI.lineupIds).length < STAR_XI_SQUAD_SIZE) return "Für das Saisonspiel brauchst du 11 passende Spieler in der Startelf.";
   const suspendedOnSquad = game.features.cup.suspendedPlayerIds.some((playerId) => game.features.starXI.lineupIds.includes(playerId) || game.features.starXI.benchIds.includes(playerId));
   if (suspendedOnSquad) return "Ein Spieler mit Roter Karte muss vor dem Anpfiff ersetzt werden und darf nicht auf der Bank sitzen.";
+  // Every kick-off action ends here, so the yellow card bans are checked for all of them.
+  const leagueBanError = squadBanError(game.features, competitionFor("season", "stadium"));
+  if (leagueBanError) return leagueBanError;
   const fixture = fixtureFor(game.features, "season");
   const travelError = travelGate(game.features, fixture, now);
   if (travelError) return travelError;
@@ -1027,8 +1030,6 @@ export async function POST(request: Request) {
 
     if (action === "cup-start") {
       if (payload.mode === "season" || typeof payload.tournamentId !== "string") {
-        const leagueBanError = squadBanError(game.features, competitionFor("season", "stadium"));
-        if (leagueBanError) return jsonError(leagueBanError, 409);
         const seasonStartError = startSeasonCupMatch(game, Date.now());
         if (seasonStartError) return jsonError(seasonStartError, 409);
         return persistGameResponse(db, room, game, timestamp, playerId, role);

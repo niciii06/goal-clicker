@@ -93,22 +93,20 @@ export function updateProfileResponse(request: Request, deps = defaults) {
     const current = await store.getProfile(user.id);
     if (!current) return json({ error: "Lege zuerst ein Profil an.", errorCode: "PROFILE_MISSING" }, 404);
     let profile: Profile = current;
-    if (typeof body.displayName === "string") {
-      const displayName = cleanDisplayName(body.displayName);
-      const invalid = displayNameError(displayName);
-      if (invalid) return json({ error: invalid, errorCode: "INVALID" }, 400);
-      profile = await store.updateDisplayName(user.id, displayName, now.toISOString()) ?? profile;
-    }
-    if (typeof body.username === "string" && body.username.trim() !== profile.username) {
-      const username = body.username.trim();
-      const invalid = usernameError(username);
-      if (invalid) return json({ error: invalid, errorCode: "INVALID" }, 400);
+    // Validate every field before the first write, so a rejected request changes nothing.
+    const displayName = typeof body.displayName === "string" ? cleanDisplayName(body.displayName) : null;
+    const username = typeof body.username === "string" && body.username.trim() !== current.username ? body.username.trim() : null;
+    const invalid = (displayName !== null ? displayNameError(displayName) : null) ?? (username !== null ? usernameError(username) : null);
+    if (invalid) return json({ error: invalid, errorCode: "INVALID" }, 400);
+    // The username can still be refused by the database (taken, too soon), so it goes first.
+    if (username !== null) {
       const result = await store.changeUsername(user.id, username, now.toISOString(), usernameChangeCutoff(now));
       if (result.reason === "taken") return json({ error: "Dieser Benutzername ist schon vergeben.", errorCode: "USERNAME_TAKEN", profile: publicProfile(profile) }, 409);
       if (result.reason === "too-soon") return json({ error: "Den Benutzernamen kannst du nur alle 30 Tage ändern.", errorCode: "USERNAME_TOO_SOON", profile: publicProfile(profile) }, 409);
       if (!result.profile) return json({ error: "Lege zuerst ein Profil an.", errorCode: "PROFILE_MISSING" }, 404);
       profile = result.profile;
     }
+    if (displayName !== null) profile = await store.updateDisplayName(user.id, displayName, now.toISOString()) ?? profile;
     return json({ profile: publicProfile(profile) });
   });
 }

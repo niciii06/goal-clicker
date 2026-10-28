@@ -69,3 +69,19 @@ test('a newer save from another device still wins', async () => {
   sync.stop();
   assert.equal(goalsIn(reloadedWith), 300);
 });
+
+test('an upload answer that arrives after stop() does not write the cleared account data back', async () => {
+  store.clear();
+  store.set(STORAGE_KEY, game(50));
+  writeCloudMeta({ userId: 'u', version: 1, hash: '' });
+  let answer!: (response: Response) => void;
+  globalThis.fetch = (() => new Promise<Response>((resolve) => { answer = resolve; })) as typeof fetch;
+  const sync = new CloudSync('u', { onNewerSave: () => {} });
+  sync.start();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  sync.stop();
+  store.clear();
+  answer(new Response(JSON.stringify({ version: 2 }), { status: 200 }));
+  await sync.settle();
+  assert.equal(store.get(CLOUD_META_KEY), undefined);
+});

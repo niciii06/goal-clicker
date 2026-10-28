@@ -185,10 +185,22 @@ function RequiredAccount({ children }: { children: ReactNode }) {
   }, []);
 
   const deleteProfile = useCallback(async (confirm: string) => {
-    const response = await fetch("/api/profile", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm }) });
+    // No upload may run alongside the deletion, or it could store the save again right after.
+    const sync = syncRef.current;
+    sync?.stop();
+    await sync?.settle();
+    let response: Response;
+    try {
+      response = await fetch("/api/profile", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm }) });
+    } catch (error) {
+      sync?.start();
+      throw error;
+    }
     const body = await readJson<{ deleted?: boolean }>(response);
-    if (!response.ok || !body.deleted) throw new Error(body.error ?? "Das Profil konnte nicht gelöscht werden.");
-    syncRef.current?.stop();
+    if (!response.ok || !body.deleted) {
+      sync?.start();
+      throw new Error(body.error ?? "Das Profil konnte nicht gelöscht werden.");
+    }
     suspendLocalPersistence();
     clearLocalAccountData();
     localStorage.removeItem(PROFILE_CACHE_KEY);

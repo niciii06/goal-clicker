@@ -903,6 +903,8 @@ export function startSeasonPrestige(value: unknown, clubName = "FC Goal", now = 
     matchday: 0,
     table: freshTable,
     fixtures: createSeasonFixtures(freshTable),
+    // The new season replays the same pairings; old scores must not show up as its results.
+    results: [],
     lastTable: freshTable,
     lastResult: `Prestige ${state.prestigeCount + 1} gestartet. Die Jagd auf die Hall of Fame beginnt von vorn.`,
     lastMatchAt: now,
@@ -1968,7 +1970,7 @@ function finishCupRound(cup: CupState, starRating: number, won: boolean, now: nu
   nextCup.round = 0;
   if (tournamentWon) nextCup.trophies = { ...nextCup.trophies, [tournament.id]: nextCup.trophies[tournament.id] + 1 };
   nextCup.lastResult = tournamentWon
-    ? `${tournament.trophyName}${decisionLabel} gewonnen! Der temporäre Goalboost ist aktiv.`
+    ? `${tournament.trophyName}${decisionLabel} gewonnen! Deine Prämie wartet im Packbereich.`
     : `Turnieraus in Runde ${completedRound} gegen ${cup.opponent}${decisionLabel}.`;
   return { cup: nextCup, ...baseResult, finished: true, won, tieBreak, tournamentWon, runEnded: true, completedRound };
 }

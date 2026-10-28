@@ -7,7 +7,7 @@ import type { ChangeEvent, FormEvent } from "react";
 import { AccountContext } from "./account-gate";
 import { useDialogFocus } from "./confirm-dialog";
 import { authErrorMessage, setAccountPassword } from "./auth/browser";
-import { subscribeSyncStatus } from "./cloud-sync";
+import { FLUSH_SAVE_EVENT, subscribeSyncStatus } from "./cloud-sync";
 import type { SyncStatus } from "./cloud-sync";
 import { resumeLocalPersistence, suspendLocalPersistence } from "./game/storage";
 import { getInstallState, promptInstall, subscribeInstallState } from "./pwa";
@@ -79,7 +79,15 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
   const [passwordRepeat, setPasswordRepeat] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState("");
-  const [now] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
+  const nextUsernameChangeAt = account ? new Date(account.profile.nextUsernameChangeAt).getTime() : 0;
+  // The lock ends while the dialog may still be open; re-render once it does.
+  useEffect(() => {
+    const wait = nextUsernameChangeAt - Date.now();
+    if (!Number.isFinite(wait) || wait <= 0) return;
+    const timer = window.setTimeout(() => setNow(Date.now()), Math.min(wait + 50, 2 ** 31 - 1));
+    return () => window.clearTimeout(timer);
+  }, [nextUsernameChangeAt, now]);
   if (!account) return null;
   const { profile } = account;
   const nextChange = new Date(profile.nextUsernameChangeAt);
@@ -194,6 +202,8 @@ export function SaveTransferPanel({ onMessage }: { onMessage: (text: string) => 
   const [busy, setBusy] = useState(false);
 
   function exportSave() {
+    // The game saves every few seconds; the file must hold what is on screen right now.
+    window.dispatchEvent(new Event(FLUSH_SAVE_EVENT));
     const file = createSaveFile(localStorage, window.location.origin);
     const url = URL.createObjectURL(new Blob([`${JSON.stringify(file, null, 2)}\n`], { type: "application/json" }));
     const link = document.createElement("a");

@@ -157,6 +157,16 @@ test('the username changes at most every 30 days, the display name any time', as
   assert.equal(changed.data.profile!.nextUsernameChangeAt, '2026-12-01T10:00:00.000Z');
 });
 
+test('a rejected profile change changes nothing, not even the display name sent along', async () => {
+  const { call, store } = setup();
+  await call(createProfileResponse, 'POST', { username: 'Nico_06', displayName: 'Nico' });
+  assert.equal((await call(updateProfileResponse, 'PATCH', { displayName: 'Neu', username: '!' })).status, 400);
+  assert.equal(store.profiles.get('user-a')!.displayName, 'Nico');
+  store.profiles.set('user-b', { userId: 'user-b', username: 'Taken', usernameKey: 'taken', displayName: 'B', loginEmail: null, usernameChangedAt: '', createdAt: '', updatedAt: '' });
+  assert.equal((await call(updateProfileResponse, 'PATCH', { displayName: 'Neu', username: 'Taken' })).data.errorCode, 'USERNAME_TAKEN');
+  assert.equal(store.profiles.get('user-a')!.displayName, 'Nico');
+});
+
 test('a cloud save only replaces the version it was loaded from', async () => {
   const { call } = setup();
   const save = (baseVersion: number, goals: number, active?: boolean) => call(putCloudSaveResponse, 'PUT', { baseVersion, active, keys: { goalClickerSiteSaveV3: game(goals), goalClickerPlayerIdV3: 'never-synced' } }, '/api/save');
