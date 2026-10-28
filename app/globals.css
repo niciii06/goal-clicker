@@ -612,6 +612,7 @@
 .injury-warning small { color: color-mix(in oklab, #9a6b32, var(--text) var(--tone-mix)); font-size: var(--text-footnote); line-height: 1.4; }
 .starxi-pitch-slot.injured { border-color: rgba(255,149,0,.9); background: rgba(116,67,8,.8); box-shadow: 0 0 0 2px rgba(255,149,0,.2), 0 5px 16px rgba(0,0,0,.2); }
 .starxi-player-card.red-carded { border-color: rgba(255,59,48,.4); color: color-mix(in oklab, #7b1a23, var(--text) var(--tone-mix)); background: color-mix(in srgb, #e60000 4%, var(--surface-raised)); }
+.starxi-player-card.injured { border-color: rgba(255,149,0,.55); color: color-mix(in oklab, #8a4b00, var(--text) var(--tone-mix)); background: color-mix(in srgb, #ff9500 9%, var(--surface-raised)); }.starxi-player-card.injured:disabled { opacity: .9; }.starxi-player-card.injured small { color: color-mix(in oklab, #b25e00, var(--text) var(--tone-mix)); font-weight: 700; }.starxi-injury-mark { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; background: color-mix(in srgb, #ff9500 18%, transparent); font-size: 18px; }
 /* Drop highlights come after the match states (poor rating, red card, injury), so a valid target always lights up. */
 .starxi-pitch-slot.squad-drop-ready, .starxi-player-card.squad-drop-ready, .starxi-bank-slot.squad-drop-ready { border-color: rgba(52,199,89,.88); box-shadow: 0 0 0 3px rgba(52,199,89,.18), 0 10px 24px rgba(18,105,52,.18); }
 .starxi-pitch-slot.squad-drop-ready { background: rgba(35,126,73,.8); }
