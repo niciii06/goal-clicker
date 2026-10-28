@@ -2176,3 +2176,7 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .body-women .avatar-leg { top: 160px; width: 28px; }
 .body-women .avatar-leg.left { left: 34px; }.body-women .avatar-leg.right { right: 34px; }
 .body-women .avatar-leg i { width: 34px; }
+/* Braids and locs hang at the sides and behind, never across the face. */
+.hair-braids .avatar-hair::after, .hair-locs .avatar-hair::after { -webkit-mask: linear-gradient(90deg, #000 0 24%, transparent 24% 76%, #000 76%); mask: linear-gradient(90deg, #000 0 24%, transparent 24% 76%, #000 76%); }
+.hair-braids .avatar-hair { top: -7px; height: 22px; }
+.hair-braids .avatar-hair::after { top: 12px; right: -4px; left: -4px; height: 34px; }
