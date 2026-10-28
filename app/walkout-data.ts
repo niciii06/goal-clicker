@@ -1,7 +1,7 @@
 import type { StarXIPlayer } from "./feature-data";
 
-export type WalkoutHair = "afro" | "bald" | "braids" | "buzz" | "crop" | "curls" | "fade" | "locs" | "medium" | "mohawk" | "pony" | "slick" | "waves";
-export type WalkoutBeard = "clean" | "full" | "goatee" | "short" | "stubble";
+export type WalkoutHair = "afro" | "bald" | "bob" | "braids" | "bun" | "buzz" | "crop" | "curls" | "curtain" | "fade" | "locs" | "long" | "mane" | "medium" | "mohawk" | "mullet" | "pony" | "quiff" | "receding" | "sidepart" | "slick" | "spiky" | "twists" | "waves";
+export type WalkoutBeard = "chinstrap" | "clean" | "full" | "goatee" | "mustache" | "short" | "stubble";
 export type WalkoutFace = "angular" | "long" | "oval" | "round" | "square";
 export type WalkoutCelebration = "arms" | "calm" | "fist" | "jump" | "point" | "siu";
 export type StarCardTier = "standard" | "rare" | "walkout" | "icon" | "legendary";
@@ -24,7 +24,19 @@ export type WalkoutPresentation = {
   /** Accessories from a reference photo, drawn over the head. */
   glasses?: boolean;
   cap?: "backwards";
+  /** A sports headband in this colour (Ronaldinho, Sócrates). */
+  headband?: string;
+  /** Petr Čech's padded skull cap. */
+  helmet?: boolean;
+  /** Tattoo sleeves on one or both arms. */
+  tattoo?: "left" | "right" | "both";
+  /** Goalkeepers wear a long sleeved keeper kit and gloves. */
+  keeper?: boolean;
+  gloves?: string;
 };
+
+/** Features that only some players have; they make a player recognisable beyond hair and beard. */
+type LookExtras = Pick<WalkoutPresentation, "headband" | "helmet" | "tattoo" | "glasses"> & { keeperKit?: readonly [string, string] };
 
 type RawProfile = readonly [
   sourceId: string,
@@ -37,6 +49,7 @@ type RawProfile = readonly [
   height: number,
   build: number,
   celebration: WalkoutCelebration,
+  extras?: LookExtras,
 ];
 
 const COUNTRY: Record<string, { name: string; flag: string; kit: [string, string] }> = {
@@ -130,6 +143,19 @@ const BLACK = "#171310";
 const BROWN = "#4a3024";
 const LIGHT_BROWN = "#80604b";
 const BLOND = "#d8bd73";
+
+// The redrawn players use a finer palette: seven skin tones from very fair to very dark, and more hair colours.
+const T1 = "#f7d7c1";
+const T2 = "#eec29f";
+const T3 = "#dda57c";
+const T4 = "#c4885d";
+const T5 = "#a06642";
+const T6 = "#7a482d";
+const T7 = "#55301f";
+const DARK_BROWN = "#2c1d15";
+const DARK_BLOND = "#a98852";
+const GINGER = "#b65a2c";
+const STRAWBERRY = "#c07f52";
 
 type PhysicalBuild = "lean" | "normal" | "stocky" | "unique";
 type PhysicalProfile = readonly [heightCm: number, weightKg: number, bodyType: PhysicalBuild];
@@ -257,118 +283,118 @@ function physicalScale(sourceId: string, fallbackHeight: number, fallbackBuild: 
 
 // Every base-card walkout has its own fixed body and face profile. Nothing is rolled at
 // render time, so a player keeps the same recognisable block-character appearance.
-// Skin, hair and beard of every current 86+ card were checked against its official
-// EA FC 27 portrait (17 October 2026).
+// Redrawn in October 2026 with the finer palette and the signature looks of each player (hair style,
+// beard, tattoos, keeper kit), so the figure can be told apart without its name.
 const RAW_PROFILES: readonly RawProfile[] = [
-  ["231747", "FR", S4, "buzz", BLACK, "clean", "round", 1.00, 1.03, "arms"],
-  ["209331", "EG", S3, "buzz", BLACK, "full", "angular", 0.96, 0.92, "point"],
-  ["239085", "NO", S1, "pony", BLOND, "clean", "long", 1.10, 1.06, "calm"],
-  ["252371", "EN", S3, "crop", BLACK, "goatee", "long", 1.05, 1.00, "arms"],
-  ["231443", "FR", S5, "buzz", BLACK, "clean", "oval", 0.95, 0.92, "fist"],
-  ["231866", "ES", S2, "crop", BLACK, "short", "square", 1.06, 1.04, "calm"],
-  ["203376", "NL", S3, "slick", BLACK, "goatee", "long", 1.11, 1.08, "fist"],
-  ["235212", "MA", S3, "fade", BLACK, "stubble", "angular", 0.97, 0.93, "point"],
-  ["212831", "BR", S2, "slick", BROWN, "full", "square", 1.05, 1.05, "fist"],
-  ["239053", "UY", S1, "crop", BROWN, "short", "long", 1.02, 0.98, "fist"],
-  ["256630", "DE", S1, "crop", BLOND, "clean", "oval", 0.97, 0.88, "arms"],
-  ["230621", "IT", S2, "slick", BLACK, "full", "long", 1.10, 1.03, "fist"],
-  ["202126", "EN", S1, "crop", LIGHT_BROWN, "short", "square", 1.03, 1.02, "point"],
-  ["212622", "DE", S1, "crop", BROWN, "clean", "angular", 0.96, 0.92, "fist"],
-  ["277643", "ES", S3, "curls", BLACK, "clean", "oval", 0.94, 0.84, "point"],
-  ["251854", "ES", S1, "crop", BROWN, "clean", "round", 0.93, 0.84, "calm"],
-  ["233419", "BR", S2, "curls", BLACK, "goatee", "angular", 0.96, 0.90, "jump"],
-  ["192119", "BE", S1, "crop", BLACK, "stubble", "long", 1.12, 1.04, "fist"],
-  ["238794", "BR", S5, "fade", BLACK, "clean", "angular", 0.94, 0.87, "jump"],
-  ["255253", "PT", S1, "medium", BROWN, "goatee", "oval", 0.94, 0.87, "calm"],
-  ["233731", "SE", S4, "buzz", BLACK, "clean", "long", 1.08, 0.92, "calm"],
-  ["246669", "EN", S5, "curls", BLACK, "clean", "round", 0.95, 0.90, "point"],
-  ["232580", "BR", S3, "fade", BLACK, "short", "square", 1.05, 1.06, "fist"],
-  ["256790", "DE", S3, "crop", BLACK, "clean", "long", 0.98, 0.84, "arms"],
-  ["200389", "SI", S1, "crop", LIGHT_BROWN, "full", "square", 1.04, 1.02, "calm"],
-  ["231478", "AR", S2, "fade", BLACK, "stubble", "angular", 0.96, 0.94, "fist"],
+  ["231747", "FR", T5, "buzz", BLACK, "clean", "round", 1.00, 1.03, "arms"],
+  ["209331", "EG", T4, "afro", BLACK, "full", "angular", 0.96, 0.92, "point"],
+  ["239085", "NO", T1, "bun", BLOND, "clean", "long", 1.10, 1.06, "calm"],
+  ["252371", "EN", T5, "fade", BLACK, "goatee", "long", 1.05, 1.00, "arms"],
+  ["231443", "FR", T6, "twists", BLACK, "clean", "oval", 0.95, 0.92, "fist"],
+  ["231866", "ES", T3, "crop", DARK_BROWN, "short", "square", 1.06, 1.04, "calm"],
+  ["203376", "NL", T5, "crop", BLACK, "full", "long", 1.11, 1.08, "fist"],
+  ["235212", "MA", T4, "fade", BLACK, "stubble", "angular", 0.97, 0.93, "point", { tattoo: "both" }],
+  ["212831", "BR", T2, "slick", DARK_BROWN, "full", "square", 1.05, 1.05, "fist"],
+  ["239053", "UY", T2, "crop", BROWN, "short", "long", 1.02, 0.98, "fist"],
+  ["256630", "DE", T2, "curtain", LIGHT_BROWN, "clean", "oval", 0.97, 0.88, "arms"],
+  ["230621", "IT", T2, "slick", DARK_BROWN, "full", "long", 1.10, 1.03, "fist"],
+  ["202126", "EN", T2, "sidepart", BROWN, "short", "square", 1.03, 1.02, "point"],
+  ["212622", "DE", T2, "slick", DARK_BLOND, "clean", "angular", 0.96, 0.92, "fist"],
+  ["277643", "ES", T4, "curls", BLACK, "clean", "oval", 0.94, 0.84, "point"],
+  ["251854", "ES", T2, "curtain", DARK_BROWN, "clean", "round", 0.93, 0.84, "calm"],
+  ["233419", "BR", T4, "fade", BLACK, "goatee", "angular", 0.96, 0.90, "jump", { tattoo: "both" }],
+  ["192119", "BE", T2, "curtain", DARK_BROWN, "stubble", "long", 1.12, 1.04, "fist"],
+  ["238794", "BR", T6, "twists", BLACK, "clean", "angular", 0.94, 0.87, "jump"],
+  ["255253", "PT", T2, "bun", DARK_BROWN, "stubble", "oval", 0.94, 0.87, "calm"],
+  ["233731", "SE", T5, "buzz", BLACK, "clean", "long", 1.08, 0.92, "calm"],
+  ["246669", "EN", T6, "twists", BLACK, "clean", "round", 0.95, 0.90, "point"],
+  ["232580", "BR", T4, "fade", BLACK, "short", "square", 1.05, 1.06, "fist"],
+  ["256790", "DE", T4, "twists", BLACK, "clean", "long", 0.98, 0.84, "arms"],
+  ["200389", "SI", T2, "bun", BROWN, "full", "square", 1.04, 1.02, "calm"],
+  ["231478", "AR", T3, "fade", BLACK, "short", "angular", 0.96, 0.94, "fist"],
   ["188545", "PL", S1, "slick", BROWN, "clean", "square", 1.00, 0.98, "fist"],
-  ["237383", "IT", S1, "curls", BLACK, "clean", "long", 1.05, 1.00, "calm"],
+  ["237383", "IT", T2, "curls", DARK_BROWN, "clean", "long", 1.05, 1.00, "calm"],
   ["239837", "AR", S1, "crop", BROWN, "stubble", "round", 0.97, 0.94, "fist"],
-  ["212198", "PT", S1, "crop", BLACK, "full", "angular", 0.96, 0.93, "fist"],
+  ["212198", "PT", T2, "sidepart", DARK_BROWN, "full", "angular", 0.96, 0.93, "fist"],
   ["257534", "EN", S1, "curls", BROWN, "short", "angular", 0.96, 0.88, "calm"],
-  ["234378", "EN", S1, "slick", LIGHT_BROWN, "short", "square", 1.03, 1.02, "fist"],
-  ["220901", "ES", S2, "curls", BLACK, "full", "round", 0.99, 0.97, "fist"],
-  ["228702", "NL", S1, "medium", BLOND, "clean", "long", 0.98, 0.88, "calm"],
-  ["246191", "AR", S1, "crop", BROWN, "clean", "round", 0.96, 0.96, "arms"],
+  ["234378", "EN", T2, "slick", BROWN, "short", "square", 1.03, 1.02, "fist"],
+  ["220901", "ES", T3, "crop", BLACK, "short", "round", 0.99, 0.97, "fist"],
+  ["228702", "NL", T2, "curtain", DARK_BLOND, "clean", "long", 0.98, 0.88, "calm"],
+  ["246191", "AR", T3, "crop", DARK_BROWN, "clean", "round", 0.96, 0.96, "arms"],
   ["241486", "FR", S4, "braids", BLACK, "goatee", "angular", 0.98, 0.94, "fist"],
-  ["213331", "DE", S3, "buzz", BLACK, "full", "square", 1.07, 1.08, "calm"],
+  ["213331", "DE", T5, "buzz", BLACK, "full", "square", 1.07, 1.08, "calm"],
   ["192985", "BE", S1, "crop", BLOND, "short", "long", 1.00, 0.96, "arms"],
-  ["247635", "GE", S1, "medium", BROWN, "full", "angular", 1.00, 0.93, "arms"],
-  ["256079", "EC", S4, "buzz", BLACK, "clean", "round", 0.95, 0.96, "fist"],
-  ["215698", "FR", S4, "buzz", BLACK, "full", "long", 1.04, 1.02, "fist"],
-  ["222665", "NO", S1, "medium", BLOND, "clean", "angular", 0.96, 0.88, "calm"],
-  ["207865", "BR", S3, "curls", BLACK, "full", "round", 1.04, 1.05, "fist"],
-  ["224232", "IT", S1, "crop", BROWN, "clean", "square", 0.96, 0.95, "fist"],
+  ["247635", "GE", T2, "long", BROWN, "stubble", "angular", 1.00, 0.93, "arms"],
+  ["256079", "EC", T6, "buzz", BLACK, "clean", "round", 0.95, 0.96, "fist"],
+  ["215698", "FR", T6, "buzz", BLACK, "full", "long", 1.04, 1.02, "fist"],
+  ["222665", "NO", T1, "sidepart", LIGHT_BROWN, "clean", "angular", 0.96, 0.88, "calm"],
+  ["207865", "BR", T3, "crop", BLACK, "full", "round", 1.04, 1.05, "fist"],
+  ["224232", "IT", T2, "crop", DARK_BROWN, "stubble", "square", 0.96, 0.95, "fist", { tattoo: "both" }],
   ["215441", "GN", S5, "buzz", BLACK, "clean", "long", 1.01, 0.96, "arms"],
-  ["241651", "SE", S1, "crop", LIGHT_BROWN, "clean", "square", 1.08, 1.08, "calm"],
+  ["241651", "SE", T2, "slick", DARK_BROWN, "short", "square", 1.08, 1.08, "calm"],
   ["232293", "NG", S5, "buzz", BLACK, "clean", "long", 1.06, 1.02, "arms"],
-  ["243715", "FR", S3, "crop", BLACK, "short", "long", 1.06, 0.98, "fist"],
+  ["243715", "FR", T5, "buzz", BLACK, "short", "long", 1.06, 0.98, "fist"],
   ["177683", "CH", S1, "medium", BROWN, "stubble", "round", 0.95, 0.96, "calm"],
   ["205452", "DE", S3, "buzz", BLACK, "full", "square", 1.05, 1.05, "fist"],
-  ["247851", "BR", S2, "crop", BLACK, "short", "round", 0.96, 0.95, "arms"],
-  ["235073", "CH", S1, "medium", BROWN, "short", "long", 1.07, 1.01, "fist"],
+  ["247851", "BR", T3, "crop", BLACK, "short", "round", 0.96, 0.95, "arms"],
+  ["235073", "CH", T2, "crop", LIGHT_BROWN, "short", "long", 1.07, 1.01, "fist"],
   ["208128", "TR", S2, "slick", BLACK, "full", "angular", 0.96, 0.92, "calm"],
   ["237678", "FR", S5, "buzz", BLACK, "clean", "long", 1.07, 1.07, "fist"],
-  ["158023", "AR", S1, "crop", BROWN, "short", "round", 0.94, 0.88, "point"],
-  ["247827", "FR", S3, "locs", BLACK, "clean", "oval", 0.97, 0.88, "point"],
+  ["158023", "AR", T3, "crop", DARK_BROWN, "full", "round", 0.94, 0.88, "point", { tattoo: "left" }],
+  ["247827", "FR", T5, "twists", BLACK, "clean", "oval", 0.97, 0.88, "point"],
   ["192448", "DE", S1, "crop", LIGHT_BROWN, "stubble", "long", 1.05, 0.96, "fist"],
   ["256516", "ES", S4, "locs", BLACK, "clean", "long", 0.98, 0.90, "arms"],
-  ["252145", "PT", S4, "buzz", BLACK, "clean", "angular", 0.97, 0.91, "point"],
+  ["252145", "PT", T6, "fade", BLACK, "clean", "angular", 0.97, 0.91, "point"],
   ["211110", "AR", S1, "slick", BLACK, "stubble", "oval", 0.94, 0.89, "point"],
-  ["239818", "PT", S1, "crop", BROWN, "full", "square", 1.05, 1.06, "fist"],
+  ["239818", "PT", T3, "crop", BLACK, "full", "square", 1.05, 1.06, "fist"],
   ["241096", "IT", S1, "medium", BLACK, "stubble", "angular", 1.00, 0.98, "calm"],
   ["231281", "EN", S2, "fade", BLACK, "goatee", "long", 0.98, 0.91, "point"],
   ["240638", "NL", S3, "slick", BLACK, "goatee", "long", 1.01, 0.96, "calm"],
-  ["256196", "EC", S4, "fade", BLACK, "clean", "long", 1.03, 1.01, "fist"],
+  ["256196", "EC", T6, "fade", BLACK, "clean", "long", 1.03, 1.01, "fist"],
   ["194765", "FR", S1, "medium", LIGHT_BROWN, "stubble", "angular", 0.95, 0.90, "arms"],
   ["243014", "CM", S4, "bald", BLACK, "full", "square", 0.99, 1.03, "fist"],
-  ["239580", "BR", S3, "buzz", BLACK, "full", "square", 1.05, 1.08, "fist"],
+  ["239580", "BR", T5, "buzz", BLACK, "full", "square", 1.05, 1.08, "fist"],
   ["204963", "ES", S1, "crop", BROWN, "full", "square", 0.97, 0.97, "fist"],
   ["20801", "PT", S2, "crop", BLACK, "clean", "angular", 1.03, 1.04, "siu"],
-  ["271421", "FR", S4, "curls", BLACK, "clean", "round", 0.94, 0.87, "jump"],
-  ["229558", "FR", S5, "buzz", BLACK, "short", "square", 1.07, 1.08, "fist"],
+  ["271421", "FR", T5, "twists", BLACK, "clean", "round", 0.94, 0.87, "jump"],
+  ["229558", "FR", T6, "buzz", BLACK, "short", "square", 1.07, 1.08, "fist"],
   ["244260", "ES", S1, "crop", BROWN, "clean", "round", 0.96, 0.88, "point"],
   ["193080", "ES", S1, "slick", BROWN, "short", "long", 1.06, 0.98, "fist"],
   ["202811", "AR", S2, "fade", BLACK, "full", "square", 1.04, 1.05, "arms"],
   ["210257", "BR", S3, "fade", BLACK, "short", "round", 1.04, 1.00, "fist"],
-  ["226268", "IT", S1, "buzz", BLOND, "full", "angular", 0.96, 0.93, "calm"],
-  ["226271", "ES", S1, "crop", BLACK, "stubble", "long", 0.97, 0.91, "calm"],
+  ["226268", "IT", T2, "buzz", BROWN, "full", "angular", 0.96, 0.93, "calm", { tattoo: "both" }],
+  ["226271", "ES", T3, "long", DARK_BROWN, "full", "long", 0.97, 0.91, "calm"],
   ["199503", "CH", S1, "crop", BLACK, "clean", "square", 1.00, 1.02, "fist"],
   ["200104", "KR", S1, "crop", BLACK, "clean", "round", 0.95, 0.89, "arms"],
   ["204525", "ES", S1, "crop", BROWN, "short", "long", 1.05, 1.01, "calm"],
-  ["272834", "PT", S1, "curls", LIGHT_BROWN, "clean", "round", 0.94, 0.86, "calm"],
+  ["272834", "PT", T2, "curls", DARK_BROWN, "clean", "round", 0.94, 0.86, "calm"],
   ["165153", "FR", S2, "buzz", BLACK, "full", "round", 1.00, 1.02, "calm"],
-  ["241084", "CO", S3, "fade", BLOND, "goatee", "long", 0.96, 0.92, "arms"],
+  ["241084", "CO", T5, "fade", BLACK, "goatee", "long", 0.96, 0.92, "arms"],
   ["228093", "FR", S4, "fade", BLACK, "full", "long", 1.05, 1.03, "fist"],
   ["215914", "FR", S5, "bald", BLACK, "clean", "round", 0.93, 0.88, "calm"],
-  ["247819", "DE", S1, "crop", LIGHT_BROWN, "clean", "long", 1.08, 1.05, "fist"],
+  ["247819", "DE", T2, "sidepart", LIGHT_BROWN, "clean", "long", 1.08, 1.05, "fist"],
   ["237692", "EN", S4, "fade", BLACK, "short", "round", 0.94, 0.88, "point"],
   ["185122", "HU", S1, "bald", BROWN, "full", "round", 1.04, 1.02, "fist"],
   ["234236", "CZ", S1, "crop", BROWN, "stubble", "long", 1.08, 1.03, "calm"],
   ["246104", "NL", S3, "curls", BLACK, "clean", "long", 1.03, 0.94, "calm"],
   ["243812", "BR", S4, "fade", BLACK, "short", "angular", 0.97, 0.94, "arms"],
-  ["237238", "SC", S1, "crop", LIGHT_BROWN, "clean", "square", 1.02, 1.05, "fist"],
+  ["237238", "SC", T2, "sidepart", BROWN, "clean", "square", 1.02, 1.05, "fist"],
   ["230869", "ES", S1, "fade", BROWN, "full", "long", 1.05, 1.00, "fist"],
   ["216393", "BE", S2, "buzz", BLACK, "goatee", "round", 0.98, 0.96, "calm"],
-  ["251570", "FR", S2, "crop", BLACK, "full", "round", 0.97, 0.94, "point"],
-  ["278046", "ES", S1, "crop", BROWN, "clean", "long", 1.01, 0.96, "fist"],
-  ["259532", "ES", S1, "crop", BROWN, "short", "long", 1.07, 1.02, "fist"],
-  ["236772", "HU", S1, "medium", BROWN, "stubble", "long", 1.02, 0.94, "arms"],
-  ["239231", "ES", S1, "curls", BROWN, "short", "long", 0.95, 0.90, "arms"],
-  ["234577", "PT", S2, "crop", BLACK, "short", "square", 1.03, 1.00, "fist"],
-  ["252154", "IT", S1, "medium", BROWN, "stubble", "long", 1.06, 1.01, "fist"],
-  ["247090", "AR", S1, "crop", LIGHT_BROWN, "stubble", "angular", 0.98, 0.95, "fist"],
+  ["251570", "FR", T3, "curls", BLACK, "stubble", "oval", 0.97, 0.94, "point"],
+  ["278046", "ES", T2, "curtain", DARK_BROWN, "clean", "long", 1.01, 0.96, "fist"],
+  ["259532", "ES", T2, "crop", DARK_BROWN, "short", "long", 1.07, 1.02, "fist"],
+  ["236772", "HU", T2, "slick", DARK_BLOND, "stubble", "long", 1.02, 0.94, "arms"],
+  ["239231", "ES", T3, "mane", DARK_BROWN, "stubble", "long", 0.95, 0.90, "arms"],
+  ["234577", "PT", T2, "sidepart", DARK_BROWN, "short", "square", 1.03, 1.00, "fist"],
+  ["252154", "IT", T2, "medium", DARK_BROWN, "stubble", "long", 1.06, 1.01, "fist"],
+  ["247090", "AR", T3, "fade", DARK_BROWN, "stubble", "angular", 0.98, 0.95, "fist", { tattoo: "both" }],
 ];
 
 const PROFILE_BY_SOURCE_ID = new Map(RAW_PROFILES.map((raw) => [raw[0], raw]));
 
 function fromRaw(raw: RawProfile): WalkoutPresentation {
-  const [, countryCode, skin, hair, hairColor, beard, face, height, build, celebration] = raw;
+  const [, countryCode, skin, hair, hairColor, beard, face, height, build, celebration, extras] = raw;
   const country = COUNTRY[countryCode] ?? COUNTRY.CH;
   const physical = physicalScale(raw[0], height, build);
   return {
@@ -386,7 +412,31 @@ function fromRaw(raw: RawProfile): WalkoutPresentation {
     kitPrimary: country.kit[0],
     kitSecondary: country.kit[1],
     boots: Number(raw[0]) % 3 === 0 ? "#f6ff00" : Number(raw[0]) % 3 === 1 ? "#f5f5f5" : "#111111",
+    ...withExtras(extras),
   };
+}
+
+function withExtras(extras: LookExtras | undefined) {
+  if (!extras) return {};
+  const { keeperKit, ...visible } = extras;
+  return keeperKit ? { ...visible, keeperKitPrimary: keeperKit[0], keeperKitSecondary: keeperKit[1] } : visible;
+}
+
+// Keepers are drawn in a long sleeved keeper kit with gloves; the colours stay the same for a player.
+const KEEPER_KITS: readonly (readonly [string, string])[] = [["#20c870", "#0b2a19"], ["#ffd21f", "#1f1f1f"], ["#ff5aa5", "#2b0f22"], ["#2b2b2b", "#e8e8e8"], ["#22b8f0", "#0d2233"], ["#ff7a1a", "#2a1405"]];
+
+function isDedicatedKeeper(player: StarXIPlayer) {
+  const positions = player.positions?.length ? player.positions : player.position ? [player.position] : [];
+  return positions.length > 0 && positions.every((position) => position === "TW");
+}
+
+function asKeeper(player: StarXIPlayer, presentation: WalkoutPresentation & { keeperKitPrimary?: string; keeperKitSecondary?: string }): WalkoutPresentation {
+  const { keeperKitPrimary, keeperKitSecondary, ...rest } = presentation;
+  if (!isDedicatedKeeper(player)) return rest;
+  let seed = 0;
+  for (const char of player.id) seed = (seed * 31 + char.charCodeAt(0)) >>> 0;
+  const [primary, secondary] = keeperKitPrimary && keeperKitSecondary ? [keeperKitPrimary, keeperKitSecondary] : KEEPER_KITS[seed % KEEPER_KITS.length];
+  return { ...rest, keeper: true, gloves: "#f1f3f6", kitPrimary: primary, kitSecondary: secondary };
 }
 
 const GOAT_PROFILE: WalkoutPresentation = {
@@ -512,203 +562,205 @@ type IconAppearance = readonly [
   height: number,
   build: number,
   celebration: WalkoutCelebration,
+  extras?: LookExtras,
 ];
 
-// Every FC 27 Icon has a fixed appearance checked against its FC 27 card portrait. Keeping
+// Every FC 27 Icon has a fixed appearance in its best known look (Gullit's locs and moustache,
+// Baggio's ponytail, Čech's skull cap). Keeping
 // this map separate from the generated player pool prevents an Icon from
 // inheriting a random skin tone, haircut or body shape when the pool changes.
 const ICON_APPEARANCE_BY_PLAYER_ID: Record<string, IconAppearance> = {
-  "icon-pele": [S4, "crop", BLACK, "clean", "round", .97, .94, "jump"],
-  "icon-diego-maradona": [S2, "curls", BLACK, "clean", "round", .90, .98, "arms"],
-  "icon-ronaldo": [S3, "buzz", BLACK, "clean", "round", 1.02, 1.05, "arms"],
-  "icon-zinedine-zidane": [S1, "crop", BROWN, "clean", "long", 1.07, 1.01, "calm"],
-  "icon-johan-cruyff": [S1, "medium", BROWN, "clean", "long", 1.01, .87, "point"],
-  "icon-mia-hamm": [S1, "pony", BROWN, "clean", "oval", .96, .88, "arms"],
-  "icon-ronaldinho": [S4, "pony", BLACK, "clean", "round", .99, .94, "point"],
-  "icon-nadine-angerer": [S1, "crop", BLOND, "clean", "square", 1.03, .96, "fist"],
-  "icon-franz-beckenbauer": [S1, "medium", LIGHT_BROWN, "clean", "long", 1.02, .91, "calm"],
-  "icon-bobby-charlton": [S1, "slick", LIGHT_BROWN, "clean", "long", .99, .91, "fist"],
-  "icon-garrincha": [S3, "crop", BLACK, "clean", "round", .93, .91, "jump"],
-  "icon-andres-iniesta": [S1, "bald", BROWN, "clean", "oval", .94, .87, "calm"],
-  "icon-paolo-maldini": [S2, "medium", BLACK, "stubble", "angular", 1.06, .98, "calm"],
-  "icon-gerd-muller": [S1, "medium", BROWN, "clean", "round", .95, 1.03, "fist"],
-  "icon-birgit-prinz": [S1, "pony", BROWN, "clean", "long", 1.03, .98, "fist"],
-  "icon-ferenc-puskas": [S1, "slick", BLACK, "clean", "round", .95, 1.01, "fist"],
-  "icon-lev-yashin": [S1, "slick", BLACK, "clean", "square", 1.07, 1.01, "arms"],
-  "icon-alex-morgan": [S1, "pony", BROWN, "clean", "oval", .97, .88, "arms"],
-  "icon-roberto-baggio": [S1, "curls", BLACK, "clean", "angular", .98, .89, "calm"],
-  "icon-franco-baresi": [S1, "medium", BROWN, "clean", "square", .98, .94, "fist"],
-  "icon-gianluigi-buffon": [S1, "slick", BLACK, "stubble", "long", 1.10, 1.03, "fist"],
-  "icon-cafu": [S4, "buzz", BLACK, "clean", "round", .98, .94, "arms"],
-  "icon-carlos-alberto": [S4, "crop", BLACK, "clean", "square", 1.00, .97, "fist"],
-  "icon-eusebio": [S4, "crop", BLACK, "clean", "round", .97, .98, "arms"],
-  "icon-thierry-henry": [S4, "bald", BLACK, "stubble", "long", 1.06, .98, "calm"],
-  "icon-zlatan-ibrahimovic": [S1, "pony", BLACK, "full", "angular", 1.12, 1.07, "arms"],
-  "icon-oliver-kahn": [S1, "crop", BLOND, "clean", "square", 1.08, 1.05, "fist"],
-  "icon-homare-sawa": [S1, "pony", BLACK, "clean", "oval", .95, .86, "arms"],
-  "icon-marco-van-basten": [S1, "medium", LIGHT_BROWN, "clean", "long", 1.08, .98, "calm"],
-  "icon-xavi": [S2, "crop", BLACK, "stubble", "round", .94, .89, "point"],
-  "icon-zico": [S2, "curls", BLACK, "clean", "round", .95, .90, "arms"],
-  "icon-camille-abily": [S1, "pony", BROWN, "clean", "oval", .96, .88, "point"],
-  "icon-dennis-bergkamp": [S1, "slick", BLOND, "clean", "long", 1.06, .97, "calm"],
-  "icon-george-best": [S1, "medium", BLACK, "clean", "angular", .96, .89, "arms"],
-  "icon-iker-casillas": [S2, "crop", BLACK, "stubble", "round", .99, .93, "fist"],
-  "icon-alessandro-del-piero": [S2, "curls", LIGHT_BROWN, "stubble", "angular", .98, .90, "point"],
-  "icon-julie-foudy": [S1, "pony", BROWN, "clean", "oval", .98, .91, "fist"],
-  "icon-ruud-gullit": [S4, "locs", BLACK, "goatee", "long", 1.09, 1.04, "arms"],
-  "icon-toni-kroos": [S1, "crop", BLOND, "stubble", "long", 1.03, .97, "calm"],
-  "icon-lothar-matthaus": [S1, "crop", BROWN, "clean", "square", .98, .96, "fist"],
-  "icon-aya-miyama": [S1, "medium", BROWN, "clean", "round", .91, .84, "point"],
-  "icon-bobby-moore": [S1, "slick", BLOND, "clean", "square", 1.02, .95, "calm"],
-  "icon-andrea-pirlo": [S1, "medium", BROWN, "full", "long", 1.00, .90, "calm"],
-  "icon-raul": [S2, "crop", BLACK, "goatee", "long", .98, .90, "point"],
-  "icon-rivaldo": [S4, "buzz", BLACK, "clean", "long", 1.04, .96, "arms"],
-  "icon-rivellino": [S2, "medium", BLACK, "short", "round", .96, .92, "point"],
-  "icon-roberto-carlos": [S3, "buzz", BLACK, "clean", "round", .93, 1.04, "fist"],
-  "icon-lotta-schelin": [S1, "pony", BROWN, "clean", "long", 1.04, .91, "arms"],
-  "icon-caroline-seger": [S1, "pony", BLOND, "clean", "long", 1.02, .92, "arms"],
-  "icon-gabriel-batistuta": [S2, "medium", BLACK, "stubble", "angular", 1.04, 1.03, "fist"],
-  "icon-emilio-butragueno": [S1, "curls", BROWN, "clean", "round", .94, .86, "point"],
-  "icon-fabio-cannavaro": [S2, "buzz", BLACK, "clean", "square", .96, .98, "fist"],
-  "icon-eric-cantona": [S1, "crop", BROWN, "stubble", "angular", 1.06, 1.04, "calm"],
-  "icon-didier-drogba": [S5, "braids", BLACK, "goatee", "square", 1.08, 1.08, "fist"],
-  "icon-kenny-dalglish": [S1, "medium", BROWN, "clean", "round", .98, .91, "arms"],
-  "icon-samuel-etoo": [S5, "buzz", BLACK, "clean", "long", .99, .96, "fist"],
-  "icon-luis-figo": [S2, "slick", BLACK, "stubble", "angular", 1.01, .95, "point"],
-  "icon-philipp-lahm": [S1, "crop", BROWN, "clean", "round", .94, .88, "calm"],
-  "icon-hugo-sanchez": [S2, "curls", BLACK, "clean", "round", .96, .91, "jump"],
-  "icon-jairzinho": [S4, "crop", BLACK, "clean", "round", .98, .94, "arms"],
-  "icon-kaka": [S2, "slick", BROWN, "clean", "long", 1.04, .92, "point"],
-  "icon-gary-lineker": [S1, "crop", BROWN, "clean", "square", .99, .94, "fist"],
-  "icon-marcelo": [S3, "afro", BLACK, "full", "round", .96, .95, "arms"],
-  "icon-alessandro-nesta": [S2, "medium", BLACK, "clean", "long", 1.07, .97, "calm"],
-  "icon-ruud-van-nistelrooy": [S1, "slick", BLACK, "stubble", "long", 1.07, 1.00, "fist"],
-  "icon-carles-puyol": [S2, "curls", BROWN, "clean", "square", .98, .97, "fist"],
-  "icon-peter-schmeichel": [S1, "crop", BLOND, "clean", "square", 1.11, 1.08, "fist"],
-  "icon-alan-shearer": [S1, "crop", BROWN, "clean", "square", 1.02, 1.03, "fist"],
-  "icon-kelly-smith": [S1, "pony", BLOND, "clean", "oval", .96, .89, "arms"],
-  "icon-socrates": [S3, "curls", BLACK, "full", "long", 1.08, .94, "calm"],
-  "icon-steffi-jones": [S3, "curls", BLACK, "clean", "angular", 1.02, .96, "fist"],
-  "icon-hristo-stoichkov": [S1, "crop", BROWN, "clean", "square", .99, .99, "fist"],
-  "icon-francesco-totti": [S2, "slick", BROWN, "stubble", "angular", 1.02, .97, "point"],
-  "icon-javier-zanetti": [S2, "slick", BLACK, "clean", "long", 1.01, .96, "fist"],
-  "icon-gareth-bale": [S1, "slick", BLACK, "stubble", "long", 1.04, .97, "arms"],
-  "icon-david-beckham": [S1, "slick", LIGHT_BROWN, "stubble", "angular", 1.02, .96, "arms"],
-  "icon-laurent-blanc": [S1, "crop", BROWN, "clean", "long", 1.09, 1.01, "calm"],
-  "icon-petr-cech": [S1, "crop", BLACK, "clean", "long", 1.11, 1.02, "fist"],
-  "icon-giorgio-chiellini": [S1, "bald", BLACK, "stubble", "long", 1.08, 1.06, "fist"],
-  "icon-marcel-desailly": [S5, "buzz", BLACK, "clean", "square", 1.06, 1.08, "fist"],
-  "icon-rio-ferdinand": [S3, "braids", BLACK, "goatee", "long", 1.09, 1.04, "calm"],
-  "icon-steven-gerrard": [S1, "crop", BROWN, "stubble", "square", 1.02, 1.00, "fist"],
-  "icon-gheorghe-hagi": [S1, "medium", BLACK, "clean", "round", .96, .91, "point"],
-  "icon-fernando-hierro": [S2, "medium", BLACK, "full", "angular", 1.06, 1.03, "fist"],
-  "icon-geoff-hurst": [S1, "crop", BROWN, "clean", "square", 1.02, 1.00, "fist"],
-  "icon-mario-kempes": [S1, "medium", BLACK, "clean", "long", 1.03, .94, "arms"],
-  "icon-miroslav-klose": [S1, "crop", BROWN, "clean", "long", 1.05, .96, "jump"],
-  "icon-ronald-koeman": [S1, "crop", BLOND, "clean", "round", 1.02, 1.00, "fist"],
-  "icon-michael-laudrup": [S1, "medium", BROWN, "clean", "long", 1.03, .92, "calm"],
-  "icon-pavel-nedved": [S1, "medium", BLOND, "clean", "long", 1.00, .94, "arms"],
-  "icon-michael-owen": [S1, "crop", BROWN, "clean", "round", .96, .88, "arms"],
-  "icon-marinette-pichon": [S1, "crop", BROWN, "clean", "oval", .96, .90, "fist"],
-  "icon-franck-ribery": [S1, "crop", BROWN, "stubble", "angular", .96, .91, "fist"],
-  "icon-juan-roman-riquelme": [S2, "medium", BLACK, "clean", "long", 1.00, .91, "calm"],
-  "icon-wayne-rooney": [S1, "crop", BROWN, "stubble", "round", .97, 1.04, "fist"],
-  "icon-paul-scholes": [S1, "crop", LIGHT_BROWN, "clean", "round", .97, .91, "fist"],
-  "icon-bastian-schweinsteiger": [S1, "crop", BLOND, "stubble", "square", 1.03, 1.00, "fist"],
-  "icon-andriy-shevchenko": [S1, "medium", LIGHT_BROWN, "clean", "long", 1.02, .94, "arms"],
-  "icon-lilian-thuram": [S5, "bald", BLACK, "clean", "square", 1.04, 1.05, "fist"],
-  "icon-edwin-van-der-sar": [S1, "crop", BROWN, "clean", "long", 1.13, 1.01, "calm"],
-  "icon-robin-van-persie": [S1, "slick", BLACK, "stubble", "long", 1.04, .94, "arms"],
-  "icon-patrick-vieira": [S5, "bald", BLACK, "clean", "long", 1.10, 1.05, "fist"],
-  "icon-john-barnes": [S4, "medium", BLACK, "clean", "round", 1.00, 1.00, "arms"],
-  "icon-dunga": [S2, "crop", BLACK, "clean", "square", .98, .97, "fist"],
-  "icon-patrick-kluivert": [S4, "buzz", BLACK, "clean", "long", 1.08, 1.00, "arms"],
-  "icon-frank-lampard": [S1, "crop", BROWN, "clean", "square", 1.02, 1.00, "fist"],
-  "icon-claude-makelele": [S5, "bald", BLACK, "clean", "round", .97, .96, "calm"],
-  "icon-emmanuel-petit": [S1, "pony", BLOND, "clean", "long", 1.06, .98, "fist"],
-  "icon-robert-pires": [S2, "medium", BLACK, "goatee", "long", 1.05, .92, "calm"],
-  "icon-frank-rijkaard": [S3, "afro", BLACK, "goatee", "long", 1.08, 1.01, "calm"],
-  "icon-ian-rush": [S1, "medium", BLACK, "stubble", "long", 1.01, .91, "fist"],
-  "icon-davor-suker": [S1, "medium", BLACK, "clean", "long", 1.00, .91, "point"],
-  "icon-fernando-torres": [S1, "crop", BLOND, "clean", "long", 1.04, .94, "arms"],
-  "icon-nemanja-vidic": [S1, "crop", BLACK, "clean", "square", 1.06, 1.06, "fist"],
-  "icon-ian-wright": [S5, "crop", BLACK, "clean", "round", .96, .95, "arms"],
-  "icon-xabi-alonso": [S1, "slick", BROWN, "full", "angular", 1.02, .96, "calm"],
-  "icon-cha-bum-kun": [S2, "medium", BLACK, "clean", "round", 1.01, .96, "arms"],
-  "icon-gianfranco-zola": [S2, "crop", BLACK, "clean", "round", .93, .87, "point"],
-  "icon-ashley-cole": [S3, "buzz", BLACK, "clean", "long", .98, .93, "calm"],
-  "icon-sol-campbell": [S5, "bald", BLACK, "goatee", "square", 1.08, 1.10, "fist"],
-  "icon-hernan-crespo": [S2, "medium", BLACK, "clean", "long", 1.03, .97, "arms"],
-  "icon-michael-essien": [S5, "buzz", BLACK, "clean", "square", 1.00, 1.04, "fist"],
-  "icon-gennaro-gattuso": [S2, "medium", BLACK, "full", "square", .98, 1.01, "fist"],
-  "icon-luis-hernandez": [S2, "pony", BLOND, "clean", "long", .99, .91, "arms"],
-  "icon-roy-keane": [S1, "crop", BLACK, "clean", "square", 1.00, 1.00, "fist"],
-  "icon-henrik-larsson": [S1, "locs", LIGHT_BROWN, "goatee", "long", 1.00, .94, "arms"],
-  "icon-sissi": [S3, "buzz", BLACK, "clean", "oval", .94, .86, "point"],
-  "icon-juan-sebastian-veron": [S2, "bald", BLACK, "goatee", "angular", 1.03, 1.00, "calm"],
-  "icon-gianluca-zambrotta": [S2, "crop", BROWN, "clean", "square", 1.01, .97, "fist"],
-  "icon-christine-sinclair": [S1, "pony", BROWN, "clean", "long", 1.02, .90, "arms"],
-  "icon-ellen-white": [S1, "pony", LIGHT_BROWN, "clean", "oval", .99, .90, "point"],
-  "icon-formiga": [S4, "braids", BLACK, "clean", "oval", .94, .86, "arms"],
-  "icon-hege-riise": [S1, "curls", BLOND, "clean", "oval", .96, .88, "fist"],
-  "icon-jean-pierre-papin": [S1, "curls", BROWN, "clean", "long", 1.02, .95, "arms"],
-  "icon-karl-heinz-rummenigge": [S1, "medium", BLOND, "clean", "oval", 1.06, .97, "fist"],
-  "icon-lucio": [S3, "crop", BLACK, "clean", "square", 1.09, 1.03, "fist"],
-  "icon-maicon": [S4, "buzz", BLACK, "clean", "round", 1.07, 1.04, "arms"],
-  "icon-pepe": [S3, "bald", BLACK, "stubble", "square", 1.09, 1.03, "fist"],
-  "icon-raphael-varane": [S3, "crop", BLACK, "clean", "long", 1.11, 1.00, "calm"],
-  "icon-sergio-aguero": [S2, "crop", BROWN, "stubble", "round", 1.01, 1.00, "arms"],
-  "icon-tobin-heath": [S1, "pony", LIGHT_BROWN, "clean", "oval", .98, .87, "point"],
-  "icon-yaya-toure": [S5, "buzz", BLACK, "clean", "long", 1.09, 1.08, "arms"],
-  "icon-yuki-nagasato": [S1, "pony", BLACK, "clean", "oval", .98, .86, "jump"],
+  "icon-pele": [T6, "crop", BLACK, "clean", "round", .97, .94, "jump"],
+  "icon-diego-maradona": [T3, "curls", BLACK, "clean", "round", .90, .98, "arms"],
+  "icon-ronaldo": [T5, "buzz", BLACK, "clean", "round", 1.02, 1.05, "arms"],
+  "icon-zinedine-zidane": [T2, "receding", DARK_BROWN, "clean", "long", 1.07, 1.01, "calm"],
+  "icon-johan-cruyff": [T2, "long", BROWN, "clean", "long", 1.01, .87, "point"],
+  "icon-mia-hamm": [T2, "pony", BROWN, "clean", "oval", .96, .88, "arms"],
+  "icon-ronaldinho": [T5, "mane", BLACK, "clean", "round", .99, .94, "point", { headband: "#f4f4f4" }],
+  "icon-nadine-angerer": [T2, "spiky", BLOND, "clean", "square", 1.03, .96, "fist"],
+  "icon-franz-beckenbauer": [T2, "medium", BROWN, "clean", "long", 1.02, .91, "calm"],
+  "icon-bobby-charlton": [T2, "receding", LIGHT_BROWN, "clean", "long", .99, .91, "fist"],
+  "icon-garrincha": [T4, "crop", BLACK, "clean", "round", .93, .91, "jump"],
+  "icon-andres-iniesta": [T2, "bald", BROWN, "clean", "oval", .94, .87, "calm"],
+  "icon-paolo-maldini": [T3, "long", DARK_BROWN, "stubble", "angular", 1.06, .98, "calm"],
+  "icon-gerd-muller": [T2, "mullet", DARK_BROWN, "clean", "round", .95, 1.03, "fist"],
+  "icon-birgit-prinz": [T2, "pony", DARK_BLOND, "clean", "long", 1.03, .98, "fist"],
+  "icon-ferenc-puskas": [T2, "slick", BLACK, "clean", "round", .95, 1.01, "fist"],
+  "icon-lev-yashin": [T2, "slick", BLACK, "clean", "square", 1.07, 1.01, "arms", { keeperKit: ["#151515", "#2e2e2e"] }],
+  "icon-alex-morgan": [T2, "pony", DARK_BROWN, "clean", "oval", .97, .88, "arms"],
+  "icon-roberto-baggio": [T2, "pony", DARK_BROWN, "goatee", "angular", .98, .89, "calm"],
+  "icon-franco-baresi": [T2, "receding", DARK_BROWN, "clean", "square", .98, .94, "fist"],
+  "icon-gianluigi-buffon": [T2, "medium", DARK_BROWN, "stubble", "long", 1.10, 1.03, "fist"],
+  "icon-cafu": [T6, "bald", BLACK, "clean", "round", .98, .94, "arms"],
+  "icon-carlos-alberto": [T5, "crop", BLACK, "clean", "square", 1.00, .97, "fist"],
+  "icon-eusebio": [T6, "crop", BLACK, "clean", "round", .97, .98, "arms"],
+  "icon-thierry-henry": [T6, "bald", BLACK, "clean", "long", 1.06, .98, "calm"],
+  "icon-zlatan-ibrahimovic": [T3, "bun", DARK_BROWN, "short", "angular", 1.12, 1.07, "arms", { tattoo: "both" }],
+  "icon-oliver-kahn": [T2, "spiky", BLOND, "clean", "square", 1.08, 1.05, "fist"],
+  "icon-homare-sawa": [T2, "pony", BLACK, "clean", "oval", .95, .86, "arms"],
+  "icon-marco-van-basten": [T2, "mullet", LIGHT_BROWN, "clean", "long", 1.08, .98, "calm"],
+  "icon-xavi": [T3, "crop", DARK_BROWN, "stubble", "round", .94, .89, "point"],
+  "icon-zico": [T3, "curls", BLACK, "clean", "round", .95, .90, "arms"],
+  "icon-camille-abily": [T2, "bun", DARK_BLOND, "clean", "oval", .96, .88, "point"],
+  "icon-dennis-bergkamp": [T2, "sidepart", DARK_BLOND, "clean", "long", 1.06, .97, "calm"],
+  "icon-george-best": [T2, "long", BLACK, "stubble", "angular", .96, .89, "arms"],
+  "icon-iker-casillas": [T3, "crop", DARK_BROWN, "stubble", "round", .99, .93, "fist"],
+  "icon-alessandro-del-piero": [T2, "crop", DARK_BROWN, "stubble", "angular", .98, .90, "point"],
+  "icon-julie-foudy": [T2, "bob", BROWN, "clean", "oval", .98, .91, "fist"],
+  "icon-ruud-gullit": [T5, "locs", BLACK, "mustache", "long", 1.09, 1.04, "arms"],
+  "icon-toni-kroos": [T2, "sidepart", LIGHT_BROWN, "stubble", "long", 1.03, .97, "calm"],
+  "icon-lothar-matthaus": [T2, "mullet", BROWN, "clean", "square", .98, .96, "fist"],
+  "icon-aya-miyama": [T2, "pony", BLACK, "clean", "round", .91, .84, "point"],
+  "icon-bobby-moore": [T2, "sidepart", BLOND, "clean", "square", 1.02, .95, "calm"],
+  "icon-andrea-pirlo": [T2, "long", DARK_BROWN, "full", "long", 1.00, .90, "calm"],
+  "icon-raul": [T3, "crop", BLACK, "clean", "long", .98, .90, "point"],
+  "icon-rivaldo": [T4, "crop", BLACK, "clean", "long", 1.04, .96, "arms"],
+  "icon-rivellino": [T4, "medium", BLACK, "mustache", "round", .96, .92, "point"],
+  "icon-roberto-carlos": [T6, "bald", BLACK, "clean", "round", .93, 1.04, "fist"],
+  "icon-lotta-schelin": [T1, "pony", BLOND, "clean", "long", 1.04, .91, "arms"],
+  "icon-caroline-seger": [T1, "pony", DARK_BLOND, "clean", "long", 1.02, .92, "arms"],
+  "icon-gabriel-batistuta": [T2, "long", BROWN, "stubble", "angular", 1.04, 1.03, "fist"],
+  "icon-emilio-butragueno": [T2, "sidepart", DARK_BROWN, "clean", "round", .94, .86, "point"],
+  "icon-fabio-cannavaro": [T3, "buzz", BLACK, "clean", "square", .96, .98, "fist"],
+  "icon-eric-cantona": [T2, "crop", DARK_BROWN, "stubble", "angular", 1.06, 1.04, "calm"],
+  "icon-didier-drogba": [T6, "buzz", BLACK, "chinstrap", "square", 1.08, 1.08, "fist"],
+  "icon-kenny-dalglish": [T2, "medium", BROWN, "clean", "round", .98, .91, "arms"],
+  "icon-samuel-etoo": [T6, "buzz", BLACK, "goatee", "long", .99, .96, "fist"],
+  "icon-luis-figo": [T3, "slick", DARK_BROWN, "stubble", "angular", 1.01, .95, "point"],
+  "icon-philipp-lahm": [T2, "crop", BROWN, "clean", "round", .94, .88, "calm"],
+  "icon-hugo-sanchez": [T3, "curls", BLACK, "mustache", "round", .96, .91, "jump"],
+  "icon-jairzinho": [T6, "afro", BLACK, "clean", "round", .98, .94, "arms"],
+  "icon-kaka": [T3, "sidepart", DARK_BROWN, "clean", "long", 1.04, .92, "point"],
+  "icon-gary-lineker": [T2, "sidepart", BROWN, "clean", "square", .99, .94, "fist"],
+  "icon-marcelo": [T5, "afro", BLACK, "stubble", "round", .96, .95, "arms"],
+  "icon-alessandro-nesta": [T2, "medium", DARK_BROWN, "clean", "long", 1.07, .97, "calm"],
+  "icon-ruud-van-nistelrooy": [T2, "crop", BROWN, "stubble", "long", 1.07, 1.00, "fist"],
+  "icon-carles-puyol": [T3, "mane", DARK_BROWN, "stubble", "square", .98, .97, "fist"],
+  "icon-peter-schmeichel": [T1, "crop", BLOND, "clean", "square", 1.11, 1.08, "fist"],
+  "icon-alan-shearer": [T2, "crop", BROWN, "clean", "square", 1.02, 1.03, "fist"],
+  "icon-kelly-smith": [T2, "pony", DARK_BLOND, "clean", "oval", .96, .89, "arms"],
+  "icon-socrates": [T3, "curls", BLACK, "full", "long", 1.08, .94, "calm", { headband: "#f4f4f4" }],
+  "icon-steffi-jones": [T5, "curls", BLACK, "clean", "angular", 1.02, .96, "fist"],
+  "icon-hristo-stoichkov": [T2, "crop", BLACK, "clean", "square", .99, .99, "fist"],
+  "icon-francesco-totti": [T2, "medium", LIGHT_BROWN, "stubble", "angular", 1.02, .97, "point"],
+  "icon-javier-zanetti": [T3, "slick", BLACK, "clean", "long", 1.01, .96, "fist"],
+  "icon-gareth-bale": [T2, "bun", DARK_BROWN, "short", "long", 1.04, .97, "arms"],
+  "icon-david-beckham": [T2, "quiff", DARK_BLOND, "stubble", "angular", 1.02, .96, "arms", { tattoo: "both" }],
+  "icon-laurent-blanc": [T2, "receding", BROWN, "clean", "long", 1.09, 1.01, "calm"],
+  "icon-petr-cech": [T2, "crop", BROWN, "clean", "long", 1.11, 1.02, "fist", { helmet: true }],
+  "icon-giorgio-chiellini": [T3, "buzz", BLACK, "stubble", "long", 1.08, 1.06, "fist"],
+  "icon-marcel-desailly": [T6, "bald", BLACK, "clean", "square", 1.06, 1.08, "fist"],
+  "icon-rio-ferdinand": [T5, "buzz", BLACK, "stubble", "long", 1.09, 1.04, "calm"],
+  "icon-steven-gerrard": [T2, "crop", BROWN, "stubble", "square", 1.02, 1.00, "fist"],
+  "icon-gheorghe-hagi": [T2, "mullet", BLACK, "clean", "round", .96, .91, "point"],
+  "icon-fernando-hierro": [T3, "medium", BLACK, "mustache", "angular", 1.06, 1.03, "fist"],
+  "icon-geoff-hurst": [T2, "sidepart", BROWN, "clean", "square", 1.02, 1.00, "fist"],
+  "icon-mario-kempes": [T3, "long", BLACK, "clean", "long", 1.03, .94, "arms"],
+  "icon-miroslav-klose": [T2, "crop", BROWN, "clean", "long", 1.05, .96, "jump"],
+  "icon-ronald-koeman": [T2, "mullet", BLOND, "clean", "round", 1.02, 1.00, "fist"],
+  "icon-michael-laudrup": [T2, "medium", DARK_BROWN, "clean", "long", 1.03, .92, "calm"],
+  "icon-pavel-nedved": [T2, "long", BLOND, "clean", "long", 1.00, .94, "arms"],
+  "icon-michael-owen": [T2, "crop", DARK_BROWN, "clean", "round", .96, .88, "arms"],
+  "icon-marinette-pichon": [T2, "crop", BROWN, "clean", "oval", .96, .90, "fist"],
+  "icon-franck-ribery": [T2, "buzz", DARK_BROWN, "short", "angular", .96, .91, "fist"],
+  "icon-juan-roman-riquelme": [T3, "medium", BLACK, "clean", "long", 1.00, .91, "calm"],
+  "icon-wayne-rooney": [T2, "buzz", BROWN, "clean", "round", .97, 1.04, "fist"],
+  "icon-paul-scholes": [T1, "buzz", GINGER, "clean", "round", .97, .91, "fist"],
+  "icon-bastian-schweinsteiger": [T2, "quiff", DARK_BLOND, "stubble", "square", 1.03, 1.00, "fist"],
+  "icon-andriy-shevchenko": [T2, "crop", LIGHT_BROWN, "clean", "long", 1.02, .94, "arms"],
+  "icon-lilian-thuram": [T6, "bald", BLACK, "clean", "square", 1.04, 1.05, "fist"],
+  "icon-edwin-van-der-sar": [T1, "receding", BLOND, "clean", "long", 1.13, 1.01, "calm"],
+  "icon-robin-van-persie": [T2, "crop", DARK_BROWN, "stubble", "long", 1.04, .94, "arms"],
+  "icon-patrick-vieira": [T6, "bald", BLACK, "clean", "long", 1.10, 1.05, "fist"],
+  "icon-john-barnes": [T6, "fade", BLACK, "clean", "round", 1.00, 1.00, "arms"],
+  "icon-dunga": [T2, "crop", BLACK, "clean", "square", .98, .97, "fist"],
+  "icon-patrick-kluivert": [T6, "buzz", BLACK, "goatee", "long", 1.08, 1.00, "arms"],
+  "icon-frank-lampard": [T2, "sidepart", BROWN, "clean", "square", 1.02, 1.00, "fist"],
+  "icon-claude-makelele": [T6, "bald", BLACK, "clean", "round", .97, .96, "calm"],
+  "icon-emmanuel-petit": [T2, "pony", BLOND, "clean", "long", 1.06, .98, "fist"],
+  "icon-robert-pires": [T2, "long", BROWN, "short", "long", 1.05, .92, "calm"],
+  "icon-frank-rijkaard": [T5, "afro", BLACK, "stubble", "long", 1.08, 1.01, "calm"],
+  "icon-ian-rush": [T2, "medium", DARK_BROWN, "mustache", "long", 1.01, .91, "fist"],
+  "icon-davor-suker": [T2, "medium", BROWN, "clean", "long", 1.00, .91, "point"],
+  "icon-fernando-torres": [T2, "medium", STRAWBERRY, "clean", "long", 1.04, .94, "arms"],
+  "icon-nemanja-vidic": [T2, "buzz", DARK_BROWN, "stubble", "square", 1.06, 1.06, "fist"],
+  "icon-ian-wright": [T6, "bald", BLACK, "clean", "round", .96, .95, "arms"],
+  "icon-xabi-alonso": [T3, "slick", DARK_BROWN, "short", "angular", 1.02, .96, "calm"],
+  "icon-cha-bum-kun": [T2, "medium", BLACK, "clean", "round", 1.01, .96, "arms"],
+  "icon-gianfranco-zola": [T2, "crop", BLACK, "clean", "round", .93, .87, "point"],
+  "icon-ashley-cole": [T5, "buzz", BLACK, "clean", "long", .98, .93, "calm"],
+  "icon-sol-campbell": [T6, "bald", BLACK, "goatee", "square", 1.08, 1.10, "fist"],
+  "icon-hernan-crespo": [T3, "medium", BLACK, "clean", "long", 1.03, .97, "arms"],
+  "icon-michael-essien": [T7, "buzz", BLACK, "clean", "square", 1.00, 1.04, "fist"],
+  "icon-gennaro-gattuso": [T2, "long", BLACK, "full", "square", .98, 1.01, "fist"],
+  "icon-luis-hernandez": [T3, "long", BLOND, "clean", "long", .99, .91, "arms", { headband: "#f4f4f4" }],
+  "icon-roy-keane": [T2, "buzz", DARK_BROWN, "short", "square", 1.00, 1.00, "fist"],
+  "icon-henrik-larsson": [T4, "locs", DARK_BROWN, "goatee", "long", 1.00, .94, "arms"],
+  "icon-sissi": [T6, "bald", BLACK, "clean", "oval", .94, .86, "point"],
+  "icon-juan-sebastian-veron": [T3, "bald", BLACK, "goatee", "angular", 1.03, 1.00, "calm"],
+  "icon-gianluca-zambrotta": [T2, "crop", DARK_BROWN, "clean", "square", 1.01, .97, "fist"],
+  "icon-christine-sinclair": [T2, "pony", BROWN, "clean", "long", 1.02, .90, "arms"],
+  "icon-ellen-white": [T2, "pony", BROWN, "clean", "oval", .99, .90, "point"],
+  "icon-formiga": [T6, "braids", BLACK, "clean", "oval", .94, .86, "arms"],
+  "icon-hege-riise": [T1, "bob", BLOND, "clean", "oval", .96, .88, "fist"],
+  "icon-jean-pierre-papin": [T2, "mullet", DARK_BROWN, "clean", "long", 1.02, .95, "arms"],
+  "icon-karl-heinz-rummenigge": [T2, "medium", BLOND, "clean", "oval", 1.06, .97, "fist"],
+  "icon-lucio": [T4, "buzz", BLACK, "clean", "square", 1.09, 1.03, "fist"],
+  "icon-maicon": [T6, "buzz", BLACK, "clean", "round", 1.07, 1.04, "arms"],
+  "icon-pepe": [T4, "bald", BLACK, "stubble", "square", 1.09, 1.03, "fist"],
+  "icon-raphael-varane": [T5, "crop", BLACK, "clean", "long", 1.11, 1.00, "calm"],
+  "icon-sergio-aguero": [T3, "crop", BLACK, "stubble", "round", 1.01, 1.00, "arms"],
+  "icon-tobin-heath": [T2, "pony", LIGHT_BROWN, "clean", "oval", .98, .87, "point"],
+  "icon-yaya-toure": [T7, "buzz", BLACK, "clean", "long", 1.09, 1.08, "arms"],
+  "icon-yuki-nagasato": [T2, "pony", BLACK, "clean", "oval", .98, .86, "jump"],
 };
 
 // Fixed appearances for every FC 27 women's card rated 86+ (the only women's cards
-// with a walkout). Skin, hair and face were checked against the official EA FC 27
-// portraits; height and build come from the FC 27 card data (height / 172 cm).
+// with a walkout), in each player's usual match look; height and build come from the FC 27 card data
+// (height / 172 cm).
 const WOMEN_APPEARANCE_BY_SOURCE_ID: Record<string, IconAppearance> = {
-  "227203": [S1, "pony", LIGHT_BROWN, "clean", "oval", 1.01, .92, "point"],
-  "241667": [S1, "pony", BROWN, "clean", "oval", .94, .91, "arms"],
-  "246219": [S5, "crop", BLACK, "clean", "long", 1.05, .97, "arms"],
-  "262531": [S1, "pony", BLACK, "clean", "oval", .93, .91, "jump"],
-  "227102": [S1, "pony", LIGHT_BROWN, "clean", "long", 1.02, .91, "calm"],
-  "241846": [S1, "pony", LIGHT_BROWN, "clean", "oval", .97, .95, "fist"],
-  "279799": [S5, "crop", BLOND, "clean", "round", .98, .97, "jump"],
-  "237288": [S1, "medium", LIGHT_BROWN, "clean", "oval", .96, .94, "point"],
-  "248822": [S1, "pony", BLOND, "clean", "oval", 1.01, .93, "arms"],
-  "265898": [S5, "locs", BLACK, "clean", "round", .93, .93, "jump"],
-  "258980": [S1, "pony", LIGHT_BROWN, "clean", "long", 1.01, .93, "calm"],
-  "276359": [S5, "locs", BLACK, "clean", "round", 1.03, .98, "jump"],
-  "237289": [S1, "pony", BROWN, "clean", "oval", .99, .98, "fist"],
-  "236479": [S1, "pony", BROWN, "clean", "angular", .98, .95, "fist"],
-  "245830": [S1, "medium", BROWN, "clean", "oval", .91, .86, "calm"],
-  "264012": [S3, "pony", BLACK, "clean", "oval", .97, .93, "point"],
-  "269404": [S4, "braids", BLACK, "clean", "long", 1.02, .94, "arms"],
-  "258310": [S1, "pony", BROWN, "clean", "long", 1.05, .89, "fist"],
-  "233746": [S1, "pony", LIGHT_BROWN, "clean", "long", 1.03, .94, "calm"],
-  "259287": [S1, "pony", BLOND, "clean", "oval", .98, .94, "arms"],
-  "227361": [S5, "braids", BLACK, "clean", "long", .98, .93, "jump"],
-  "278219": [S5, "braids", BLACK, "clean", "round", 1.00, .97, "jump"],
-  "227190": [S1, "pony", BROWN, "clean", "angular", 1.03, .97, "fist"],
-  "232075": [S1, "pony", BROWN, "clean", "oval", .95, .85, "point"],
-  "253436": [S1, "pony", BLACK, "clean", "oval", .93, .88, "arms"],
-  "263009": [S1, "pony", LIGHT_BROWN, "clean", "oval", 1.02, .88, "fist"],
-  "257008": [S1, "pony", BLOND, "clean", "oval", .95, .89, "arms"],
-  "266928": [S3, "curls", BROWN, "clean", "long", 1.01, .94, "point"],
-  "226893": [S2, "pony", BLACK, "clean", "round", .90, .84, "jump"],
-  "233662": [S2, "pony", BLACK, "clean", "oval", .93, .87, "fist"],
-  "243404": [S1, "pony", LIGHT_BROWN, "clean", "oval", .95, .91, "fist"],
-  "265239": [S1, "pony", BROWN, "clean", "oval", .95, .90, "fist"],
-  "265674": [S2, "pony", BLACK, "clean", "oval", .94, .91, "arms"],
-  "231432": [S1, "medium", BLOND, "clean", "oval", 1.02, .95, "point"],
-  "245879": [S1, "pony", BROWN, "clean", "oval", 1.01, .89, "calm"],
-  "257001": [S1, "pony", BLOND, "clean", "oval", .98, .92, "arms"],
-  "227323": [S1, "pony", LIGHT_BROWN, "clean", "oval", .97, .88, "arms"],
-  "246272": [S5, "braids", BLACK, "clean", "oval", 1.03, .95, "point"],
+  "227203": [T2, "pony", BROWN, "clean", "oval", 1.01, .92, "point"],
+  "241667": [T2, "pony", BROWN, "clean", "oval", .94, .91, "arms"],
+  "246219": [T7, "twists", BLACK, "clean", "long", 1.05, .97, "arms"],
+  "262531": [T3, "pony", DARK_BROWN, "clean", "oval", .93, .91, "jump"],
+  "227102": [T1, "bun", DARK_BLOND, "clean", "long", 1.02, .91, "calm"],
+  "241846": [T2, "pony", DARK_BLOND, "clean", "oval", .97, .95, "fist"],
+  "279799": [T7, "crop", BLACK, "clean", "round", .98, .97, "jump"],
+  "237288": [T2, "pony", DARK_BROWN, "clean", "oval", .96, .94, "point"],
+  "248822": [T1, "pony", BLOND, "clean", "oval", 1.01, .93, "arms"],
+  "265898": [T6, "braids", BLACK, "clean", "round", .93, .93, "jump"],
+  "258980": [T2, "pony", DARK_BROWN, "clean", "long", 1.01, .93, "calm"],
+  "276359": [T7, "twists", BLACK, "clean", "round", 1.03, .98, "jump", { headband: "#111111" }],
+  "237289": [T2, "pony", BROWN, "clean", "oval", .99, .98, "fist"],
+  "236479": [T2, "crop", DARK_BLOND, "clean", "angular", .98, .95, "fist", { tattoo: "both" }],
+  "245830": [T2, "bob", BLACK, "clean", "oval", .91, .86, "calm"],
+  "264012": [T5, "pony", BLACK, "clean", "oval", .97, .93, "point"],
+  "269404": [T5, "braids", BLACK, "clean", "long", 1.02, .94, "arms"],
+  "258310": [T2, "crop", BLOND, "clean", "long", 1.05, .89, "fist"],
+  "233746": [T2, "pony", STRAWBERRY, "clean", "long", 1.03, .94, "calm"],
+  "259287": [T1, "pony", BLOND, "clean", "oval", .98, .94, "arms"],
+  "227361": [T6, "braids", BLACK, "clean", "long", .98, .93, "jump"],
+  "278219": [T7, "braids", BLACK, "clean", "round", 1.00, .97, "jump"],
+  "227190": [T2, "pony", DARK_BROWN, "clean", "angular", 1.03, .97, "fist"],
+  "232075": [T2, "pony", BROWN, "clean", "oval", .95, .85, "point"],
+  "253436": [T2, "pony", BROWN, "clean", "oval", .93, .88, "arms"],
+  "263009": [T2, "pony", LIGHT_BROWN, "clean", "oval", 1.02, .88, "fist"],
+  "257008": [T1, "pony", BLOND, "clean", "oval", .95, .89, "arms"],
+  "266928": [T4, "mane", DARK_BROWN, "clean", "long", 1.01, .94, "point"],
+  "226893": [T5, "pony", BLACK, "clean", "round", .90, .84, "jump"],
+  "233662": [T4, "pony", BLACK, "clean", "oval", .93, .87, "fist"],
+  "243404": [T2, "pony", BROWN, "clean", "oval", .95, .91, "fist"],
+  "265239": [T2, "pony", DARK_BROWN, "clean", "oval", .95, .90, "fist", { tattoo: "both" }],
+  "265674": [T3, "pony", BLACK, "clean", "oval", .94, .91, "arms"],
+  "231432": [T2, "long", BLOND, "clean", "oval", 1.02, .95, "point"],
+  "245879": [T1, "pony", LIGHT_BROWN, "clean", "oval", 1.01, .89, "calm"],
+  "257001": [T2, "pony", DARK_BLOND, "clean", "oval", .98, .92, "arms"],
+  "227323": [T1, "pony", BLOND, "clean", "oval", .97, .88, "arms"],
+  "246272": [T6, "braids", BLACK, "clean", "oval", 1.03, .95, "point"],
 };
 
 function fromIconAppearance(player: StarXIPlayer, appearance: IconAppearance): WalkoutPresentation {
-  const [skin, hair, hairColor, beard, face, height, build, celebration] = appearance;
+  const [skin, hair, hairColor, beard, face, height, build, celebration, extras] = appearance;
   const countryCode = player.countryCode && COUNTRY[player.countryCode] ? player.countryCode : "CH";
   const country = COUNTRY[countryCode];
   return {
@@ -726,6 +778,7 @@ function fromIconAppearance(player: StarXIPlayer, appearance: IconAppearance): W
     kitPrimary: country.kit[0],
     kitSecondary: country.kit[1],
     boots: "#d7dce5",
+    ...withExtras(extras),
   };
 }
 
@@ -770,11 +823,11 @@ export function getWalkoutPresentation(player: StarXIPlayer) {
   const specialBody = SPECIAL_BODY_PROFILE_BY_PLAYER_ID[player.id];
   if (specialBody) return fromSpecialBody(player, specialBody);
   const iconAppearance = ICON_APPEARANCE_BY_PLAYER_ID[player.id];
-  if (iconAppearance) return fromIconAppearance(player, iconAppearance);
+  if (iconAppearance) return asKeeper(player, fromIconAppearance(player, iconAppearance));
   const womenAppearance = player.isWomen && player.sourceId ? WOMEN_APPEARANCE_BY_SOURCE_ID[player.sourceId] : undefined;
-  if (womenAppearance) return fromIconAppearance(player, womenAppearance);
+  if (womenAppearance) return asKeeper(player, fromIconAppearance(player, womenAppearance));
   const raw = player.sourceId ? PROFILE_BY_SOURCE_ID.get(player.sourceId) : undefined;
-  return raw ? fromRaw(raw) : fallbackProfile(player);
+  return asKeeper(player, raw ? fromRaw(raw) : fallbackProfile(player));
 }
 
 export const AUTHENTIC_WALKOUT_PROFILE_COUNT = RAW_PROFILES.length;

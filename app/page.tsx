@@ -48,6 +48,7 @@ import { expectedHomeCrowd, getTicketIncome, recordTicketIncome } from "./ticket
 import { directionLabel, formatCountdown, formatGoalDifference, formatHistoryTime, formatNumber, formatPackChance, getRandomCrossbarHeight, getRandomMatchPrediction, getRandomPenaltyDirection, heightLabel, predictionLabel } from "./game/format";
 import { getCurrentTime, getTravelTime, syncTravelClock } from "./game/clock";
 import { getStarCardTier, getWalkoutPresentation } from "./walkout-data";
+import { WalkoutAvatar } from "./walkout-avatar";
 import { loadRouteCache } from "./travel-route-cache-lazy";
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
@@ -2827,15 +2828,7 @@ function App() {
               {starWalkoutPresentation && <>
                 <div className="star-walkout-country"><WalkoutCountryFlag code={starWalkoutPresentation.countryCode} country={starWalkoutPresentation.country} /><strong>{starWalkoutPresentation.country}</strong><small>{starWalkoutPresentation.countryCode}</small></div>
                 <div className="star-walkout-rating-panel"><StarXIPositionBadges player={starReveal.player} variant="walkout" /><strong>{starReveal.player.rating}</strong><em>{starRevealIsLegendary ? "LEGENDÄRE KARTE" : starRevealIsIconic ? "ICON KARTE" : "WALKOUT KARTE"}</em></div>
-                <div className={`star-walkout-avatar-wrap hair-${starWalkoutPresentation.hair} beard-${starWalkoutPresentation.beard} face-${starWalkoutPresentation.face} celebration-${starWalkoutPresentation.celebration}${starWalkoutPresentation.cap ? " with-cap" : ""}`} aria-label={`Ganzkörper Figur von ${starReveal.player.name}`} onAnimationEnd={finishStarWalkout}>
-                  <div className="star-walkout-avatar">
-                    <div className="avatar-head"><i className="avatar-ear left" /><i className="avatar-ear right" /><i className="avatar-hair" /><i className="avatar-brow left" /><i className="avatar-brow right" /><i className="avatar-eye left" /><i className="avatar-eye right" /><i className="avatar-nose" /><i className="avatar-mouth" /><i className="avatar-beard" />{starWalkoutPresentation.glasses && <i className="avatar-glasses" />}{starWalkoutPresentation.cap && <i className="avatar-cap" />}</div>
-                    <div className="avatar-neck" />
-                    <div className="avatar-torso"><i className="avatar-kit-stripe" /><span>{starReveal.player.rating}</span></div>
-                    <div className="avatar-arm left"><i /></div><div className="avatar-arm right"><i /></div>
-                    <div className="avatar-leg left"><i /></div><div className="avatar-leg right"><i /></div>
-                  </div>
-                </div>
+                <WalkoutAvatar presentation={starWalkoutPresentation} rating={starReveal.player.rating} label={`Ganzkörper Figur von ${starReveal.player.name}`} onAnimationEnd={finishStarWalkout} />
                 <div className="star-walkout-nameplate"><span><WalkoutCountryFlag compact code={starWalkoutPresentation.countryCode} country={starWalkoutPresentation.country} /> {starWalkoutPresentation.countryCode} · {formatStarXIPositions(starReveal.player)}</span><h2>{starReveal.player.name}</h2></div>
               </>}
             </div>}

@@ -3,9 +3,13 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("walkout avatar renders the revealed player without crashing", async () => {
-  const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const [pageSource, avatarSource] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/walkout-avatar.tsx", import.meta.url), "utf8"),
+  ]);
 
-  assert.match(pageSource, /avatar-torso[\s\S]*?starReveal\.player\.rating/);
+  assert.match(pageSource, /<WalkoutAvatar presentation=\{starWalkoutPresentation\} rating=\{starReveal\.player\.rating\}/);
+  assert.match(avatarSource, /avatar-torso[\s\S]*?\{rating\}/);
   assert.doesNotMatch(pageSource, /starWalkout\.player/);
 });
 
@@ -65,7 +69,7 @@ test("every Icon and current 86+ base card has a fixed appearance", async () => 
 
   assert.equal(iconIds.length, 143);
   assert.deepEqual(appearanceIds, iconIds);
-  assert.match(appearanceBlock, /"icon-ferenc-puskas": \[S1, "slick", BLACK/);
+  assert.match(appearanceBlock, /"icon-ferenc-puskas": \[T2, "slick", BLACK/);
 
   const officialRatings = new Map(
     [...ratingSource.matchAll(/^  "(\d+)": (\d+),$/gm)].map((match) => [match[1], Number(match[2])]),
