@@ -95,10 +95,9 @@ test('a full storage is reported instead of passing for saved', () => {
   assert.equal(localSaveFailed(), false);
 });
 
-test('a broken travel event in an imported save does not stop the game from loading', () => {
+test('a broken travel event in a stored save does not stop the game from loading', () => {
   assert.doesNotThrow(() => normalizeTravel({ journey: { id: 'x', fixture: { id: 'f' }, events: [null] }, stats: null }));
   const broken = game(100) as unknown as { features: { travel: unknown } };
   broken.features.travel = { journey: { id: 'x', fixture: { id: 'f', venue: { lat: 1, lon: 1, city: 'Bern' }, opponent: 'X' }, transport: 'bus', startedAt: 1, baseMs: 10, endsAt: 20, events: [null] }, stats: null };
-  assert.equal(tabA.storedGameLoads(JSON.stringify(broken)), true);
-  assert.equal(tabA.storedGameLoads('{"features":'), false);
+  assert.doesNotThrow(() => tabA.normalizeRuntimeGame(JSON.parse(JSON.stringify(broken))));
 });

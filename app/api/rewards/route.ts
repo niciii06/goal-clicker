@@ -12,8 +12,8 @@ export async function POST(request:Request) {
   const limited=rateLimited(request,'rewards');if(limited)return limited;
   const p=await readJsonBody<{playerId?:unknown;rewardId?:unknown;features?:unknown}>(request,MAX_GAME_STATE_BODY_BYTES);
   if(typeof p.playerId!=='string'||p.playerId.length<8||p.playerId.length>80||typeof p.rewardId!=='string'||p.rewardId.length>240)return Response.json({error:'Ungültige Prämie.'},{status:400});
-  // With accounts the game always runs signed in, so a receipt is only written for a verified player.
-  const auth=await resolvePlayer(request,p.playerId,{loginRequired:true,loginMessage:'Bitte melde dich an.'});if(!auth.ok)return auth.response;
+  // Guests play solo without login; a player ID that belongs to an account needs that account.
+  const auth=await resolvePlayer(request,p.playerId,{loginRequired:false});if(!auth.ok)return auth.response;
   const f=normalizeGameFeatures(p.features),earned=f.earnedPacks.find(e=>e.id===p.rewardId);
   if(!earned||f.cup.active)return Response.json({error:'Prämie nicht verfügbar.'},{status:409});
   const db=getDb(),key=`reward:${earned.id}`;

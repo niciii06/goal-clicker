@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 import { authMode, safeReturnPath } from '../app/auth/config.ts';
 import { clearAccountCacheForTests, resolvePlayer } from '../app/auth/player.ts';
-import { applySaveFile, createSaveFile, parseSaveFile, PRE_IMPORT_BACKUP_KEY, savedPlayerId } from '../app/save-file.ts';
 
 const ENV_KEYS = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'VERCEL', 'AUTH_REQUIRED'];
 let saved: Record<string, string | undefined> = {};
@@ -31,6 +30,7 @@ function deps(user: { id: string; email: string | null } | null, accounts = new 
       if (!accounts.has(userId)) accounts.set(userId, playerId);
       return { playerId: accounts.get(userId)! };
     },
+    isPlayerLinked: async (playerId: string) => [...accounts.values()].includes(playerId),
   };
 }
 
@@ -52,6 +52,14 @@ test('multiplayer needs a login, solo play does not', async () => {
   assert.equal(!anonymous.ok && anonymous.response.status, 401);
   assert.equal((await bodyOf(anonymous)).errorCode, 'LOGIN_REQUIRED');
   assert.deepEqual(await resolvePlayer(request, 'player-solo-12', { loginRequired: false }, deps(null)), { ok: true, playerId: 'player-solo-12', userId: null });
+});
+
+test('a guest plays solo with its own player ID, but never with the ID of an account', async () => {
+  configure();
+  const accounts = new Map([['user-1', 'account-player-1']]);
+  assert.deepEqual(await resolvePlayer(request, 'guest-player-1', { loginRequired: false }, deps(null, accounts)), { ok: true, playerId: 'guest-player-1', userId: null });
+  const refused = await resolvePlayer(request, 'account-player-1', { loginRequired: false }, deps(null, accounts));
+  assert.equal(!refused.ok && refused.response.status, 401);
 });
 
 test('the first login links the device player ID, later devices get the account ID', async () => {
@@ -103,37 +111,3 @@ test('the OAuth callback and logout only redirect inside the site', async () => 
   assert.equal(own.headers.get('location'), 'http://localhost/');
 });
 
-class MemoryStorage {
-  private data = new Map<string, string>();
-  constructor(entries: Record<string, string> = {}) { for (const [k, v] of Object.entries(entries)) this.data.set(k, v); }
-  get length() { return this.data.size; }
-  key(i: number) { return [...this.data.keys()][i] ?? null; }
-  getItem(k: string) { return this.data.get(k) ?? null; }
-  setItem(k: string, v: string) { this.data.set(k, v); }
-  removeItem(k: string) { this.data.delete(k); }
-  snapshot() { return Object.fromEntries(this.data); }
-}
-
-test('a save file carries every goalClicker key and restores it on another address', () => {
-  const old = new MemoryStorage({ goalClickerSiteSaveV3: JSON.stringify({ goals: 42 }), goalClickerPlayerIdV3: 'old-player-from-save', goalClickerLayoutV3: '[]', otherApp: 'x' });
-  const file = createSaveFile(old, 'https://old.example', new Date('2026-10-21T10:00:00Z'));
-  assert.deepEqual(Object.keys(file.keys).sort(), ['goalClickerLayoutV3', 'goalClickerPlayerIdV3', 'goalClickerSiteSaveV3']);
-  const parsed = parseSaveFile(JSON.stringify(file));
-  assert.ok(parsed.ok);
-  assert.equal(savedPlayerId(parsed.file), 'old-player-from-save');
-  const fresh = new MemoryStorage({ goalClickerSiteSaveV3: JSON.stringify({ goals: 1 }), goalClickerPlayerIdV3: 'fresh-device-id', otherApp: 'keep' });
-  applySaveFile(fresh, parsed.file);
-  const after = fresh.snapshot();
-  assert.equal(after.goalClickerPlayerIdV3, 'old-player-from-save');
-  assert.equal(JSON.parse(after.goalClickerSiteSaveV3).goals, 42);
-  assert.equal(after.otherApp, 'keep');
-  assert.equal(JSON.parse(after[PRE_IMPORT_BACKUP_KEY]).goalClickerPlayerIdV3, 'fresh-device-id');
-});
-
-test('broken or foreign files are rejected before anything is replaced', () => {
-  assert.equal(parseSaveFile('nope').ok, false);
-  assert.equal(parseSaveFile(JSON.stringify({ format: 'other' })).ok, false);
-  assert.equal(parseSaveFile(JSON.stringify({ format: 'goal-clicker-save', version: 1, keys: { goalClickerPlayerIdV3: 'x' } })).ok, false);
-  assert.equal(parseSaveFile(JSON.stringify({ format: 'goal-clicker-save', version: 1, keys: { goalClickerSiteSaveV3: '{broken' } })).ok, false);
-  assert.equal(parseSaveFile(JSON.stringify({ format: 'goal-clicker-save', version: 1, keys: { goalClickerSiteSaveV3: '{}', evil: 'x' } })).ok, false);
-});

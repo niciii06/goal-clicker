@@ -5,7 +5,6 @@ import type { AccountApiDeps } from '../app/account-api.ts';
 import { cleanCloudSaveKeys, hashText, serializeCloudSaveKeys, summarizeSave } from '../app/cloud-save-rules.ts';
 import { adoptOwnUpload, planInitialSync } from '../app/cloud-sync.ts';
 import { cleanDisplayName, displayNameError, isPasswordLoginEmail, nextUsernameChangeAt, passwordError, usernameError } from '../app/profile-rules.ts';
-import { createSaveFile } from '../app/save-file.ts';
 import type { CloudSave, Profile } from '../db/index.ts';
 
 const ENV_KEYS = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'];
@@ -230,13 +229,10 @@ test('a device keeps its save when it continues the cloud version, otherwise tak
   assert.equal(adoptOwnUpload({ userId: 'u', version: 3, hash: 'older' }, cloud), null);
 });
 
-test('only the game, layout and vibration keys travel, and device keys stay out of save files', () => {
+test('only the game, layout and vibration keys travel to the cloud', () => {
   assert.deepEqual(cleanCloudSaveKeys({ goalClickerSiteSaveV3: game(1), goalClickerLayoutV3: '[]', goalClickerPlayerIdV3: 'id', other: 'x' }), { goalClickerSiteSaveV3: game(1), goalClickerLayoutV3: '[]' });
   assert.equal(cleanCloudSaveKeys({ goalClickerSiteSaveV3: '{broken' }), null);
   assert.deepEqual(summarizeSave({ goalClickerSiteSaveV3: game(7) }), { totalGoals: 7, seasons: 1, stars: 2, clicks: 7 });
-  const values: Record<string, string> = { goalClickerSiteSaveV3: game(1), goalClickerCloudMetaV1: '{}', goalClickerProfileCacheV1: '{}' };
-  const storage = { length: 3, key: (i: number) => Object.keys(values)[i] ?? null, getItem: (key: string) => values[key] ?? null };
-  assert.deepEqual(Object.keys(createSaveFile(storage, 'https://x').keys), ['goalClickerSiteSaveV3']);
 });
 
 test('a registration whose profile fails to save removes its new login again', async () => {

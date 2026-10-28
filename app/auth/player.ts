@@ -13,6 +13,8 @@ type Dependencies = {
   linkAccount: (userId: string, playerId: string, email: string | null) => Promise<{ playerId: string } | null>;
   /** Whether the login still exists; a token outlives a deleted account until it expires. */
   loginExists?: (request: Request) => Promise<boolean>;
+  /** Whether a player ID belongs to an account. */
+  isPlayerLinked?: (playerId: string) => Promise<boolean>;
 };
 
 const defaults: Dependencies = {
@@ -20,6 +22,7 @@ const defaults: Dependencies = {
   getAccount: (userId) => getDb().getAccount(userId),
   linkAccount: (userId, playerId, email) => getDb().linkAccount(userId, playerId, email),
   loginExists: requestLoginExists,
+  isPlayerLinked: (playerId) => getDb().isPlayerLinked(playerId),
 };
 
 // Warm server instances skip the account lookup on the frequent multiplayer polls.
@@ -50,7 +53,12 @@ export async function resolvePlayer(request: Request, claimedPlayerId: string, {
   if (mode === "misconfigured") return deny(503, "Der Login ist auf diesem Server nicht eingerichtet.", { errorCode: "AUTH_NOT_CONFIGURED" });
   if (mode === "anonymous") return { ok: true, playerId: claimedPlayerId, userId: null };
   const user = await deps.getUser(request);
-  if (!user) return loginRequired ? deny(401, loginMessage, { errorCode: "LOGIN_REQUIRED" }) : { ok: true, playerId: claimedPlayerId, userId: null };
+  if (!user) {
+    if (loginRequired) return deny(401, loginMessage, { errorCode: "LOGIN_REQUIRED" });
+    // A guest plays with its own player ID; the ID of an account is only usable signed in.
+    if (claimedPlayerId && deps.isPlayerLinked && await deps.isPlayerLinked(claimedPlayerId)) return deny(401, "Diese Spieler-ID gehört zu einem Konto. Bitte melde dich an.", { errorCode: "LOGIN_REQUIRED" });
+    return { ok: true, playerId: claimedPlayerId, userId: null };
+  }
   const playerId = await accountPlayerId(user, claimedPlayerId, deps, request);
   if (!playerId) return deny(409, "Diese Spieler-ID gehört bereits zu einem anderen Konto.", { errorCode: "PLAYER_TAKEN" });
   if (claimedPlayerId && playerId !== claimedPlayerId) return deny(409, "Dein Konto nutzt eine andere Spieler-ID. Bitte lade die Seite neu.", { errorCode: "PLAYER_MISMATCH", playerId });

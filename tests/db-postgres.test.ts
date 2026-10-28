@@ -167,19 +167,6 @@ test('a login links one player ID, once, even when two devices log in at the sam
   assert.equal((await db.linkAccount(user, 'yet-another-id', null))!.playerId, owned);
 });
 
-test('an account without worlds may switch to an imported player ID, one with worlds may not', { skip }, async () => {
-  const fresh = '00000000-0000-4000-8000-000000000003', busy = '00000000-0000-4000-8000-000000000004';
-  await db.linkAccount(fresh, 'fresh-random-id', null);
-  assert.equal((await db.relinkAccount(fresh, 'imported-old-id')).account!.playerId, 'imported-old-id');
-  await db.linkAccount('00000000-0000-4000-8000-000000000005', 'someone-elses-id', null);
-  assert.equal((await db.relinkAccount(fresh, 'someone-elses-id')).reason, 'taken');
-  await db.linkAccount(busy, 'busy-player-id', null);
-  await db.insertRoom({ ...room('BUSY'), hostPlayerId: 'busy-player-id' });
-  const refused = await db.relinkAccount(busy, 'another-imported-id');
-  assert.equal(refused.reason, 'has-worlds');
-  assert.equal(refused.account!.playerId, 'busy-player-id');
-});
-
 test('of many accounts claiming one username in any case, exactly one gets it', { skip }, async () => {
   const now = iso();
   const claims = await Promise.all(Array.from({ length: 12 }, (_, i) => db.createProfile(`00000000-0000-4000-8000-0000000001${String(i).padStart(2, '0')}`, i % 2 ? 'Striker' : 'STRIKER', `Spieler ${i}`, now)));

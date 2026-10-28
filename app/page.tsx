@@ -14,13 +14,13 @@ import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIO
 import { DailyRewardCard } from "./daily-reward-panel";
 import { FootballGraphic, GameErrorBoundary, Icon, StarXIPositionBadges } from "./game/ui";
 import { LiveMatchViewer } from "./match-viewer";
-import { AccountButton, AccountLink, SaveTransferPanel } from "./account-panel";
+import { AccountButton, AccountLink } from "./account-panel";
 import { ConfirmDialog } from "./confirm-dialog";
 import { TAB_PATHS, tabForPath } from "./tab-routes";
 import type { RoutedTab } from "./tab-routes";
 import { gameAudioContext, playPackReveal } from "./match-audio";
 import { MatchAudio } from "./match-audio-player";
-import { AccountContext, AccountGate } from "./account-gate";
+import { AccountContext, AccountGate, GuestContext } from "./account-gate";
 import { FLUSH_SAVE_EVENT } from "./cloud-sync";
 import { resolveSquadTap, SquadBenchCard, SquadBenchPanel, SquadBenchSlot, SquadPitchPanel, SquadPitchSlot, formatStarXIPositions, useSquadDrag } from "./squad-board";
 import type { SquadPick } from "./squad-board";
@@ -171,6 +171,9 @@ function App() {
   const [playerId, setPlayerId] = useState("");
   const [playerName, setPlayerName] = useState("");
   const account = useContext(AccountContext);
+  // A guest plays single player only; co-op needs an account.
+  const guest = useContext(GuestContext);
+  const [guestCoopPrompt, setGuestCoopPrompt] = useState(false);
   // With an account the display name of the profile is the nickname in every world.
   const coopNickname = account?.profile.displayName ?? playerName;
   const [coopCodeInput, setCoopCodeInput] = useState("");
@@ -715,10 +718,10 @@ function App() {
   }, [displayedCupCard]);
 
   useEffect(() => {
-    if (!hydrated || !playerId || coopRestoreAttemptedRef.current) return;
+    if (!hydrated || !playerId || guest || coopRestoreAttemptedRef.current) return;
     coopRestoreAttemptedRef.current = true;
     void restoreCoopRoom();
-  }, [hydrated, playerId, restoreCoopRoom]);
+  }, [hydrated, playerId, guest, restoreCoopRoom]);
 
   useEffect(() => {
     if (!hydrated || appMode !== "coop" || !playerId || coopSession) return;
@@ -2568,12 +2571,15 @@ function App() {
         <div className="top-actions"><AccountButton /><button className="icon-button" aria-label="Benachrichtigungsverlauf" onClick={()=>openFeatureTab("history")}><Icon name="bell" size={18} /></button><button className="icon-button" onClick={toggleSound} aria-label={game.sound ? "Sound ausschalten" : "Sound einschalten"}><Icon name={game.sound ? "sound" : "mute"} size={17} /></button>{vibrationSupported && <button className={`icon-button vibration-toggle${vibrationEnabled ? "" : " off"}`} onClick={toggleVibration} aria-pressed={vibrationEnabled} aria-label={vibrationEnabled ? "Vibration ausschalten" : "Vibration einschalten"}><Icon name="vibrate" size={18} /></button>}<button className="reset-button" onClick={resetGame}>Reset</button></div>
       </header>
 
+      {guestCoopPrompt && guest && <ConfirmDialog title="Koop braucht ein Konto" confirmLabel="Anmelden" onCancel={() => setGuestCoopPrompt(false)} onConfirm={() => { setGuestCoopPrompt(false); guest.signIn(); }}>
+        <p>Als Gast spielst du nur Einzelspieler. Melde dich an oder erstelle ein Konto, um mit anderen in einer Koop Welt zu spielen. Hat dein Konto noch keinen Spielstand, nimmt es deinen Gast Spielstand mit.</p>
+      </ConfirmDialog>}
       {confirmSingle && <ConfirmDialog title="Zum Singleplayer wechseln?" confirmLabel="Wechseln" onCancel={() => setConfirmSingle(false)} onConfirm={() => { setConfirmSingle(false); setAppMode("single"); }}>
         <p>{coopSession ? `Du verlässt „${coopSession.room.roomName}“. Die Welt bleibt gespeichert und du kannst jederzeit zurück.` : "Du verlässt den Koop Multiplayer und spielst mit deinem eigenen Spielstand weiter."}</p>
       </ConfirmDialog>}
       <nav className="mode-switch" aria-label="Spielmodus">
         <button className={appMode === "single" ? "active" : ""} onClick={() => { if (appMode === "coop") setConfirmSingle(true); }}>Singleplayer</button>
-        <button className={appMode === "coop" ? "active" : ""} onClick={() => setAppMode("coop")}>Koop Multiplayer</button>
+        <button className={appMode === "coop" ? "active" : ""} onClick={() => guest ? setGuestCoopPrompt(true) : setAppMode("coop")}>Koop Multiplayer{guest ? " 🔒" : ""}</button>
       </nav>
       <AccountLink playerId={playerId} onPlayerId={adoptAccountPlayerId} onMessage={accountMessage} />
 
@@ -2741,7 +2747,6 @@ function App() {
           {featureTab === "club" && <div className="feature-panel">            <section className="trophy-room" aria-label="Gewonnene Pokale"><div className="trophy-room-heading"><div><p className="eyebrow">TROPHÄENRAUM</p><h4>Deine gewonnenen Pokale.</h4></div><span>{totalTrophies} GESAMT</span></div><div className="trophy-grid">{TOURNAMENTS.map((tournament) => { const count = displayGame.features.cup.trophies[tournament.id]; return <article className={`trophy-card${count > 0 ? " earned" : " locked"}`} key={`trophy-${tournament.id}`} style={{ "--trophy-accent": tournament.accent } as CSSProperties}><span className="trophy-icon" aria-hidden="true">{tournament.trophyIcon}</span><div><strong>{tournament.trophyName}</strong><small>{count > 0 ? `${count} Mal gewonnen` : `${tournament.rounds} Runden bis zum Pokal`}</small></div><b>{count}</b></article>; })}</div></section>
             <section className="club-scorer-board" aria-label="Ewige Torschützenliste"><div className="club-scorer-heading"><div><p className="eyebrow">CLUBREKORDE / EWIG</p><h4>Deine drei besten Torschützen.</h4></div><span>ALLE SPIELE</span></div>{allTimeTopScorers.length ? <ol>{allTimeTopScorers.map(({ player, goals, appearances }, index) => <li key={`all-time-${player.id}`}><span>{index + 1}</span><div><strong>{player.name}</strong><small>{formatStarXIPositions(player)} · OVR {player.rating}</small></div><b>{goals} {goals === 1 ? "TOR" : "TORE"} · {appearances} {appearances === 1 ? "SPIEL" : "SPIELE"}</b></li>)}</ol> : <div className="club-scorer-empty"><strong>Die Rekordliste wartet.</strong><small>Das erste Tor eröffnet deine Klubgeschichte.</small></div>}</section>
             <TravelStatsPanel travel={displayGame.features.travel} now={getTravelTime()} clubName={displayGame.features.club.name} />
-            <SaveTransferPanel onMessage={accountMessage} />
 <div className="feature-panel-heading"><div><p className="eyebrow">CLUBIDENTITÄT / DEIN VEREIN</p><h3>Mach ihn zu deinem Club.</h3></div><span className="club-preview" style={{ color: clubDraft.color, borderColor: clubDraft.color }}>{clubDraft.badge}</span></div><div className="club-form"><label htmlFor="club-name">Clubname</label><input id="club-name" className="mode-input" value={clubDraft.name} maxLength={22} onChange={(event) => setClubDraft((current) => ({ ...current, name: event.target.value }))} /><div><span className="club-form-label">Wappen</span><div className="club-choice-row">{CLUB_BADGES.map((badge) => <button key={badge} className={clubDraft.badge === badge ? "selected" : ""} onClick={() => setClubDraft((current) => ({ ...current, badge }))}>{badge}</button>)}</div></div><div><span className="club-form-label">Clubfarbe</span><div className="club-choice-row colors">{CLUB_COLORS.map((color) => <button key={color} className={clubDraft.color === color ? "selected" : ""} style={{ background: color }} aria-label={`Clubfarbe ${color}`} onClick={() => setClubDraft((current) => ({ ...current, color }))} />)}</div></div><button className="mode-primary" onClick={() => void saveClubProfile()} disabled={coopBusy}>Clubprofil speichern</button></div></div>}
 
           {featureTab === "missions" && <div className="feature-panel">{!isCoopLive ? <div className="feature-empty"><Icon name="stadium" size={25} /><strong>Koop Missionen</strong><p>Starte ein Koop Match, um gemeinsame Ziele mit deinem Team freizuschalten.</p></div> : <><div className="feature-panel-heading"><div><p className="eyebrow">KOOP / GEMEINSAME ZIELE</p><h3>Missionen für euer Team.</h3></div><span className="feature-stat">SAISON {currentSeason}</span></div><div className="mission-list">{featureMissions.map((mission) => { const progress = getMissionProgress(mission, { seasonGoals: displayGame.seasonGoals, clicks: displayGame.clicks, minigameWins: displayGame.minigameWins, cupWins: displayGame.features.cup.wins }); const complete = progress >= mission.target; return <div className={`mission-row${mission.claimed ? " claimed" : ""}`} key={mission.id}><div className="mission-copy"><strong>{mission.title}</strong><small>{mission.description}</small><div className="mission-progress"><span style={{ width: `${Math.min(100, (progress / mission.target) * 100)}%` }} /></div><em>{formatNumber(Math.min(progress, mission.target))} / {formatNumber(mission.target)}</em></div><button className="feature-buy-button" onClick={() => void claimMission(mission)} disabled={mission.claimed || !complete || coopBusy}>{mission.claimed ? "Abgeholt" : complete ? `+${formatNumber(mission.reward)}` : "offen"}</button></div>; })}</div></>}</div>}

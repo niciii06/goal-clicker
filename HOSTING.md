@@ -88,33 +88,17 @@ Hinweis: Der frühere Cloudflare Worker hatte eine optionale Anfragebegrenzung f
 Auf der Preview Adresse nacheinander:
 
 1. **Login**: *Mit Google anmelden* → Google Konto wählen → beim ersten Mal Profil anlegen → im Spiel stehen Anzeigename und Benutzername oben. Ebenso mit *Konto erstellen* (Benutzername und Passwort) und danach *Anmelden*. *Abmelden* funktioniert.
-2. **Einzelspieler**: klicken, Upgrade kaufen, Seite neu laden, Stand bleibt. Auf einem zweiten Gerät anmelden: derselbe Stand. Unter *Club & Mehr* *Spielstand herunterladen* und wieder *hochladen*.
+2. **Einzelspieler**: klicken, Upgrade kaufen, Seite neu laden, Stand bleibt. Auf einem zweiten Gerät anmelden: derselbe Stand. *Als Gast fortfahren* startet ohne Konto, nur Einzelspieler; *Anmelden* nimmt den Gast Spielstand in ein neues Konto mit.
 3. **Multiplayer**: angemeldet eine Welt erstellen, in einem zweiten Browser (anderes Google Konto) mit dem Code beitreten, beide klicken, beide sehen dieselben Tore. Abgemeldet erscheint der Hinweis, dass Multiplayer einen Login braucht.
 
 ### 5. Daten übernehmen
 
 1. **Vor der Kündigung von ChatGPT** die Live Datenbank der Sites Version sichern. Das ist nicht aus diesem Repository heraus möglich, siehe [Abschnitt in docs/supabase-datenbank.md](docs/supabase-datenbank.md#wichtig-vor-der-kündigung-von-chatgpt-live-daten-der-sites-version-sichern).
 2. `DATABASE_URL=<Session Pooler URL> npm run db:import-d1 -- --dump d1-export.sql --dry-run`, danach ohne `--dry-run`. Der Import ist wiederholbar.
-3. Spieler bitten, ihren Einzelspieler Spielstand zu sichern (nächster Abschnitt).
 
 ## Spielstand sichern (für Spieler)
 
-Der Einzelspieler Spielstand liegt im Browser unter der alten Adresse und zieht nicht automatisch auf eine neue Domain um.
-
-**Auf der neuen Seite**: *Club & Mehr* → *Spielstand herunterladen* bzw. *Spielstand hochladen*.
-
-**Auf der alten ChatGPT Sites Adresse** gibt es diesen Knopf nicht. Dort die Seite öffnen, die Entwicklerkonsole des Browsers öffnen (F12, Reiter *Konsole*) und einfügen:
-
-```js
-(() => {
-  const keys = Object.fromEntries(Object.keys(localStorage).filter((k) => k.startsWith("goalClicker")).map((k) => [k, localStorage.getItem(k)]));
-  const file = { format: "goal-clicker-save", version: 1, exportedAt: new Date().toISOString(), origin: location.origin, keys };
-  const link = Object.assign(document.createElement("a"), { href: URL.createObjectURL(new Blob([JSON.stringify(file, null, 2)], { type: "application/json" })), download: "goal-clicker-spielstand.json" });
-  link.click();
-})();
-```
-
-Die heruntergeladene Datei auf der neuen Seite unter *Spielstand hochladen* einlesen. Sie enthält auch die Spieler ID. Wer danach angemeldet ist, bekommt seine bisherigen Multiplayer Welten zurück (Details in [docs/google-login.md](docs/google-login.md)). Die Datei nicht öffentlich teilen, die Spieler ID darin ist der Schlüssel zu den eigenen Welten.
+Der Spielstand liegt im Profil, sobald man angemeldet ist, und ist auf allen Geräten gleich. Gäste spielen nur Einzelspieler mit einem Spielstand in diesem Browser; mit *Anmelden* kommt er in ein neues Konto. Einen Datei Export gibt es nicht mehr.
 
 ## Was entfernt wurde
 

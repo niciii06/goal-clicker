@@ -2155,3 +2155,8 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
   72% { opacity: 1; transform: translate3d(0,0,0) scale(1); filter: blur(0) brightness(1); }
   100% { opacity: 1; transform: translate3d(0,0,0) scale(1); filter: none; }
 }
+/* Guests: the header shows a sign in button, the login screen a way to play without an account. */
+.account-signin-button { height: 36px; padding: 0 14px; border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 980px; color: var(--on-accent); cursor: pointer; background: var(--accent); font-size: var(--text-footnote); font-weight: 700; }
+.account-signin-button:hover { filter: brightness(1.06); }
+.account-guest { display: grid; gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); text-align: center; }
+.account-guest .account-hint { margin-top: 0; }

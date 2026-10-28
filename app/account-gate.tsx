@@ -1,18 +1,17 @@
 "use client";
-// Login is required once Supabase is configured: Google, or username and password (no e-mail involved). Every
-// account has a profile with a unique username and a display name; Google accounts create it after their first
-// login, username accounts when they register. Before the game starts, the account's cloud save is written to
-// localStorage; while it runs, CloudSync uploads every change.
+// Once Supabase is configured the game starts with a login: Google, or username and password (no e-mail involved).
+// Every account has a profile with a unique username and a display name; Google accounts create it after their
+// first login, username accounts when they register. Before the game starts, the account's cloud save is written
+// to localStorage; while it runs, CloudSync uploads every change. A guest plays single player only, with a save
+// in this browser; signing in later takes that save into a new account.
 import { createContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { authErrorMessage, browserSupabase, registerWithUsername, signInWithGoogle, signInWithUsername } from "./auth/browser";
 import { authConfigured } from "./auth/config";
-import { adoptOwnUpload, applyCloudSave, clearLocalAccountData, CloudSync, fetchCloudSave, holdsOtherAccountSave, planInitialSync, readCloudMeta, readLocalSaveKeys, writeCloudMeta } from "./cloud-sync";
+import { adoptOwnUpload, applyCloudSave, clearLocalAccountData, CloudSync, FLUSH_SAVE_EVENT, fetchCloudSave, holdsOtherAccountSave, planInitialSync, readCloudMeta, readCloudMetaOwner, readLocalSaveKeys, writeCloudMeta } from "./cloud-sync";
 import type { CloudSaveState } from "./cloud-sync";
 import { PLAYER_NAME_KEY } from "./game/constants";
 import { suspendLocalPersistence } from "./game/storage";
-import { IMPORT_PENDING_KEY } from "./game/save-revision";
-import { cleanCloudSaveKeys } from "./cloud-save-rules";
 import { cleanDisplayName, DISPLAY_NAME_MAX, displayNameError, isPasswordLoginEmail, PASSWORD_MAX, PASSWORD_MIN, passwordError, USERNAME_MAX, usernameError } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
 
@@ -30,8 +29,15 @@ export type AccountContextValue = {
   deleteProfile: (confirm: string) => Promise<void>;
 };
 
-/** null in local development without Supabase, where the game runs without an account as before. */
+/** null in local development without Supabase, where the game runs without an account as before, and for guests. */
 export const AccountContext = createContext<AccountContextValue | null>(null);
+
+/** Set while a guest plays: single player only, and a way to the login. */
+export type GuestContextValue = { signIn: () => void };
+export const GuestContext = createContext<GuestContextValue | null>(null);
+
+/** Remembers on this device that the player chose to play as a guest. */
+const GUEST_MODE_KEY = "goalClickerGuestModeV1";
 
 const PROFILE_CACHE_KEY = "goalClickerProfileCacheV1";
 const LOGIN_MESSAGES: Record<string, string> = {
@@ -44,6 +50,7 @@ type SessionUser = { id: string; email: string | null; passwordLogin: boolean; s
 type Phase =
   | { name: "checking" }
   | { name: "signed-out"; message?: string }
+  | { name: "guest" }
   | { name: "profile"; user: SessionUser }
   | { name: "unreachable"; message: string; user: SessionUser | null; offlineProfile: PublicProfile | null }
   | { name: "ready"; user: SessionUser; profile: PublicProfile };
@@ -116,10 +123,7 @@ function RequiredAccount({ children }: { children: ReactNode }) {
     // An upload that went through while the page closed is this device's own save, not another device's.
     const own = adoptOwnUpload(readCloudMeta(user.id), cloud);
     if (own) writeCloudMeta(own);
-    // A save file the player just imported replaces the profile's save, as the import dialog promised.
-    const importedHere = localStorage.getItem(IMPORT_PENDING_KEY) === user.id;
-    localStorage.removeItem(IMPORT_PENDING_KEY);
-    const plan = importedHere && cleanCloudSaveKeys(readLocalSaveKeys()) ? "keep-local" : planInitialSync(readCloudMeta(user.id), cloud, readLocalSaveKeys());
+    const plan = planInitialSync(readCloudMeta(user.id), cloud, readLocalSaveKeys());
     if (plan === "use-cloud") applyCloudSave(user.id, cloud);
     // The next upload replaces the cloud save on top of its current version.
     else if (plan === "keep-local") writeCloudMeta({ userId: user.id, version: cloud.version, hash: "", played: true });
@@ -132,9 +136,10 @@ function RequiredAccount({ children }: { children: ReactNode }) {
     const supabase = browserSupabase()!;
     const { data } = await supabase.auth.getSession();
     if (!data.session) {
-      setPhase({ name: "signed-out" });
+      setPhase(localStorage.getItem(GUEST_MODE_KEY) === "1" ? { name: "guest" } : { name: "signed-out" });
       return;
     }
+    localStorage.removeItem(GUEST_MODE_KEY);
     const user = sessionUser(data.session.user);
     let profile: PublicProfile | null;
     try {
@@ -171,7 +176,7 @@ function RequiredAccount({ children }: { children: ReactNode }) {
     const { data } = browserSupabase()!.auth.onAuthStateChange((event) => {
       if (event !== "SIGNED_OUT") return;
       syncRef.current?.stop();
-      setPhase((current) => current.name === "signed-out" ? current : { name: "signed-out", message: "Du wurdest abgemeldet." });
+      setPhase((current) => current.name === "signed-out" || current.name === "guest" ? current : { name: "signed-out", message: "Du wurdest abgemeldet." });
     });
     return () => {
       window.clearTimeout(timer);
@@ -215,6 +220,21 @@ function RequiredAccount({ children }: { children: ReactNode }) {
     window.location.replace("/");
   }, []);
 
+  // A guest's save stays in this browser. A save another account left behind is not the guest's, so it goes first.
+  const playAsGuest = useCallback(() => {
+    if (readCloudMetaOwner()) clearLocalAccountData();
+    localStorage.setItem(GUEST_MODE_KEY, "1");
+    setPhase({ name: "guest" });
+  }, []);
+
+  const guestSignIn = useCallback(() => {
+    // The running game writes its last state first; signing in then takes it into a new account.
+    window.dispatchEvent(new Event(FLUSH_SAVE_EVENT));
+    localStorage.removeItem(GUEST_MODE_KEY);
+    setPhase({ name: "signed-out", message: "Dein Gast Spielstand kommt in dein Konto, wenn es noch keinen Spielstand hat." });
+  }, []);
+  const guestContext = useMemo<GuestContextValue>(() => ({ signIn: guestSignIn }), [guestSignIn]);
+
   const ready = phase.name === "ready" ? phase : null;
   const setProfile = useCallback((profile: PublicProfile) => {
     setPhase((current) => current.name === "ready" ? { ...current, profile } : current);
@@ -228,12 +248,17 @@ function RequiredAccount({ children }: { children: ReactNode }) {
       {children}
     </AccountContext.Provider>;
   }
+  if (phase.name === "guest") {
+    return <GuestContext.Provider value={guestContext}>
+      {children}
+    </GuestContext.Provider>;
+  }
 
   return <main className="account-screen">
     <section className="account-card">
       <div className="account-brand"><span className="account-brand-ball" aria-hidden="true">⚽</span><div><p className="eyebrow">FOOTBALL IDLE CLUB</p><strong>Goal Clicker</strong></div></div>
       {phase.name === "checking" && <p className="account-status" role="status">Anmeldung wird geprüft …</p>}
-      {phase.name === "signed-out" && <LoginForm message={phase.message} onSignedIn={() => void enter()} />}
+      {phase.name === "signed-out" && <LoginForm message={phase.message} onSignedIn={() => void enter()} onGuest={playAsGuest} />}
       {phase.name === "profile" && <ProfileSetup user={phase.user} onCreated={(profile) => { writeProfileCache(phase.user.id, profile); void syncAndStart(phase.user, profile); }} onSignOut={() => void signOut()} />}
       {phase.name === "unreachable" && <>
         <h2>Keine Verbindung</h2>
@@ -275,7 +300,7 @@ function UsernameHint({ check }: { check: ReturnType<typeof useUsernameCheck> })
   return <small className={`account-hint${check.tone}`}>{check.message || "3 bis 20 Zeichen: Buchstaben, Zahlen und _. Änderbar alle 30 Tage."}</small>;
 }
 
-function LoginForm({ message, onSignedIn }: { message?: string; onSignedIn: () => void }) {
+function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSignedIn: () => void; onGuest: () => void }) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -332,6 +357,10 @@ function LoginForm({ message, onSignedIn }: { message?: string; onSignedIn: () =
       <button type="submit" className="mode-primary" disabled={busy || (mode === "register" && check.blocked)}>{mode === "login" ? "Anmelden" : "Konto erstellen"}</button>
     </form>
     {error && <p className="account-error" role="alert">{error}</p>}
+    <div className="account-guest">
+      <button type="button" className="mode-secondary quiet" disabled={busy} onClick={onGuest}>Als Gast fortfahren</button>
+      <small className="account-hint">Als Gast spielst du nur Einzelspieler, und dein Spielstand bleibt in diesem Browser. Anmelden kannst du dich jederzeit.</small>
+    </div>
   </>;
 }
 

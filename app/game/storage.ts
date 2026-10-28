@@ -3,7 +3,7 @@ import type { GameState, LayoutCardId, MiniGameCooldowns, MiniGameId } from "./t
 import { ACHIEVEMENTS, BACKUP_STORAGE_KEY, BALANCE_VERSION, DEFAULT_LAYOUT_ORDER, LAYOUT_CARD_IDS, LEGACY_STORAGE_KEYS, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_IDS, RECOVERY_STORAGE_KEY, STORAGE_KEY } from "./constants";
 import { compareStoredGameProgress, parseStoredGame, selectSafestStoredGame, shouldRejectRegressedSave } from "../save-safety";
 import { getBasePassivePower, normalizeUpgrades } from "./economy";
-import { getGoalBoostedPassiveReward, initialGameFeatures, normalizeGameFeatures, pauseGameFeatureTimers } from "../feature-data";
+import { getGoalBoostedPassiveReward, initialGameFeatures, normalizeGameFeatures } from "../feature-data";
 import { bumpSaveRevision, readSaveRevision, SAVE_WRITER_KEY, setLocalSaveFailed } from "./save-revision";
 
 export function normalizeLayoutOrder(value: unknown) {
@@ -198,19 +198,6 @@ export function normalizeRuntimeGame(value: unknown, soundFallback = true): Game
     minigameWins: Math.floor(nonNegative(source.minigameWins)),
     features: normalizeGameFeatures(source.features),
   };
-}
-
-/** Whether a stored game can be turned into a running game, as the start of the page does. */
-export function storedGameLoads(raw: string | undefined) {
-  if (!raw) return false;
-  try {
-    const value = JSON.parse(raw) as { features?: unknown };
-    normalizeRuntimeGame(value);
-    pauseGameFeatureTimers(value.features, 0);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export function normalizeNickname(value: string) {

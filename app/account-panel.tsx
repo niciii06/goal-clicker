@@ -3,28 +3,24 @@
 // between account and player ID, and the save file export/import in the club tab.
 import { useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import type { ChangeEvent, FormEvent } from "react";
-import { AccountContext } from "./account-gate";
+import type { FormEvent } from "react";
+import { AccountContext, GuestContext } from "./account-gate";
 import { useDialogFocus } from "./confirm-dialog";
 import { authErrorMessage, setAccountPassword } from "./auth/browser";
-import { FLUSH_SAVE_EVENT, subscribeSyncStatus } from "./cloud-sync";
+import { subscribeSyncStatus } from "./cloud-sync";
 import type { SyncStatus } from "./cloud-sync";
-import { IMPORT_PENDING_KEY } from "./game/save-revision";
-import { resumeLocalPersistence, storedGameLoads, suspendLocalPersistence } from "./game/storage";
 import { getInstallState, promptInstall, subscribeInstallState } from "./pwa";
 import type { InstallState } from "./pwa";
 import { DISPLAY_NAME_MAX, displayNameError, PASSWORD_MAX, PASSWORD_MIN, passwordError, USERNAME_MAX, usernameError } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
-import { applySaveFile, createSaveFile, parseSaveFile, saveFileGameRaw, saveFileName, savedPlayerId } from "./save-file";
 import { readThemePreference, setThemePreference, THEME_OPTIONS } from "./theme";
 import type { ThemePreference } from "./theme";
 
-const ADOPT_AFTER_IMPORT_KEY = "goalClickerAdoptAfterImport";
 const SYNC_LABELS: Record<SyncStatus, string> = { saved: "Gespeichert", saving: "Speichert …", offline: "Offline, wird später gespeichert", failed: "Nicht gespeichert, der Browser Speicher ist voll" };
 
-async function linkAccount(playerId: string, adopt: boolean) {
-  const response = await fetch("/api/account", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ playerId, adopt }) });
-  const data = await response.json() as { playerId?: string; email?: string | null; error?: string; adoptError?: string };
+async function linkAccount(playerId: string) {
+  const response = await fetch("/api/account", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ playerId }) });
+  const data = await response.json() as { playerId?: string; email?: string | null; error?: string };
   if (!response.ok) throw new Error(data.error ?? "Das Konto konnte nicht geladen werden.");
   return data;
 }
@@ -46,10 +42,7 @@ export function AccountLink({ playerId, onPlayerId, onMessage }: { playerId: str
   useEffect(() => {
     if (!account || !playerId || linked.current === playerId) return;
     linked.current = playerId;
-    const adopt = localStorage.getItem(ADOPT_AFTER_IMPORT_KEY) === playerId;
-    void linkAccount(playerId, adopt).then((data) => {
-      if (adopt) localStorage.removeItem(ADOPT_AFTER_IMPORT_KEY);
-      if (data.adoptError) onMessage(data.adoptError);
+    void linkAccount(playerId).then((data) => {
       if (data.playerId && data.playerId !== playerId) {
         linked.current = data.playerId;
         onPlayerId(data.playerId);
@@ -149,6 +142,7 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
 /** The account button in the header; it opens the profile settings in a dialog. */
 export function AccountButton() {
   const account = useContext(AccountContext);
+  const guest = useContext(GuestContext);
   const [open, setOpen] = useState(false);
   // Feedback stays inside the dialog; the page toast would sit under the dimmed overlay.
   const [notice, setNotice] = useState("");
@@ -156,6 +150,21 @@ export function AccountButton() {
 
   useDialogFocus(open, dialogRef, () => setOpen(false));
 
+  if (!account && guest) return <>
+    <button type="button" className="account-signin-button" aria-haspopup="dialog" aria-expanded={open} onClick={() => { setNotice(""); setOpen(true); }}>Anmelden</button>
+    {open && createPortal(<div className="account-overlay" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
+      <div ref={dialogRef} className="account-dialog" role="dialog" aria-modal="true" aria-label="Gast">
+        <button type="button" className="account-dialog-close" aria-label="Schliessen" onClick={() => setOpen(false)}>×</button>
+        <section className="profile-panel" aria-label="Gast">
+          <div><p className="eyebrow">GAST</p><h4>Du spielst als Gast</h4><p>Dein Spielstand liegt nur in diesem Browser, und Koop Multiplayer ist gesperrt. Mit einem Konto ist dein Spielstand gesichert, auf allen deinen Geräten gleich, und du kannst mit anderen zusammen spielen. Hat das Konto noch keinen Spielstand, nimmt es deinen Gast Spielstand mit.</p></div>
+          <button type="button" className="mode-primary" onClick={() => { setOpen(false); guest.signIn(); }}>Anmelden oder Konto erstellen</button>
+        </section>
+        <ThemePicker />
+        <InstallAppPanel onMessage={setNotice} />
+        {notice && <p className="account-notice" role="status">{notice}</p>}
+      </div>
+    </div>, document.body)}
+  </>;
   if (!account) return null;
   return <>
     <button type="button" className="icon-button account-button" aria-label={`Konto von ${account.profile.displayName}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => { setNotice(""); setOpen(true); }}>👤</button>
@@ -194,61 +203,4 @@ function InstallAppPanel({ onMessage }: { onMessage: (text: string) => void }) {
     {state === "prompt" && <button type="button" className="mode-secondary" onClick={() => void promptInstall().then((accepted) => { if (accepted) onMessage("Goal Clicker wird installiert."); })}>App installieren</button>}
     {state === "ios" && <p>Zum Installieren unten auf Teilen tippen und dann «Zum Home Bildschirm».</p>}
   </div>;
-}
-
-/** Download and upload of the single player save, for moving to a new address or device. */
-export function SaveTransferPanel({ onMessage }: { onMessage: (text: string) => void }) {
-  const account = useContext(AccountContext);
-  const input = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-
-  function exportSave() {
-    // The game saves every few seconds; the file must hold what is on screen right now.
-    window.dispatchEvent(new Event(FLUSH_SAVE_EVENT));
-    const file = createSaveFile(localStorage, window.location.origin);
-    const url = URL.createObjectURL(new Blob([`${JSON.stringify(file, null, 2)}\n`], { type: "application/json" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = saveFileName();
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    onMessage("Spielstand heruntergeladen.");
-  }
-
-  async function importSave(event: ChangeEvent<HTMLInputElement>) {
-    const selected = event.target.files?.[0];
-    event.target.value = "";
-    if (!selected) return;
-    setBusy(true);
-    try {
-      const parsed = parseSaveFile(await selected.text());
-      if (!parsed.ok) { onMessage(parsed.error); return; }
-      // The game must also load, not only parse; otherwise the import would replace a working save with a broken one.
-      if (!storedGameLoads(saveFileGameRaw(parsed.file.keys))) { onMessage("Der Spielstand ist beschädigt."); return; }
-      if (!window.confirm("Der aktuelle Spielstand in diesem Browser wird durch die Datei ersetzt. Fortfahren?")) return;
-      suspendLocalPersistence();
-      applySaveFile(localStorage, parsed.file);
-      // The next start sends the imported game to the profile instead of taking the profile's save.
-      if (account) localStorage.setItem(IMPORT_PENDING_KEY, account.userId);
-      const importedPlayerId = savedPlayerId(parsed.file);
-      // A signed in account adopts the imported player ID (and its worlds) on the next start, if it has no world yet.
-      if (importedPlayerId) localStorage.setItem(ADOPT_AFTER_IMPORT_KEY, importedPlayerId);
-      window.location.reload();
-    } catch {
-      // The previous game is back in storage; it has to keep saving, or the next minutes would be lost.
-      resumeLocalPersistence();
-      onMessage("Der Spielstand konnte nicht importiert werden. Dein bisheriger Stand bleibt erhalten.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return <section className="save-transfer" aria-label="Spielstand sichern">
-    <div><p className="eyebrow">SPIELSTAND / SICHERN</p><h4>Spielstand als Datei</h4><p>{account ? "Dein Spielstand liegt automatisch in deinem Profil. Zusätzlich kannst du ihn als Datei sichern oder eine gesicherte Datei wieder einlesen; sie ersetzt dann den Stand im Profil." : "Der Einzelspieler Spielstand liegt nur in diesem Browser. Lade ihn als Datei herunter, um ihn auf einer neuen Adresse oder einem anderen Gerät wieder hochzuladen."} Die Datei enthält auch deine Spieler ID für deine Multiplayer Welten.</p></div>
-    <div className="save-transfer-actions">
-      <button type="button" className="mode-secondary" onClick={exportSave}>Spielstand herunterladen</button>
-      <button type="button" className="mode-secondary" disabled={busy} onClick={() => input.current?.click()}>Spielstand hochladen</button>
-      <input ref={input} type="file" accept="application/json,.json" hidden onChange={(event) => void importSave(event)} />
-    </div>
-  </section>;
 }

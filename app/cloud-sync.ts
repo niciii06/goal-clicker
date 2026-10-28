@@ -53,11 +53,17 @@ export function readCloudMeta(userId: string): CloudMeta | null {
  * example by expiring). That save must not become the save of the account signing in now.
  */
 export function holdsOtherAccountSave(userId: string) {
+  const owner = readCloudMetaOwner();
+  return owner !== null && owner !== userId;
+}
+
+/** The account this browser's save belongs to, or null for a save without an account (a guest's). */
+export function readCloudMetaOwner() {
   try {
     const meta = JSON.parse(localStorage.getItem(CLOUD_META_KEY) ?? "null") as { userId?: unknown } | null;
-    return typeof meta?.userId === "string" && meta.userId !== userId;
+    return typeof meta?.userId === "string" ? meta.userId : null;
   } catch {
-    return false;
+    return null;
   }
 }
 

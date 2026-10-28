@@ -272,3 +272,34 @@ test('signing out right after clicking still saves those clicks, then forgets th
   assert.ok((await cloudSave('Striker'))!.totalGoals >= before + 3, `cloud has ${(await cloudSave('Striker'))!.totalGoals}, before the clicks ${before}`);
   assert.deepEqual(problems, []);
 });
+
+test('a guest plays single player only, and signing up takes the guest save into the new account', { skip }, async () => {
+  const page = await device('guest');
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Als Gast fortfahren' }).click();
+  await clickBall(page, 5);
+  await page.evaluate(() => window.dispatchEvent(new Event('goalclicker:flush-save')));
+  const guestGoals = await localGoals(page);
+  assert.ok(guestGoals >= 5);
+  // The choice is remembered: a reload goes straight back into the game.
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Fussball anklicken' }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Anmelden', exact: true }).count(), 1);
+  // Co-op is locked for guests; the prompt leads to the login.
+  await page.getByRole('button', { name: /Koop Multiplayer/ }).click();
+  const prompt = page.getByRole('alertdialog').or(page.getByRole('dialog'));
+  await prompt.getByText('Koop braucht ein Konto').waitFor();
+  await prompt.getByRole('button', { name: 'Anmelden' }).click();
+  await page.getByText('Dein Gast Spielstand kommt in dein Konto').waitFor();
+  await page.getByRole('tab', { name: 'Konto erstellen' }).click();
+  await page.getByLabel('Benutzername').fill('GuestFan');
+  await page.getByText('Dieser Benutzername ist frei.').waitFor();
+  await page.getByLabel('Anzeigename').fill('Gast');
+  await page.getByLabel(/^Passwort \(mindestens/).fill('sicheres-passwort-9');
+  await page.getByLabel('Passwort wiederholen').fill('sicheres-passwort-9');
+  await page.getByRole('button', { name: 'Konto erstellen', exact: true }).click();
+  await page.getByRole('button', { name: 'Konto von Gast' }).waitFor();
+  await hideTab(page);
+  await waitFor(() => cloudSave('GuestFan'), (save) => Boolean(save && save.totalGoals >= guestGoals), 'guest save in the new account');
+  assert.deepEqual(problems, []);
+});
