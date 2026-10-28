@@ -378,7 +378,11 @@ export class GoalClickerDatabase {
   }
 
   /** Clicks change only counters, so the world comes back without its features (with their md5). */
-  async applyClick(code: string, role: string, amount: number, clickCount: number, timestamp: string): Promise<LightRoomRow | null> {
+  /**
+   * Books a batch of clicks the server counted. `previousClickState` is the seat's click state the amount was
+   * computed from; when another request of the same seat changed it meanwhile, nothing is written (null).
+   */
+  async applyClick(code: string, role: string, amount: number, clickCount: number, timestamp: string, previousClickState: unknown = null, nextClickState: unknown = null, presence: RoomUpdate = {}): Promise<LightRoomRow | null> {
     const [room] = await this.client
       .update(coopRooms)
       .set({
@@ -386,16 +390,20 @@ export class GoalClickerDatabase {
         sharedTotalGoals: increment(coopRooms.sharedTotalGoals, amount),
         sharedSeasonGoals: increment(coopRooms.sharedSeasonGoals, amount),
         sharedStateVersion: increment(coopRooms.sharedStateVersion, 1), // shared_state_version = shared_state_version + 1
-        lastPassiveAt: timestamp,
         pendingPlayerId: null,
         pendingUpgradeId: null,
         pendingUpgradeName: null,
         pendingCost: null,
         pendingUpgradeCount: null,
         updatedAt: timestamp,
+        ...presence,
+        ...(nextClickState ? { clickStateJson: sql`jsonb_set(${coopRooms.clickStateJson}::jsonb, array[${role}::text], ${JSON.stringify(nextClickState)}::jsonb)::text` } : {}),
         ...roleClickUpdate(role, amount, clickCount),
       })
-      .where(eq(coopRooms.code, code))
+      .where(and(
+        eq(coopRooms.code, code),
+        nextClickState ? sql`(${coopRooms.clickStateJson}::jsonb -> ${role}::text) is not distinct from ${previousClickState === null ? null : JSON.stringify(previousClickState)}::jsonb` : undefined,
+      ))
       .returning(LIGHT_ROOM_FIELDS);
     return room ?? null;
   }

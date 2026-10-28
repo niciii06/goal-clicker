@@ -93,6 +93,8 @@ export type GameFeatures = {
   club: ClubProfile;
   cup: CupState;
   squadLock?: { fixtureId: string; playerIds: string[]; startedAt: number; transferRemaining: number; eventRemaining: number; varRemaining: number; offerRemaining?: number };
+  /** Co-op mini game runs, by "<minigame>:<seat>": a reward needs a run the server saw start. */
+  miniGameRuns?: Record<string, number>;
   seasonMode: SeasonModeState;
   goalBoost: GoalBoostState;
   missions: CoopMission[];
@@ -2422,6 +2424,17 @@ function normalizeCupPenaltyEvent(value: unknown): CupPenaltyEvent | null {
   };
 }
 
+// A long career earns thousands of packs. Unopened ones always stay; of the opened ones only the latest are kept,
+// together with the latest finished tournament runs, so every save stays well below the storage and request limits.
+const MAX_OPENED_EARNED_PACKS = 100;
+const MAX_COMPLETED_TOURNAMENT_RUNS = 200;
+function keepRecentOpenedPacks(packs: EarnedPack[]) {
+  const opened = packs.filter((pack) => pack.opening);
+  if (opened.length <= MAX_OPENED_EARNED_PACKS) return packs;
+  const dropped = new Set(opened.slice(0, opened.length - MAX_OPENED_EARNED_PACKS).map((pack) => pack.id));
+  return packs.filter((pack) => !dropped.has(pack.id));
+}
+
 export function normalizeGameFeatures(value: unknown): GameFeatures {
   const source = asRecord(value);
   const defaults = initialGameFeatures();
@@ -2637,9 +2650,10 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
   });
   return {
     schemaVersion: GAME_FEATURES_SCHEMA_VERSION,
-    completedTournamentRuns: Array.isArray(source.completedTournamentRuns)?[...new Set(source.completedTournamentRuns.filter((id):id is string=>typeof id==='string'))]:[],
-    earnedPacks: (Array.isArray(source.earnedPacks)?source.earnedPacks:[]).map(asRecord).filter(p=>typeof p.id==='string'&&isRewardPack(String(p.packId))).filter((p,i,a)=>a.findIndex(x=>x.id===p.id)===i).map(p=>{const saved=asRecord(p.opening),player=getStarXIPlayer(String(asRecord(saved.player).id));return {id:String(p.id),packId:p.packId as RewardPackId,earnedAt:Number(p.earnedAt)||0,...(player?{opening:{packId:p.packId as RewardPackId,packName:getStarPack(String(p.packId))!.label,player,duplicate:saved.duplicate===true,fragmentCompensation:Math.max(0,Number(saved.fragmentCompensation)||0)}}:{})};}),
+    completedTournamentRuns: Array.isArray(source.completedTournamentRuns)?[...new Set(source.completedTournamentRuns.filter((id):id is string=>typeof id==='string'))].slice(-MAX_COMPLETED_TOURNAMENT_RUNS):[],
+    earnedPacks: keepRecentOpenedPacks((Array.isArray(source.earnedPacks)?source.earnedPacks:[]).map(asRecord).filter(p=>typeof p.id==='string'&&isRewardPack(String(p.packId))).filter((p,i,a)=>a.findIndex(x=>x.id===p.id)===i).map(p=>{const saved=asRecord(p.opening),player=getStarXIPlayer(String(asRecord(saved.player).id));return {id:String(p.id),packId:p.packId as RewardPackId,earnedAt:Number(p.earnedAt)||0,...(player?{opening:{packId:p.packId as RewardPackId,packName:getStarPack(String(p.packId))!.label,player,duplicate:saved.duplicate===true,fragmentCompensation:Math.max(0,Number(saved.fragmentCompensation)||0)}}:{})};})),
     travel: normalizeTravel(source.travel),
+    miniGameRuns: Object.fromEntries(Object.entries(asRecord(source.miniGameRuns)).filter(([key, startedAt]) => /^[a-z]+:[a-z0-9]+$/.test(key) && Number.isFinite(Number(startedAt))).slice(0, 16).map(([key, startedAt]) => [key, Number(startedAt)])),
     squadLock: normalizeSquadLock(source.squadLock ?? asRecord(asRecord(source.travel).journey).squadLock),
     career: normalizeCareerState(source.career, [...normalizedStarXI.ownedIds, ...loans.map(loan => loan.playerId)], { ...defaults.cup, ...cup, allTimeScorers, allTimeAppearances, playerEnteredAt, matchEvents, active } as CupState),
     transferMarket: { offerIds: offerIds.length ? offerIds : defaults.transferMarket.offerIds, ownedIds: [...new Set(ownedIds)] },

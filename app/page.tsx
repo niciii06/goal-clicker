@@ -271,6 +271,7 @@ function App() {
   const eventAnnouncementQueueRef = useRef<RandomEvent[]>([]);
   const coopClickBatchRef = useRef({ amount: 0, count: 0 });
   const coopClickBatchTimerRef = useRef<number | null>(null);
+  const coopClickInFlightRef = useRef(false);
   const cupGoalRef = useRef<string | null>(null);
   const cupCardRef = useRef<string | null>(null);
   const coopControlQueueRef = useRef<Promise<unknown>>(Promise.resolve());
@@ -841,10 +842,18 @@ function App() {
       coopClickBatchTimerRef.current = window.setTimeout(flushCoopClickBatch, 70);
       return;
     }
+    // One click request at a time: the server counts each batch on top of the previous one.
+    if (coopClickInFlightRef.current) {
+      coopClickBatchTimerRef.current = window.setTimeout(flushCoopClickBatch, 70);
+      return;
+    }
     const batch = coopClickBatchRef.current;
     coopClickBatchRef.current = { amount: 0, count: 0 };
     coopClickBatchTimerRef.current = null;
-    if (batch.count > 0) void sendCoopAction("click", { amount: batch.amount, clickCount: batch.count });
+    if (batch.count > 0) {
+      coopClickInFlightRef.current = true;
+      void sendCoopAction("click", { amount: batch.amount, clickCount: batch.count }).finally(() => { coopClickInFlightRef.current = false; });
+    }
   }
 
   function queueCoopClick(amount: number) {
@@ -1165,7 +1174,8 @@ function App() {
           if (data.room) setCoopSession((current) => mergeCoopSessionRoom(current, data.room!, data.role));
           if (!response.ok && data.errorCode === "STALE_STATE" && attempt + 1 < maxAttempts) continue;
           if (!response.ok) {
-            setCoopMessage(data.error ?? "Die Koop-Aktion ist fehlgeschlagen.");
+            // Clicks beyond the server's click budget are simply not counted; that is no error to show.
+            if (action !== "click" || response.status !== 429) setCoopMessage(data.error ?? "Die Koop-Aktion ist fehlgeschlagen.");
             return null;
           }
           if (data.packReveal) {
@@ -2125,6 +2135,7 @@ function App() {
       showToast(`${MINI_GAME_NAMES.penalty} ist noch ${formatCountdown(displayGame.miniGameCooldowns.penalty, countdownNow)} gesperrt.`);
       return;
     }
+    if (isCoopLive) void sendCoopAction("minigame-start", { minigameId: "penalty" });
     setActiveMiniGame("penalty");
     setPenaltyGame({ shots: 0, goals: 0, message: "Such dir eine Ecke aus.", finished: false, reward: 0 });
   }
@@ -2150,6 +2161,7 @@ function App() {
       return;
     }
     const sequence = Array.from({ length: 6 }, () => getRandomPenaltyDirection());
+    if (isCoopLive) void sendCoopAction("minigame-start", { minigameId: "dribble" });
     setActiveMiniGame("dribble");
     setDribbleGame({ sequence, step: 0, attempts: 0, misses: 0, message: `Erster Move: ${directionLabel(sequence[0])}.`, finished: false, reward: 0 });
   }
@@ -2181,6 +2193,7 @@ function App() {
       showToast(`${MINI_GAME_NAMES.crossbar} ist noch ${formatCountdown(displayGame.miniGameCooldowns.crossbar, countdownNow)} gesperrt.`);
       return;
     }
+    if (isCoopLive) void sendCoopAction("minigame-start", { minigameId: "crossbar" });
     setActiveMiniGame("crossbar");
     setCrossbarGame({ shots: 0, hits: 0, message: "Zielhöhe wählen und die Latte treffen.", finished: false, reward: 0 });
   }
@@ -2205,6 +2218,7 @@ function App() {
       showToast(`${MINI_GAME_NAMES.prediction} ist noch ${formatCountdown(displayGame.miniGameCooldowns.prediction, countdownNow)} gesperrt.`);
       return;
     }
+    if (isCoopLive) void sendCoopAction("minigame-start", { minigameId: "prediction" });
     setActiveMiniGame("prediction");
     setPredictionGame({ round: 0, wins: 0, message: "Wer gewinnt das nächste Match?", finished: false, reward: 0 });
   }

@@ -5,6 +5,7 @@ import { getDb } from "../../../db";
 import { accountPlayerId, forgetAccountLink } from "../../auth/player";
 import { getRequestUser } from "../../auth/server";
 import { readJsonBody, RequestBodyTooLargeError } from "../request-body";
+import { rateLimited } from "../rate-limit";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -24,6 +25,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const limited = rateLimited(request, "account");
+    if (limited) return limited;
     if (!authConfigured()) return Response.json({ error: "Der Login ist nicht eingerichtet." }, { status: 503, headers: noStore });
     const user = await getRequestUser(request);
     if (!user) return Response.json({ error: "Nicht angemeldet.", errorCode: "LOGIN_REQUIRED" }, { status: 401, headers: noStore });

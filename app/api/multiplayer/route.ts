@@ -17,19 +17,23 @@ import { getFormationUnlockLeague, getPackUnlockLeague, getReachedLeague, getTou
 import { calculateBulkUpgradePurchase } from "../../upgrade-purchase";
 import { MAX_MULTIPLAYER_BODY_BYTES, readJsonBody, RequestBodyTooLargeError } from "../request-body";
 import { claimDailyReward } from "../../daily-reward";
-import { ACHIEVEMENTS, BALANCE_VERSION, COMBO_LEVELS, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_IDS } from "../../game/constants";
+import { ACHIEVEMENTS, BALANCE_VERSION, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_IDS } from "../../game/constants";
 import { getBaseClickPower, getBasePassivePower, getClickPower, getCost, getLevel } from "../../game/economy";
 import { getUpgrade } from "../../game/upgrades";
 import { getTicketIncome, recordTicketIncome } from "../../ticket-income";
 
-const MAX_COMBO_MULTIPLIER = Math.max(...COMBO_LEVELS.map((level) => level.multiplier));
 import { answerPressConference, getPressReward } from "../../press-conference";
+import { applyServerClicks, readServerClickState } from "../../coop-clicks";
+import { rateLimited } from "../rate-limit";
 
 const MAX_NAME_LENGTH = 18;
 const MAX_ROOM_NAME_LENGTH = 28;
 const MAX_PLAYER_ID_LENGTH = 80;
 // Highest reward each client minigame can legitimately produce (see awardMiniGame callers in app/page.tsx).
 const MINI_GAME_MAX_REWARD: Record<string, number> = { penalty: 1000, dribble: 355, crossbar: 275, prediction: 335 };
+// A mini game takes several taps; a reward claimed within a second of the start, or long after it, was not played.
+const MINI_GAME_MIN_RUN_MS = 1000;
+const MINI_GAME_MAX_RUN_MS = 30 * 60 * 1000;
 // Passive income is additive over time, so it is saved now and then instead of on every poll.
 const GET_PASSIVE_REFRESH_MIN_MS = 30_000;
 const TICK_PASSIVE_REFRESH_MIN_MS = 5000;
@@ -465,20 +469,23 @@ async function quickPoll(code: string, playerId: string, knownFeaturesKey: strin
   const role = roomRole(light, playerId);
   if (!role) return null;
   const now = Date.now();
+  const elapsed = now - (Date.parse(light.lastPassiveAt || light.updatedAt) || now);
+  // Passive income due: the full path books it with the presence as it was, and only then marks the player present.
+  // Marking first would make a long absence look like presence and pay the whole gap.
+  if (elapsed >= passiveMinMs && (!leaderOnly || getSimulationLeaderRole(light, now) === role)) return null;
   const room = await touchPresence(db, light, role, new Date(now).toISOString());
-  const elapsed = now - (Date.parse(room.lastPassiveAt || room.updatedAt) || now);
-  if (elapsed >= passiveMinMs && (!leaderOnly || getSimulationLeaderRole(room, now) === role)) return null;
   return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
 }
 
-async function refreshPassive(db: ReturnType<typeof getDb>, room: RoomRow, minElapsedMs = 0) {
+/** `presence`: the seats as they were before this request marked its player present; past income depends on them. */
+async function refreshPassive(db: ReturnType<typeof getDb>, room: RoomRow, minElapsedMs = 0, presence: AnyRoomRow = room) {
   const now = Date.now();
   const last = Date.parse(room.lastPassiveAt || room.updatedAt) || now;
   const fullElapsed = Math.max(0, now - last);
   // Passive income and timer shifts are additive over [last, now], so a deferred refresh loses nothing.
   if (fullElapsed < minElapsedMs) return room;
   const game = readGame(room);
-  const latestSeenAt = Math.max(...getOccupiedRoomPlayers(room).map((player) => Date.parse(player.lastSeenAt || "") || 0), 0);
+  const latestSeenAt = Math.max(...getOccupiedRoomPlayers(presence).map((player) => Date.parse(player.lastSeenAt || "") || 0), 0);
   const activeLeaseEndsAt = latestSeenAt + PASSIVE_BACKGROUND_GRACE_MS;
   const activeUntil = getOccupiedRoomPlayers(room).length >= 2 ? Math.min(now, Math.max(last, activeLeaseEndsAt)) : last;
   const activeElapsed = Math.max(0, Math.min(fullElapsed, activeUntil - last));
@@ -516,6 +523,8 @@ function requireLive(room: RoomRow) {
 
 export async function GET(request: Request) {
   try {
+    const limited = rateLimited(request, "multiplayer");
+    if (limited) return limited;
     const url = new URL(request.url);
     if (!isSupportedMultiplayerProtocol(url.searchParams.get("protocol"))) return jsonError(MULTIPLAYER_UPDATE_MESSAGE, 426);
     const playerId = cleanPlayerId(url.searchParams.get("playerId"));
@@ -544,6 +553,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const limited = rateLimited(request, "multiplayer");
+    if (limited) return limited;
     const payload = await readJsonBody<{
       action?: unknown;
       mode?: unknown;
@@ -692,10 +703,15 @@ export async function POST(request: Request) {
     const isBackgroundAction = action === "tick" || action === "cup-tick";
     if (isBackgroundAction) {
       const presenceTimestamp = new Date().toISOString();
+      const beforePresence = room;
       room = await touchPresence(db, room, role, presenceTimestamp);
       if (getSimulationLeaderRole(room, Date.parse(presenceTimestamp)) !== role) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
-      room = await refreshPassive(db, room);
+      room = await refreshPassive(db, room, 0, beforePresence);
       if (action === "tick") return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
+    } else if (action === "click") {
+      // Clicks arrive every few hundred milliseconds. Passive income adds up over time, so it is booked at most every
+      // few seconds instead of rewriting the whole world on each batch; the click itself marks the player present.
+      room = await refreshPassive(db, room, TICK_PASSIVE_REFRESH_MIN_MS);
     } else {
       room = await refreshPassive(db, room);
       room = await touchPresence(db, room, role);
@@ -740,13 +756,22 @@ export async function POST(request: Request) {
 
     if (action === "click") {
       const clickPower = getClickPower(game.upgrades, game.stars, game.features, Date.parse(timestamp));
-      const clickCount = Math.max(1, Math.min(50, Math.floor(finite(payload.clickCount, 1))));
-      // Highest legitimate click: the top combo, streak bonus x1.1 and a critical hit x2.
-      const maxAmount = Math.max(clickCount, Math.floor(clickPower * clickCount * MAX_COMBO_MULTIPLIER * 1.1 * 2));
-      const amount = Math.max(clickCount, Math.min(maxAmount, Math.floor(finite(payload.amount, clickPower * clickCount))));
-      const updated = await db.applyClick(code, role, amount, clickCount, timestamp);
-      if (!updated) return jsonError("Dieser Raum wurde gelöscht.", 404);
-      return Response.json({ serverNow: Date.now(), room: shapeRoom(updated, playerId), role });
+      const requested = Math.max(1, Math.min(50, Math.floor(finite(payload.clickCount, 1))));
+      // The client only says how often it clicked; budget, combo, streak and critical hits are the server's.
+      let clickRoom: AnyRoomRow = room;
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        const previous = readServerClickState(parseJson<Record<string, unknown>>(clickRoom.clickStateJson, {})[role]);
+        const now = Date.now();
+        const clicks = applyServerClicks(previous, requested, now, clickPower);
+        if (!clicks.accepted) return jsonError("Zu viele Klicks in zu kurzer Zeit.", 429);
+        const updated = await db.applyClick(code, role, clicks.amount, clicks.accepted, new Date(now).toISOString(), previous, clicks.state, rolePresenceUpdate(role, new Date(now).toISOString()));
+        if (updated) return Response.json({ serverNow: Date.now(), room: shapeRoom(updated, playerId), role, clicks: { accepted: clicks.accepted, amount: clicks.amount } });
+        // Another click batch of this seat came first; count on top of it.
+        const fresh = await db.getLightRoom(code);
+        if (!fresh) return jsonError("Dieser Raum wurde gelöscht.", 404);
+        clickRoom = fresh;
+      }
+      return jsonError("Die Klicks konnten gerade nicht gezählt werden.", 409);
     }
 
     if (action === "daily-claim") {
@@ -1201,10 +1226,26 @@ export async function POST(request: Request) {
       return persistGameResponse(db, room, game, timestamp, playerId, role, { hostGoals: 0, guestGoals: 0, player3Goals: 0, player4Goals: 0, hostClicks: 0, guestClicks: 0, player3Clicks: 0, player4Clicks: 0 });
     }
 
+    if (action === "minigame-start") {
+      const minigameId = MINI_GAME_IDS.find((id) => id === payload.minigameId);
+      if (!minigameId) return jsonError("Dieses Minigame gibt es nicht.");
+      if (game.miniGameCooldowns[minigameId] > Date.now()) return jsonError("Dieses Minigame ist noch nicht bereit.", 409);
+      game.features.miniGameRuns = { ...game.features.miniGameRuns, [`${minigameId}:${role}`]: Date.now() };
+      return persistGameResponse(db, room, game, timestamp, playerId, role);
+    }
+
     if (action === "minigame") {
       const minigameId = MINI_GAME_IDS.find((id) => id === payload.minigameId);
       if (!minigameId) return jsonError("Dieses Minigame gibt es nicht.");
       if (game.miniGameCooldowns[minigameId] > Date.now()) return jsonError("Dieses Minigame ist noch nicht bereit.", 409);
+      // Only a run this player started here earns a reward, and not one finished faster than a person can play it.
+      const runKey = `${minigameId}:${role}`;
+      const startedAt = game.features.miniGameRuns?.[runKey];
+      const runAge = startedAt === undefined ? -1 : Date.now() - startedAt;
+      if (runAge < MINI_GAME_MIN_RUN_MS || runAge > MINI_GAME_MAX_RUN_MS) return jsonError("Starte das Minigame zuerst.", 409);
+      const { [runKey]: _finished, ...openRuns } = game.features.miniGameRuns ?? {};
+      void _finished;
+      game.features.miniGameRuns = openRuns;
       const reward = Math.max(0, Math.min(MINI_GAME_MAX_REWARD[minigameId] ?? 0, Math.floor(finite(payload.reward))));
       game.goals += reward;
       game.seasonGoals += reward;

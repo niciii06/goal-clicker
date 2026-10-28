@@ -5,17 +5,21 @@ import { getDb } from '../../../db';
 import { resolvePlayer } from '../../auth/player';
 import { normalizeGameFeatures, openStarPack } from '../../feature-data';
 import { MAX_GAME_STATE_BODY_BYTES, readJsonBody, RequestBodyTooLargeError } from '../request-body';
+import { rateLimited } from '../rate-limit';
 // Reuse the existing insert-once solo receipt ledger with a separate key namespace.
 export async function POST(request:Request) {
  try {
+  const limited=rateLimited(request,'rewards');if(limited)return limited;
   const p=await readJsonBody<{playerId?:unknown;rewardId?:unknown;features?:unknown}>(request,MAX_GAME_STATE_BODY_BYTES);
   if(typeof p.playerId!=='string'||p.playerId.length<8||p.playerId.length>80||typeof p.rewardId!=='string'||p.rewardId.length>240)return Response.json({error:'Ungültige Prämie.'},{status:400});
-  const auth=await resolvePlayer(request,p.playerId,{loginRequired:false});if(!auth.ok)return auth.response;
+  // With accounts the game always runs signed in, so a receipt is only written for a verified player.
+  const auth=await resolvePlayer(request,p.playerId,{loginRequired:true,loginMessage:'Bitte melde dich an.'});if(!auth.ok)return auth.response;
   const f=normalizeGameFeatures(p.features),earned=f.earnedPacks.find(e=>e.id===p.rewardId);
   if(!earned||f.cup.active)return Response.json({error:'Prämie nicht verfügbar.'},{status:409});
   const db=getDb(),key=`reward:${earned.id}`;
   let receipt=await db.getSoloJourney(p.playerId,key);
-  if(!receipt)receipt=await db.putSoloJourney(p.playerId,key,{opening:earned.opening??openStarPack(earned.packId,f.starXI.ownedIds)});
+  // The first draw is always the server's own; a card the request names is never written into the receipt.
+  if(!receipt)receipt=await db.putSoloJourney(p.playerId,key,{opening:openStarPack(earned.packId,f.starXI.ownedIds)});
   return Response.json(receipt,{headers:{'cache-control':'no-store'}});
  }catch(error){if(error instanceof RequestBodyTooLargeError)return Response.json({error:error.message},{status:413});return Response.json({error:'Prämie bleibt gespeichert. Bitte erneut versuchen.'},{status:503});}
 }

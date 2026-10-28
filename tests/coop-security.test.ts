@@ -49,13 +49,21 @@ test('only the host may reset the shared game',async()=>{
  assert.equal(r.status,403);
 });
 
-test('minigame rewards are capped per minigame',async t=>{
- const clock=Date.now();t.mock.method(Date,'now',()=>clock);
+test('minigame rewards need a started run and are capped per minigame',async t=>{
+ let clock=Date.now();t.mock.method(Date,'now',()=>clock);
  setup({lastPassiveAt:new Date(clock).toISOString()});
  const before=row.sharedCoins;
+ // A reward without a run the server saw start is refused, also one claimed right after the start.
+ assert.equal((await action('minigame',{minigameId:'penalty',reward:1000})).status,409);
+ assert.equal((await action('minigame-start',{minigameId:'penalty'})).status,200);
+ assert.equal((await action('minigame',{minigameId:'penalty',reward:1000})).status,409);
+ clock+=8000;
  const r=await action('minigame',{minigameId:'penalty',reward:1000000});
  assert.equal(r.status,200);
  assert.ok(row.sharedCoins-before<=1000,`gained ${row.sharedCoins-before}`);
+ // The run is used up.
+ clock+=10*60*1000;
+ assert.equal((await action('minigame',{minigameId:'penalty',reward:1000})).status,409);
 });
 
 test('minigame ids that are only object keys are rejected and leave the goals intact',async t=>{

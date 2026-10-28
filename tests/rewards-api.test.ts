@@ -25,3 +25,22 @@ test('solo reward validates owner, missing entitlement and active game, keeps fa
 test('shared pack consumption gives one card/compensation under simultaneous different members',async()=>{const f=ready();f.starXI.ownedIds=STAR_XI_PLAYERS.map(p=>p.id);setup(f);const results=await Promise.all([action('reward-pack',{rewardId:'world:123456'}),action('reward-pack',{rewardId:'world:123456'},'guest-12345678')]);assert.equal(results.filter(r=>r.status===200).length,1);const saved=JSON.parse(row.sharedFeaturesJson);assert.ok(saved.earnedPacks[0].opening);assert.equal(saved.starXI.fragments,saved.earnedPacks[0].opening.fragmentCompensation);assert.equal((await action('reward-pack',{rewardId:'world:123456'})).status,409);});
 test('reward tiers cannot be purchased for zero currency through regular shop action',async()=>{setup(ready());assert.equal((await action('star-pack',{packId:'reward-6'})).status,400);assert.equal(JSON.parse(row.sharedFeaturesJson).earnedPacks[0].opening,undefined);});
 test('server tournament victory grants pack once, keeps trophy, gazette, cooldown and no new multiplier',async()=>{const f=ready();f.earnedPacks=[];f.completedTournamentRuns=[];f.starXI.ownedIds=STAR_XI_PLAYERS.map(p=>p.id);f.cup={...f.cup,active:true,mode:'tournament',tournamentId:'stadium',round:2,homeScore:3,awayScore:0,matchStartedAt:Date.now()-180000,matchEndsAt:Date.now()-1,lastTickAt:Date.now(),opponentIds:['stadium-servette-genevois','stadium-fc-sionais','stadium-fc-thoune']};setup(f);assert.equal((await action('cup-tick')).status,200);const saved=JSON.parse(row.sharedFeaturesJson);assert.equal(saved.cup.active,false);assert.equal(saved.cup.trophies.stadium,1);assert.equal(saved.earnedPacks.length,1);assert.equal(saved.earnedPacks[0].packId,'reward-2');assert.equal(saved.goalBoost.multiplier,1);assert.ok(saved.cup.nextTournamentAt>Date.now());await action('cup-tick');assert.equal(JSON.parse(row.sharedFeaturesJson).earnedPacks.length,1);});
+test('a solo receipt is the server\'s own draw, never a card the request names',async()=>{
+ ledger.clear();const f=ready();
+ // The weakest card of the game can never come out of the top reward pack, so only a copied request could give it.
+ const named=STAR_XI_PLAYERS.reduce((low,p)=>p.rating<low.rating?p:low);
+ f.earnedPacks[0].opening={packId:'reward-6',packName:'x',player:named,duplicate:false,fragmentCompensation:0};
+ const r=await request(f);assert.equal(r.status,200);
+ assert.notEqual((r.data as {opening:{player:{id:string}}}).opening.player.id,named.id);
+});
+test('a long career keeps every unopened pack but only the latest opened ones and finished runs',()=>{
+ const f=initialGameFeatures();const player=STAR_XI_PLAYERS[0];
+ f.earnedPacks=Array.from({length:400},(_,i)=>({id:`run:${i}`,packId:'reward-2' as const,earnedAt:i,...(i<390?{opening:{packId:'reward-2' as const,packName:'x',player,duplicate:true,fragmentCompensation:1}}:{})}));
+ f.completedTournamentRuns=Array.from({length:1000},(_,i)=>`run:${i}`);
+ const normalized=normalizeGameFeatures(JSON.parse(JSON.stringify(f)));
+ assert.equal(normalized.earnedPacks.filter(p=>!p.opening).length,10);
+ assert.equal(normalized.earnedPacks.filter(p=>p.opening).length,100);
+ assert.equal(normalized.earnedPacks.at(-11)!.id,'run:389');
+ assert.equal(normalized.completedTournamentRuns.length,200);
+ assert.equal(normalized.completedTournamentRuns.at(-1),'run:999');
+});

@@ -13,7 +13,7 @@ test("multiplayer state writes use a monotonic revision and retry stale actions"
   assert.match(databaseSource, /shared_state_version.*shared_state_version \+ 1|apply_coop_click/);
   assert.match(apiSource, /sharedStateVersion: room\.sharedStateVersion/);
   assert.match(apiSource, /updateRoom\([\s\S]*sharedStateVersion: room\.sharedStateVersion/);
-  assert.match(apiSource, /applyClick\(code, role, amount, clickCount, timestamp\)/);
+  assert.match(apiSource, /applyClick\(code, role, clicks\.amount, clicks\.accepted, /);
   assert.match(apiSource, /errorCode: "STALE_STATE"/);
   assert.match(pageSource, /data\.errorCode === "STALE_STATE"/);
   assert.match(pageSource, /room\.revision < current\.room\.revision/);

@@ -88,6 +88,20 @@ test('concurrent clicks add up exactly and bump the version each time', { skip }
   assert.equal((await db.getRoom('CLIK'))!.sharedCoins, 80);
 });
 
+test('a click batch counts only on the click state it was computed from, per seat', { skip }, async () => {
+  await db.insertRoom(room('CAS1'));
+  const first = { at: 1, count: 1, streak: 1, budgetAt: 50 };
+  // Many batches of one seat computed from the same state: exactly one is booked.
+  const results = await Promise.all(Array.from({ length: 8 }, () => db.applyClick('CAS1', 'host', 1, 1, iso(), null, first)));
+  assert.equal(results.filter(Boolean).length, 1);
+  // Another seat has its own state and is not blocked by the host's.
+  assert.ok(await db.applyClick('CAS1', 'guest', 2, 1, iso(), null, { ...first, at: 2 }));
+  assert.ok(await db.applyClick('CAS1', 'host', 1, 1, iso(), first, { ...first, at: 3, count: 2 }));
+  const stored = (await db.getRoom('CAS1'))!;
+  assert.equal(stored.sharedCoins, 4);
+  assert.deepEqual(JSON.parse(stored.clickStateJson), { host: { ...first, at: 3, count: 2 }, guest: { ...first, at: 2 } });
+});
+
 test('the world list finds a player in any seat, newest first', { skip }, async () => {
   await db.insertRoom({ ...room('LST1'), guestPlayerId: 'lister', updatedAt: '2026-01-01T00:00:00.000Z' });
   await db.insertRoom({ ...room('LST2'), player3PlayerId: 'lister', updatedAt: '2026-02-01T00:00:00.000Z' });

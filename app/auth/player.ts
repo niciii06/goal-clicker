@@ -45,12 +45,12 @@ export async function accountPlayerId(user: RequestUser, claimedPlayerId: string
  * Resolves the acting player of a request. `loginRequired` routes (multiplayer worlds) refuse anonymous
  * requests once login is configured; solo routes keep working without an account.
  */
-export async function resolvePlayer(request: Request, claimedPlayerId: string, { loginRequired }: { loginRequired: boolean }, deps: Dependencies = defaults): Promise<PlayerResolution> {
+export async function resolvePlayer(request: Request, claimedPlayerId: string, { loginRequired, loginMessage = "Bitte melde dich mit Google an, um Multiplayer zu spielen." }: { loginRequired: boolean; loginMessage?: string }, deps: Dependencies = defaults): Promise<PlayerResolution> {
   const mode = authMode();
   if (mode === "misconfigured") return deny(503, "Der Login ist auf diesem Server nicht eingerichtet.", { errorCode: "AUTH_NOT_CONFIGURED" });
   if (mode === "anonymous") return { ok: true, playerId: claimedPlayerId, userId: null };
   const user = await deps.getUser(request);
-  if (!user) return loginRequired ? deny(401, "Bitte melde dich mit Google an, um Multiplayer zu spielen.", { errorCode: "LOGIN_REQUIRED" }) : { ok: true, playerId: claimedPlayerId, userId: null };
+  if (!user) return loginRequired ? deny(401, loginMessage, { errorCode: "LOGIN_REQUIRED" }) : { ok: true, playerId: claimedPlayerId, userId: null };
   const playerId = await accountPlayerId(user, claimedPlayerId, deps, request);
   if (!playerId) return deny(409, "Diese Spieler-ID gehört bereits zu einem anderen Konto.", { errorCode: "PLAYER_TAKEN" });
   if (claimedPlayerId && playerId !== claimedPlayerId) return deny(409, "Dein Konto nutzt eine andere Spieler-ID. Bitte lade die Seite neu.", { errorCode: "PLAYER_MISMATCH", playerId });

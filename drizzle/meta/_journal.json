@@ -43,6 +43,13 @@
       "when": 1793197394630,
       "tag": "0005_active_version_and_leaderboard_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793198373212,
+      "tag": "0006_coop_click_state",
+      "breakpoints": true
     }
   ]
 }

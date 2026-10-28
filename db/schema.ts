@@ -47,6 +47,8 @@ export const coopRooms = pgTable("coop_rooms", {
   sharedStateBackupJson: text("shared_state_backup_json").notNull().default("{}"),
   sharedStateVersion: bigint("shared_state_version", { mode: "number" }).notNull().default(0),
   redeemedBonusCodesJson: text("redeemed_bonus_codes_json").notNull().default("[]"),
+  /** Per seat: last click batch, combo, streak and click budget, so the server can count clicks itself. */
+  clickStateJson: text("click_state_json").notNull().default("{}"),
   lastPassiveAt: text("last_passive_at").notNull().default(""),
   pendingPlayerId: text("pending_player_id"),
   pendingUpgradeId: text("pending_upgrade_id"),
