@@ -5,7 +5,7 @@ import { capGoalsAfterRebalance, getBasePassivePower, REBALANCED_FEATURES_SCHEMA
 import { STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from "../app/game/constants.ts";
 import { cleanCloudSaveKeys } from "../app/cloud-save-rules.ts";
 import { WHATS_NEW } from "../app/whats-new.ts";
-import { GAME_FEATURES_SCHEMA_VERSION, drawRandomStarXICustomCard, getSpecialCardChances, getStarXIPlayer, getTournamentRewardPack, initialGameFeatures, normalizeGameFeatures, SPECIAL_PACK_HUNDRED_CHANCE, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_RANDOM_CUSTOM_CARD_COST } from "../app/feature-data.ts";
+import { GAME_FEATURES_SCHEMA_VERSION, grantWelcomePack, WELCOME_PACK_LABEL, drawRandomStarXICustomCard, getSpecialCardChances, getStarXIPlayer, getTournamentRewardPack, initialGameFeatures, normalizeGameFeatures, SPECIAL_PACK_HUNDRED_CHANCE, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_RANDOM_CUSTOM_CARD_COST } from "../app/feature-data.ts";
 import { getPackUnlockLeague, getUpgradeUnlockLeague } from "../app/season-progression.ts";
 import { getFirstLevelPayback, simulateEconomy } from "../scripts/balance/economy-model.ts";
 
@@ -93,7 +93,9 @@ test("tournament rewards follow the best league reached and the World Cup adds o
 test("economy grows evenly by league and packs cost real playing time", () => {
   const snapshots = simulateEconomy();
   for (const upgrade of UPGRADES.filter((item) => item.kind === "auto")) {
-    assert.ok(getFirstLevelPayback(upgrade.id) >= 115, `${upgrade.id} pays back too fast`);
+    // The Liga 15 upgrades pay back within a minute on purpose, so a new club gets going quickly.
+    const minimum = getUpgradeUnlockLeague(upgrade.id) === 15 ? 10 : 115;
+    assert.ok(getFirstLevelPayback(upgrade.id) >= minimum, `${upgrade.id} pays back too fast`);
   }
   // Later upgrades take longer to pay back than earlier ones.
   const lateAuto = UPGRADES.filter((item) => item.kind === "auto" && getUpgradeUnlockLeague(item.id) <= 12);
@@ -189,4 +191,28 @@ test("every 100 rated card leaves the album once, whatever the league", () => {
   cleaned.career.players[inSquad] = stats;
   const again = normalizeGameFeatures(JSON.parse(JSON.stringify(cleaned)));
   assert.ok(again.career.milestoneCards[inSquad]?.length);
+});
+
+test("a new club opens a free welcome pack with a guaranteed base walkout", () => {
+  const seen = new Set<string>();
+  for (let index = 0; index < 40; index++) {
+    const features = initialGameFeatures();
+    const reveal = grantWelcomePack(features, 1000, () => (index + 0.5) / 40);
+    assert.equal(reveal.packName, WELCOME_PACK_LABEL);
+    assert.ok(reveal.player.rating >= 86 && reveal.player.rating <= 89, `${reveal.player.name} ${reveal.player.rating}`);
+    assert.ok(!reveal.player.isCustom && reveal.player.cardType !== "icon" && reveal.player.cardType !== "legendary");
+    assert.deepEqual(features.starXI.ownedIds, [reveal.player.id]);
+    assert.equal(features.starPackReveal?.player.id, reveal.player.id);
+    assert.equal(features.history.at(-1)?.title, `${WELCOME_PACK_LABEL}: ${reveal.player.name}`);
+    // The reveal survives a save and reload.
+    assert.equal(normalizeGameFeatures(JSON.parse(JSON.stringify(features))).starPackReveal?.packName, WELCOME_PACK_LABEL);
+    seen.add(reveal.player.id);
+  }
+  assert.ok(seen.size > 10, "the welcome card varies");
+});
+
+test("a new club buys its first pack within a few minutes", () => {
+  // Liga 15 upgrades: cheap and strong, the start must not drag.
+  for (const id of ["boots", "ballboy", "technique", "instinct", "coach"]) assert.equal(getUpgradeUnlockLeague(id), 15);
+  assert.ok(getFirstLevelPayback("ballboy") < 60 && getFirstLevelPayback("coach") < 60);
 });

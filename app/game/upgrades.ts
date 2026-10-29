@@ -1,12 +1,13 @@
 // The 21 club office upgrades, shared by single player and the co-op server.
+// The five Liga 15 upgrades are cheap and strong on purpose: a new club gets its first pack within minutes.
 import type { UpgradeDefinition } from "./types";
 
 export const UPGRADES: UpgradeDefinition[] = [
-  { id: "boots", icon: "boot", name: "Schnellere Stiefel", description: "+1 Tor pro Klick", baseCost: 25, scale: 1.22, gain: 1, kind: "click" },
-  { id: "ballboy", icon: "worker", name: "Balljunge", description: "+1 Tor pro Sekunde", baseCost: 120, scale: 1.2, gain: 1, kind: "auto" },
-  { id: "technique", icon: "ball", name: "Schusstechnik", description: "+3 Tore pro Klick", baseCost: 260, scale: 1.24, gain: 3, kind: "click" },
-  { id: "instinct", icon: "scorer", name: "Torinstinkt", description: "+5 Tore pro Klick", baseCost: 1400, scale: 1.26, gain: 5, kind: "click" },
-  { id: "coach", icon: "board", name: "Taktiktafel", description: "+15 Tore pro Sekunde", baseCost: 3500, scale: 1.23, gain: 15, kind: "auto" },
+  { id: "boots", icon: "boot", name: "Schnellere Stiefel", description: "+3 Tore pro Klick", baseCost: 12, scale: 1.22, gain: 3, kind: "click" },
+  { id: "ballboy", icon: "worker", name: "Balljunge", description: "+3 Tore pro Sekunde", baseCost: 60, scale: 1.2, gain: 3, kind: "auto" },
+  { id: "technique", icon: "ball", name: "Schusstechnik", description: "+9 Tore pro Klick", baseCost: 130, scale: 1.24, gain: 9, kind: "click" },
+  { id: "instinct", icon: "scorer", name: "Torinstinkt", description: "+15 Tore pro Klick", baseCost: 700, scale: 1.26, gain: 15, kind: "click" },
+  { id: "coach", icon: "board", name: "Taktiktafel", description: "+45 Tore pro Sekunde", baseCost: 1750, scale: 1.23, gain: 45, kind: "auto" },
   { id: "striker", icon: "striker", name: "Killerstürmer", description: "+10 Tore pro Klick", baseCost: 7500, scale: 1.28, gain: 10, kind: "click" },
   { id: "academy", icon: "board", name: "Nachwuchsakademie", description: "+60 Tore pro Sekunde", baseCost: 12500, scale: 1.25, gain: 60, kind: "auto" },
   { id: "floodlight", icon: "light", name: "Flutlichtanlage", description: "+300 Tore pro Sekunde", baseCost: 55000, scale: 1.27, gain: 300, kind: "auto" },

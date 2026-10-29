@@ -1,3 +1,4 @@
+import { UPGRADES } from '../app/game/upgrades.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { getTableColumns } from 'drizzle-orm';
@@ -90,6 +91,7 @@ test('coming back after ten days pays at most the one day of passive income an a
  const response=await GET(new Request(`http://localhost/api/multiplayer?code=FEATUR&playerId=guest-player-123&featuresKey=${lightRow(row).featuresKey}&protocol=${MULTIPLAYER_PROTOCOL_VERSION}`));
  assert.equal(response.status,200);
  const gained=row.sharedTotalGoals-before;
- // One ball boy earns one goal per second; the grace period after the last presence is one day.
- assert.ok(gained>0&&gained<=86_400*1.01,`gained ${gained}`);
+ // One ball boy earns its catalogue gain per second; the grace period after the last presence is one day.
+ const perSecond=UPGRADES.find(u=>u.id==='ballboy')!.gain;
+ assert.ok(gained>0&&gained<=86_400*perSecond*1.01,`gained ${gained}`);
 });

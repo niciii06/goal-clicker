@@ -112,3 +112,8 @@ Am 29. Oktober stand der Hobby Plan bei 9,08 von 10 GB "Fast Origin Transfer" (3
 ## Nachtrag: Mehr Einkommen ab Liga 12
 
 Packs dauerten zu lange. Die passiven Upgrades ab Liga 12 bringen 50% mehr (Talent-Scouting 1'200/s, VAR 2.0 1'950/s, Arena-Ausbau 8'250/s, Weltweite Übertragung 28'500/s, Globaler Sponsor 102'000/s, Superclub-Netzwerk 450'000/s). Das Einkommen ab Liga 11 steigt in der Simulation um etwa 70%; ein neues Pack kostet beim Freischalten 10 bis 14 Minuten Einkommen statt rund 20, das Legenden Pack 28 statt 48 Minuten. Der Balance Test erlaubt 8 bis 35 Minuten.
+
+## Nachtrag: Packender Start
+
+* **Willkommenspack:** Ein ganz neuer Club (kein Spielstand im Browser und keiner im Konto) öffnet beim ersten Start ein Gratis-Pack mit einer garantierten Walkout-Karte 86 bis 89 (keine Icons, keine Spezialkarten) und sieht die Walkout-Show (`grantWelcomePack` in `app/feature-data.ts`).
+* **Schnellerer Anfang:** Die fünf Upgrades aus Liga 15 kosten die Hälfte und bringen dreimal so viel (Schnellere Stiefel +3 pro Klick ab 12, Balljunge +3/s ab 60, Schusstechnik +9 pro Klick ab 130, Torinstinkt +15 pro Klick ab 700, Taktiktafel +45/s ab 1'750). Erstes gekauftes Pack nach etwa 3 Minuten bei 3 Klicks pro Sekunde (vorher 9), nach etwa 5 Minuten bei 1 Klick pro Sekunde (vorher 21); volle Startelf nach 5 bzw. 8 Minuten. Das Regional-Pack kostet beim Freischalten 11 statt 19 Minuten Einkommen; ab Liga 12 bleibt alles gleich.

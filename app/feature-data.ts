@@ -1701,6 +1701,20 @@ export function getCupMatchStrength(cup: CupState, starRating: number) {
   };
 }
 
+export const WELCOME_PACK_LABEL = "Willkommenspack";
+
+/** The first start of a new club opens one free pack with a guaranteed walkout (86 to 89, no icons or
+ * special cards), so a new player sees the pack show in the first minute. Adds the card and logs it. */
+export function grantWelcomePack(features: GameFeatures, now = Date.now(), random: () => number = Math.random): StarPackReveal {
+  const pool = (STAR_RATING_POOLS.get("86-89") ?? []).filter((player) => !player.isCustom && player.cardType !== "icon" && player.cardType !== "legendary");
+  const player = pickByPackWeight(pool, Math.max(0, Math.min(0.999999, random())));
+  features.starXI = addStarXIPlayer(features.starXI, player.id);
+  addHistory(features, { title: `${WELCOME_PACK_LABEL}: ${player.name}`, detail: `Willkommen im Club! ${player.positions.join(" / ")} · Rating ${player.rating}`, tone: "positive" }, now);
+  const reveal: StarPackReveal = { packId: "scout", packName: WELCOME_PACK_LABEL, player, duplicate: false, fragmentCompensation: 0, openedAt: now, openedBy: "Du", troll: false };
+  features.starPackReveal = reveal;
+  return reveal;
+}
+
 export function openStarPack(packId: StarPackId, ownedIds: string[], random = Math.random, formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS): StarPackOpening {
   void formationPositions;
   const pack = getStarPack(packId) ?? getStarPack("scout")!;

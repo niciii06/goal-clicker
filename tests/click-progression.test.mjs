@@ -3,9 +3,9 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const clickTiers = [
-  ["boots", 1],
-  ["technique", 3],
-  ["instinct", 5],
+  ["boots", 3],
+  ["technique", 9],
+  ["instinct", 15],
   ["striker", 10],
   ["longshot", 25],
   ["freekick", 50],
