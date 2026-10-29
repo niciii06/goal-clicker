@@ -12,7 +12,7 @@ export function formatCountdown(until: number, now: number) {
 
 export function formatPackChance(chance: number) {
   const percentage = chance * 100;
-  const precision = percentage < 0.01 ? 3 : percentage < 0.1 ? 2 : percentage < 1 ? 1 : 0;
+  const precision = percentage < 0.001 ? 4 : percentage < 0.01 ? 3 : percentage < 0.1 ? 2 : percentage < 1 ? 1 : 0;
   return `${percentage.toLocaleString("de-CH", { minimumFractionDigits: precision, maximumFractionDigits: precision })}%`;
 }
 

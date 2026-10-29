@@ -30,13 +30,17 @@ const UPGRADE_UNLOCK_SEASONS: Record<string, number> = {
   legacy: 14,
 };
 
+// Tier = 16 - league: every pack opens in the league whose opponents match its cards.
 const PACK_UNLOCK_SEASONS: Record<string, number> = {
   scrap: 1,
-  scout: 1,
-  elite: 5,
-  legend: 10,
-  // The fragment priced special card pack keeps the former draw's availability from the start.
-  special: 1,
+  regional: 3,
+  scout: 5,
+  profi: 7,
+  elite: 9,
+  weltklasse: 11,
+  legend: 12,
+  // The fragment priced special card pack holds the 100 rated cards, so it opens only in Liga 3.
+  special: 13,
 };
 
 const TOURNAMENT_UNLOCK_SEASONS: Record<string, number> = {
@@ -78,19 +82,19 @@ const FORMATION_UNLOCK_SEASONS: Record<string, number> = {
 };
 
 export const SEASON_MILESTONES: readonly SeasonMilestone[] = [
-  { season: 1, title: "Der Anpfiff", description: "Das Fundament für deinen neuen Club.", rewards: ["6 Basis Upgrades", "Schrott-Pack", "Scout Pack", "Stadionpokal", "4 Formationen"] },
+  { season: 1, title: "Der Anpfiff", description: "Das Fundament für deinen neuen Club.", rewards: ["6 Basis Upgrades", "Schrott-Pack", "Stadionpokal", "4 Formationen"] },
   { season: 2, title: "Nachwuchsprojekt", description: "Der Club beginnt, eigene Talente aufzubauen.", rewards: ["Nachwuchsakademie", "Distanzschütze", "2 neue Formationen"] },
-  { season: 3, title: "Abendspiele", description: "Mehr Reichweite und neue taktische Möglichkeiten.", rewards: ["Flutlichtanlage", "Freistoss-Spezialist", "2 neue Formationen"] },
+  { season: 3, title: "Abendspiele", description: "Mehr Reichweite und neue taktische Möglichkeiten.", rewards: ["Flutlichtanlage", "Freistoss-Spezialist", "Regional-Pack", "2 neue Formationen"] },
   { season: 4, title: "Scouting Netzwerk", description: "Dein Club sucht jetzt weit über die Region hinaus.", rewards: ["Talent Scouting", "2 neue Formationen"] },
-  { season: 5, title: "Video Ära", description: "Technik und bessere Packs verändern den Club.", rewards: ["VAR 2.0", "Weltklasse-Abschluss", "Elite Pack", "2 neue Formationen"] },
+  { season: 5, title: "Video Ära", description: "Technik und das Scout Pack verändern den Club.", rewards: ["VAR 2.0", "Weltklasse-Abschluss", "Scout Pack", "2 neue Formationen"] },
   { season: 6, title: "Grosse Bühne", description: "Das Stadion wächst und Europa schaut zu.", rewards: ["Arena Ausbau", "Champions Cup", "2 neue Formationen"] },
-  { season: 7, title: "Medienhaus", description: "Jedes Spiel wird in die ganze Welt übertragen.", rewards: ["Weltweite Übertragung", "Ballon-d'Or-Angreifer", "2 neue Formationen"] },
+  { season: 7, title: "Medienhaus", description: "Jedes Spiel wird in die ganze Welt übertragen.", rewards: ["Weltweite Übertragung", "Ballon-d'Or-Angreifer", "Profi-Pack", "2 neue Formationen"] },
   { season: 8, title: "Weltmarke", description: "Der erste globale Partner steigt ein.", rewards: ["Globaler Sponsor", "2 neue Formationen"] },
-  { season: 9, title: "Superclub", description: "Aus einem Verein wird ein internationales Netzwerk.", rewards: ["Superclub Netzwerk", "2 neue Formationen"] },
-  { season: 10, title: "Captain Era", description: "Ein Leader prägt die nächste Generation.", rewards: ["Kapitänsbinde", "Legenden Pack", "2 neue Formationen"] },
-  { season: 11, title: "Goldene Generation", description: "Deine Klicks werden zur echten Weltklasse.", rewards: ["Goldener Schuh", "2 neue Formationen"] },
-  { season: 12, title: "Weltbühne", description: "Jetzt wartet das härteste Turnier im Spiel.", rewards: ["Weltmeisterschaft", "2 neue Formationen"] },
-  { season: 13, title: "Legendenjagd", description: "Die seltensten Karten kommen in Reichweite.", rewards: ["Formation 5-2-3"] },
+  { season: 9, title: "Superclub", description: "Aus einem Verein wird ein internationales Netzwerk.", rewards: ["Superclub Netzwerk", "Elite Pack", "2 neue Formationen"] },
+  { season: 10, title: "Captain Era", description: "Ein Leader prägt die nächste Generation.", rewards: ["Kapitänsbinde", "2 neue Formationen"] },
+  { season: 11, title: "Goldene Generation", description: "Deine Klicks werden zur echten Weltklasse.", rewards: ["Goldener Schuh", "Weltklasse-Pack", "2 neue Formationen"] },
+  { season: 12, title: "Weltbühne", description: "Jetzt wartet das härteste Turnier im Spiel.", rewards: ["Weltmeisterschaft", "Legenden Pack", "2 neue Formationen"] },
+  { season: 13, title: "Legendenjagd", description: "Die seltensten Karten kommen in Reichweite.", rewards: ["Spezialkarten-Pack", "Formation 5-2-3"] },
   { season: 14, title: "Vereins Dynastie", description: "Dein Club verdient dauerhaft auf höchstem Niveau.", rewards: ["Vereins Dynastie", "Formation 5-3-2"] },
   { season: 15, title: "Hall of Fame", description: "Liga 1 ist erreicht. Dein Club gehört jetzt zur ewigen Elite.", rewards: ["Hall of Fame Status", "Prestige freigeschaltet", "Alle 29 Formationen"] },
 ] as const;

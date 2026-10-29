@@ -211,7 +211,7 @@ export type StarXIState = {
 };
 
 export type RewardPackId = `reward-${1|2|3|4|5|6}`;
-export type StarPackId = "scrap" | "scout" | "elite" | "legend" | RewardPackId;
+export type StarPackId = "scrap" | "regional" | "scout" | "profi" | "elite" | "weltklasse" | "legend" | RewardPackId;
 export type EarnedPack = { id:string; packId:RewardPackId; earnedAt:number; opening?:StarPackOpening };
 
 export type StarPackOdds = {

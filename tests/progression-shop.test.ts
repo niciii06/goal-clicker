@@ -20,24 +20,28 @@ test('league numbers count down: Liga 15 is the entry, Liga 1 the top', () => {
 });
 
 test('every former season requirement maps to its league equivalent', () => {
-  assert.equal(getPackUnlockLeague('scout'), 15);
-  assert.equal(getPackUnlockLeague('elite'), 11, 'was Saison 5');
-  assert.equal(getPackUnlockLeague('legend'), 6, 'was Saison 10');
-  assert.equal(getPackUnlockLeague(SPECIAL_CARD_PACK.id), 15, 'the fragment pack stays available from the start');
+  assert.equal(getPackUnlockLeague('scrap'), 15);
+  assert.equal(getPackUnlockLeague('regional'), 13);
+  assert.equal(getPackUnlockLeague('scout'), 11);
+  assert.equal(getPackUnlockLeague('profi'), 9);
+  assert.equal(getPackUnlockLeague('elite'), 7);
+  assert.equal(getPackUnlockLeague('weltklasse'), 5);
+  assert.equal(getPackUnlockLeague('legend'), 4);
+  assert.equal(getPackUnlockLeague(SPECIAL_CARD_PACK.id), 3, 'the 100 rated special cards open only in Liga 3');
   assert.equal(getTournamentUnlockLeague('champions'), 10, 'was Saison 6');
   assert.equal(getTournamentUnlockLeague('world'), 4, 'was Saison 12');
   assert.equal(getFormationUnlockLeague('541'), 1);
   assert.equal(getUpgradeUnlockLeague('legacy'), 2);
-  assert.equal(isLeagueContentUnlocked(getPackUnlockLeague('legend'), getReachedLeague(8), false), false);
-  assert.equal(isLeagueContentUnlocked(getPackUnlockLeague('legend'), getReachedLeague(9), false), true);
+  assert.equal(isLeagueContentUnlocked(getPackUnlockLeague('legend'), getReachedLeague(10), false), false);
+  assert.equal(isLeagueContentUnlocked(getPackUnlockLeague('legend'), getReachedLeague(11), false), true);
   assert.equal(isLeagueContentUnlocked(1, 15, true), true, 'test mode keeps its bypass');
 });
 
 test('unlocks are permanent: relegation and old saves keep their entitlements', () => {
-  // Reached Liga 6 once (division 10), then relegated to Liga 8: the legend pack stays unlocked.
+  // Reached Liga 6 once (division 10), then relegated to Liga 8: the elite pack (Liga 7) stays unlocked.
   const save = { seasons: 9, highestDivision: 10, currentDivision: 8 };
   assert.equal(getReachedLeague(save.seasons, save.highestDivision), 6);
-  assert.equal(isLeagueContentUnlocked(getPackUnlockLeague('legend'), getReachedLeague(save.seasons, save.highestDivision)), true);
+  assert.equal(isLeagueContentUnlocked(getPackUnlockLeague('elite'), getReachedLeague(save.seasons, save.highestDivision)), true);
   // A save whose season counter is ahead of the league (older clicker progress) is never downgraded.
   assert.equal(getReachedLeague(12, 3), 3);
   // A save whose season counter lags behind the league uses the league.
@@ -54,14 +58,16 @@ test('displayed requirements and purchase checks use the same league rules', asy
 });
 
 test('fragments buy the special card pack exactly once per purchase', () => {
+  // A roll of 0 lands in the rare 100 group and on its first card.
+  const firstHundred = STAR_XI_CUSTOM_PLAYERS.find(p => p.rating === 100)!;
   const f = initialGameFeatures(1000);
-  f.starXI.fragments = 60000;
+  f.starXI.fragments = 120000;
   const ownedBefore = f.starXI.ownedIds.length;
   const first = purchaseSpecialCardPack(f, 'buy-1', { random: () => 0, now: 5000 });
   assert.ok(first.ok);
-  assert.equal(first.reveal.player.id, STAR_XI_CUSTOM_PLAYERS[0].id, 'awards the card drawn by the pack logic');
+  assert.equal(first.reveal.player.id, firstHundred.id, 'awards the card drawn by the pack logic');
   assert.equal(first.reveal.packName, 'Spezialkarten-Pack');
-  assert.equal(f.starXI.fragments, 60000 - SPECIAL_CARD_PACK.price);
+  assert.equal(f.starXI.fragments, 120000 - SPECIAL_CARD_PACK.price);
   assert.ok(f.starXI.ownedIds.includes(first.reveal.player.id), 'the collection updates immediately');
   assert.equal(f.starXI.ownedIds.length, ownedBefore + 1);
   // The same request again (double click or network retry) changes nothing.
@@ -76,8 +82,9 @@ test('fragments buy the special card pack exactly once per purchase', () => {
   // A duplicate card refunds fragments without a second inventory entry.
   const duplicate = purchaseSpecialCardPack(f, 'buy-2', { random: () => 0, now: 6000 });
   assert.ok(duplicate.ok && duplicate.reveal.duplicate);
-  assert.equal(f.starXI.ownedIds.filter(id => id === STAR_XI_CUSTOM_PLAYERS[0].id).length, 1);
-  assert.equal(f.starXI.fragments, 60000 - 2 * SPECIAL_CARD_PACK.price + duplicate.reveal.fragmentCompensation);
+  assert.equal(f.starXI.ownedIds.filter(id => id === firstHundred.id).length, 1);
+  assert.equal(f.starXI.fragments, 120000 - 2 * SPECIAL_CARD_PACK.price + duplicate.reveal.fragmentCompensation);
+  assert.ok(duplicate.reveal.fragmentCompensation <= SPECIAL_CARD_PACK.price / 10, 'a duplicate never pays for the next pack');
 });
 
 test('insufficient fragments and live matches block the purchase without side effects', () => {
@@ -93,8 +100,8 @@ test('insufficient fragments and live matches block the purchase without side ef
   assert.equal(f.starXI.fragments, SPECIAL_CARD_PACK.price);
   const odds = getSpecialCardPackOdds([]);
   assert.equal(odds.total, STAR_XI_CUSTOM_PLAYERS.length);
-  assert.ok(Math.abs(odds.perCard * odds.total - 1) < 1e-12);
-  assert.equal(odds.newCard, 1);
+  assert.ok(Math.abs(odds.hundredChance - 0.08) < 1e-12);
+  assert.ok(Math.abs(odds.newCard - 1) < 1e-12);
 });
 
 test('player statistics equal the authoritative match records and are counted once', () => {

@@ -113,14 +113,14 @@ test("walkout uses real SVG flags and shortens GOAT Nicu positions", async () =>
   assert.doesNotMatch(pageSource, /star-walkout-country"><span aria-hidden="true">/);
 });
 
-test("Flurin Fabrice is a 69-rated card with a slim fixed walkout appearance independent of clothing", async () => {
+test("Flurin Fabrice is a 100-rated special card with a slim fixed walkout appearance independent of clothing", async () => {
   const [featureSource, walkoutSource] = await Promise.all([
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/walkout-data.ts", import.meta.url), "utf8"),
   ]);
   const flurinProfile = walkoutSource.match(/"star-flurin-fabrice": \{([\s\S]*?)\n  \},/)?.[1] ?? "";
 
-  assert.match(featureSource, /id: "star-flurin-fabrice",[\s\S]*?name: "Flurin Fabrice",[\s\S]*?rating: 69,/);
+  assert.match(featureSource, /id: "star-flurin-fabrice",[\s\S]*?name: "Flurin Fabrice",[\s\S]*?rating: 100,/);
   assert.match(flurinProfile, /hair: "medium"/);
   assert.match(flurinProfile, /hairColor: LIGHT_BROWN/);
   assert.match(flurinProfile, /face: "long"/);

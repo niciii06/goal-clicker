@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { getTableColumns } from 'drizzle-orm';
 import { coopRooms } from '../db/schema.ts';
-import { initialGameFeatures, normalizeGameFeatures, resolveTransferInsiderEvent, setBestStarXI, STAR_XI_PLAYERS, TRANSFER_OFFER_DURATION_MS } from '../app/feature-data.ts';
+import { initialGameFeatures, normalizeGameFeatures, resolveTransferInsiderEvent, setBestStarXI, STAR_PACKS, STAR_XI_PLAYERS, TRANSFER_OFFER_DURATION_MS } from '../app/feature-data.ts';
+const SCRAP_PRICE = STAR_PACKS.find(p => p.id === 'scrap')!.price;
 import { beginSeasonCupMatch, getStarXISelection, getStarXIPlayer } from '../app/feature-data';
 import { draftMatch } from '../app/match-commands';
 import { prepareCareerMatch } from '../app/career-data';
@@ -77,19 +78,19 @@ test('API bulk claim collects all complete groups once, including concurrent ind
 });
 
 test('API scrap purchases charge exactly once under concurrent requests, persist cards and reject outdated clients',async()=>{
- setup();row.sharedCoins=7500;
- const old=await action('star-pack',{packId:'scrap',protocol:4});assert.equal(old.status,426);assert.equal(row.sharedCoins,7500);
+ setup();row.sharedCoins=SCRAP_PRICE;
+ const old=await action('star-pack',{packId:'scrap',protocol:4});assert.equal(old.status,426);assert.equal(row.sharedCoins,SCRAP_PRICE);
  const results=await Promise.all([action('star-pack',{packId:'scrap'}),action('star-pack',{packId:'scrap'},'guest-player-123')]);
  assert.equal(results.filter(r=>r.status===200).length,1);assert.equal(row.sharedCoins,0);
  const saved=JSON.parse(row.sharedFeaturesJson);assert.equal(saved.starXI.ownedIds.length,1);assert.equal(saved.starPackReveal.packId,'scrap');assert.ok(saved.starPackReveal.player.rating<=69);assert.equal(saved.starPackReveal.player.countryCode,'IN');
  const fail=await action('star-pack',{packId:'scrap'});assert.notEqual(fail.status,200);assert.equal(row.sharedCoins,0);assert.equal(JSON.parse(row.sharedFeaturesJson).starXI.ownedIds.length,1);
 });
 test('API random scrap purchases allow duplicates and persist a playable team for a season game',async()=>{
- setup();row.sharedCoins=7500*500;
+ setup();row.sharedCoins=SCRAP_PRICE*500;
  let purchases=0;
  while(purchases<500){
   const result=await action('star-pack',{packId:'scrap'});assert.equal(result.status,200,JSON.stringify(result.data));purchases++;
-  assert.equal(row.sharedCoins,7500*(500-purchases));
+  assert.equal(row.sharedCoins,SCRAP_PRICE*(500-purchases));
   const saved=result.data.room.game.features;
   assert.ok(saved.starXI.ownedIds.length<=purchases);
   if(saved.starXI.lineupIds.filter(Boolean).length===11)break;

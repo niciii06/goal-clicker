@@ -23,9 +23,11 @@ test("singleplayer and multiplayer share the complete click progression", async 
   ]);
 
   for (const [id, power] of clickTiers) {
-    assert.match(upgradesSource, new RegExp(`id: \\"${id}\\"[^\\n]*description: \\"\\+${power} (?:Tor|Tore) pro Klick\\"`));
-    assert.match(economySource, new RegExp(`getLevel\\(upgrades, \\"${id}\\"\\)${power === 1 ? "" : ` \\* ${power}`}`));
+    assert.match(upgradesSource, new RegExp(`id: \\"${id}\\"[^\\n]*description: \\"\\+${power} (?:Tor|Tore) pro Klick\\"[^\\n]*gain: ${power}, kind: \\"click\\"`));
   }
+  // Click and passive power both read each upgrade's gain from the one catalogue.
+  assert.match(economySource, /const flat = 1 \+ getFlatGain\(upgrades, "click"\);/);
+  assert.match(economySource, /const base = getFlatGain\(upgrades, "auto"\);/);
 
   // Both sides read the one catalogue and the one formula instead of keeping their own copies.
   assert.match(pageSource, /import \{ UPGRADES \} from "\.\/game\/upgrades";/);

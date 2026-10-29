@@ -2,6 +2,7 @@
 
 Aktueller Spielcode mit Spielerpool, Saisons, Walkouts und Multiplayer. Release vom 16. Oktober 2026: Cup Auswärtsspiele mit neutralem Wembley Finale, Pfuschi/Di Certo, persistente Kader und Fabrizio Sperre, fünf Wechsel in drei Fenstern, feste Tor und Halbzeitpausen und entfernte manuelle Taktikauswahl.
 
+* [Balance Update vom 29. Oktober 2026: Packs nach Liga, seltene 100er, Upgrades](docs/balance-update.md)
 * [Gameplay-, Reise- und Stadionupdate vom 19. Oktober 2026](docs/gameplay-travel-stadium-update.md)
 * [Releasebericht und vollständige Prüfevidenz](docs/release-match-realism.md)
 * [Projektwissen und Spielregeln (aus der ChatGPT Sites Zeit)](docs/chatgpt-sites-knowledge.md)

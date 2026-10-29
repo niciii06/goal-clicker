@@ -4,6 +4,7 @@ import type { PurchaseMode, UpgradeDefinition } from "./types";
 import { COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, RANKS } from "./constants";
 import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../upgrade-purchase";
 import { getGoalBoostMultiplier, getTransferBonuses } from "../feature-data";
+import { UPGRADES, getUpgrade } from "./upgrades";
 
 export function getLevel(upgrades: Record<string, number>, id: string) {
   return upgrades[id] ?? 0;
@@ -24,14 +25,23 @@ export function getBulkPurchase(definition: UpgradeDefinition, upgrades: Record<
   });
 }
 
+/** Sum of level times gain over every upgrade of one kind, straight from the catalogue. */
+function getFlatGain(upgrades: Record<string, number>, kind: UpgradeDefinition["kind"]) {
+  return UPGRADES.reduce((total, upgrade) => upgrade.kind === kind ? total + getLevel(upgrades, upgrade.id) * upgrade.gain : total, 0);
+}
+
+function getMultiplierFactor(upgrades: Record<string, number>, id: string) {
+  return (1 + (getUpgrade(id)?.gain ?? 0)) ** Math.min(MAX_MULTIPLIER_LEVEL, getLevel(upgrades, id));
+}
+
 export function getIncomeMultiplier(upgrades: Record<string, number>, stars: number) {
-  return (1 + Math.min(MAX_SEASON_STARS, Math.max(0, stars)) * 0.02) * 1.05 ** Math.min(MAX_MULTIPLIER_LEVEL, getLevel(upgrades, "legacy"));
+  return (1 + Math.min(MAX_SEASON_STARS, Math.max(0, stars)) * 0.02) * getMultiplierFactor(upgrades, "legacy");
 }
 
 export function getBaseClickPower(upgrades: Record<string, number>, stars = 0, features?: GameFeatures) {
-  const flat = 1 + getLevel(upgrades, "boots") + getLevel(upgrades, "technique") * 3 + getLevel(upgrades, "instinct") * 5 + getLevel(upgrades, "striker") * 10 + getLevel(upgrades, "longshot") * 25 + getLevel(upgrades, "freekick") * 50 + getLevel(upgrades, "worldclass") * 100 + getLevel(upgrades, "ballondor") * 250 + getLevel(upgrades, "captain") * 500;
+  const flat = 1 + getFlatGain(upgrades, "click");
   const transfer = getTransferBonuses(features?.transferMarket.ownedIds ?? []);
-  return (flat + transfer.clickBonus) * 1.1 ** Math.min(MAX_MULTIPLIER_LEVEL, getLevel(upgrades, "golden")) * getIncomeMultiplier(upgrades, stars) * (1 + transfer.incomeBonus);
+  return (flat + transfer.clickBonus) * getMultiplierFactor(upgrades, "golden") * getIncomeMultiplier(upgrades, stars) * (1 + transfer.incomeBonus);
 }
 
 export function getClickPower(upgrades: Record<string, number>, stars = 0, features?: GameFeatures, now = Date.now()) {
@@ -39,7 +49,7 @@ export function getClickPower(upgrades: Record<string, number>, stars = 0, featu
 }
 
 export function getBasePassivePower(upgrades: Record<string, number>, stars = 0, features?: GameFeatures) {
-  const base = getLevel(upgrades, "ballboy") + getLevel(upgrades, "coach") * 15 + getLevel(upgrades, "academy") * 60 + getLevel(upgrades, "floodlight") * 300 + getLevel(upgrades, "scout") * 1200 + getLevel(upgrades, "var") * 10000 + getLevel(upgrades, "stadium") * 50000 + getLevel(upgrades, "broadcast") * 250000 + getLevel(upgrades, "sponsor") * 1200000 + getLevel(upgrades, "superclub") * 6000000;
+  const base = getFlatGain(upgrades, "auto");
   const transfer = getTransferBonuses(features?.transferMarket.ownedIds ?? []);
   return (base + transfer.passiveBonus) * getIncomeMultiplier(upgrades, stars) * (1 + transfer.incomeBonus);
 }
@@ -50,8 +60,8 @@ export function getPassivePower(upgrades: Record<string, number>, stars = 0, fea
 
 export function getUpgradeEffect(upgrade: UpgradeDefinition, level: number) {
   const effectiveLevel = Math.min(level, MAX_MULTIPLIER_LEVEL);
-  if (upgrade.id === "golden") return `Stufe ${effectiveLevel}: x${(1.1 ** effectiveLevel).toFixed(2)} Klickpower`;
-  if (upgrade.id === "legacy") return `Stufe ${effectiveLevel}: x${(1.05 ** effectiveLevel).toFixed(2)} alle Einnahmen`;
+  if (upgrade.id === "golden") return `Stufe ${effectiveLevel}: x${((1 + upgrade.gain) ** effectiveLevel).toFixed(2)} Klickpower`;
+  if (upgrade.id === "legacy") return `Stufe ${effectiveLevel}: x${((1 + upgrade.gain) ** effectiveLevel).toFixed(2)} alle Einnahmen`;
   return `${upgrade.description} · Stufe ${level}`;
 }
 

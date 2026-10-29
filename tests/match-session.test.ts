@@ -1,7 +1,7 @@
 import test from 'node:test';
 import { getWalkoutPresentation } from '../app/walkout-data';
 import assert from 'node:assert/strict';
-import { initialGameFeatures, setBestStarXI, STAR_XI_PLAYERS, TOURNAMENTS, getStarXIPlayer, getStarXIPositions, setStarXIStarter, setStarXIBenchPlayer, normalizeGameFeatures, lockMatchSquad, releaseMatchSquad, resolveTransferInsiderEvent, beginCupMatch, getStarXISelection, drawRandomStarXICustomCard, getCupPlayerMatchRating, canStarXIPlayerFillSlot, getUnavailableStarXIPlayerIds } from '../app/feature-data.ts';
+import { initialGameFeatures, setBestStarXI, STAR_XI_PLAYERS, TOURNAMENTS, getStarXIPlayer, getStarXIPositions, setStarXIStarter, setStarXIBenchPlayer, normalizeGameFeatures, lockMatchSquad, releaseMatchSquad, resolveTransferInsiderEvent, beginCupMatch, getStarXISelection, drawRandomStarXICustomCard, STAR_XI_RANDOM_CUSTOM_CARD_COST, getCupPlayerMatchRating, canStarXIPlayerFillSlot, getUnavailableStarXIPlayerIds } from '../app/feature-data.ts';
 import { fixtureFor } from '../app/travel-data.ts';
 import { baseActors } from '../app/match-viewer.tsx';
 function ready(){const f=initialGameFeatures();f.starXI=setBestStarXI({...f.starXI,ownedIds:STAR_XI_PLAYERS.map(p=>p.id)});return f;}
@@ -26,7 +26,7 @@ test('Pfuschi is positionless, bench-only, excluded from ratings/automatic XI an
  const di=getStarXIPlayer('star-di-certo')!;assert.equal(di.rating,100);assert.deepEqual(getStarXIPositions(di),['LV','RV']);assert.equal(di.countryCode,'CH');
  const look=getWalkoutPresentation(di);assert.equal(look.countryCode,'CH');assert.equal(look.glasses,true);assert.equal(look.cap,'backwards');
  // Both remain reachable in the existing custom-card draw, with no automatic grant.
- for(const id of [p.id,di.id]){let found=false;for(let i=0;i<STAR_XI_PLAYERS.filter(p=>p.isCustom).length;i++){const n=STAR_XI_PLAYERS.filter(p=>p.isCustom).length;const result=drawRandomStarXICustomCard({...initialGameFeatures().starXI,fragments:25000},()=> (i+.5)/n);if(result.player?.id===id)found=true;}assert.ok(found);}
+ for(const id of [p.id,di.id]){let found=false;for(const rarity of [.01,.5])for(let i=0;i<200;i++){const rolls=[rarity,(i+.5)/200];const result=drawRandomStarXICustomCard({...initialGameFeatures().starXI,fragments:STAR_XI_RANDOM_CUSTOM_CARD_COST},()=>rolls.shift() ?? 0);if(result.player?.id===id)found=true;}assert.ok(found);}
 });
 test('timer remainders survive reload on the way; the squad stays open until kick-off and is fixed from then on',()=>{
  const f=ready(),outsider=STAR_XI_PLAYERS.find(p=>!f.starXI.lineupIds.includes(p.id)&&!f.starXI.benchIds.includes(p.id)&&canStarXIPlayerFillSlot(p.id,0,f.starXI.formationPositions))!;

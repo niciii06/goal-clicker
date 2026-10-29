@@ -66,6 +66,8 @@ export type UpgradeDefinition = {
   baseCost: number;
   scale: number;
   kind: UpgradeKind;
+  /** Goals per click or per second for each level; for multipliers the factor per level (0.1 = +10%). */
+  gain: number;
 };
 
 export type GameState = {

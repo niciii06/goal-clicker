@@ -58,5 +58,5 @@ Details: [docs/gameplay-travel-stadium-update.md](gameplay-travel-stadium-update
 - Stadiums (`app/stadium-profiles.ts`): six categories from the fixture venue, known capacities where published, estimates marked as such; home ground grows with the league.
 - Discipline (`app/discipline.ts`): 3 league yellows or 2 yellows per tournament run give a one match ban in that competition.
 - Unlocks: former Saison N requirements are Liga 16-N, evaluated from the best league reached (permanent).
-- Spezialkarten-Pack in the pack shop: 25'000 fragments, receipts prevent double purchases.
+- Spezialkarten-Pack in the pack shop: 50'000 fragments from Liga 3, 8% chance of a 100 rated card, receipts prevent double purchases (see docs/balance-update.md).
 - Travel map: zoom never ends Follow, Follow keeps the zoom, only panning ends following; dense great circle flights with take-off and landing profile. The accelerated travel time is unchanged (real time / 60, no three minute ceiling exists).

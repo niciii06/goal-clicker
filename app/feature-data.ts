@@ -21,6 +21,7 @@ import { addBroadcastSubstitution, advanceMatchBroadcast, chooseGoalPattern, cre
 import { advanceInteractive, normalizeInteractive, resumeInteractive } from "./interactive-match";
 import { emptyTravel, normalizeTravel } from "./travel-data";
 import { getCareerCard, getPlayerForm, initialCareerState, normalizeCareerState } from "./career-data";
+import { getPackUnlockLeague, hasReachedLeague, leagueForTier } from "./season-progression";
 import { getFunnyPlayerName } from "./funny-player-names";
 import { normalizeDailyRewards } from "./daily-reward";
 import { normalizePress } from "./press-conference";
@@ -161,7 +162,7 @@ export const STAR_PACK_ROLL_DURATION_MS = 8000;
 export const STAR_XI_SQUAD_SIZE = 11;
 export const STAR_XI_BENCH_SIZE = 12;
 export const STAR_XI_MAX_SUBSTITUTIONS = 5;
-export const GAME_FEATURES_SCHEMA_VERSION = 5;
+export const GAME_FEATURES_SCHEMA_VERSION = 6;
 export const SEASON_MODE_DIVISION_COUNT = 15;
 export const SEASON_MODE_MATCHES_PER_SEASON = 10;
 export const SEASON_MODE_TABLE_SIZE = 6;
@@ -231,11 +232,11 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
     name: "Flurin Fabrice",
     position: "ZM",
     positions: ["ZM"],
-    rating: 69,
-    price: 1000,
-    accent: "#8e8e93",
+    rating: 100,
+    price: 5000000000,
+    accent: "#c69214",
     cardType: "legendary",
-    packWeight: 0.04,
+    packWeight: 0.02,
   },
   {
     id: "star-benxli",
@@ -553,27 +554,55 @@ export const STAR_XI_TOTAL_CARD_COUNT = STAR_XI_ACTIVE_PLAYERS.length;
 const STAR_XI_PLAYER_BY_ID = new Map(STAR_XI_PLAYERS.map((player) => [player.id, player]));
 
 export const STAR_XI_CUSTOM_PLAYERS = STAR_XI_PLAYERS.filter((player) => player.isCustom === true);
-export const STAR_XI_RANDOM_CUSTOM_CARD_COST = 25000;
+export const STAR_XI_RANDOM_CUSTOM_CARD_COST = 50000;
+/** Share of special card pack draws that award a 100 rated special card. */
+export const SPECIAL_PACK_HUNDRED_CHANCE = 0.08;
+// A duplicate special card refunds at most a tenth of the pack, so duplicates never pay for the next draw.
+const CUSTOM_DUPLICATE_COMPENSATION_CAP = STAR_XI_RANDOM_CUSTOM_CARD_COST / 10;
+
+function isHundredSpecialCard(player: StarXIPlayer) {
+  return player.isCustom === true && player.rating >= 100;
+}
+const SPECIAL_PACK_GROUPS = [
+  { chance: SPECIAL_PACK_HUNDRED_CHANCE, players: STAR_XI_CUSTOM_PLAYERS.filter(isHundredSpecialCard) },
+  { chance: 1 - SPECIAL_PACK_HUNDRED_CHANCE, players: STAR_XI_CUSTOM_PLAYERS.filter((player) => !isHundredSpecialCard(player)) },
+].filter((group) => group.players.length);
+
+/** Picks by `packWeight` (default 1); `roll` is in [0, 1). */
+function pickByPackWeight<T extends { packWeight?: number }>(candidates: readonly T[], roll: number) {
+  const weight = (candidate: T) => Math.max(0.0001, candidate.packWeight ?? 1);
+  let remaining = roll * candidates.reduce((sum, candidate) => sum + weight(candidate), 0);
+  return candidates.find((candidate) => (remaining -= weight(candidate)) <= 0) ?? candidates[candidates.length - 1];
+}
 
 export function getStarXIFragmentCompensation(player: StarXIPlayer) {
   const ratingStep = Math.max(1, Math.min(34, Math.floor(player.rating) - 66));
-  if (player.isCustom) return ratingStep * 600;
+  if (player.isCustom) return Math.min(CUSTOM_DUPLICATE_COMPENSATION_CAP, ratingStep * 600);
   if (player.cardType === "icon") return ratingStep * 75;
   if (player.cardType === "legendary") return ratingStep * 150;
   return ratingStep * 15;
 }
 
+// One pack per league band: every pack unlocks where its cards fit the opponents of that league.
 export const STAR_PACKS: readonly StarPackDefinition[] = [
-  { id: "scrap", label: "Schrott-Pack", price: 7500, description: "Günstig einsteigen und dein Team ergänzen. Enthält eine Basiskarte.", odds: SCRAP_RATING_GROUPS.map(group => ({ ...group, label: group.minRating === 0 ? "Rating bis 54" : `Rating ${group.minRating}–${group.maxRating}` })) },
-  { id: "scout", label: "Scout Pack", price: 25000, description: "Früh verfügbar und ideal zum Aufbau, starke Karten bleiben extrem selten", odds: [{ label: "Standard 65–79", minRating: 65, maxRating: 79, chance: 0.9 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.09 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.009 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.00099 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.00001 }] },
-  { id: "elite", label: "Elite Pack", price: 250000000, description: "Midgame Pack mit besseren Chancen, aber ohne geschenkte Topelf", odds: [{ label: "Standard 65–79", minRating: 65, maxRating: 79, chance: 0.55 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.38 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.06 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.0099 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.0001 }] },
-  { id: "legend", label: "Legenden Pack", price: 5000000000, description: "Teures Endgame Risiko mit klar besseren, aber weiterhin seltenen Topkarten", odds: [{ label: "Standard 65–79", minRating: 65, maxRating: 79, chance: 0.18 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.42 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.34 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.05 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.01 }] },
+  { id: "scrap", label: "Schrott-Pack", price: 15000, description: "Günstig einsteigen und dein Team ergänzen. Enthält eine Basiskarte.", odds: SCRAP_RATING_GROUPS.map(group => ({ ...group, label: group.minRating === 0 ? "Rating bis 54" : `Rating ${group.minRating}–${group.maxRating}` })) },
+  { id: "regional", label: "Regional-Pack", price: 10000000, description: "Solide Regionalliga Spieler, starke Karten sind die grosse Ausnahme", odds: [{ label: "Standard 65–74", minRating: 65, maxRating: 74, chance: 0.85 }, { label: "Gut 75–79", minRating: 75, maxRating: 79, chance: 0.14 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.01 }] },
+  { id: "scout", label: "Scout Pack", price: 50000000, description: "Ideal zum Aufbau, starke Karten bleiben extrem selten", odds: [{ label: "Standard 65–79", minRating: 65, maxRating: 79, chance: 0.9 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.09 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.009009 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.00099 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.000001 }] },
+  { id: "profi", label: "Profi-Pack", price: 350000000, description: "Profis für die Liga Mitte, Walkouts bleiben selten", odds: [{ label: "Standard 70–79", minRating: 70, maxRating: 79, chance: 0.65 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.32 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.03 }] },
+  { id: "elite", label: "Elite Pack", price: 3000000000, description: "Pack für die oberen Ligen mit besseren Chancen, aber ohne geschenkte Topelf", odds: [{ label: "Standard 65–79", minRating: 65, maxRating: 79, chance: 0.55 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.38 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.06009 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.0099 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.00001 }] },
+  { id: "weltklasse", label: "Weltklasse-Pack", price: 6000000000, description: "Starke Karten für den Aufstiegskampf, Top Walkouts bleiben selten", odds: [{ label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.6 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.37 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.03 }] },
+  { id: "legend", label: "Legenden Pack", price: 15000000000, description: "Teures Endgame Risiko mit klar besseren, aber weiterhin seltenen Topkarten", odds: [{ label: "Standard 65–79", minRating: 65, maxRating: 79, chance: 0.18 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.42 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.349 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.05 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.001 }] },
 ];
 
 const REWARD_BRACKETS = [[0,59],[60,69],[70,79],[80,85],[86,89],[90,99]] as const;
 const REWARD_PERCENTAGES = [[60,30,9,1,0,0],[25,45,25,4.5,.5,0],[5,20,55,18,1.9,.1],[0,5,40,48,6.5,.5],[0,0,20,55,23,2],[0,0,5,50,40,5]] as const;
 export const REWARD_PACKS:readonly StarPackDefinition[] = ['Kleines Prämienpack','Basis-Prämienpack','Solides Prämienpack','Hochwertiges Prämienpack','Premium-Prämienpack','Top-Prämienpack'].map((label,i)=>({id:`reward-${i+1}` as RewardPackId,label,price:0,description:'Eine originale Basiskarte als Turnierprämie. Doppelte Karten geben Fragmente.',odds:REWARD_BRACKETS.map(([minRating,maxRating],b)=>({label:minRating===0?'Rating bis 59':`Rating ${minRating}–${maxRating}`,minRating,maxRating,chance:REWARD_PERCENTAGES[i][b]/100}))}));
-export function getTournamentRewardPack(id:TournamentId) {return REWARD_PACKS[id==='stadium'?1:id==='champions'?3:5];}
+/** Reward tier by the best league reached (Liga 15 to 13 the smallest pack, Liga 2 and 1 the top pack); the World Cup adds one tier. */
+export function getTournamentRewardPack(id:TournamentId, highestDivision=1) {
+  const league=SEASON_MODE_DIVISION_COUNT+1-clamp(Math.floor(Number(highestDivision))||1,1,SEASON_MODE_DIVISION_COUNT);
+  const tier=league>=13?0:league>=10?1:league>=7?2:league>=5?3:league>=3?4:5;
+  return REWARD_PACKS[Math.min(REWARD_PACKS.length-1,tier+(id==='world'?1:0))];
+}
 export function isRewardPack(id:string):id is RewardPackId {return REWARD_PACKS.some(p=>p.id===id);}
 const rewardPoolCache=new Map<RewardPackId,ReturnType<typeof calculateRewardPackOdds>>();
 export function getRewardPackOdds(id:RewardPackId,players:readonly StarXIPlayer[]=STAR_XI_ACTIVE_PLAYERS) {
@@ -940,8 +969,11 @@ export function drawRandomStarXICustomCard(state: StarXIState, random = Math.ran
   if (next.fragments < cost || STAR_XI_CUSTOM_PLAYERS.length === 0) {
     return { state: next, drawn: false, cost, player: null, duplicate: false, fragmentCompensation: 0, source: "custom-draw" as const };
   }
-  const roll = clamp(Number(random()) || 0, 0, 0.999999999);
-  const player = STAR_XI_CUSTOM_PLAYERS[Math.floor(roll * STAR_XI_CUSTOM_PLAYERS.length)];
+  // First the rarity (8% for a 100 rated card), then the card within it by pack weight.
+  const groupTotal = SPECIAL_PACK_GROUPS.reduce((sum, group) => sum + group.chance, 0);
+  let groupRoll = clamp(Number(random()) || 0, 0, 0.999999999) * groupTotal;
+  const group = SPECIAL_PACK_GROUPS.find((entry) => (groupRoll -= entry.chance) < 0) ?? SPECIAL_PACK_GROUPS[SPECIAL_PACK_GROUPS.length - 1];
+  const player = pickByPackWeight(group.players, clamp(Number(random()) || 0, 0, 0.999999999));
   const duplicate = next.ownedIds.includes(player.id);
   next.fragments -= cost;
   const fragmentCompensation = duplicate ? getStarXIFragmentCompensation(player) : 0;
@@ -967,14 +999,25 @@ export const SPECIAL_CARD_PACK = {
   label: "Spezialkarten-Pack",
   price: STAR_XI_RANDOM_CUSTOM_CARD_COST,
   currency: "fragments" as const,
-  description: "Eine zufällige Spezialkarte. Doppelte Karten geben automatisch Fragmente zurück.",
+  description: "Eine zufällige Spezialkarte, nur 8% sind 100er. Doppelte Karten geben ein paar Fragmente zurück.",
 };
 export const PURCHASE_RECEIPT_LIMIT = 50;
 
+/** Chance of every special card in one pack draw, from the rarity groups and pack weights. */
+export function getSpecialCardChances() {
+  const groupTotal = SPECIAL_PACK_GROUPS.reduce((sum, group) => sum + group.chance, 0);
+  return new Map(SPECIAL_PACK_GROUPS.flatMap((group) => {
+    const weightTotal = group.players.reduce((sum, player) => sum + Math.max(0.0001, player.packWeight ?? 1), 0);
+    return group.players.map((player) => [player.id, group.chance / groupTotal * Math.max(0.0001, player.packWeight ?? 1) / weightTotal] as const);
+  }));
+}
+
 export function getSpecialCardPackOdds(ownedIds: readonly string[] = []) {
+  const chances = getSpecialCardChances();
   const total = STAR_XI_CUSTOM_PLAYERS.length;
-  const missing = STAR_XI_CUSTOM_PLAYERS.filter((player) => !ownedIds.includes(player.id)).length;
-  return { total, missing, perCard: total ? 1 / total : 0, newCard: total ? missing / total : 0 };
+  const missingPlayers = STAR_XI_CUSTOM_PLAYERS.filter((player) => !ownedIds.includes(player.id));
+  const hundredChance = STAR_XI_CUSTOM_PLAYERS.filter(isHundredSpecialCard).reduce((sum, player) => sum + (chances.get(player.id) ?? 0), 0);
+  return { total, missing: missingPlayers.length, hundredChance, newCard: missingPlayers.reduce((sum, player) => sum + (chances.get(player.id) ?? 0), 0) };
 }
 
 export type SpecialPackPurchase = { ok: true; reveal: StarPackReveal } | { ok: false; error: string; duplicateRequest?: boolean };
@@ -1663,12 +1706,7 @@ export function openStarPack(packId: StarPackId, ownedIds: string[], random = Ma
   }) ?? PACK_POSITION_GROUPS[PACK_POSITION_GROUPS.length - 1];
   const positionCandidates = ownershipPool.filter((player) => positionGroup.positions.some((position) => position === player.position));
   const selectionPool = positionCandidates.length ? positionCandidates : ownershipPool;
-  const totalWeight = selectionPool.reduce((sum, candidate) => sum + Math.max(0.0001, candidate.packWeight ?? 1), 0);
-  let weightedRoll = Math.max(0, Math.min(0.999999, random())) * totalWeight;
-  const player = selectionPool.find((candidate) => {
-    weightedRoll -= Math.max(0.0001, candidate.packWeight ?? 1);
-    return weightedRoll <= 0;
-  }) ?? selectionPool[selectionPool.length - 1] ?? STAR_XI_ACTIVE_PLAYERS[0];
+  const player = selectionPool.length ? pickByPackWeight(selectionPool, Math.max(0, Math.min(0.999999, random()))) : STAR_XI_ACTIVE_PLAYERS[0];
   const duplicate = ownedIdSet.has(player.id);
   return { packId: pack.id, packName: pack.label, player, duplicate, fragmentCompensation: duplicate ? getStarXIFragmentCompensation(player) : 0 };
 }
@@ -2450,8 +2488,38 @@ function keepRecentOpenedPacks(packs: EarnedPack[]) {
   return packs.filter((pack) => !dropped.has(pack.id));
 }
 
+/** Schema 6 rebalance: 100 rated special cards drawn before Liga 3 leave the save once. Later draws stay. */
+function removeEarlyHundredSpecialCards(source: Record<string, unknown>) {
+  if (Number(source.schemaVersion) >= 6) return { source, removed: 0 };
+  const seasonMode = asRecord(source.seasonMode);
+  const highestDivision = Math.max(Math.floor(Number(seasonMode.highestDivision) || 0), Math.floor(Number(seasonMode.division) || 0), Math.floor(Number(source.seasons) || 0) + 1);
+  if (hasReachedLeague(getPackUnlockLeague(SPECIAL_CARD_PACK.id), leagueForTier(highestDivision))) return { source, removed: 0 };
+  const hundredIds = new Set(STAR_XI_CUSTOM_PLAYERS.filter(isHundredSpecialCard).map((player) => player.id));
+  const starXI = asRecord(source.starXI);
+  const ids = (value: unknown) => Array.isArray(value) ? value : [];
+  const removed = new Set(ids(starXI.ownedIds).filter((id) => hundredIds.has(String(id)))).size;
+  const career = asRecord(source.career);
+  const squadLock = asRecord(source.squadLock);
+  return {
+    removed,
+    source: {
+      ...source,
+      starXI: {
+        ...starXI,
+        ownedIds: ids(starXI.ownedIds).filter((id) => !hundredIds.has(String(id))),
+        lineupIds: ids(starXI.lineupIds).map((id) => hundredIds.has(String(id)) ? "" : id),
+        benchIds: ids(starXI.benchIds).map((id) => hundredIds.has(String(id)) ? "" : id),
+        ...(Array.isArray(starXI.lockedPlayerIds) ? { lockedPlayerIds: starXI.lockedPlayerIds.filter((id) => !hundredIds.has(String(id))) } : {}),
+      },
+      ...(source.career ? { career: { ...career, collectedIds: ids(career.collectedIds).filter((id) => !hundredIds.has(String(id))) } } : {}),
+      ...(Array.isArray(squadLock.playerIds) ? { squadLock: { ...squadLock, playerIds: squadLock.playerIds.filter((id) => !hundredIds.has(String(id))) } } : {}),
+    } as Record<string, unknown>,
+  };
+}
+
 export function normalizeGameFeatures(value: unknown): GameFeatures {
-  const source = asRecord(value);
+  const migration = removeEarlyHundredSpecialCards(asRecord(value));
+  const source = migration.source;
   const defaults = initialGameFeatures();
   const market = asRecord(source.transferMarket);
   const starXI = asRecord(source.starXI);
@@ -2663,7 +2731,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
   Object.keys(playerEnteredAt).forEach((playerId) => {
     if (!playerMatchPositions[playerId]) playerMatchPositions[playerId] = getStarXIPlayer(playerId)?.position ?? "ZM";
   });
-  return {
+  const normalized: GameFeatures = {
     schemaVersion: GAME_FEATURES_SCHEMA_VERSION,
     completedTournamentRuns: Array.isArray(source.completedTournamentRuns)?[...new Set(source.completedTournamentRuns.filter((id):id is string=>typeof id==='string'))].slice(-MAX_COMPLETED_TOURNAMENT_RUNS):[],
     earnedPacks: keepRecentOpenedPacks((Array.isArray(source.earnedPacks)?source.earnedPacks:[]).map(asRecord).filter(p=>typeof p.id==='string'&&isRewardPack(String(p.packId))).filter((p,i,a)=>a.findIndex(x=>x.id===p.id)===i).map(p=>{const saved=asRecord(p.opening),player=getStarXIPlayer(String(asRecord(saved.player).id));return {id:String(p.id),packId:p.packId as RewardPackId,earnedAt:Number(p.earnedAt)||0,...(player?{opening:{packId:p.packId as RewardPackId,packName:getStarPack(String(p.packId))!.label,player,duplicate:saved.duplicate===true,fragmentCompensation:Math.max(0,Number(saved.fragmentCompensation)||0)}}:{})};})),
@@ -2690,6 +2758,8 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     nextEventAt: Number(source.nextEventAt) > 0 ? Number(source.nextEventAt) : defaults.nextEventAt,
     nextVarAt: Number(source.nextVarAt) > 0 ? Number(source.nextVarAt) : defaults.nextVarAt,
   };
+  if (migration.removed) addHistory(normalized, { title: "Spezialkarten neu verteilt", detail: `${migration.removed} 100er ${migration.removed === 1 ? "Karte wurde" : "Karten wurden"} entfernt. Das Spezialkarten-Pack öffnet ab Liga ${getPackUnlockLeague(SPECIAL_CARD_PACK.id)}.`, tone: "neutral" });
+  return normalized;
 }
 
 export function pauseGameFeatureTimers(value: unknown, pausedMs: number, now = Date.now()): GameFeatures {
@@ -2825,7 +2895,7 @@ export function completeTournamentRun(value: GameFeatures, summary: TournamentCo
   if(features.completedTournamentRuns.includes(runId))return features;
   features.completedTournamentRuns.push(runId);
   if(summary.tournamentWon){
-    const pack=getTournamentRewardPack(summary.tournamentId);
+    const pack=getTournamentRewardPack(summary.tournamentId,features.seasonMode.highestDivision);
     features.earnedPacks.push({id:runId,packId:pack.id as RewardPackId,earnedAt:now});
     addHistory(features,{title:`${pack.label} gewonnen`,detail:'Deine Prämie wartet im Packbereich.',tone:'positive'},now);
   }

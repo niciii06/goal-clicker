@@ -46,21 +46,26 @@ test("pack odds are complete and remain intentionally conservative", () => {
   assert.ok(Math.abs(elite.odds.slice(2).reduce((sum, band) => sum + band.chance, 0) - 0.07) < 1e-9);
   assert.ok(Math.abs(legend.odds.slice(2).reduce((sum, band) => sum + band.chance, 0) - 0.4) < 1e-9);
 
-  const expectedHundredChances = { scout: 0.00001, elite: 0.0001, legend: 0.01 };
-  for (const pack of STAR_PACKS.filter(pack => pack.id !== "scrap")) {
+  // Only three packs can hold a 100 rated card, each ten times rarer than before the rebalance.
+  const expectedHundredChances = { scout: 0.000001, elite: 0.00001, legend: 0.001 };
+  for (const pack of STAR_PACKS) {
+    const hundred = pack.odds.find((band) => band.minRating === 100 && band.maxRating === 100);
+    if (!(pack.id in expectedHundredChances)) {
+      assert.equal(hundred, undefined, `${pack.id} has no 100 rated cards`);
+      continue;
+    }
     const topWalkout = pack.odds.find((band) => band.minRating === 90 && band.maxRating === 99)!;
-    const hundred = pack.odds.find((band) => band.minRating === 100 && band.maxRating === 100)!;
-    assert.equal(hundred.chance, expectedHundredChances[pack.id as keyof typeof expectedHundredChances]);
-    assert.ok(hundred.chance < topWalkout.chance, `${pack.id} rating 100 must remain rarer than 90–99`);
-    if (pack.id !== "legend") assert.ok(hundred.chance * 90 < topWalkout.chance, `${pack.id} rating 100 must remain much rarer than 90–99`);
+    assert.equal(hundred!.chance, expectedHundredChances[pack.id as keyof typeof expectedHundredChances]);
+    assert.ok(hundred!.chance * 40 < topWalkout.chance, `${pack.id} rating 100 must remain much rarer than 90–99`);
   }
 });
 
 test("pack prices and season unlocks match the current progression", () => {
   const scout = STAR_PACKS.find((pack) => pack.id === "scout")!;
   const legend = STAR_PACKS.find((pack) => pack.id === "legend")!;
-  assert.equal(scout.price, 25000);
-  assert.equal(getPackUnlockLeague("legend"), 6);
+  assert.equal(scout.price, 50000000);
+  assert.equal(getPackUnlockLeague("scout"), 11);
+  assert.equal(getPackUnlockLeague("legend"), 4);
   assert.equal(legend.label, "Legenden Pack");
 });
 
@@ -110,7 +115,7 @@ test("fragment compensation rises with rating and card rarity", () => {
   assert.notEqual(getStarXIFragmentCompensation(normal68), getStarXIFragmentCompensation(normal69));
 });
 
-test("custom cards are only available through the fixed random 25k fragment draw", () => {
+test("custom cards are only available through the fixed random fragment draw", () => {
   assert.ok(STAR_XI_CUSTOM_PLAYERS.length > 0);
   const initial = initialGameFeatures(1000).starXI;
   const opening = drawRandomStarXICustomCard({ ...initial, fragments: STAR_XI_RANDOM_CUSTOM_CARD_COST }, () => 0);
