@@ -23,11 +23,15 @@ test("AZB upgrade purchases bypass overflowed prices in client and multiplayer",
   assert.match(pageSource, /try \{[\s\S]*?sendCoopAction\("buy"[\s\S]*?finally \{[\s\S]*?setCoopBusy\(false\)/);
 });
 
-test("new AZB redemptions are disabled without removing existing test rooms", async () => {
-  const apiSource = await readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8");
+test("lobby codes are disabled without removing existing AZB test rooms", async () => {
+  const [apiSource, pageSource] = await Promise.all([
+    readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  ]);
 
-  assert.match(apiSource, /const AZB_CODE_ENABLED = false/);
-  assert.match(apiSource, /bonusCode === "AZB" && !AZB_CODE_ENABLED[\s\S]*?momentan deaktiviert/);
+  assert.match(apiSource, /if \(action === "redeem-lobby-code"\) return jsonError\("Lobby Codes sind deaktiviert\.", 409\);/);
+  assert.doesNotMatch(apiSource, /"SILVAN"|silvuz\.id/);
+  assert.doesNotMatch(pageSource, /LOBBY CODES|redeem-lobby-code/);
   assert.match(apiSource, /const testMode = parseJson<string\[]>\(room\.redeemedBonusCodesJson, \[\]\)\.includes\("AZB"\)/);
 });
 
@@ -47,14 +51,13 @@ test("client and multiplayer server apply AZB to every season gated category", a
   }
 });
 
-test("lobby code history stays hidden while duplicate codes remain blocked", async () => {
+test("lobby code history stays hidden", async () => {
   const [pageSource, apiSource] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
   ]);
 
   assert.doesNotMatch(apiSource, /12345/);
-  assert.match(apiSource, /redeemedCodes\.includes\(bonusCode\)[\s\S]*?bereits eingelöst/);
   assert.doesNotMatch(pageSource, /bonusCodeRedeemed|silvanCodeRedeemed|coop-bonus-used/);
 });
 

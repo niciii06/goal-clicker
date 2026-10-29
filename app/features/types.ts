@@ -175,6 +175,8 @@ export type StarXIPlayer = {
   isCustom?: boolean;
   cardType?: "base" | "icon" | "legendary";
   packWeight?: number;
+  /** Caption under the player on the ball in the 2D match; defaults to the last word of the name. */
+  pitchName?: string;
   // Not part of FC 27: kept so existing saves stay valid, never drawn again.
   retired?: boolean;
   isWomen?: boolean;

@@ -3,7 +3,7 @@ import type { GameFeatures } from "../feature-data";
 import type { PurchaseMode, UpgradeDefinition } from "./types";
 import { COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, RANKS } from "./constants";
 import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../upgrade-purchase";
-import { getGoalBoostMultiplier, getTransferBonuses } from "../feature-data";
+import { addHistory, getGoalBoostMultiplier, getTransferBonuses } from "../feature-data";
 import { UPGRADES, getUpgrade } from "./upgrades";
 
 export function getLevel(upgrades: Record<string, number>, id: string) {
@@ -56,6 +56,25 @@ export function getBasePassivePower(upgrades: Record<string, number>, stars = 0,
 
 export function getPassivePower(upgrades: Record<string, number>, stars = 0, features?: GameFeatures, now = Date.now()) {
   return getBasePassivePower(upgrades, stars, features) * getGoalBoostMultiplier(features, now);
+}
+
+/** Feature schema of the league economy rebalance: older saves had their goals capped once on load. */
+export const REBALANCED_FEATURES_SCHEMA = 7;
+const REBALANCE_GOAL_CAP_SECONDS = 3600;
+const REBALANCE_MIN_GOALS = 1_000_000;
+
+/**
+ * Goals saved under the old economy are capped once to one hour of passive income at the new rates,
+ * so a stockpile cannot skip the new pack prices. `rawFeatures` is the stored, not yet normalized
+ * features object; total and season goals stay untouched.
+ */
+export function capGoalsAfterRebalance(goals: number, rawFeatures: unknown, upgrades: Record<string, number>, stars: number, features: GameFeatures) {
+  const raw = rawFeatures && typeof rawFeatures === "object" && !Array.isArray(rawFeatures) ? rawFeatures as Record<string, unknown> : {};
+  if ((Number(raw.schemaVersion) || 0) >= REBALANCED_FEATURES_SCHEMA) return goals;
+  const cap = Math.max(REBALANCE_MIN_GOALS, Math.floor(getBasePassivePower(upgrades, stars, features) * REBALANCE_GOAL_CAP_SECONDS));
+  if (!(goals > cap)) return goals;
+  addHistory(features, { title: "Kontostand angepasst", detail: `${Math.floor(goals).toLocaleString("de-CH")} Tore auf ${cap.toLocaleString("de-CH")} gekürzt (eine Stunde Einkommen nach dem Balance Update).`, tone: "neutral" });
+  return cap;
 }
 
 export function getUpgradeEffect(upgrade: UpgradeDefinition, level: number) {

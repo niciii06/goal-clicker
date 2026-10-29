@@ -11,14 +11,14 @@ import { nameRecoveryAllowed, resolvePlayer } from "../../auth/player";
 import type { LightRoomRow, RoomRow, RoomSeats, RoomUpdate } from "../../../db";
 import { createHash } from "node:crypto";
 import { SPECIAL_CARD_PACK, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
-import type { GameFeatures, PenaltyDirection, StarFormationId, StarPackReveal } from "../../feature-data";
+import type { GameFeatures, PenaltyDirection, StarFormationId } from "../../feature-data";
 import { isSupportedMultiplayerProtocol, MULTIPLAYER_UPDATE_MESSAGE } from "../../multiplayer-protocol";
 import { getFormationUnlockLeague, getPackUnlockLeague, getReachedLeague, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked, MAX_CAREER_SEASON } from "../../season-progression";
 import { calculateBulkUpgradePurchase } from "../../upgrade-purchase";
 import { MAX_MULTIPLAYER_BODY_BYTES, readJsonBody, RequestBodyTooLargeError } from "../request-body";
 import { claimDailyReward } from "../../daily-reward";
 import { ACHIEVEMENTS, BALANCE_VERSION, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_IDS } from "../../game/constants";
-import { getBaseClickPower, getBasePassivePower, getClickPower, getCost, getLevel } from "../../game/economy";
+import { capGoalsAfterRebalance, getBaseClickPower, getBasePassivePower, getClickPower, getCost, getLevel } from "../../game/economy";
 import { getUpgrade } from "../../game/upgrades";
 import { getTicketIncome, recordTicketIncome } from "../../ticket-income";
 
@@ -42,8 +42,6 @@ const PRESENCE_TIMEOUT_MS = 180000;
 const SIMULATION_LEADER_TIMEOUT_MS = 5000;
 const PASSIVE_BACKGROUND_GRACE_MS = 24 * 60 * 60 * 1000;
 const TRANSFER_MARKET_CLOSED_MESSAGE = "Der Transfermarkt ist geschlossen. Fabrizio Romario bleibt aktiv.";
-// Temporärer Schalter: auf true setzen, um neue AZB Einlösungen wieder zu erlauben.
-const AZB_CODE_ENABLED = false;
 
 type MiniGameCooldowns = Record<string, number>;
 type CoopGameState = {
@@ -201,6 +199,7 @@ function readGame(row: RoomRow): CoopGameState {
   game.miniGameCooldowns = normalizeCooldowns(storedCooldowns);
   game.minigameWins = Math.max(0, Math.floor(finite(row.sharedMinigameWins)));
   game.features = normalizeGameFeatures(storedFeatures);
+  game.goals = capGoalsAfterRebalance(game.goals, storedFeatures, game.upgrades, game.stars, game.features);
   unlockAchievements(game);
   return game;
 }
@@ -586,7 +585,6 @@ export async function POST(request: Request) {
       badge?: unknown;
       color?: unknown;
       roomName?: unknown;
-      bonusCode?: unknown;
       preferredRole?: unknown;
       matchId?: unknown;
       questionId?: unknown;
@@ -717,38 +715,8 @@ export async function POST(request: Request) {
       room = await touchPresence(db, room, role);
     }
     const game = readGame(room);
-    if (action === "redeem-lobby-code") {
-      const bonusCode = typeof payload.bonusCode === "string" ? payload.bonusCode.trim().toUpperCase() : "";
-      if (bonusCode !== "AZB" && bonusCode !== "SILVAN") return jsonError("Dieser Lobby Code ist ungültig.", 409);
-      if (bonusCode === "AZB" && !AZB_CODE_ENABLED) return jsonError("Der AZB Testcode ist momentan deaktiviert.", 409);
-      const redeemedCodes = parseJson<string[]>(room.redeemedBonusCodesJson, []).filter((value) => typeof value === "string");
-      if (redeemedCodes.includes(bonusCode)) return jsonError("Dieser Code wurde in dieser Welt bereits eingelöst.", 409);
-      let packReveal: StarPackReveal | undefined;
-      if (bonusCode === "AZB") {
-        addHistory(game.features, { title: "AZB Testmodus aktiviert", detail: "Unbegrenztes Guthaben und alle Saison Inhalte sind in dieser Multiplayer Welt aktiv.", tone: "positive" });
-      } else {
-        const silvuz = getStarXIPlayer("star-silvuz");
-        if (!silvuz) return jsonError("Silvuz ist gerade nicht verfügbar.", 409);
-        const alreadyOwned = game.features.starXI.ownedIds.includes(silvuz.id);
-        if (!alreadyOwned) {
-          game.features.starXI = addStarXIPlayer(game.features.starXI, silvuz.id);
-          packReveal = {
-            packId: "legend",
-            packName: "Silvan Code",
-            player: silvuz,
-            duplicate: false,
-            fragmentCompensation: 0,
-            openedAt: Date.now(),
-            openedBy: roomPlayerName(room, role),
-            troll: false,
-          };
-          game.features.starPackReveal = packReveal;
-        }
-        addHistory(game.features, { title: "Silvuz freigeschaltet", detail: alreadyOwned ? "Silvuz war bereits im gemeinsamen Club." : "100 Rating · LF / LM / RF · Schweiz", tone: "positive" });
-      }
-      const timestamp = new Date().toISOString();
-      return persistGameResponse(db, room, game, timestamp, playerId, role, { redeemedBonusCodesJson: JSON.stringify([...redeemedCodes, bonusCode]) }, { packReveal });
-    }
+    // Lobby codes are switched off; worlds that redeemed AZB earlier keep their test mode.
+    if (action === "redeem-lobby-code") return jsonError("Lobby Codes sind deaktiviert.", 409);
     const liveError = requireLive(room);
     if (liveError) return liveError;
     const timestamp = new Date().toISOString();

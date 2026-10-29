@@ -156,19 +156,14 @@ test("Mätthu matches Nedu's strong walkout appearance except for being bald", a
   assert.doesNotMatch(maetthuProfile, /kitPrimary|kitSecondary|boots/);
 });
 
-test("Silvuz is a fixed Swiss 100-rated pack player with the SILVAN lobby code", async () => {
-  const [apiSource, featureSource, walkoutSource, pageSource] = await Promise.all([
-    readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
+test("Silvanzambi (formerly Silvuz) is a fixed Swiss 100-rated pack player", async () => {
+  const [featureSource, walkoutSource] = await Promise.all([
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/walkout-data.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
   ]);
 
-  assert.match(featureSource, /id: "star-silvuz",[\s\S]*?countryCode: "CH",[\s\S]*?name: "Silvuz",[\s\S]*?position: "LF",[\s\S]*?positions: \["LF", "LM", "RF"\],[\s\S]*?rating: 100,[\s\S]*?packWeight: 0\.02/);
+  assert.match(featureSource, /id: "star-silvuz",[\s\S]*?countryCode: "CH",[\s\S]*?name: "Silvanzambi",[\s\S]*?position: "LF",[\s\S]*?positions: \["LF", "LM", "RF"\],[\s\S]*?rating: 100,[\s\S]*?packWeight: 0\.02/);
   assert.match(walkoutSource, /"star-silvuz": \{ \.\.\.GOAT_PROFILE/);
-  assert.match(apiSource, /bonusCode !== "SILVAN"/);
-  assert.match(apiSource, /addStarXIPlayer\(game\.features\.starXI, silvuz\.id\)/);
-  assert.match(pageSource, /Silvan Code eingelöst: Silvuz ist für euren gemeinsamen Club freigeschaltet/);
 });
 
 test("Mikeboy Jr. is a Swiss 67-rated legendary centre-back with a fixed walkout", async () => {

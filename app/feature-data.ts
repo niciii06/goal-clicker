@@ -162,7 +162,7 @@ export const STAR_PACK_ROLL_DURATION_MS = 8000;
 export const STAR_XI_SQUAD_SIZE = 11;
 export const STAR_XI_BENCH_SIZE = 12;
 export const STAR_XI_MAX_SUBSTITUTIONS = 5;
-export const GAME_FEATURES_SCHEMA_VERSION = 6;
+export const GAME_FEATURES_SCHEMA_VERSION = 7;
 export const SEASON_MODE_DIVISION_COUNT = 15;
 export const SEASON_MODE_MATCHES_PER_SEASON = 10;
 export const SEASON_MODE_TABLE_SIZE = 6;
@@ -211,11 +211,12 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
   { id: "star-pfuschi", name: "Pfuschi", isCustom: true, benchOnly: true,
     position: null, positions: [], rating: 67, price: 1000, accent: "#64748b",
     cardType: "legendary", symbol: "☠️", packWeight: .04, originalAttributes: specialAttributes(1) },
-  { id: "star-di-certo", name: "Di Certo", isCustom: true, countryCode: "CH", position: "LV",
+  { id: "star-di-certo", name: "Di Certo", pitchName: "Di Certo", isCustom: true, countryCode: "CH", position: "LV",
     positions: ["LV", "RV"], rating: 100, price: 5000000000, accent: "#c69214",
     cardType: "legendary", packWeight: .02, originalAttributes: specialAttributes(100) },
   {
     id: "star-goat-nicu",
+    pitchName: "GOAT Nicu",
     isCustom: true,
     name: "GOAT Nicu",
     position: "ST",
@@ -228,6 +229,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
   },
   {
     id: "star-flurin-fabrice",
+    pitchName: "Flurin",
     isCustom: true,
     name: "Flurin Fabrice",
     position: "ZM",
@@ -240,6 +242,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
   },
   {
     id: "star-benxli",
+    pitchName: "Mikeboy",
     isCustom: true,
     countryCode: "CH",
     name: "Mikeboy Jr.",
@@ -264,6 +267,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
   },
   {
     id: "star-champ-simu",
+    pitchName: "Champ Simu",
     isCustom: true,
     name: "Champ Simu",
     position: "IV",
@@ -277,7 +281,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
     id: "star-silvuz",
     isCustom: true,
     countryCode: "CH",
-    name: "Silvuz",
+    name: "Silvanzambi",
     position: "LF",
     positions: ["LF", "LM", "RF"],
     rating: 100,
@@ -287,6 +291,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
   },
   {
     id: "star-nedu-mann-yesss",
+    pitchName: "Nedu",
     isCustom: true,
     countryCode: "BA",
     name: "Nedu Mann Yesss",
@@ -300,6 +305,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
   },
   {
     id: "star-di-santo",
+    pitchName: "Di Santo",
     isCustom: true,
     countryCode: "NL",
     name: "Di Santo",

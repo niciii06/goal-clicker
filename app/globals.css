@@ -1356,14 +1356,13 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
   .cup-penalty-footer { align-items: flex-start; font-size: var(--text-caption2); }
 }
 .coop-lobby-panel .room-name-input { grid-column: 1 / -1; min-height: 54px; padding-inline: 18px; font-size: var(--text-body); font-weight: 680; }
-.coop-world-tools { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; padding: 14px; border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent); border-radius: 18px; background: color-mix(in srgb, var(--surface-raised) 92%, transparent); box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 6%, transparent); }
+.coop-world-tools { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0,1fr); gap: 12px; padding: 14px; border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent); border-radius: 18px; background: color-mix(in srgb, var(--surface-raised) 92%, transparent); box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 6%, transparent); }
 .coop-world-tools.waiting { margin-top: 12px; }
 .coop-world-tools > div { min-width: 0; }
 .coop-world-tools .eyebrow { margin-bottom: 8px; }
 .coop-world-tools strong { color: var(--text); font-size: 14px; }
 .coop-tool-input { display: flex; align-items: center; gap: 7px; }
 .coop-tool-input .mode-input { min-width: 0; min-height: 42px; font-size: var(--text-footnote); font-weight: 650; }
-.coop-tool-input .bonus-code-input { letter-spacing: .08em; }
 .coop-tool-input button { flex: 0 0 auto; min-height: 42px; }
 @media (max-width: 720px) {
   .coop-world-tools { grid-template-columns: 1fr; }
@@ -2075,6 +2074,10 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .confirm-dialog h2 { margin: 0 0 8px; font-size: var(--text-title3); }
 .confirm-dialog p { margin: 0; color: var(--soft); line-height: 1.45; }
 .confirm-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+.whats-new-dialog { width: min(480px, 100%); }
+.whats-new-dialog .eyebrow { margin: 0 0 6px; }
+.whats-new-dialog h2 { margin: 0 0 12px; font-size: var(--text-title3); }
+.whats-new-dialog ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--soft); line-height: 1.45; }
 
 /* The in-match lineup editor looks like the "Kader" tab: same heading, formation box, pitch and bench. */
 .gc-sub-panel.gc-squad-substitutions { border: 1px solid var(--line-soft); border-radius: 22px; padding: 18px; }

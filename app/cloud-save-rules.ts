@@ -1,9 +1,9 @@
 // Which localStorage keys travel with the account's cloud save. Shared by the browser sync and the API.
 // Device specific keys stay local: the player ID comes from the account, the backups are copies of the
 // main save, and the active world and nickname are set per device.
-import { LAYOUT_STORAGE_KEY, STORAGE_KEY, VIBRATION_STORAGE_KEY } from "./game/constants";
+import { LAYOUT_STORAGE_KEY, STORAGE_KEY, VIBRATION_STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from "./game/constants";
 
-export const SYNCED_SAVE_KEYS = [STORAGE_KEY, LAYOUT_STORAGE_KEY, VIBRATION_STORAGE_KEY] as const;
+export const SYNCED_SAVE_KEYS = [STORAGE_KEY, LAYOUT_STORAGE_KEY, VIBRATION_STORAGE_KEY, WHATS_NEW_STORAGE_KEY] as const;
 export const MAX_CLOUD_SAVE_BYTES = 2 * 1024 * 1024;
 
 export type CloudSaveKeys = Partial<Record<(typeof SYNCED_SAVE_KEYS)[number], string>>;

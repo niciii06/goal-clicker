@@ -91,3 +91,5 @@ export const COMBO_DECAY_MS = 1000 / 3;
 // The count stops at the top threshold, so the drain leaves the top level right after the hold.
 export const COMBO_MAX_COUNT = 50;
 export const VIBRATION_STORAGE_KEY = "goalClickerVibrationV1";
+/** Id of the newest "Was ist neu" entry the player closed; synced with the cloud save like the layout. */
+export const WHATS_NEW_STORAGE_KEY = "goalClickerWhatsNewSeenV1";

@@ -82,7 +82,7 @@ export function drawMatchFrame(ctx:CanvasRenderingContext2D,frame:ReturnType<typ
    }
    // The name of the player on the ball, like a TV caption under him.
    const owner=frame.ballOwnerId?actors.find(p=>p.id===frame.ballOwnerId):undefined;
-   if(owner&&owner.label){const name=owner.label.split(' ').slice(-1)[0];ctx.font='700 1.45px system-ui, sans-serif';ctx.textAlign='center';ctx.textBaseline='top';const w=ctx.measureText(name).width+1;ctx.fillStyle='rgba(6,22,15,.72)';ctx.fillRect(owner.x-w/2,owner.y+2.35,w,1.85);ctx.fillStyle='#f4fff7';ctx.fillText(name,owner.x,owner.y+2.55);}
+   if(owner&&owner.label){const name=owner.caption??owner.label.split(' ').slice(-1)[0];ctx.font='700 1.45px system-ui, sans-serif';ctx.textAlign='center';ctx.textBaseline='top';const w=ctx.measureText(name).width+1;ctx.fillStyle='rgba(6,22,15,.72)';ctx.fillRect(owner.x-w/2,owner.y+2.35,w,1.85);ctx.fillStyle='#f4fff7';ctx.fillText(name,owner.x,owner.y+2.55);}
    // A short trail behind a ball that flies.
    const lift=frame.height*.7,trail=motion.trail;
    const flying=Boolean(frame.pass||frame.shotFlight||frame.height>.2);

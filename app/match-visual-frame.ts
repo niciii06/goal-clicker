@@ -7,7 +7,8 @@ import { goalAssistId } from './match-goals';
 import { interactiveFrame } from './interactive-match';
 import { ballHeight, playLabel } from './interactive-frame-data';
 type Team = "club" | "opponent";
-export type Actor = { id: string; label: string; shirt: string; team: Team; role: StarPosition; x: number; y: number; goalkeeper: boolean; rating: number | null };
+/** `caption`: fixed name under the player on the ball (special cards); otherwise the last word of `label`. */
+export type Actor = { id: string; label: string; caption?: string; shirt: string; team: Team; role: StarPosition; x: number; y: number; goalkeeper: boolean; rating: number | null };
 export type MatchEvent = { id: string; kind: "goal" | "card" | "injury" | "penalty" | BroadcastKind; at: number; minute: number; side: Team; player: string; playerId: string | null; outcome?: string; direction?: string; keeperDirection?: string; action?: BroadcastEvent; assistId?:string; style?:string };
 type VisualPass={fromId:string;toId:string;progress:number};
 export type Replay = { event: MatchEvent; startedAt: number };
@@ -101,7 +102,7 @@ export function baseActors(features: GameFeatures, cup: CupState, minute: number
     occupied.add(slotIndex);
     const forward = 12 + (100 - slot.y) / 100 * 68;
     const goalkeeper = role === "TW";
-    return [{ id, label: p.name, shirt: String(cup.broadcast?.shirtNumbers[id] ?? slotIndex + 1), team: "club" as const, role,
+    return [{ id, label: p.name, caption: p.pitchName, shirt: String(cup.broadcast?.shirtNumbers[id] ?? slotIndex + 1), team: "club" as const, role,
       x: goalkeeper ? (clubRight ? 3 : 102) : clubRight ? forward : 105-forward,
       y: goalkeeper ? 34 : clubRight?5+slot.x*.58:63-slot.x*.58, goalkeeper, rating: getCupPlayerMatchRating(cup, id, minute) }];
   });
@@ -199,7 +200,7 @@ export function getVisualFrame(features: GameFeatures, wallNow: number, replay?:
   if(cup.simulation && cup.phase!=='penalties' && !replay){
     const f=interactiveFrame(cup,wallNow),recent=getViewerEvents(cup).filter(e=>e.at<=cup.lastTickAt).at(-1);
     const a=f.action,travelling=a&&['pass','cross','shot','interception','restart'].includes(a.kind);
-    const actors:Actor[]=f.players.map(p=>({id:p.id,label:p.name,shirt:String(p.number),team:p.side,role:p.role,x:p.x,y:p.y,goalkeeper:p.role==='TW',rating:getCupPlayerMatchRating(cup,p.id,Math.max(1,Math.ceil(f.time/60)))}));
+    const actors:Actor[]=f.players.map(p=>({id:p.id,label:p.name,caption:p.side==='club'?getStarXIPlayer(p.id)?.pitchName:undefined,shirt:String(p.number),team:p.side,role:p.role,x:p.x,y:p.y,goalkeeper:p.role==='TW',rating:getCupPlayerMatchRating(cup,p.id,Math.max(1,Math.ceil(f.time/60)))}));
     return {actors,ball:f.ball,height:ballHeight(a,f.progress),minute:Math.max(1,Math.min(120,Math.ceil(f.time/60))),status:cup.matchPaused?'Pausiert':f.celebration&&f.celebration.progress<.62?'Torjubel':playLabel(a),recent,age:recent?(wallNow-recent.at)/1000:Infinity,keeperDive:a?.kind==='shot'&&a.outcome==='save'&&f.progress>.55?a.target:undefined,ballOwnerId:travelling?undefined:a?.actor,pass:undefined,shotFlight:undefined,celebration:f.celebration};
   }
   const frozen=cup.timedPause;

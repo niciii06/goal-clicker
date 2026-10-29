@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { UPGRADES } from "../app/game/upgrades.ts";
-import { drawRandomStarXICustomCard, getSpecialCardChances, getStarXIPlayer, getTournamentRewardPack, initialGameFeatures, normalizeGameFeatures, SPECIAL_PACK_HUNDRED_CHANCE, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_RANDOM_CUSTOM_CARD_COST } from "../app/feature-data.ts";
+import { capGoalsAfterRebalance, getBasePassivePower, REBALANCED_FEATURES_SCHEMA } from "../app/game/economy.ts";
+import { STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from "../app/game/constants.ts";
+import { cleanCloudSaveKeys } from "../app/cloud-save-rules.ts";
+import { WHATS_NEW } from "../app/whats-new.ts";
+import { GAME_FEATURES_SCHEMA_VERSION, drawRandomStarXICustomCard, getSpecialCardChances, getStarXIPlayer, getTournamentRewardPack, initialGameFeatures, normalizeGameFeatures, SPECIAL_PACK_HUNDRED_CHANCE, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_RANDOM_CUSTOM_CARD_COST } from "../app/feature-data.ts";
 import { getPackUnlockLeague, getUpgradeUnlockLeague } from "../app/season-progression.ts";
 import { getFirstLevelPayback, simulateEconomy } from "../scripts/balance/economy-model.ts";
 
@@ -55,7 +59,7 @@ test("100 rated special cards drawn before Liga 3 leave an old save once", () =>
   old.starXI.benchIds[0] = hundredIds[1];
   old.career.collectedIds = [hundredIds[0], hundredIds[1], hundredIds[2], keep.id];
   const migrated = normalizeGameFeatures(JSON.parse(JSON.stringify(old)));
-  assert.equal(migrated.schemaVersion, 6);
+  assert.equal(migrated.schemaVersion, GAME_FEATURES_SCHEMA_VERSION);
   assert.deepEqual(migrated.starXI.ownedIds, [keep.id]);
   assert.ok(!migrated.starXI.lineupIds.some((id) => hundredIds.includes(id)));
   assert.ok(!migrated.starXI.benchIds.some((id) => hundredIds.includes(id)));
@@ -111,4 +115,44 @@ test("every upgrade description states its gain", () => {
   }
   assert.equal(UPGRADES.find((item) => item.id === "golden")!.description, `+${UPGRADES.find((item) => item.id === "golden")!.gain * 100}% Klickpower`);
   assert.equal(UPGRADES.find((item) => item.id === "legacy")!.description, `+${UPGRADES.find((item) => item.id === "legacy")!.gain * 100}% auf alle Einnahmen`);
+});
+
+test("goals saved under the old economy are capped once to one hour of new passive income", () => {
+  const upgrades = { ballboy: 40, coach: 30, academy: 20, floodlight: 15, scout: 12, var: 10 };
+  const features = initialGameFeatures();
+  const hour = Math.floor(getBasePassivePower(upgrades, 0, features) * 3600);
+  assert.ok(hour > 1_000_000);
+  assert.equal(capGoalsAfterRebalance(9e12, { schemaVersion: 6 }, upgrades, 0, features), hour);
+  assert.equal(features.history.at(-1)?.title, "Kontostand angepasst");
+  // Saves without a schema count as old; small balances, new saves and the minimum stay untouched.
+  assert.equal(capGoalsAfterRebalance(9e12, {}, upgrades, 0, initialGameFeatures()), hour);
+  assert.equal(capGoalsAfterRebalance(hour - 1, { schemaVersion: 5 }, upgrades, 0, initialGameFeatures()), hour - 1);
+  assert.equal(capGoalsAfterRebalance(9e12, { schemaVersion: REBALANCED_FEATURES_SCHEMA }, upgrades, 0, initialGameFeatures()), 9e12);
+  assert.equal(capGoalsAfterRebalance(5e6, { schemaVersion: 6 }, {}, 0, initialGameFeatures()), 1_000_000);
+  assert.equal(GAME_FEATURES_SCHEMA_VERSION, REBALANCED_FEATURES_SCHEMA, "new saves are never capped");
+});
+
+test("release notes are listed newest first and their seen marker syncs with the cloud save", () => {
+  assert.ok(WHATS_NEW.length > 0);
+  assert.equal(new Set(WHATS_NEW.map((entry) => entry.id)).size, WHATS_NEW.length);
+  const ids = WHATS_NEW.map((entry) => entry.id);
+  assert.deepEqual(ids, [...ids].sort().reverse(), "ids start with the date, newest first");
+  for (const entry of WHATS_NEW) {
+    assert.match(entry.id, /^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$/);
+    assert.ok(entry.title.trim() && entry.items.length && entry.items.every((item) => item.trim()));
+  }
+  const keys = cleanCloudSaveKeys({ [STORAGE_KEY]: JSON.stringify({ goals: 1 }), [WHATS_NEW_STORAGE_KEY]: WHATS_NEW[0].id });
+  assert.equal(keys?.[WHATS_NEW_STORAGE_KEY], WHATS_NEW[0].id);
+});
+
+test("special cards with several words show a fixed name under the player on the ball", async () => {
+  const { readFile } = await import("node:fs/promises");
+  for (const player of STAR_XI_CUSTOM_PLAYERS.filter((item) => item.name.includes(" "))) {
+    assert.ok(player.pitchName, `${player.name} needs a pitch name`);
+  }
+  assert.equal(getStarXIPlayer("star-nedu-mann-yesss")!.pitchName, "Nedu");
+  assert.equal(getStarXIPlayer("star-benxli")!.pitchName, "Mikeboy");
+  assert.equal(getStarXIPlayer("star-silvuz")!.name, "Silvanzambi");
+  const canvas = await readFile(new URL("../app/match-canvas-drawing.ts", import.meta.url), "utf8");
+  assert.match(canvas, /owner\.caption\?\?owner\.label\.split\(' '\)\.slice\(-1\)\[0\]/);
 });

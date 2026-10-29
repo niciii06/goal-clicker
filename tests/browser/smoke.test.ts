@@ -10,6 +10,8 @@ import type { Browser, Page } from 'playwright-core';
 import { advanceCupMatch, beginSeasonCupMatch, getStarXISelection, normalizeGameFeatures, resumeCupMatch, setBestStarXI, STAR_XI_PLAYERS } from '../../app/feature-data.ts';
 import type { GameFeatures } from '../../app/feature-data.ts';
 import { prepareCareerMatch } from '../../app/career-data.ts';
+import { WHATS_NEW_STORAGE_KEY } from '../../app/game/constants.ts';
+import { WHATS_NEW } from '../../app/whats-new.ts';
 
 const PORT = Number(process.env.SMOKE_PORT ?? 8799);
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -79,7 +81,8 @@ function finishedMatch(now: number) {
   return f;
 }
 
-async function openWithSave(viewport: { width: number; height: number }, saveJson: string, colorScheme: 'light' | 'dark' = 'light') {
+/** `whatsNewSeen: false` leaves the newest release notes unread, so the "Was ist neu" window opens. */
+async function openWithSave(viewport: { width: number; height: number }, saveJson: string, colorScheme: 'light' | 'dark' = 'light', whatsNewSeen = true) {
   const page = await browser.newPage({ viewport, colorScheme });
   // tsx keeps function names with a __name helper; functions passed to page.evaluate need it in the browser too.
   await page.addInitScript('globalThis.__name = (fn) => fn;');
@@ -88,7 +91,7 @@ async function openWithSave(viewport: { width: number; height: number }, saveJso
   page.on('response', (response) => { if (response.status() >= 400 && !IGNORED_URL.test(response.url())) problems.push(`${response.status()} ${response.url()}`); });
   page.on('console', (message) => { if (message.type() === 'error' && !message.text().startsWith('Failed to load resource')) problems.push(`console: ${message.text()}`); });
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  await page.evaluate(([key, value]) => { localStorage.clear(); localStorage.setItem(key, value); }, [SAVE_KEY, saveJson]);
+  await page.evaluate(([key, value, seenKey, seen]) => { localStorage.clear(); localStorage.setItem(key, value); if (seen) localStorage.setItem(seenKey, seen); }, [SAVE_KEY, saveJson, WHATS_NEW_STORAGE_KEY, whatsNewSeen ? WHATS_NEW[0].id : '']);
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(1200);
   return { page, problems };
@@ -305,6 +308,29 @@ test('switching from co-op back to single player asks first', async () => {
   await page.getByRole('alertdialog').getByRole('button', { name: 'Wechseln' }).click();
   assert.match(await single.getAttribute('class') ?? '', /active/, 'confirm switches to single player');
   await page.close();
+});
+
+test('the "Was ist neu" window opens once for an existing game and stays closed after reading', async () => {
+  const now = Date.now();
+  const { page, problems } = await openWithSave(VIEWPORTS[1], save(richFeatures(now), now), 'light', false);
+  const dialog = page.getByRole('dialog', { name: WHATS_NEW[0].title });
+  await dialog.waitFor();
+  assert.deepEqual(await layoutProblems(page), []);
+  await dialog.getByRole('button', { name: 'Verstanden' }).click();
+  assert.equal(await dialog.count(), 0);
+  assert.equal(await page.evaluate((key) => localStorage.getItem(key), WHATS_NEW_STORAGE_KEY), WHATS_NEW[0].id);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  assert.equal(await page.getByRole('dialog', { name: WHATS_NEW[0].title }).count(), 0, 'shown only once');
+  assert.deepEqual(problems, []);
+  await page.close();
+  // A brand new player (fresh browser storage) starts without the window.
+  const fresh = await browser.newPage({ viewport: VIEWPORTS[1] });
+  await fresh.goto(BASE, { waitUntil: 'networkidle' });
+  await fresh.waitForTimeout(1200);
+  assert.equal(await fresh.getByRole('dialog', { name: WHATS_NEW[0].title }).count(), 0, 'no release notes for a new game');
+  assert.equal(await fresh.evaluate((key) => localStorage.getItem(key), WHATS_NEW_STORAGE_KEY), WHATS_NEW[0].id);
+  await fresh.close();
 });
 
 test('the layout checker itself reports overlapping text, unreadable text and horizontal overflow', async () => {
