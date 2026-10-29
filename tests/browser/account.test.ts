@@ -72,6 +72,19 @@ async function register(page: Page, username: string, displayName: string, passw
   await page.getByLabel(/^Passwort \(mindestens/).fill(password);
   await page.getByLabel('Passwort wiederholen').fill(password);
   await page.getByRole('button', { name: 'Konto erstellen', exact: true }).click();
+  await closeWelcomePack(page);
+}
+
+/** A brand new game opens the free welcome pack first; its walkout covers the game until it is taken over. */
+async function closeWelcomePack(page: Page) {
+  await page.getByRole('button', { name: 'Fussball anklicken' }).waitFor();
+  const reveal = page.locator('.star-reveal');
+  try { await reveal.waitFor({ timeout: 4000 }); } catch { return; }
+  const takeOver = reveal.getByRole('button', { name: 'In Star XI übernehmen' });
+  await takeOver.waitFor({ timeout: 20000 });
+  await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('.star-reveal .star-walkout-dismiss')?.disabled, undefined, { timeout: 20000 });
+  await takeOver.click();
+  await reveal.waitFor({ state: 'detached', timeout: 10000 });
 }
 
 async function login(page: Page, username: string, password: string) {
@@ -277,6 +290,7 @@ test('a guest plays single player only, and signing up takes the guest save into
   const page = await device('guest');
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: 'Als Gast fortfahren' }).click();
+  await closeWelcomePack(page);
   await clickBall(page, 5);
   await page.evaluate(() => window.dispatchEvent(new Event('goalclicker:flush-save')));
   const guestGoals = await localGoals(page);
