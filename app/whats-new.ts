@@ -5,6 +5,15 @@ export type WhatsNewEntry = { id: string; date: string; title: string; items: re
 
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
   {
+    id: "2026-10-29-100er",
+    date: "29. Oktober 2026",
+    title: "100er Karten: gleich selten, legendärer Auftritt",
+    items: [
+      "Alle 100er Karten sind gleich selten und bekommen den legendären Walkout.",
+      "Neben dem Spezialkarten-Pack gibt es 100er jetzt auch im Weltklasse-Pack (0,001%) und im Legenden Pack (0,01%).",
+    ],
+  },
+  {
     id: "2026-10-29-pack-stufen",
     date: "29. Oktober 2026",
     title: "Packchancen passen zur Karte",

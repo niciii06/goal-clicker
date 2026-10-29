@@ -44,8 +44,9 @@ test("the special card pack awards a 100 rated card in 8% of draws, weighted by 
     const expected = chances.get(player.id)!;
     assert.ok(Math.abs((counts.get(player.id) ?? 0) / draws - expected) < Math.max(0.001, 6 * Math.sqrt(expected * (1 - expected) / draws)), player.id);
   }
-  // GOAT Nicu keeps the lowest pack weight and stays the rarest card.
-  assert.equal(Math.min(...hundredIds.map((id) => chances.get(id)!)), chances.get("star-goat-nicu"));
+  // Every 100 rated card is equally rare and gets the legendary walkout.
+  assert.equal(new Set(hundredIds.map((id) => chances.get(id)!.toFixed(12))).size, 1);
+  assert.ok(hundredIds.every((id) => getStarXIPlayer(id)!.cardType === "legendary"));
 });
 
 test("100 rated special cards drawn before Liga 3 leave an old save once", () => {

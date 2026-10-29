@@ -45,18 +45,23 @@ test("pack rows follow the card tiers and a dearer pack is never worse in any ti
       assert.ok(band.label.startsWith(`${tierOf(band.maxRating)} `), `${pack.id} ${band.label}`);
     }
   }
-  // 100 rated cards come only from the special card pack.
-  assert.ok(STAR_PACKS.every((pack) => pack.odds.every((band) => band.maxRating < 100)));
+  // Besides the special card pack only the two top packs hold 100 rated cards, and only as a tiny chance.
+  const hundred = Object.fromEntries(STAR_PACKS.map((pack) => [pack.id, pack.odds.find((band) => band.minRating === 100)?.chance ?? 0]));
+  assert.deepEqual(hundred, { scrap: 0, regional: 0, scout: 0, profi: 0, elite: 0, weltklasse: 0.00001, legend: 0.0001 });
+  for (const id of ["weltklasse", "legend"] as const) {
+    const pulls = Array.from({ length: 40 }, (_, index) => openStarPack(id, [], sequenceRandom([0.999999, 0.5, (index % 4 + 0.5) / 4, (index + 0.5) / 40]))).map((opening) => opening.player);
+    assert.ok(pulls.every((player) => player.rating === 100 && player.isCustom && player.cardType === "legendary"), `${id} 100 row draws only 100 rated special cards`);
+  }
   const atLeast = (pack: (typeof STAR_PACKS)[number], rating: number) => pack.odds.filter((band) => band.minRating >= rating).reduce((sum, band) => sum + band.chance, 0);
   const byPrice = [...STAR_PACKS].sort((first, second) => first.price - second.price);
   byPrice.slice(1).forEach((pack, index) => {
     const cheaper = byPrice[index];
-    for (const rating of [71, 80, 86, 90]) {
+    for (const rating of [71, 80, 86, 90, 100]) {
       assert.ok(atLeast(pack, rating) >= atLeast(cheaper, rating), `${pack.id} must not be worse than ${cheaper.id} from ${rating}`);
     }
     assert.ok(Math.min(...pack.odds.map((band) => band.minRating)) > Math.min(...cheaper.odds.map((band) => band.minRating)), `${pack.id} starts higher than ${cheaper.id}`);
   });
-  assert.equal(atLeast(byPrice.at(-1)!, 90), 0.1, "the legend pack has the best top walkout chance");
+  assert.ok(Math.abs(atLeast(byPrice.at(-1)!, 90) - 0.1001) < 1e-12, "the legend pack has the best top walkout chance");
 });
 
 test("pack prices and season unlocks match the current progression", () => {

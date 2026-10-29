@@ -95,3 +95,8 @@ Jede Zeile der Packchancen liegt jetzt in genau einer Kartenstufe der Pack-Enth�
 | 4 | Legenden Pack | | | 55% | 35% | 10% |
 
 Die Turnierprämien nutzen dieselben Stufen: Gewöhnlich bis 64, Gewöhnlich 65 bis 70, Profi 71 bis 79, Selten 80 bis 85, Walkout 86 bis 89, Top Walkout 90 bis 99.
+
+## Nachtrag: 100er Karten
+
+* Alle 100er Spezialkarten haben dasselbe `packWeight` (gleich selten) und `cardType: "legendary"`, damit alle den legendären Walkout bekommen.
+* Weltklasse-Pack: Legendär 100 mit 0,001%, Legenden Pack: 0,01%. Die Zeile zieht nur aus den 100er Spezialkarten; andere Spezialkarten kommen weiter nur aus dem Spezialkarten-Pack.
