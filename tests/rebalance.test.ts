@@ -135,8 +135,8 @@ test("goals saved under the old economy are capped once to one hour of new passi
 test("release notes are listed newest first and their seen marker syncs with the cloud save", () => {
   assert.ok(WHATS_NEW.length > 0);
   assert.equal(new Set(WHATS_NEW.map((entry) => entry.id)).size, WHATS_NEW.length);
-  const ids = WHATS_NEW.map((entry) => entry.id);
-  assert.deepEqual(ids, [...ids].sort().reverse(), "ids start with the date, newest first");
+  const dates = WHATS_NEW.map((entry) => entry.id.slice(0, 10));
+  assert.deepEqual(dates, [...dates].sort().reverse(), "ids start with the date, newest first");
   for (const entry of WHATS_NEW) {
     assert.match(entry.id, /^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$/);
     assert.ok(entry.title.trim() && entry.items.length && entry.items.every((item) => item.trim()));

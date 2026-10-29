@@ -35,23 +35,28 @@ function positionGroup(position: string) {
   return "attack";
 }
 
-test("pack odds are complete and the ladder only climbs with price", () => {
-  for (const pack of STAR_PACKS.filter(p => p.id !== "scrap")) {
-    assert.ok(Math.abs(pack.odds.reduce((sum, band) => sum + band.chance, 0) - 1) < 1e-9);
-    assert.equal(pack.odds.length, 3, `${pack.id} has standard, good and rare tiers`);
-    // 100 rated cards come only from the special card pack.
-    assert.ok(pack.odds.every((band) => band.maxRating < 100), `${pack.id} has no 100 rated tier`);
+test("pack rows follow the card tiers and a dearer pack is never worse in any tier", () => {
+  const tierOf = (rating: number) => rating >= 100 ? "Legendär" : rating >= 90 ? "Top Walkout" : rating >= 86 ? "Walkout" : rating >= 80 ? "Selten" : rating >= 71 ? "Profi" : "Gewöhnlich";
+  for (const pack of [...STAR_PACKS, ...REWARD_PACKS]) {
+    assert.ok(Math.abs(pack.odds.reduce((sum, band) => sum + band.chance, 0) - 1) < 1e-9, pack.id);
+    for (const band of pack.odds) {
+      // The row stays inside one tier of the reveal (86+ is the walkout animation) and carries its name.
+      assert.equal(tierOf(band.minRating), tierOf(band.maxRating), `${pack.id} ${band.label}`);
+      assert.ok(band.label.startsWith(`${tierOf(band.maxRating)} `), `${pack.id} ${band.label}`);
+    }
   }
+  // 100 rated cards come only from the special card pack.
+  assert.ok(STAR_PACKS.every((pack) => pack.odds.every((band) => band.maxRating < 100)));
+  const atLeast = (pack: (typeof STAR_PACKS)[number], rating: number) => pack.odds.filter((band) => band.minRating >= rating).reduce((sum, band) => sum + band.chance, 0);
   const byPrice = [...STAR_PACKS].sort((first, second) => first.price - second.price);
   byPrice.slice(1).forEach((pack, index) => {
     const cheaper = byPrice[index];
-    const floor = (item: typeof pack) => Math.min(...item.odds.map((band) => band.minRating));
-    const best = (item: typeof pack) => Math.max(...item.odds.map((band) => band.maxRating));
-    assert.ok(best(pack) > best(cheaper), `${pack.id} must reach higher than ${cheaper.id}`);
-    assert.ok(floor(pack) > floor(cheaper), `${pack.id} must start higher than ${cheaper.id}`);
+    for (const rating of [71, 80, 86, 90]) {
+      assert.ok(atLeast(pack, rating) >= atLeast(cheaper, rating), `${pack.id} must not be worse than ${cheaper.id} from ${rating}`);
+    }
+    assert.ok(Math.min(...pack.odds.map((band) => band.minRating)) > Math.min(...cheaper.odds.map((band) => band.minRating)), `${pack.id} starts higher than ${cheaper.id}`);
   });
-  // Only the most expensive pack reaches top walkouts beyond 91.
-  assert.deepEqual(STAR_PACKS.filter((pack) => pack.odds.some((band) => band.maxRating >= 92)).map((pack) => pack.id), ["legend"]);
+  assert.equal(atLeast(byPrice.at(-1)!, 90), 0.1, "the legend pack has the best top walkout chance");
 });
 
 test("pack prices and season unlocks match the current progression", () => {

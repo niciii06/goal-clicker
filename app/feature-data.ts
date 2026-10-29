@@ -589,22 +589,40 @@ export function getStarXIFragmentCompensation(player: StarXIPlayer) {
   return ratingStep * 15;
 }
 
+/** Card tiers of the pack reveal (`getStarCardTier`): up to 70 common, 71 to 79 pro, 80 to 85 rare
+ * (rare animation), from 86 walkout (walkout animation), from 90 top walkout. Every pack row stays
+ * inside one tier and carries its name, so the odds name exactly what the reveal shows. */
+const CARD_TIERS = [
+  { name: "Gewöhnlich", min: 0, max: 70 },
+  { name: "Profi", min: 71, max: 79 },
+  { name: "Selten", min: 80, max: 85 },
+  { name: "Walkout", min: 86, max: 89 },
+  { name: "Top Walkout", min: 90, max: 99 },
+  { name: "Legendär", min: 100, max: 100 },
+] as const;
+
+function tierBand(minRating: number, maxRating: number, chance: number) {
+  const tier = CARD_TIERS.find((item) => minRating >= item.min && maxRating <= item.max);
+  if (!tier) throw new Error(`Pack row ${minRating}–${maxRating} crosses a card tier.`);
+  return { label: minRating === 0 ? `${tier.name} bis ${maxRating}` : `${tier.name} ${minRating}–${maxRating}`, minRating, maxRating, chance };
+}
+
 // One pack per league band: every pack unlocks where its cards fit the opponents of that league.
-// The ladder only climbs: a dearer pack never has a lower floor or a lower best tier than a cheaper one,
-// and 100 rated cards come only from the special card pack.
+// The ladder only climbs: for every tier a dearer pack has at least the chance of a cheaper one, and
+// 100 rated cards come only from the special card pack.
 export const STAR_PACKS: readonly StarPackDefinition[] = [
-  { id: "scrap", label: "Schrott-Pack", price: 15000, description: "Günstig einsteigen und dein Team ergänzen. Enthält eine Basiskarte.", odds: SCRAP_RATING_GROUPS.map(group => ({ ...group, label: group.minRating === 0 ? "Rating bis 54" : `Rating ${group.minRating}–${group.maxRating}` })) },
-  { id: "regional", label: "Regional-Pack", price: 10000000, description: "Solide Regionalliga Spieler, starke Karten sind die grosse Ausnahme", odds: [{ label: "Standard 65–72", minRating: 65, maxRating: 72, chance: 0.8 }, { label: "Gut 73–76", minRating: 73, maxRating: 76, chance: 0.18 }, { label: "Selten 77–79", minRating: 77, maxRating: 79, chance: 0.02 }] },
-  { id: "scout", label: "Scout Pack", price: 50000000, description: "Solide Profis zum Aufbau, starke Karten bleiben selten", odds: [{ label: "Standard 70–76", minRating: 70, maxRating: 76, chance: 0.75 }, { label: "Gut 77–79", minRating: 77, maxRating: 79, chance: 0.2 }, { label: "Selten 80–83", minRating: 80, maxRating: 83, chance: 0.05 }] },
-  { id: "profi", label: "Profi-Pack", price: 350000000, description: "Profis für die Liga Mitte, Spitzenkarten bleiben selten", odds: [{ label: "Standard 73–79", minRating: 73, maxRating: 79, chance: 0.65 }, { label: "Gut 80–83", minRating: 80, maxRating: 83, chance: 0.3 }, { label: "Selten 84–86", minRating: 84, maxRating: 86, chance: 0.05 }] },
-  { id: "elite", label: "Elite Pack", price: 3000000000, description: "Für die oberen Ligen, Walkouts sind möglich, aber selten", odds: [{ label: "Standard 77–81", minRating: 77, maxRating: 81, chance: 0.6 }, { label: "Gut 82–85", minRating: 82, maxRating: 85, chance: 0.33 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.07 }] },
-  { id: "weltklasse", label: "Weltklasse-Pack", price: 6000000000, description: "Starke Karten für den Aufstiegskampf, Walkouts bleiben selten", odds: [{ label: "Standard 80–84", minRating: 80, maxRating: 84, chance: 0.55 }, { label: "Gut 85–88", minRating: 85, maxRating: 88, chance: 0.38 }, { label: "Walkout 89–91", minRating: 89, maxRating: 91, chance: 0.07 }] },
-  { id: "legend", label: "Legenden Pack", price: 15000000000, description: "Das teuerste Pack, nur hier gibt es Top Walkouts bis 99", odds: [{ label: "Standard 83–86", minRating: 83, maxRating: 86, chance: 0.5 }, { label: "Walkout 87–89", minRating: 87, maxRating: 89, chance: 0.4 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.1 }] },
+  { id: "scrap", label: "Schrott-Pack", price: 15000, description: "Günstig einsteigen und dein Team ergänzen. Enthält eine Basiskarte.", odds: SCRAP_RATING_GROUPS.map(group => tierBand(group.minRating, group.maxRating, group.chance)) },
+  { id: "regional", label: "Regional-Pack", price: 10000000, description: "Gewöhnliche und Profi Karten für den Aufbau", odds: [tierBand(65, 70, 0.7), tierBand(71, 79, 0.3)] },
+  { id: "scout", label: "Scout Pack", price: 50000000, description: "Meist Profis, seltene Karten sind die Ausnahme", odds: [tierBand(68, 70, 0.35), tierBand(71, 79, 0.62), tierBand(80, 85, 0.03)] },
+  { id: "profi", label: "Profi-Pack", price: 350000000, description: "Profis für die Liga Mitte, Walkouts sind sehr selten", odds: [tierBand(71, 79, 0.85), tierBand(80, 85, 0.14), tierBand(86, 89, 0.01)] },
+  { id: "elite", label: "Elite Pack", price: 3000000000, description: "Für die oberen Ligen, Walkouts sind möglich, aber selten", odds: [tierBand(75, 79, 0.6), tierBand(80, 85, 0.33), tierBand(86, 89, 0.06), tierBand(90, 99, 0.01)] },
+  { id: "weltklasse", label: "Weltklasse-Pack", price: 6000000000, description: "Starke Karten für den Aufstiegskampf, mehr Walkouts", odds: [tierBand(77, 79, 0.4), tierBand(80, 85, 0.48), tierBand(86, 89, 0.1), tierBand(90, 99, 0.02)] },
+  { id: "legend", label: "Legenden Pack", price: 15000000000, description: "Das teuerste Pack mit den besten Walkout Chancen", odds: [tierBand(80, 85, 0.55), tierBand(86, 89, 0.35), tierBand(90, 99, 0.1)] },
 ];
 
-const REWARD_BRACKETS = [[0,59],[60,69],[70,79],[80,85],[86,89],[90,99]] as const;
+const REWARD_BRACKETS = [[0,64],[65,70],[71,79],[80,85],[86,89],[90,99]] as const;
 const REWARD_PERCENTAGES = [[60,30,9,1,0,0],[25,45,25,4.5,.5,0],[5,20,55,18,1.9,.1],[0,5,40,48,6.5,.5],[0,0,20,55,23,2],[0,0,5,50,40,5]] as const;
-export const REWARD_PACKS:readonly StarPackDefinition[] = ['Kleines Prämienpack','Basis-Prämienpack','Solides Prämienpack','Hochwertiges Prämienpack','Premium-Prämienpack','Top-Prämienpack'].map((label,i)=>({id:`reward-${i+1}` as RewardPackId,label,price:0,description:'Eine originale Basiskarte als Turnierprämie. Doppelte Karten geben Fragmente.',odds:REWARD_BRACKETS.map(([minRating,maxRating],b)=>({label:minRating===0?'Rating bis 59':`Rating ${minRating}–${maxRating}`,minRating,maxRating,chance:REWARD_PERCENTAGES[i][b]/100}))}));
+export const REWARD_PACKS:readonly StarPackDefinition[] = ['Kleines Prämienpack','Basis-Prämienpack','Solides Prämienpack','Hochwertiges Prämienpack','Premium-Prämienpack','Top-Prämienpack'].map((label,i)=>({id:`reward-${i+1}` as RewardPackId,label,price:0,description:'Eine originale Basiskarte als Turnierprämie. Doppelte Karten geben Fragmente.',odds:REWARD_BRACKETS.map(([minRating,maxRating],b)=>tierBand(minRating,maxRating,REWARD_PERCENTAGES[i][b]/100))}));
 /** Reward tier by the best league reached (Liga 15 to 13 the smallest pack, Liga 2 and 1 the top pack); the World Cup adds one tier. */
 export function getTournamentRewardPack(id:TournamentId, highestDivision=1) {
   const league=SEASON_MODE_DIVISION_COUNT+1-clamp(Math.floor(Number(highestDivision))||1,1,SEASON_MODE_DIVISION_COUNT);

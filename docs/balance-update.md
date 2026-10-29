@@ -79,3 +79,19 @@ Die Packs bilden jetzt eine Leiter, die nur steigt: Jedes teurere Pack beginnt h
 * Flurin Fabrice spielt ZM und ZOM.
 * Einmalige Album Bereinigung (Feature Schema 8, alle Ligen): Für alle 100er Karten werden Sammelstatus, Meilensteinkarten und die Karrierestatistiken entfernt, aus denen Meilensteine entstehen. Karten im Kader bleiben im Kader. Abgeholte Albumprämien bleiben.
 * Der Kaufknopf sitzt in jeder Packkarte am unteren Rand.
+
+## Nachtrag: Packzeilen nach Kartenstufen
+
+Jede Zeile der Packchancen liegt jetzt in genau einer Kartenstufe der Pack-Enthüllung und trägt deren Namen: Gewöhnlich bis 70, Profi 71 bis 79, Selten 80 bis 85 (eigene Animation), Walkout 86 bis 89 (Walkout Animation ab 86), Top Walkout 90 bis 99. `tierBand` in `app/feature-data.ts` bricht beim Start ab, wenn eine Zeile eine Stufe überschreitet. Für jede Stufe hat ein teureres Pack mindestens die Chance eines billigeren.
+
+| Liga | Pack | Gewöhnlich | Profi | Selten | Walkout | Top Walkout |
+|---|---|---|---|---|---|---|
+| 15 | Schrott-Pack | 100% (bis 69) | | | | |
+| 13 | Regional-Pack | 70% (65 bis 70) | 30% | | | |
+| 11 | Scout Pack | 35% (68 bis 70) | 62% | 3% | | |
+| 9 | Profi-Pack | | 85% | 14% | 1% | |
+| 7 | Elite Pack | | 60% (75 bis 79) | 33% | 6% | 1% |
+| 5 | Weltklasse-Pack | | 40% (77 bis 79) | 48% | 10% | 2% |
+| 4 | Legenden Pack | | | 55% | 35% | 10% |
+
+Die Turnierprämien nutzen dieselben Stufen: Gewöhnlich bis 64, Gewöhnlich 65 bis 70, Profi 71 bis 79, Selten 80 bis 85, Walkout 86 bis 89, Top Walkout 90 bis 99.

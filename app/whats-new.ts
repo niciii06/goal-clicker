@@ -5,6 +5,16 @@ export type WhatsNewEntry = { id: string; date: string; title: string; items: re
 
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
   {
+    id: "2026-10-29-pack-stufen",
+    date: "29. Oktober 2026",
+    title: "Packchancen passen zur Karte",
+    items: [
+      "Jede Zeile in den Packchancen ist jetzt eine Kartenstufe: Gewöhnlich bis 70, Profi 71 bis 79, Selten 80 bis 85, Walkout ab 86, Top Walkout ab 90.",
+      "Ein teureres Pack hat in jeder Stufe mindestens so gute Chancen wie ein billigeres.",
+      "Turnierprämien zeigen ihre Chancen mit denselben Stufen.",
+    ],
+  },
+  {
     id: "2026-10-29-packs-album",
     date: "29. Oktober 2026",
     title: "Packs mit klarer Leiter",
