@@ -1169,101 +1169,9 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .star-walkout-nameplate h2 { display: block; width: 100%; max-width: 100%; margin: 7px 0 0; padding: 2px 0 4px; box-sizing: border-box; font-size: clamp(27px, 4vw, 43px); line-height: 1.05; text-align: right; text-wrap: balance; overflow-wrap: anywhere; }
 .star-walkout-avatar-wrap { position: absolute; z-index: 6; bottom: 23px; left: 50%; width: 130px; height: 252px; margin-left: -65px; opacity: 0; transform-origin: 50% 100%; animation: star-avatar-walk var(--walkout-duration, 9500ms) cubic-bezier(.22,.72,.2,1) both; animation-delay: var(--walkout-delay, 0ms); }
 .star-walkout-avatar { position: relative; width: 130px; height: 252px; transform: scaleX(var(--walkout-build, 1)) scaleY(var(--walkout-height, 1)); transform-origin: 50% 100%; filter: drop-shadow(0 16px 15px rgba(0,0,0,.55)); }
-.avatar-head { position: absolute; z-index: 8; top: 5px; left: 37px; width: 56px; height: 66px; border: 2px solid rgba(0,0,0,.15); border-radius: 24px 24px 21px 21px; background: var(--walkout-skin); box-shadow: inset 0 -8px 0 rgba(80,30,16,.08); }
-.face-round .avatar-head { width: 60px; left: 35px; border-radius: 27px 27px 24px 24px; }
-.face-long .avatar-head { width: 53px; height: 71px; left: 39px; border-radius: 22px; }
-.face-square .avatar-head { border-radius: 17px 17px 14px 14px; }
-.face-angular .avatar-head { border-radius: 20px 20px 30px 30px / 20px 20px 44px 44px; }
-.avatar-ear { position: absolute; z-index: -1; top: 27px; width: 9px; height: 16px; border: 1px solid rgba(0,0,0,.13); border-radius: 50%; background: var(--walkout-skin); }
-.avatar-ear.left { left: -7px; }.avatar-ear.right { right: -7px; }
-.avatar-brow { position: absolute; top: 28px; width: 15px; height: 3px; border-radius: 3px; background: color-mix(in srgb, var(--walkout-hair) 82%, #111); }
-.avatar-brow.left { left: 7px; transform: rotate(5deg); }.avatar-brow.right { right: 7px; transform: rotate(-5deg); }
-.avatar-eye { position: absolute; top: 35px; width: 7px; height: 5px; border-radius: 50%; background: #fff; box-shadow: inset 3px 0 0 #2a211d; }
-.avatar-eye.left { left: 11px; }.avatar-eye.right { right: 11px; }
-.avatar-nose { position: absolute; top: 38px; left: 50%; width: 6px; height: 11px; border-right: 2px solid rgba(88,38,20,.26); border-bottom: 2px solid rgba(88,38,20,.2); border-radius: 0 0 5px; transform: translateX(-50%); }
-.avatar-mouth { position: absolute; bottom: 10px; left: 50%; width: 16px; height: 5px; border-bottom: 2px solid rgba(87,25,25,.56); border-radius: 50%; transform: translateX(-50%); }
-.avatar-glasses { position: absolute; z-index: 3; top: 31px; right: 4px; left: 4px; height: 12px; background: linear-gradient(#2a2a2a,#2a2a2a) center 4px / 8px 2px no-repeat; }
-.avatar-glasses::before, .avatar-glasses::after { position: absolute; top: 0; width: 18px; height: 11px; border: 2px solid #2a2a2a; border-radius: 4px; background: rgba(200,220,255,.18); box-sizing: border-box; content: ""; }
-.avatar-glasses::before { left: 0; }.avatar-glasses::after { right: 0; }
-.avatar-cap { position: absolute; z-index: 4; top: -10px; right: -3px; left: -3px; height: 24px; border-radius: 28px 28px 7px 7px; background: #141414; box-shadow: inset 0 -3px 0 rgba(255,255,255,.08); }
-/* Worn backwards: the strap opening sits over the forehead and the brim points to the back. */
-.avatar-cap::before { position: absolute; bottom: 1px; left: 50%; width: 16px; height: 8px; border: 2px solid #3a3a3a; border-bottom: 0; border-radius: 9px 9px 0 0; background: var(--walkout-hair); transform: translateX(-50%); content: ""; }
-.avatar-cap::after { position: absolute; top: 9px; right: -9px; width: 14px; height: 6px; border-radius: 0 7px 7px 0; background: #0c0c0c; content: ""; }
-.with-cap .avatar-hair { top: 6px; height: 12px; }
-.avatar-hair { position: absolute; z-index: 2; top: -8px; right: -2px; left: -2px; height: 25px; border-radius: 23px 23px 9px 9px; background: var(--walkout-hair); }
-.hair-bald .avatar-hair { display: none; }
-.hair-buzz .avatar-hair { top: -3px; height: 14px; opacity: .92; }
-.hair-crop .avatar-hair { top: -6px; height: 21px; border-radius: 20px 20px 7px 7px; clip-path: polygon(0 20%,100% 0,96% 100%,4% 88%); }
-.hair-fade .avatar-hair { top: -5px; right: 4px; left: 4px; height: 21px; border-radius: 50% 50% 20% 20%; box-shadow: -5px 11px 0 -3px color-mix(in srgb, var(--walkout-hair) 60%, transparent), 5px 11px 0 -3px color-mix(in srgb, var(--walkout-hair) 60%, transparent); }
-.hair-curls .avatar-hair, .hair-afro .avatar-hair { top: -14px; height: 32px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--walkout-hair) 60%, #000) 0 1.7px, transparent 2.3px) 0 0 / 7px 7px, radial-gradient(circle, color-mix(in srgb, var(--walkout-hair) 72%, #fff) 0 1.2px, transparent 1.8px) 3.5px 3.5px / 7px 7px, var(--walkout-hair); clip-path: polygon(50.0% 0.0%,57.5% 7.7%,67.1% 3.0%,71.5% 12.8%,82.1% 11.7%,82.9% 22.4%,93.3% 25.0%,90.4% 35.3%,99.2% 41.3%,93.0% 50.0%,99.2% 58.7%,90.4% 64.7%,93.3% 75.0%,82.9% 77.6%,82.1% 88.3%,71.5% 87.2%,67.1% 97.0%,57.5% 92.3%,50.0% 100.0%,42.5% 92.3%,32.9% 97.0%,28.5% 87.2%,17.9% 88.3%,17.1% 77.6%,6.7% 75.0%,9.6% 64.7%,0.8% 58.7%,7.0% 50.0%,0.8% 41.3%,9.6% 35.3%,6.7% 25.0%,17.1% 22.4%,17.9% 11.7%,28.5% 12.8%,32.9% 3.0%,42.5% 7.7%); }
-.hair-afro .avatar-hair { top: -22px; right: -9px; left: -9px; height: 47px; }
-.hair-braids .avatar-hair { top: -8px; height: 35px; border-radius: 20px 20px 5px 5px; background: repeating-linear-gradient(90deg, var(--walkout-hair) 0 5px, color-mix(in srgb, var(--walkout-hair) 72%, #fff) 5px 7px); }
-.hair-braids .avatar-hair::after, .hair-locs .avatar-hair::after { position: absolute; top: 22px; right: 4px; left: 4px; height: 24px; background: repeating-linear-gradient(90deg, var(--walkout-hair) 0 4px, transparent 4px 8px); content: ""; }
-.hair-locs .avatar-hair { top: -10px; height: 35px; border-radius: 20px 20px 7px 7px; }
-.hair-locs .avatar-hair::after { top: 20px; right: -2px; left: -2px; height: 34px; }
-.hair-medium .avatar-hair { top: -9px; right: -4px; left: -4px; height: 34px; border-radius: 22px 25px 11px 12px; transform: rotate(-4deg); }
-.hair-mohawk .avatar-hair { top: -18px; right: 16px; left: 16px; height: 35px; border-radius: 50% 50% 6px 6px; clip-path: polygon(8% 100%,25% 10%,47% 45%,67% 0,92% 100%); }
-.hair-pony .avatar-hair { top: -8px; height: 25px; }
-.hair-pony .avatar-hair::after { position: absolute; top: 7px; right: -10px; width: 16px; height: 46px; border-radius: 10px 10px 14px 4px; background: var(--walkout-hair); content: ""; transform: rotate(-10deg); }
-.hair-slick .avatar-hair { top: -6px; height: 22px; clip-path: polygon(0 35%,82% 0,100% 20%,94% 100%,4% 82%); }
-.hair-waves .avatar-hair { top: -5px; height: 21px; background: repeating-radial-gradient(ellipse at center, var(--walkout-hair) 0 4px, color-mix(in srgb, var(--walkout-hair) 72%, #fff) 5px 6px); }
-/* Hair styles added with the redrawn walkouts. */
-.hair-long .avatar-hair, .hair-bob .avatar-hair, .hair-mane .avatar-hair { top: -9px; right: -4px; left: -4px; height: 27px; border-radius: 26px 26px 10px 10px; }
-.hair-long .avatar-hair::before, .hair-long .avatar-hair::after, .hair-bob .avatar-hair::before, .hair-bob .avatar-hair::after { position: absolute; top: 12px; width: 13px; height: 58px; border-radius: 6px 6px 9px 9px; background: var(--walkout-hair); content: ""; }
-.hair-long .avatar-hair::before, .hair-bob .avatar-hair::before { left: -3px; }.hair-long .avatar-hair::after, .hair-bob .avatar-hair::after { right: -3px; }
-.hair-bob .avatar-hair::before, .hair-bob .avatar-hair::after { height: 40px; width: 14px; border-radius: 6px 6px 12px 12px; }
-.hair-mane .avatar-hair { top: -16px; right: -10px; left: -10px; height: 36px; border-radius: 50% 50% 30% 30%; background: radial-gradient(circle, color-mix(in srgb, var(--walkout-hair) 60%, #000) 0 1.7px, transparent 2.3px) 0 0 / 7px 7px, radial-gradient(circle, color-mix(in srgb, var(--walkout-hair) 72%, #fff) 0 1.2px, transparent 1.8px) 3.5px 3.5px / 7px 7px, var(--walkout-hair); }
-.hair-mane .avatar-hair::before, .hair-mane .avatar-hair::after { position: absolute; top: 20px; width: 20px; height: 52px; border-radius: 10px; background: radial-gradient(circle at 50% 20%, var(--walkout-hair) 0 9px, transparent 10px), radial-gradient(circle at 40% 55%, var(--walkout-hair) 0 10px, transparent 11px), radial-gradient(circle at 55% 85%, var(--walkout-hair) 0 9px, transparent 10px); content: ""; }
-.hair-mane .avatar-hair::before { left: -2px; }.hair-mane .avatar-hair::after { right: -2px; }
-.hair-bun .avatar-hair { top: -6px; height: 22px; border-radius: 22px 22px 8px 8px; }
-.hair-bun .avatar-hair::after { position: absolute; top: -13px; left: 50%; width: 20px; height: 17px; border-radius: 50%; background: var(--walkout-hair); box-shadow: inset 0 -3px 0 rgba(0,0,0,.18); content: ""; transform: translateX(-50%); }
-.hair-spiky .avatar-hair { top: -15px; height: 30px; border-radius: 10px 10px 6px 6px; clip-path: polygon(0 100%,4% 30%,14% 52%,22% 8%,34% 46%,45% 0,56% 44%,68% 6%,78% 48%,88% 14%,96% 42%,100% 100%); }
-.hair-quiff .avatar-hair { top: -17px; height: 32px; border-radius: 30px 18px 8px 8px; clip-path: polygon(0 60%,10% 30%,30% 6%,58% 0,82% 16%,100% 48%,98% 100%,2% 100%); }
-.hair-sidepart .avatar-hair { top: -8px; height: 24px; border-radius: 22px 26px 8px 8px; background: linear-gradient(100deg, var(--walkout-hair) 0 32%, color-mix(in srgb, var(--walkout-hair) 55%, #fff) 32% 35%, var(--walkout-hair) 35%); clip-path: polygon(0 40%,30% 8%,100% 0,100% 100%,0 100%); }
-.hair-curtain .avatar-hair { top: -9px; height: 30px; border-radius: 24px 24px 10px 10px; clip-path: polygon(0 0,100% 0,100% 100%,62% 70%,50% 42%,38% 70%,0 100%); }
-.hair-mullet .avatar-hair { top: -8px; height: 26px; border-radius: 22px 22px 8px 8px; }
-.hair-mullet .avatar-hair::before, .hair-mullet .avatar-hair::after { position: absolute; top: 18px; width: 12px; height: 52px; border-radius: 4px 4px 8px 8px; background: var(--walkout-hair); content: ""; }
-.hair-mullet .avatar-hair::before { left: -4px; }.hair-mullet .avatar-hair::after { right: -4px; }
-.hair-twists .avatar-hair { top: -12px; right: 1px; left: 1px; height: 27px; border-radius: 18px 18px 8px 8px; background: repeating-linear-gradient(90deg, var(--walkout-hair) 0 4px, color-mix(in srgb, var(--walkout-hair) 55%, #000) 4px 5.5px); clip-path: polygon(0 100%,0.0% 0%,7.1% 22%,14.3% 0%,21.4% 22%,28.6% 0%,35.7% 22%,42.9% 0%,50.0% 22%,57.1% 0%,64.3% 22%,71.4% 0%,78.6% 22%,85.7% 0%,92.9% 22%,100.0% 0%,100% 100%); }
-.hair-receding .avatar-hair { top: 6px; right: -3px; left: -3px; height: 20px; border-radius: 10px; background: linear-gradient(90deg, var(--walkout-hair) 0 18%, transparent 18% 82%, var(--walkout-hair) 82%); }
-.hair-receding .avatar-hair::after { position: absolute; top: -10px; right: 14px; left: 14px; height: 8px; border-radius: 50%; background: var(--walkout-hair); opacity: .35; content: ""; }
-.avatar-beard { position: absolute; z-index: 1; right: 7px; bottom: -1px; left: 7px; height: 24px; border-radius: 4px 4px 20px 20px; background: var(--walkout-hair); clip-path: polygon(0 0,22% 22%,50% 5%,78% 22%,100% 0,87% 75%,50% 100%,13% 75%); }
-.beard-clean .avatar-beard { display: none; }
-.beard-stubble .avatar-beard { opacity: .28; height: 18px; }
-.beard-short .avatar-beard { opacity: .78; height: 20px; }
-.beard-goatee .avatar-beard { right: 19px; left: 19px; height: 20px; clip-path: polygon(20% 0,80% 0,100% 100%,0 100%); }
-.beard-full .avatar-beard { right: 4px; bottom: -5px; left: 4px; height: 28px; }
-.beard-mustache .avatar-beard { right: 16px; bottom: 15px; left: 16px; height: 6px; border-radius: 4px 4px 6px 6px; clip-path: none; }
-.beard-chinstrap .avatar-beard { right: 3px; bottom: -2px; left: 3px; height: 26px; border: 3px solid var(--walkout-hair); border-top: 0; border-radius: 0 0 22px 22px; background: transparent; clip-path: none; }
-/* Accessories: headband, keeper skull cap, tattoo sleeves and the keeper kit with gloves. */
-.avatar-headband { position: absolute; z-index: 3; top: 6px; right: -3px; left: -3px; height: 6px; border-radius: 3px; background: var(--walkout-headband, #f4f4f4); box-shadow: 0 1px 0 rgba(0,0,0,.18); }
-.avatar-helmet { position: absolute; z-index: 4; top: -9px; right: -5px; left: -5px; height: 38px; border-radius: 28px 28px 12px 12px; background: repeating-linear-gradient(90deg, #1c1c1c 0 9px, #2a2a2a 9px 11px); box-shadow: inset 0 -3px 0 rgba(255,255,255,.08); }
-.with-helmet .avatar-hair { display: none; }
-.tattoo-left .avatar-arm.left::after, .tattoo-right .avatar-arm.right::after, .tattoo-both .avatar-arm::after { position: absolute; top: 46%; right: 3px; bottom: 16px; left: 3px; border-radius: 6px; background: repeating-linear-gradient(40deg, rgba(25,32,52,.5) 0 3px, transparent 3px 7px), radial-gradient(circle at 50% 40%, rgba(25,32,52,.45) 0 4px, transparent 5px); content: ""; }
-.keeper .avatar-arm { background: linear-gradient(var(--walkout-primary) 0 100%); }
-.keeper .avatar-arm::after { display: none; }
-.keeper .avatar-arm i { bottom: -8px; height: 24px; border-radius: 9px; background: var(--walkout-gloves, #f1f3f6); box-shadow: inset 0 -5px 0 color-mix(in srgb, var(--walkout-secondary) 60%, transparent); }
-.avatar-neck { position: absolute; z-index: 5; top: 64px; left: 51px; width: 28px; height: 28px; border-radius: 8px; background: var(--walkout-skin); }
-.avatar-torso { position: absolute; z-index: 4; top: 82px; left: 27px; width: 76px; height: 88px; overflow: hidden; border: 2px solid rgba(255,255,255,.2); border-radius: 20px 20px 11px 11px; background: linear-gradient(105deg, color-mix(in srgb, var(--walkout-primary) 75%, #fff), var(--walkout-primary) 46%, color-mix(in srgb, var(--walkout-primary) 78%, #000)); box-shadow: inset 0 0 0 4px rgba(0,0,0,.06); }
-.avatar-torso span { position: absolute; top: 25px; left: 50%; color: var(--walkout-secondary); font-size: 24px; font-weight: 900; text-shadow: 0 2px 3px rgba(0,0,0,.3); transform: translateX(-50%); }
-.avatar-kit-stripe { position: absolute; inset: 0 29px; background: var(--walkout-secondary); opacity: .9; }
-.avatar-arm { position: absolute; z-index: 3; top: 91px; width: 22px; height: 88px; border-radius: 12px; background: linear-gradient(var(--walkout-primary) 0 42%, var(--walkout-skin) 43%); transform-origin: 50% 8px; }
-.avatar-arm.left { left: 13px; transform: rotate(6deg); }.avatar-arm.right { right: 13px; transform: rotate(-6deg); }
-.avatar-arm i { position: absolute; right: 0; bottom: -5px; left: 0; height: 20px; border-radius: 50%; background: var(--walkout-skin); }
-.avatar-leg { position: absolute; z-index: 2; top: 159px; width: 31px; height: 87px; border-radius: 7px 7px 10px 10px; background: linear-gradient(var(--walkout-secondary) 0 44%, var(--walkout-skin) 45% 67%, #f5f5f5 68% 91%, var(--walkout-boots) 92%); transform-origin: 50% 4px; }
-.avatar-leg.left { left: 31px; }.avatar-leg.right { right: 31px; }
-.avatar-leg i { position: absolute; right: -7px; bottom: -2px; width: 38px; height: 12px; border-radius: 10px 13px 5px 4px; background: var(--walkout-boots); }
-.avatar-leg.left i { right: 0; left: -7px; transform: scaleX(-1); }
-.star-walkout-avatar-wrap .avatar-arm, .star-walkout-avatar-wrap .avatar-leg { animation-duration: .88s; animation-timing-function: ease-in-out; animation-iteration-count: 6; animation-delay: calc(1.45s + var(--walkout-delay, 0ms)); }
-.star-walkout-avatar-wrap .avatar-arm.left, .star-walkout-avatar-wrap .avatar-leg.right { animation-name: star-avatar-limb-a; }
-.star-walkout-avatar-wrap .avatar-arm.right, .star-walkout-avatar-wrap .avatar-leg.left { animation-name: star-avatar-limb-b; }
-.celebration-arms .avatar-arm.left { animation: star-celebrate-arm-left 2.2s ease both; animation-delay: calc(5.25s + var(--walkout-delay, 0ms)); }.celebration-arms .avatar-arm.right { animation: star-celebrate-arm-right 2.2s ease both; animation-delay: calc(5.25s + var(--walkout-delay, 0ms)); }
-.celebration-fist .avatar-arm.right, .celebration-point .avatar-arm.right { animation: star-celebrate-fist 2.2s ease both; animation-delay: calc(5.25s + var(--walkout-delay, 0ms)); }
 .celebration-siu .star-walkout-avatar { animation: star-celebrate-siu 2.35s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(5.1s + var(--walkout-delay, 0ms)); }
 .celebration-jump .star-walkout-avatar { animation: star-celebrate-jump 2.15s ease both; animation-delay: calc(5.2s + var(--walkout-delay, 0ms)); }
 .star-reveal-top-walkout .star-walkout-avatar-wrap { animation-duration: var(--walkout-duration, 11500ms); }
-.star-reveal-top-walkout .star-walkout-avatar-wrap .avatar-arm, .star-reveal-top-walkout .star-walkout-avatar-wrap .avatar-leg { animation-duration: 1.05s; animation-iteration-count: 9; }
-.star-reveal-top-walkout .celebration-arms .avatar-arm.left, .star-reveal-top-walkout .celebration-arms .avatar-arm.right, .star-reveal-top-walkout .celebration-fist .avatar-arm.right, .star-reveal-top-walkout .celebration-point .avatar-arm.right { animation-duration: 3s; }
 .star-reveal-top-walkout .celebration-siu .star-walkout-avatar { animation-duration: 3.2s; }
 .star-reveal-top-walkout .celebration-jump .star-walkout-avatar { animation-duration: 2.9s; }
 .star-walkout-confetti { position: absolute; z-index: 4; inset: 0; overflow: hidden; pointer-events: none; }
@@ -1299,11 +1207,6 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 @keyframes star-walkout-actions { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes star-walkout-country { 0% { opacity: 0; transform: translateX(-35px) scale(.72); filter: blur(10px); } 65% { opacity: 1; transform: translateX(5px) scale(1.05); filter: blur(0); } 100% { opacity: 1; transform: none; } }
 @keyframes star-avatar-walk { 0%, 16% { opacity: 0; transform: translate3d(0,34px,-180px) scale(.5); filter: blur(8px) brightness(.4); } 24% { opacity: 1; } 57% { opacity: 1; transform: translate3d(0,0,0) scale(1); filter: blur(0) brightness(1); } 100% { opacity: 1; transform: translate3d(0,0,0) scale(1); filter: none; } }
-@keyframes star-avatar-limb-a { 0%,100% { transform: rotate(12deg); } 50% { transform: rotate(-14deg); } }
-@keyframes star-avatar-limb-b { 0%,100% { transform: rotate(-12deg); } 50% { transform: rotate(14deg); } }
-@keyframes star-celebrate-arm-left { 0% { transform: rotate(6deg); } 45%,100% { transform: rotate(145deg); } }
-@keyframes star-celebrate-arm-right { 0% { transform: rotate(-6deg); } 45%,100% { transform: rotate(-145deg); } }
-@keyframes star-celebrate-fist { 0% { transform: rotate(-6deg); } 45%,100% { transform: rotate(-152deg) translateY(-4px); } }
 @keyframes star-celebrate-siu { 0% { transform: scaleX(var(--walkout-build,1)) scaleY(var(--walkout-height,1)) translateY(0) rotate(0); } 35% { transform: scaleX(var(--walkout-build,1)) scaleY(var(--walkout-height,1)) translateY(-34px) rotate(10deg); } 70% { transform: scaleX(var(--walkout-build,1)) scaleY(var(--walkout-height,1)) translateY(0) rotate(-8deg); } 100% { transform: scaleX(var(--walkout-build,1)) scaleY(var(--walkout-height,1)) translateY(0) rotate(0); } }
 @keyframes star-celebrate-jump { 0%,100% { transform: scaleX(var(--walkout-build,1)) scaleY(var(--walkout-height,1)) translateY(0); } 45% { transform: scaleX(var(--walkout-build,1)) scaleY(var(--walkout-height,1)) translateY(-42px); } }
 @keyframes star-rare-rays { to { transform: rotate(360deg); } }
@@ -2133,8 +2036,6 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .star-walkout-rating-panel strong { transform-origin: 0 100%; animation: star-walkout-rating-stage 1.7s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(3.4s + var(--walkout-delay, 0ms)); }
 .star-walkout-rating-panel em { animation-delay: calc(5s + var(--walkout-delay, 0ms)); }
 .star-walkout-avatar-wrap { animation-name: star-avatar-walk-late; }
-.star-walkout-avatar-wrap .avatar-arm, .star-walkout-avatar-wrap .avatar-leg { animation-iteration-count: 3; animation-delay: calc(4.5s + var(--walkout-delay, 0ms)); }
-.star-reveal-top-walkout .star-walkout-avatar-wrap .avatar-arm, .star-reveal-top-walkout .star-walkout-avatar-wrap .avatar-leg { animation-iteration-count: 3; animation-delay: calc(5.6s + var(--walkout-delay, 0ms)); }
 .star-walkout-nameplate { animation-delay: calc(6.2s + var(--walkout-delay, 0ms)); }
 .star-reveal-top-walkout .star-walkout-nameplate { animation-delay: calc(8s + var(--walkout-delay, 0ms)); }
 @keyframes star-walkout-country-stage {
@@ -2160,26 +2061,6 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .account-signin-button:hover { filter: brightness(1.06); }
 .account-guest { display: grid; gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); text-align: center; }
 .account-guest .account-hint { margin-top: 0; }
-/* The women's walkout figure: narrower shoulders, a waist, slimmer limbs and a softer face (no blush: in small it read as a moustache). */
-.body-women .avatar-head { left: 39px; width: 52px; border-radius: 24px 24px 26px 26px / 24px 24px 32px 32px; box-shadow: none; }
-.body-women.face-round .avatar-head { left: 38px; width: 54px; }
-.body-women.face-long .avatar-head { left: 40px; width: 50px; }
-.body-women .avatar-brow { height: 2px; width: 13px; }
-.body-women .avatar-eye { border-top: 2px solid #2a211d; }
-.body-women .avatar-mouth { bottom: 12px; width: 11px; height: 4px; border-bottom: 2px solid rgba(170,70,82,.7); border-radius: 0 0 8px 8px; }
-.body-women .avatar-neck { left: 54px; width: 22px; }
-.body-women .avatar-torso { top: 84px; left: 33px; width: 64px; height: 84px; border-radius: 18px 18px 12px 12px; clip-path: polygon(3% 0, 97% 0, 99% 18%, 88% 58%, 96% 100%, 4% 100%, 12% 58%, 1% 18%); }
-.body-women .avatar-kit-stripe { inset: 0 25px; }
-.body-women .avatar-torso span { font-size: 21px; }
-.body-women .avatar-arm { top: 92px; width: 18px; height: 84px; }
-.body-women .avatar-arm.left { left: 19px; }.body-women .avatar-arm.right { right: 19px; }
-.body-women .avatar-leg { top: 160px; width: 28px; }
-.body-women .avatar-leg.left { left: 34px; }.body-women .avatar-leg.right { right: 34px; }
-.body-women .avatar-leg i { width: 34px; }
-/* Braids and locs hang at the sides and behind, never across the face. */
-.hair-braids .avatar-hair::after, .hair-locs .avatar-hair::after { -webkit-mask: linear-gradient(90deg, #000 0 24%, transparent 24% 76%, #000 76%); mask: linear-gradient(90deg, #000 0 24%, transparent 24% 76%, #000 76%); }
-.hair-braids .avatar-hair { top: -7px; height: 22px; }
-.hair-braids .avatar-hair::after { top: 12px; right: -4px; left: -4px; height: 34px; }
 /* The realistic walkout figure (walkout-figure.tsx): one SVG drawing, coloured from the walkout variables. */
 .wf { --wf-skin-shade: color-mix(in srgb, var(--walkout-skin) 58%, #2a1006); --wf-hair-dark: color-mix(in srgb, var(--walkout-hair) 55%, #000); --wf-hair-light: color-mix(in srgb, var(--walkout-hair) 62%, #fff); --wf-brow: color-mix(in srgb, var(--walkout-hair) 62%, #120b07); --wf-lip: color-mix(in srgb, var(--walkout-skin) 72%, #8e3f33); }
 .wf.body-women { --wf-lip: color-mix(in srgb, var(--walkout-skin) 62%, #a8434f); }
@@ -2239,3 +2120,7 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .wf .wf-cap { fill: var(--walkout-secondary); }
 .wf .wf-glasses rect { fill: rgba(255,255,255,.12); stroke: #121212; stroke-width: .8; }
 .wf .wf-glasses path { fill: none; stroke: #121212; stroke-width: .8; }
+/* The 3D walkout (walkout-3d.ts) renders over the whole stage; the drawn figure in the wrap is its fallback. */
+.star-walkout-3d { position: absolute; z-index: 6; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; transition: opacity .35s ease; }
+.star-walkout-3d.ready { opacity: 1; }
+.star-walkout-avatar-wrap.is-3d { visibility: hidden; }

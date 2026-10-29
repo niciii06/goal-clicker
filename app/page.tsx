@@ -2833,7 +2833,7 @@ function App() {
               {starWalkoutPresentation && <>
                 <div className="star-walkout-country"><WalkoutCountryFlag code={starWalkoutPresentation.countryCode} country={starWalkoutPresentation.country} /><strong>{starWalkoutPresentation.country}</strong><small>{starWalkoutPresentation.countryCode}</small></div>
                 <div className="star-walkout-rating-panel"><StarXIPositionBadges player={starReveal.player} variant="walkout" /><strong>{starReveal.player.rating}</strong><em>{starRevealIsLegendary ? "LEGENDÄRE KARTE" : starRevealIsIconic ? "ICON KARTE" : "WALKOUT KARTE"}</em></div>
-                <WalkoutAvatar presentation={starWalkoutPresentation} rating={starReveal.player.rating} label={`Ganzkörper Figur von ${starReveal.player.name}`} onAnimationEnd={finishStarWalkout} />
+                <WalkoutAvatar presentation={starWalkoutPresentation} rating={starReveal.player.rating} label={`Ganzkörper Figur von ${starReveal.player.name}`} durationMs={starWalkoutAnimationDuration} elapsedMs={starWalkoutElapsed} onAnimationEnd={finishStarWalkout} />
                 <div className="star-walkout-nameplate"><span><WalkoutCountryFlag compact code={starWalkoutPresentation.countryCode} country={starWalkoutPresentation.country} /> {starWalkoutPresentation.countryCode} · {formatStarXIPositions(starReveal.player)}</span><h2>{starReveal.player.name}</h2></div>
               </>}
             </div>}

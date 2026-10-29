@@ -1,4 +1,4 @@
-import { useId, type AnimationEvent, type CSSProperties, type ReactNode } from "react";
+import { useId, type CSSProperties, type ReactNode } from "react";
 import type { WalkoutFace, WalkoutHair, WalkoutPresentation } from "./walkout-data";
 
 /*
@@ -311,7 +311,18 @@ const TORSO = {
   women: "M 90 73.4 C 84 76 74 78 68 83 L 66 85 C 67 96 70 106 71 114 C 72 128 74 145 75 165 C 75 180 73 192 72 203 Q 100 208 128 203 C 127 192 125 180 125 165 C 126 145 128 128 129 114 C 130 106 133 96 134 85 L 132 83 C 126 78 116 76 110 73.4 L 100 86 Z",
 };
 
-export function WalkoutFigure({ presentation: p, rating, label, onAnimationEnd }: { presentation: WalkoutPresentation; rating: number; label: string; onAnimationEnd?: (event: AnimationEvent<HTMLDivElement>) => void }) {
+/** Classes for the wrap around the drawing: celebration, women's figure and keeper kit. */
+export function walkoutFigureClasses(p: WalkoutPresentation) {
+  return ["wf", `celebration-${p.celebration}`, p.body === "women" ? "body-women" : "", p.keeper ? "keeper" : ""].filter(Boolean).join(" ");
+}
+
+/** Colours the drawing needs beyond the stage variables. */
+export function walkoutFigureStyle(p: WalkoutPresentation) {
+  return { "--walkout-headband": p.headband, "--walkout-gloves": p.gloves, "--wf-iris": irisColor(p) } as CSSProperties;
+}
+
+/** The drawn figure: shown when the 3D walkout cannot run (no WebGL) or has not loaded yet. */
+export function WalkoutFigure({ presentation: p, rating }: { presentation: WalkoutPresentation; rating: number }) {
   const u = `wf${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const women = p.body === "women";
   const g = geometry(p.face, women);
@@ -323,14 +334,11 @@ export function WalkoutFigure({ presentation: p, rating, label, onAnimationEnd }
   const beard = women ? "clean" : p.beard;
   const tattooLeft = p.tattoo === "left" || p.tattoo === "both";
   const tattooRight = p.tattoo === "right" || p.tattoo === "both";
-  const classes = ["star-walkout-avatar-wrap", "wf", `celebration-${p.celebration}`, women ? "body-women" : "", keeper ? "keeper" : ""].filter(Boolean).join(" ");
-  const style = { "--walkout-headband": p.headband, "--walkout-gloves": p.gloves, "--wf-iris": irisColor(p) } as CSSProperties;
   // Women's limbs are the men's drawing, narrowed around the shoulder and hip.
   const armShape = women ? "translate(66.4 0) scale(.84 1) translate(-61 0)" : undefined;
   const legShape = women ? "translate(88 0) scale(.9 1) translate(-88 0)" : undefined;
   const L = 100 - g.w;
-  return <div className={classes} style={style} aria-label={label} role="img" onAnimationEnd={onAnimationEnd}>
-    <div className="star-walkout-avatar">
+  return <div className="star-walkout-avatar">
       <svg viewBox="0 0 200 420" aria-hidden="true" focusable="false">
         <defs>
           <linearGradient id={`${u}-sc`} x1="0" x2="1" y1="0" y2="0"><stop offset="0" className="wf-stop-shade" stopOpacity=".55" /><stop offset=".3" className="wf-stop-shade" stopOpacity="0" /><stop offset=".42" stopColor="#fff" stopOpacity=".1" /><stop offset=".7" className="wf-stop-shade" stopOpacity="0" /><stop offset="1" className="wf-stop-shade" stopOpacity=".6" /></linearGradient>
@@ -415,7 +423,6 @@ export function WalkoutFigure({ presentation: p, rating, label, onAnimationEnd }
         <g className="wf-arm left"><g transform={armShape}><Arm keeper={keeper} tattoo={tattooLeft} u={u} /></g></g>
         <g className="wf-arm right"><g transform="matrix(-1 0 0 1 200 0)"><g transform={armShape}><Arm keeper={keeper} tattoo={tattooRight} u={u} /></g></g></g>
       </svg>
-    </div>
   </div>;
 }
 

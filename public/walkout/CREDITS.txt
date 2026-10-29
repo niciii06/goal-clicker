@@ -1,0 +1,2 @@
+3D walkout models and animations by Quaternius (https://quaternius.com), CC0 1.0 Universal (public domain).
+Universal Base Characters (Standard) and Universal Animation Library (Standard), converted with scripts/walkout-assets.mjs.
