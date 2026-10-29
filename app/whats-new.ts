@@ -5,6 +5,17 @@ export type WhatsNewEntry = { id: string; date: string; title: string; items: re
 
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
   {
+    id: "2026-10-29-packs-album",
+    date: "29. Oktober 2026",
+    title: "Packs mit klarer Leiter",
+    items: [
+      "Jedes teurere Pack beginnt höher und erreicht bessere Karten als das billigere davor.",
+      "Top Walkouts bis 99 gibt es nur noch im Legenden Pack, 100er nur im Spezialkarten-Pack.",
+      "Flurin Fabrice spielt jetzt auch ZOM.",
+      "100er Karten zählen im Sammelalbum nicht mehr als gesammelt, ihre Meilensteinkarten sind entfernt.",
+    ],
+  },
+  {
     id: "2026-10-29-balance",
     date: "29. Oktober 2026",
     title: "Balance Update: Packs passen zur Liga",

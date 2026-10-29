@@ -162,7 +162,7 @@ export const STAR_PACK_ROLL_DURATION_MS = 8000;
 export const STAR_XI_SQUAD_SIZE = 11;
 export const STAR_XI_BENCH_SIZE = 12;
 export const STAR_XI_MAX_SUBSTITUTIONS = 5;
-export const GAME_FEATURES_SCHEMA_VERSION = 7;
+export const GAME_FEATURES_SCHEMA_VERSION = 8;
 export const SEASON_MODE_DIVISION_COUNT = 15;
 export const SEASON_MODE_MATCHES_PER_SEASON = 10;
 export const SEASON_MODE_TABLE_SIZE = 6;
@@ -233,7 +233,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
     isCustom: true,
     name: "Flurin Fabrice",
     position: "ZM",
-    positions: ["ZM"],
+    positions: ["ZM", "ZOM"],
     rating: 100,
     price: 5000000000,
     accent: "#c69214",
@@ -590,14 +590,16 @@ export function getStarXIFragmentCompensation(player: StarXIPlayer) {
 }
 
 // One pack per league band: every pack unlocks where its cards fit the opponents of that league.
+// The ladder only climbs: a dearer pack never has a lower floor or a lower best tier than a cheaper one,
+// and 100 rated cards come only from the special card pack.
 export const STAR_PACKS: readonly StarPackDefinition[] = [
   { id: "scrap", label: "Schrott-Pack", price: 15000, description: "Günstig einsteigen und dein Team ergänzen. Enthält eine Basiskarte.", odds: SCRAP_RATING_GROUPS.map(group => ({ ...group, label: group.minRating === 0 ? "Rating bis 54" : `Rating ${group.minRating}–${group.maxRating}` })) },
-  { id: "regional", label: "Regional-Pack", price: 10000000, description: "Solide Regionalliga Spieler, starke Karten sind die grosse Ausnahme", odds: [{ label: "Standard 65–74", minRating: 65, maxRating: 74, chance: 0.85 }, { label: "Gut 75–79", minRating: 75, maxRating: 79, chance: 0.14 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.01 }] },
-  { id: "scout", label: "Scout Pack", price: 50000000, description: "Ideal zum Aufbau, starke Karten bleiben extrem selten", odds: [{ label: "Standard 65–79", minRating: 65, maxRating: 79, chance: 0.9 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.09 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.009009 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.00099 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.000001 }] },
-  { id: "profi", label: "Profi-Pack", price: 350000000, description: "Profis für die Liga Mitte, Walkouts bleiben selten", odds: [{ label: "Standard 70–79", minRating: 70, maxRating: 79, chance: 0.65 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.32 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.03 }] },
-  { id: "elite", label: "Elite Pack", price: 3000000000, description: "Pack für die oberen Ligen mit besseren Chancen, aber ohne geschenkte Topelf", odds: [{ label: "Standard 65–79", minRating: 65, maxRating: 79, chance: 0.55 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.38 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.06009 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.0099 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.00001 }] },
-  { id: "weltklasse", label: "Weltklasse-Pack", price: 6000000000, description: "Starke Karten für den Aufstiegskampf, Top Walkouts bleiben selten", odds: [{ label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.6 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.37 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.03 }] },
-  { id: "legend", label: "Legenden Pack", price: 15000000000, description: "Teures Endgame Risiko mit klar besseren, aber weiterhin seltenen Topkarten", odds: [{ label: "Standard 65–79", minRating: 65, maxRating: 79, chance: 0.18 }, { label: "Selten 80–85", minRating: 80, maxRating: 85, chance: 0.42 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.349 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.05 }, { label: "Legendär 100", minRating: 100, maxRating: 100, chance: 0.001 }] },
+  { id: "regional", label: "Regional-Pack", price: 10000000, description: "Solide Regionalliga Spieler, starke Karten sind die grosse Ausnahme", odds: [{ label: "Standard 65–72", minRating: 65, maxRating: 72, chance: 0.8 }, { label: "Gut 73–76", minRating: 73, maxRating: 76, chance: 0.18 }, { label: "Selten 77–79", minRating: 77, maxRating: 79, chance: 0.02 }] },
+  { id: "scout", label: "Scout Pack", price: 50000000, description: "Solide Profis zum Aufbau, starke Karten bleiben selten", odds: [{ label: "Standard 70–76", minRating: 70, maxRating: 76, chance: 0.75 }, { label: "Gut 77–79", minRating: 77, maxRating: 79, chance: 0.2 }, { label: "Selten 80–83", minRating: 80, maxRating: 83, chance: 0.05 }] },
+  { id: "profi", label: "Profi-Pack", price: 350000000, description: "Profis für die Liga Mitte, Spitzenkarten bleiben selten", odds: [{ label: "Standard 73–79", minRating: 73, maxRating: 79, chance: 0.65 }, { label: "Gut 80–83", minRating: 80, maxRating: 83, chance: 0.3 }, { label: "Selten 84–86", minRating: 84, maxRating: 86, chance: 0.05 }] },
+  { id: "elite", label: "Elite Pack", price: 3000000000, description: "Für die oberen Ligen, Walkouts sind möglich, aber selten", odds: [{ label: "Standard 77–81", minRating: 77, maxRating: 81, chance: 0.6 }, { label: "Gut 82–85", minRating: 82, maxRating: 85, chance: 0.33 }, { label: "Walkout 86–89", minRating: 86, maxRating: 89, chance: 0.07 }] },
+  { id: "weltklasse", label: "Weltklasse-Pack", price: 6000000000, description: "Starke Karten für den Aufstiegskampf, Walkouts bleiben selten", odds: [{ label: "Standard 80–84", minRating: 80, maxRating: 84, chance: 0.55 }, { label: "Gut 85–88", minRating: 85, maxRating: 88, chance: 0.38 }, { label: "Walkout 89–91", minRating: 89, maxRating: 91, chance: 0.07 }] },
+  { id: "legend", label: "Legenden Pack", price: 15000000000, description: "Das teuerste Pack, nur hier gibt es Top Walkouts bis 99", odds: [{ label: "Standard 83–86", minRating: 83, maxRating: 86, chance: 0.5 }, { label: "Walkout 87–89", minRating: 87, maxRating: 89, chance: 0.4 }, { label: "Top Walkout 90–99", minRating: 90, maxRating: 99, chance: 0.1 }] },
 ];
 
 const REWARD_BRACKETS = [[0,59],[60,69],[70,79],[80,85],[86,89],[90,99]] as const;
@@ -647,7 +649,8 @@ const STAR_RATING_POOLS = new Map<string, StarXIPlayer[]>();
 for (const pack of STAR_PACKS) {
   for (const odds of pack.odds) {
     const key = `${odds.minRating}-${odds.maxRating}`;
-    if (!STAR_RATING_POOLS.has(key)) STAR_RATING_POOLS.set(key, EXISTING_STAR_XI_PLAYERS.filter((player) => !player.retired && player.rating >= odds.minRating && player.rating <= odds.maxRating));
+    // Special cards are drawn only in the special card pack.
+    if (!STAR_RATING_POOLS.has(key)) STAR_RATING_POOLS.set(key, EXISTING_STAR_XI_PLAYERS.filter((player) => !player.retired && !player.isCustom && player.rating >= odds.minRating && player.rating <= odds.maxRating));
   }
 }
 
@@ -2523,9 +2526,37 @@ function removeEarlyHundredSpecialCards(source: Record<string, unknown>) {
   };
 }
 
+/** Schema 8: every 100 rated card leaves the album once (collected status, milestones and the career
+ * statistics they are earned from), whatever the league. A card in the squad stays in the squad. */
+function clearHundredCardsFromAlbum(source: Record<string, unknown>) {
+  if (Number(source.schemaVersion) >= 8 || !source.career) return { source, cleared: false };
+  const hundredIds = new Set(STAR_XI_PLAYERS.filter((player) => player.rating >= 100).map((player) => player.id));
+  const career = asRecord(source.career);
+  const withoutHundreds = (value: unknown) => Object.fromEntries(Object.entries(asRecord(value)).filter(([id]) => !hundredIds.has(id)));
+  const collectedIds = Array.isArray(career.collectedIds) ? career.collectedIds : [];
+  const cleared = collectedIds.some((id) => hundredIds.has(String(id)))
+    || [career.milestoneCards, career.players].some((value) => Object.keys(asRecord(value)).some((id) => hundredIds.has(id)));
+  if (!cleared) return { source, cleared };
+  return {
+    cleared,
+    source: {
+      ...source,
+      career: {
+        ...career,
+        collectedIds: collectedIds.filter((id) => !hundredIds.has(String(id))),
+        milestoneCards: withoutHundreds(career.milestoneCards),
+        milestoneCategories: withoutHundreds(career.milestoneCategories),
+        players: withoutHundreds(career.players),
+        seasonPlayers: withoutHundreds(career.seasonPlayers),
+      },
+    } as Record<string, unknown>,
+  };
+}
+
 export function normalizeGameFeatures(value: unknown): GameFeatures {
   const migration = removeEarlyHundredSpecialCards(asRecord(value));
-  const source = migration.source;
+  const album = clearHundredCardsFromAlbum(migration.source);
+  const source = album.source;
   const defaults = initialGameFeatures();
   const market = asRecord(source.transferMarket);
   const starXI = asRecord(source.starXI);
@@ -2765,6 +2796,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     nextVarAt: Number(source.nextVarAt) > 0 ? Number(source.nextVarAt) : defaults.nextVarAt,
   };
   if (migration.removed) addHistory(normalized, { title: "Spezialkarten neu verteilt", detail: `${migration.removed} 100er ${migration.removed === 1 ? "Karte wurde" : "Karten wurden"} entfernt. Das Spezialkarten-Pack öffnet ab Liga ${getPackUnlockLeague(SPECIAL_CARD_PACK.id)}.`, tone: "neutral" });
+  if (album.cleared) addHistory(normalized, { title: "Sammelalbum bereinigt", detail: "100er Karten zählen nicht mehr als gesammelt, ihre Meilensteine sind entfernt.", tone: "neutral" });
   return normalized;
 }
 

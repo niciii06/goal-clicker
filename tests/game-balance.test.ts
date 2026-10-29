@@ -35,29 +35,23 @@ function positionGroup(position: string) {
   return "attack";
 }
 
-test("pack odds are complete and remain intentionally conservative", () => {
+test("pack odds are complete and the ladder only climbs with price", () => {
   for (const pack of STAR_PACKS.filter(p => p.id !== "scrap")) {
     assert.ok(Math.abs(pack.odds.reduce((sum, band) => sum + band.chance, 0) - 1) < 1e-9);
+    assert.equal(pack.odds.length, 3, `${pack.id} has standard, good and rare tiers`);
+    // 100 rated cards come only from the special card pack.
+    assert.ok(pack.odds.every((band) => band.maxRating < 100), `${pack.id} has no 100 rated tier`);
   }
-  const scout = STAR_PACKS.find((pack) => pack.id === "scout")!;
-  const elite = STAR_PACKS.find((pack) => pack.id === "elite")!;
-  const legend = STAR_PACKS.find((pack) => pack.id === "legend")!;
-  assert.ok(Math.abs(scout.odds.slice(2).reduce((sum, band) => sum + band.chance, 0) - 0.01) < 1e-9);
-  assert.ok(Math.abs(elite.odds.slice(2).reduce((sum, band) => sum + band.chance, 0) - 0.07) < 1e-9);
-  assert.ok(Math.abs(legend.odds.slice(2).reduce((sum, band) => sum + band.chance, 0) - 0.4) < 1e-9);
-
-  // Only three packs can hold a 100 rated card, each ten times rarer than before the rebalance.
-  const expectedHundredChances = { scout: 0.000001, elite: 0.00001, legend: 0.001 };
-  for (const pack of STAR_PACKS) {
-    const hundred = pack.odds.find((band) => band.minRating === 100 && band.maxRating === 100);
-    if (!(pack.id in expectedHundredChances)) {
-      assert.equal(hundred, undefined, `${pack.id} has no 100 rated cards`);
-      continue;
-    }
-    const topWalkout = pack.odds.find((band) => band.minRating === 90 && band.maxRating === 99)!;
-    assert.equal(hundred!.chance, expectedHundredChances[pack.id as keyof typeof expectedHundredChances]);
-    assert.ok(hundred!.chance * 40 < topWalkout.chance, `${pack.id} rating 100 must remain much rarer than 90–99`);
-  }
+  const byPrice = [...STAR_PACKS].sort((first, second) => first.price - second.price);
+  byPrice.slice(1).forEach((pack, index) => {
+    const cheaper = byPrice[index];
+    const floor = (item: typeof pack) => Math.min(...item.odds.map((band) => band.minRating));
+    const best = (item: typeof pack) => Math.max(...item.odds.map((band) => band.maxRating));
+    assert.ok(best(pack) > best(cheaper), `${pack.id} must reach higher than ${cheaper.id}`);
+    assert.ok(floor(pack) > floor(cheaper), `${pack.id} must start higher than ${cheaper.id}`);
+  });
+  // Only the most expensive pack reaches top walkouts beyond 91.
+  assert.deepEqual(STAR_PACKS.filter((pack) => pack.odds.some((band) => band.maxRating >= 92)).map((pack) => pack.id), ["legend"]);
 });
 
 test("pack prices and season unlocks match the current progression", () => {

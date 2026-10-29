@@ -430,7 +430,7 @@
 .starxi-pack-heading > div > small { display: block; margin-top: 4px; color: var(--muted); font-size: var(--text-footnote); line-height: 1.35; }
 .starxi-pack-heading > span, .starxi-lineup-heading > span { color: var(--muted); font-size: var(--text-footnote); font-weight: 800; white-space: nowrap; }
 .star-pack-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 10px; }
-.star-pack-card { min-width: 0; padding: 12px; border: 1px solid var(--line-soft); border-top: 3px solid var(--accent); border-radius: 14px; background: var(--surface-raised); box-shadow: 0 7px 19px rgba(29,29,31,.045); }
+.star-pack-card { min-width: 0; display: flex; flex-direction: column; padding: 12px; border: 1px solid var(--line-soft); border-top: 3px solid var(--accent); border-radius: 14px; background: var(--surface-raised); box-shadow: 0 7px 19px rgba(29,29,31,.045); }
 .star-pack-card.scout { border-top-color: var(--accent); }
 .star-pack-card.elite { border-top-color: #8b5cf6; }
 .star-pack-card.legend { border-top-color: #c69214; }
@@ -451,7 +451,8 @@
 .star-pack-odds span { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: var(--text-footnote); }
 .star-pack-odds em { font-style: normal; }
 .star-pack-odds b { color: var(--soft); font-size: var(--text-footnote); }
-.star-pack-card .feature-buy-button { width: 100%; margin-top: 11px; }
+.star-pack-card .feature-buy-button { width: 100%; margin-top: auto; }
+.star-pack-card > :nth-last-child(2) { margin-bottom: 11px; }
 .star-pack-rarity-note { margin: 8px 2px 0; color: var(--muted); font-size: var(--text-footnote); line-height: 1.45; }
 .custom-card-shop { margin-top: 17px; padding: 15px; border: 1px solid rgba(198,146,20,.22); border-radius: 17px; background: linear-gradient(145deg, color-mix(in srgb, #e69900 6%, var(--surface-raised)), var(--surface-raised) 70%); }
 .custom-card-shop-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }

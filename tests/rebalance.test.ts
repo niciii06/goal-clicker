@@ -23,7 +23,7 @@ test("Flurin Fabrice is one of the 100 rated special cards", () => {
   const flurin = getStarXIPlayer("star-flurin-fabrice")!;
   assert.equal(flurin.rating, 100);
   assert.equal(flurin.isCustom, true);
-  assert.deepEqual(flurin.positions, ["ZM"]);
+  assert.deepEqual(flurin.positions, ["ZM", "ZOM"]);
   assert.ok(hundredIds.includes(flurin.id));
 });
 
@@ -129,7 +129,7 @@ test("goals saved under the old economy are capped once to one hour of new passi
   assert.equal(capGoalsAfterRebalance(hour - 1, { schemaVersion: 5 }, upgrades, 0, initialGameFeatures()), hour - 1);
   assert.equal(capGoalsAfterRebalance(9e12, { schemaVersion: REBALANCED_FEATURES_SCHEMA }, upgrades, 0, initialGameFeatures()), 9e12);
   assert.equal(capGoalsAfterRebalance(5e6, { schemaVersion: 6 }, {}, 0, initialGameFeatures()), 1_000_000);
-  assert.equal(GAME_FEATURES_SCHEMA_VERSION, REBALANCED_FEATURES_SCHEMA, "new saves are never capped");
+  assert.ok(GAME_FEATURES_SCHEMA_VERSION >= REBALANCED_FEATURES_SCHEMA, "new saves are never capped");
 });
 
 test("release notes are listed newest first and their seen marker syncs with the cloud save", () => {
@@ -155,4 +155,36 @@ test("special cards with several words show a fixed name under the player on the
   assert.equal(getStarXIPlayer("star-silvuz")!.name, "Silvanzambi");
   const canvas = await readFile(new URL("../app/match-canvas-drawing.ts", import.meta.url), "utf8");
   assert.match(canvas, /owner\.caption\?\?owner\.label\.split\(' '\)\.slice\(-1\)\[0\]/);
+});
+
+test("every 100 rated card leaves the album once, whatever the league", () => {
+  const save = initialGameFeatures();
+  const inSquad = hundredIds[0], archived = hundredIds[1];
+  const normal = STAR_XI_CUSTOM_PLAYERS.find((player) => player.rating < 100 && !player.benchOnly)!;
+  const stats = { appearances: 30, minutes: 2700, goals: 60, assists: 30, ratingTotal: 240, ratedMatches: 30, motm: 12, subAppearances: 0, subRatingTotal: 0, subMinutes: 0, recent: [] };
+  save.schemaVersion = 7;
+  save.seasonMode.division = 14;
+  save.seasonMode.highestDivision = 14;
+  save.starXI.ownedIds = [inSquad, normal.id];
+  save.starXI.lineupIds[0] = inSquad;
+  save.career.collectedIds = [inSquad, archived, normal.id];
+  save.career.players = { [inSquad]: stats, [archived]: stats, [normal.id]: stats };
+  save.career.seasonPlayers = { [inSquad]: stats };
+  save.career.milestoneCards = { [inSquad]: ["hero"], [archived]: ["hero"], [normal.id]: ["hero"] };
+  const cleaned = normalizeGameFeatures(JSON.parse(JSON.stringify(save)));
+  assert.equal(cleaned.schemaVersion, GAME_FEATURES_SCHEMA_VERSION);
+  assert.ok(!cleaned.career.collectedIds.includes(archived), "no longer in the club archive");
+  assert.equal(cleaned.career.milestoneCards[inSquad], undefined);
+  assert.equal(cleaned.career.milestoneCards[archived], undefined);
+  assert.equal(cleaned.career.players[inSquad], undefined);
+  assert.equal(cleaned.career.players[archived], undefined);
+  assert.equal(cleaned.career.seasonPlayers[inSquad], undefined);
+  assert.ok(cleaned.starXI.ownedIds.includes(inSquad), "a card in the squad stays in the squad");
+  assert.ok(cleaned.career.collectedIds.includes(normal.id));
+  assert.ok(cleaned.career.milestoneCards[normal.id]?.length);
+  assert.equal(cleaned.history.at(-1)?.title, "Sammelalbum bereinigt");
+  // Runs once: later progress of a 100 rated card stays.
+  cleaned.career.players[inSquad] = stats;
+  const again = normalizeGameFeatures(JSON.parse(JSON.stringify(cleaned)));
+  assert.ok(again.career.milestoneCards[inSquad]?.length);
 });

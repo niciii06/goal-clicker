@@ -61,3 +61,21 @@ Beide Spalten zeigen den Schnitt über die ganze Liga.
 * **Lobby Codes deaktiviert:** `redeem-lobby-code` antwortet immer mit "Lobby Codes sind deaktiviert.", das Eingabefeld ist weg. Welten, die AZB früher eingelöst haben, behalten ihren Testmodus.
 * **Kontostand gekürzt:** Spielstände mit Feature Schema unter 7 (vor diesem Update) werden beim Laden einmalig auf höchstens eine Stunde passives Einkommen nach den neuen Werten gekürzt, mindestens 1 Mio (`capGoalsAfterRebalance` in `app/game/economy.ts`). Gesamttore und Rangliste bleiben. Gilt für Einzelspieler, Cloud Spielstände und Multiplayer Welten.
 * **"Was ist neu" Fenster:** `app/whats-new.ts` hält die Einträge, `app/whats-new-dialog.tsx` zeigt den neuesten einmal. Der Gesehen Status (`goalClickerWhatsNewSeenV1`) gehört zu den Cloud Schlüsseln, daher erscheint das Fenster pro Konto nur einmal, auch über mehrere Geräte. Die Regel für künftige Updates steht in `CLAUDE.md`.
+
+## Nachtrag: Pack-Leiter, Flurin, Sammelalbum
+
+Die Packs bilden jetzt eine Leiter, die nur steigt: Jedes teurere Pack beginnt höher und erreicht bessere Karten als das billigere davor. Normale Packs enthalten keine 100er und keine Spezialkarten mehr, die gibt es nur im Spezialkarten-Pack. Preise und Ligen bleiben.
+
+| Liga | Pack | Standard | Gut | Selten |
+|---|---|---|---|---|
+| 15 | Schrott-Pack | bis 54 50%, 55 bis 59 35% | 60 bis 64 13% | 65 bis 69 2% |
+| 13 | Regional-Pack | 65 bis 72 80% | 73 bis 76 18% | 77 bis 79 2% |
+| 11 | Scout Pack | 70 bis 76 75% | 77 bis 79 20% | 80 bis 83 5% |
+| 9 | Profi-Pack | 73 bis 79 65% | 80 bis 83 30% | 84 bis 86 5% |
+| 7 | Elite Pack | 77 bis 81 60% | 82 bis 85 33% | 86 bis 89 7% |
+| 5 | Weltklasse-Pack | 80 bis 84 55% | 85 bis 88 38% | 89 bis 91 7% |
+| 4 | Legenden Pack | 83 bis 86 50% | 87 bis 89 40% | 90 bis 99 10% |
+
+* Flurin Fabrice spielt ZM und ZOM.
+* Einmalige Album Bereinigung (Feature Schema 8, alle Ligen): Für alle 100er Karten werden Sammelstatus, Meilensteinkarten und die Karrierestatistiken entfernt, aus denen Meilensteine entstehen. Karten im Kader bleiben im Kader. Abgeholte Albumprämien bleiben.
+* Der Kaufknopf sitzt in jeder Packkarte am unteren Rand.
