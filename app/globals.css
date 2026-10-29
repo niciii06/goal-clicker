@@ -2180,3 +2180,62 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .hair-braids .avatar-hair::after, .hair-locs .avatar-hair::after { -webkit-mask: linear-gradient(90deg, #000 0 24%, transparent 24% 76%, #000 76%); mask: linear-gradient(90deg, #000 0 24%, transparent 24% 76%, #000 76%); }
 .hair-braids .avatar-hair { top: -7px; height: 22px; }
 .hair-braids .avatar-hair::after { top: 12px; right: -4px; left: -4px; height: 34px; }
+/* The realistic walkout figure (walkout-figure.tsx): one SVG drawing, coloured from the walkout variables. */
+.wf { --wf-skin-shade: color-mix(in srgb, var(--walkout-skin) 58%, #2a1006); --wf-hair-dark: color-mix(in srgb, var(--walkout-hair) 55%, #000); --wf-hair-light: color-mix(in srgb, var(--walkout-hair) 62%, #fff); --wf-brow: color-mix(in srgb, var(--walkout-hair) 62%, #120b07); --wf-lip: color-mix(in srgb, var(--walkout-skin) 72%, #8e3f33); }
+.wf.body-women { --wf-lip: color-mix(in srgb, var(--walkout-skin) 62%, #a8434f); }
+.wf svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.wf .wf-skin { fill: var(--walkout-skin); }
+.wf .wf-skin-shade { fill: var(--wf-skin-shade); }
+.wf .wf-stop-shade { stop-color: var(--wf-skin-shade); }
+.wf .wf-hair { fill: var(--walkout-hair); }
+.wf .wf-strand { fill: none; stroke: var(--wf-hair-dark); stroke-width: .45; stroke-linecap: round; opacity: .55; }
+.wf .wf-strand-light { fill: none; stroke: var(--wf-hair-light); stroke-width: .5; opacity: .35; }
+.wf .wf-part { fill: none; stroke: var(--wf-skin-shade); stroke-width: .5; opacity: .7; }
+.wf .wf-curl-marks circle { fill: none; stroke: var(--wf-hair-dark); stroke-width: .5; opacity: .45; }
+.wf .wf-twist { fill: none; stroke: var(--walkout-hair); stroke-width: 2.6; stroke-linecap: round; }
+.wf .wf-twist-mark { fill: none; stroke: var(--wf-hair-dark); stroke-width: 2.6; stroke-linecap: round; stroke-dasharray: .7 1.1; opacity: .5; }
+.wf .wf-rope { fill: none; stroke: var(--walkout-hair); stroke-linecap: round; }
+.wf .wf-rope-mark { fill: none; stroke: var(--wf-hair-dark); stroke-linecap: butt; opacity: .55; }
+.wf .wf-cornrow { fill: none; stroke: var(--wf-hair-dark); stroke-width: .8; stroke-dasharray: .9 .7; opacity: .7; }
+.wf .wf-hair-tie { fill: none; stroke: #1b1b1f; stroke-width: 1.4; stroke-linecap: round; }
+.wf .wf-ear-inner { fill: none; stroke: var(--wf-skin-shade); stroke-width: .7; opacity: .7; }
+.wf .wf-sclera { fill: #efe9e2; }
+.wf .wf-iris { fill: var(--wf-iris); }
+.wf .wf-lid { fill: none; stroke: #23150e; stroke-linecap: round; }
+.wf .wf-crease { fill: none; stroke: var(--wf-skin-shade); stroke-width: .5; opacity: .6; }
+.wf .wf-lower-lid { fill: none; stroke: var(--wf-skin-shade); stroke-width: .4; opacity: .5; }
+.wf .wf-brow { fill: var(--wf-brow); }
+.wf .wf-nose-shade { fill: none; stroke: var(--wf-skin-shade); stroke-width: 1.3; opacity: .45; }
+.wf .wf-nose-line { fill: none; stroke: var(--wf-skin-shade); stroke-width: .6; opacity: .8; }
+.wf .wf-nostril { fill: #2a140b; opacity: .55; }
+.wf .wf-lip-upper { fill: color-mix(in srgb, var(--wf-lip) 82%, #000); }
+.wf .wf-lip-lower { fill: var(--wf-lip); }
+.wf .wf-mouth { fill: none; stroke: #2a120b; stroke-width: .45; opacity: .75; }
+.wf .wf-beard { fill: color-mix(in srgb, var(--walkout-hair) 78%, #000); opacity: .9; }
+.wf .wf-beard.wf-stubble { fill: var(--wf-hair-dark); opacity: .5; }
+.wf .wf-neck-line { fill: none; stroke: var(--wf-skin-shade); stroke-width: .8; opacity: .14; }
+.wf .wf-kit { fill: var(--walkout-primary); }
+.wf .wf-kit-trim, .wf .wf-crest { fill: var(--walkout-secondary); }
+.wf .wf-crest-inner { fill: var(--walkout-primary); opacity: .8; }
+.wf .wf-brand { fill: var(--walkout-secondary); opacity: .85; }
+.wf .wf-collar { fill: none; stroke: var(--walkout-secondary); stroke-width: 2.4; stroke-linejoin: round; }
+.wf .wf-fold { fill: none; stroke: #000; stroke-width: 1.1; stroke-linecap: round; opacity: .12; }
+.wf .wf-number { fill: var(--walkout-secondary); font: 900 25px/1 system-ui, sans-serif; letter-spacing: -1px; paint-order: stroke; stroke: color-mix(in srgb, var(--walkout-primary) 60%, #000); stroke-width: .8px; }
+.wf .wf-shorts { fill: var(--walkout-secondary); }
+.wf .wf-shorts-trim { fill: var(--walkout-primary); }
+.wf .wf-sock { fill: var(--walkout-primary); }
+.wf .wf-boot { fill: var(--walkout-boots); }
+.wf .wf-boot-stripe { fill: none; stroke: #fff; stroke-width: 1.4; stroke-linecap: round; opacity: .55; }
+.wf .wf-sole { fill: color-mix(in srgb, var(--walkout-boots) 45%, #000); }
+.wf .wf-finger { fill: none; stroke: var(--wf-skin-shade); stroke-width: .45; opacity: .6; }
+.wf .wf-glove { fill: var(--walkout-gloves, #f1f3f6); }
+.wf .wf-glove-band { fill: var(--walkout-secondary); }
+.wf.keeper .wf-finger { stroke: #000; opacity: .25; }
+.wf .wf-tattoo { fill: none; stroke: #1d2433; stroke-width: .9; opacity: .6; }
+.wf .wf-tattoo-fill { fill: #1d2433; stroke: none; opacity: .7; }
+.wf .wf-headband { fill: var(--walkout-headband, #fff); }
+.wf .wf-helmet { fill: #1e2026; }
+.wf .wf-helmet-seam, .wf .wf-cap-seam { fill: none; stroke: #000; stroke-width: .6; opacity: .45; }
+.wf .wf-cap { fill: var(--walkout-secondary); }
+.wf .wf-glasses rect { fill: rgba(255,255,255,.12); stroke: #121212; stroke-width: .8; }
+.wf .wf-glasses path { fill: none; stroke: #121212; stroke-width: .8; }
