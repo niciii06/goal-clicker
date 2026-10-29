@@ -90,8 +90,7 @@ test("every Icon and current 86+ base card has a fixed appearance", async () => 
     .filter((sourceId) => (officialRatings.get(sourceId) ?? 0) >= 86);
   const womenAppearanceBlock = walkoutSource.match(/const WOMEN_APPEARANCE_BY_SOURCE_ID[^=]*= \{([\s\S]*?)\n\};/)?.[1] ?? "";
   const womenAppearanceIds = [...womenAppearanceBlock.matchAll(/^  "(\d+)":/gm)].map((match) => match[1]);
-  // 38 from the October capture and Millie Bright, rated 87 since.
-  assert.equal(womenWalkouts.length, 39);
+  assert.equal(womenWalkouts.length, 38);
   assert.deepEqual(womenAppearanceIds.sort(), womenWalkouts.sort());
 
   const physicalBlock = walkoutSource.match(/const FC26_PHYSICAL_BY_SOURCE_ID[^=]*= \{([\s\S]*?)\n\};/)?.[1] ?? "";
