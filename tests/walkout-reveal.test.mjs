@@ -8,10 +8,8 @@ test("walkout avatar renders the revealed player without crashing", async () => 
     readFile(new URL("../app/walkout-avatar.tsx", import.meta.url), "utf8"),
   ]);
 
-  assert.match(pageSource, /<WalkoutAvatar presentation=\{starWalkoutPresentation\} rating=\{starReveal\.player\.rating\}[^>]*durationMs=\{starWalkoutAnimationDuration\} elapsedMs=\{starWalkoutElapsed\}/);
-  // The 3D scene loads on demand; the drawn figure stands in until it is ready or when WebGL is missing.
-  assert.match(avatarSource, /import\("\.\/walkout-3d"\)/);
-  assert.match(avatarSource, /\{!ready && <WalkoutFigure presentation=\{presentation\} rating=\{rating\} \/>\}/);
+  assert.match(pageSource, /<WalkoutAvatar presentation=\{starWalkoutPresentation\} rating=\{starReveal\.player\.rating\}/);
+  assert.match(avatarSource, /avatar-torso[\s\S]*?\{rating\}/);
   assert.doesNotMatch(pageSource, /starWalkout\.player/);
 });
 

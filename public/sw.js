@@ -1,7 +1,7 @@
 // Service worker of the installable app. Pages and the API always come from the network, because the game needs
 // the login and the cloud save; without a connection a page request shows offline.html. Hashed build files, icons
-// stadium sounds and the 3D walkout models never change, so they are served from the cache once loaded.
-const VERSION = "v2";
+// and stadium sounds never change, so they are served from the cache once loaded.
+const VERSION = "v1";
 const STATIC_CACHE = `goal-clicker-static-${VERSION}`;
 const OFFLINE_CACHE = `goal-clicker-offline-${VERSION}`;
 const OFFLINE_URL = "/offline.html";
@@ -18,7 +18,7 @@ self.addEventListener("activate", (event) => {
 });
 
 function isStatic(path) {
-  return path.startsWith("/_next/static/") || path.startsWith("/icons/") || path.startsWith("/sounds/") || path.startsWith("/walkout/") || path === "/favicon.svg";
+  return path.startsWith("/_next/static/") || path.startsWith("/icons/") || path.startsWith("/sounds/") || path === "/favicon.svg";
 }
 
 async function trimStaticCache(cache) {
