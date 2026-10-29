@@ -1,6 +1,7 @@
 // CloudSync in a minimal browser: memory localStorage, an event target as window and a scripted /api/save.
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { gunzipSync } from 'node:zlib';
 
 const store = new Map<string, string>();
 const target = new EventTarget();
@@ -17,10 +18,14 @@ const goalsIn = (text: string | undefined) => text ? (JSON.parse(text) as { tota
 
 /** The server: one save with a version; a PUT on an older base version is a conflict. */
 function server(initialVersion: number, initialKeys: Record<string, string>) {
-  const state = { version: initialVersion, keys: initialKeys, loseNextAnswer: false, requests: 0 };
+  const state = { version: initialVersion, keys: initialKeys, loseNextAnswer: false, requests: 0, gzipped: 0 };
   globalThis.fetch = (async (_url: string, init?: RequestInit) => {
     state.requests++;
-    const body = JSON.parse(String(init?.body)) as { baseVersion: number; keys: Record<string, string> };
+    // Uploads go out gzipped where the runtime can compress, like in the browser.
+    const gzipped = (init?.headers as Record<string, string> | undefined)?.['content-encoding'] === 'gzip';
+    if (gzipped) state.gzipped++;
+    const text = gzipped ? gunzipSync(init!.body as Uint8Array).toString('utf8') : String(init?.body);
+    const body = JSON.parse(text) as { baseVersion: number; keys: Record<string, string> };
     if (body.baseVersion !== state.version) return new Response(JSON.stringify({ errorCode: 'SAVE_CONFLICT', version: state.version, keys: state.keys, active: true, updatedAt: null }), { status: 409 });
     state.version++; state.keys = body.keys;
     if (state.loseNextAnswer) { state.loseNextAnswer = false; throw new TypeError('Failed to fetch'); }
@@ -74,14 +79,15 @@ test('an upload answer that arrives after stop() does not write the cleared acco
   store.clear();
   store.set(STORAGE_KEY, game(50));
   writeCloudMeta({ userId: 'u', version: 1, hash: '' });
-  let answer!: (response: Response) => void;
+  let answer: ((response: Response) => void) | undefined;
   globalThis.fetch = (() => new Promise<Response>((resolve) => { answer = resolve; })) as typeof fetch;
   const sync = new CloudSync('u', { onNewerSave: () => {} });
   sync.start();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  // The upload compresses first; wait until its request is out.
+  while (!answer) await new Promise((resolve) => setTimeout(resolve, 0));
   sync.stop();
   store.clear();
-  answer(new Response(JSON.stringify({ version: 2 }), { status: 200 }));
+  answer!(new Response(JSON.stringify({ version: 2 }), { status: 200 }));
   await sync.settle();
   assert.equal(store.get(CLOUD_META_KEY), undefined);
 });
@@ -93,4 +99,33 @@ test('the save another account left in this browser is recognised as not this ac
   writeCloudMeta({ userId: 'a', version: 3, hash: 'x' });
   assert.equal(holdsOtherAccountSave('a'), false);
   assert.equal(holdsOtherAccountSave('b'), true);
+});
+
+test('an upload stopped while it compresses writes nothing back', async () => {
+  store.clear();
+  store.set(STORAGE_KEY, game(70));
+  writeCloudMeta({ userId: 'u', version: 1, hash: '' });
+  let calls = 0;
+  globalThis.fetch = (async () => { calls++; return new Response(JSON.stringify({ version: 2 }), { status: 200 }); }) as typeof fetch;
+  const sync = new CloudSync('u', { onNewerSave: () => {} });
+  sync.start();
+  sync.stop();
+  store.clear();
+  await sync.settle();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(calls, 0);
+  assert.equal(store.get(CLOUD_META_KEY), undefined);
+});
+
+test('uploads go out gzipped and the server reads them', async () => {
+  store.clear();
+  store.set(STORAGE_KEY, game(90));
+  writeCloudMeta({ userId: 'u', version: 1, hash: '' });
+  const cloud = server(1, {});
+  const sync = new CloudSync('u', { onNewerSave: () => {} });
+  sync.start();
+  await sync.settle();
+  sync.stop();
+  assert.ok(cloud.gzipped >= 1);
+  assert.equal(goalsIn(cloud.keys[STORAGE_KEY]), 90);
 });

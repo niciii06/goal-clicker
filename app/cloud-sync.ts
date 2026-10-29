@@ -32,7 +32,9 @@ export function cloudPlayedSince(cloud: CloudSaveState, baseVersion: number) {
 }
 export type SyncStatus = "saved" | "saving" | "offline" | "failed";
 
-const UPLOAD_INTERVAL_MS = 15_000;
+// Passive income changes the save all the time; uploading it once a minute (and when the page is left or
+// hidden) keeps the cloud close while sending a quarter of the data a 15 s rhythm would.
+const UPLOAD_INTERVAL_MS = 60_000;
 // Browsers drop keepalive requests above 64 KB, the limit for the last upload while a page closes.
 const KEEPALIVE_LIMIT = 60 * 1024;
 
@@ -144,6 +146,17 @@ export async function fetchCloudSave(since?: number): Promise<CloudSaveState & {
   const data = await response.json() as CloudSaveState & { error?: string; unchanged?: boolean };
   if (!response.ok) throw Object.assign(new Error(data.error ?? "Der Spielstand konnte nicht geladen werden."), { status: response.status });
   return { version: data.version, updatedAt: data.updatedAt, active: data.active !== false, activeVersion: data.activeVersion, keys: cleanCloudSaveKeys(data.keys), unchanged: data.unchanged };
+}
+
+/** The save as gzip (about a tenth of the JSON), or null where the browser cannot compress. */
+async function gzipText(text: string): Promise<Uint8Array<ArrayBuffer> | null> {
+  if (typeof CompressionStream === "undefined") return null;
+  try {
+    const stream = new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  } catch {
+    return null;
+  }
 }
 
 let statusListeners: ((status: SyncStatus) => void)[] = [];
@@ -282,13 +295,20 @@ export class CloudSync {
     const inputs = this.inputs;
     const generation = this.generation;
     const active = this.played || meta.played === true;
-    const body = JSON.stringify({ baseVersion: overwriteVersion ?? meta.version, keys, active });
+    const json = JSON.stringify({ baseVersion: overwriteVersion ?? meta.version, keys, active });
+    // A closing page sends at once: compression is asynchronous and the page may be gone before it ends.
+    const gzipped = keepalive ? null : await gzipText(json);
+    // Signed out or replaced while compressing: this upload belongs to a finished sync.
+    if (generation !== this.generation) return false;
+    const body = gzipped ?? json;
     setStatus("saving");
     // Remembered until an answer arrives: if the page closes or the request fails first, the next start or
     // retry recognises this save in the cloud. Earlier unanswered uploads stay on the list.
     writeCloudMeta({ ...meta, pending: [...(meta.pending ?? []).filter((item) => item !== hash), hash].slice(-MAX_PENDING_UPLOADS) });
     try {
-      const response = await fetch("/api/save", { method: "PUT", headers: { "content-type": "application/json" }, body, keepalive: keepalive && body.length < KEEPALIVE_LIMIT });
+      const headers: Record<string, string> = { "content-type": "application/json", ...(gzipped ? { "content-encoding": "gzip" } : {}) };
+      const size = typeof body === "string" ? body.length : body.byteLength;
+      const response = await fetch("/api/save", { method: "PUT", headers, body, keepalive: keepalive && size < KEEPALIVE_LIMIT });
       const data = await response.json() as { version?: number; errorCode?: string } & Partial<CloudSaveState>;
       if (generation !== this.generation) return response.ok;
       if (response.ok && typeof data.version === "number") {

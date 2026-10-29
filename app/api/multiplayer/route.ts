@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+import { withGzip } from "../compression";
 import { requestMatchEdit, confirmMatchDraft } from '../../match-commands';
 import type { MatchDraft } from '../../match-commands';
 import { fixtureFor, travelGate, consumeTravel, eligibilityError, payTravelFines, settleTravel } from '../../travel-data';
@@ -520,7 +521,7 @@ function requireLive(room: RoomRow) {
   return getOccupiedRoomPlayers(room).length >= 2 ? null : jsonError("Warte, bis der zweite Spieler beigetreten ist.", 409);
 }
 
-export async function GET(request: Request) {
+async function handleGet(request: Request) {
   try {
     const limited = rateLimited(request, "multiplayer");
     if (limited) return limited;
@@ -550,7 +551,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   try {
     const limited = rateLimited(request, "multiplayer");
     if (limited) return limited;
@@ -1230,3 +1231,7 @@ export async function POST(request: Request) {
     return Response.json({ error: errorMessage(error) }, { status: 500 });
   }
 }
+
+// Coop polls every 1.5 s and carries the whole world whenever its features change; gzip keeps that small.
+export const GET = withGzip(handleGet);
+export const POST = withGzip(handlePost);

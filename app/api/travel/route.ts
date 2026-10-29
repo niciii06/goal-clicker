@@ -8,9 +8,10 @@ import { createJourney, eligibilityError, fixtureFor } from '../../travel-data';
 import type { Journey } from '../../travel-data';
 import { MAX_GAME_STATE_BODY_BYTES, readJsonBody, RequestBodyTooLargeError } from '../request-body';
 import { rateLimited } from '../rate-limit';
+import { withGzip } from '../compression';
 // Solo saves remain browser-local; this ledger makes elapsed travel server-authoritative.
 // Player IDs are existing opaque capabilities, matching the shared-world API architecture.
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
  try {
   const limited=rateLimited(request,'travel');if(limited)return limited;
   const p=await readJsonBody<{playerId?:unknown;action?:unknown;fixtureId?:unknown;features?:unknown;mode?:unknown;tournamentId?:unknown}>(request,MAX_GAME_STATE_BODY_BYTES);
@@ -41,3 +42,5 @@ export async function POST(request: Request) {
   return Response.json({journey,serverNow:now},{headers:{'cache-control':'no-store'}});
  } catch (error) {if(error instanceof RequestBodyTooLargeError)return Response.json({error:error.message},{status:413});return Response.json({error:'Die Reise konnte nicht synchronisiert werden. Bitte erneut versuchen.'},{status:503});}
 }
+// A running journey is polled every 5 s and carries its whole route; gzip keeps that small.
+export const POST = withGzip(handlePost);
