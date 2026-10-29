@@ -66,3 +66,20 @@ test('a prestige season starts without the results of the season before', () => 
   assert.deepEqual(prestige.results, []);
   assert.ok(getSeasonSchedule(prestige).every((day) => day.matches.every((match) => match.homeScore === undefined && match.awayScore === undefined)));
 });
+
+test('all matchdays start open and only the next match is marked', async () => {
+  const { createElement } = await import('react');
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const { SeasonPanel } = await import('../app/season-panel.tsx');
+  const { initialGameFeatures } = await import('../app/feature-data.ts');
+  const features = initialGameFeatures();
+  features.seasonMode = playSeasonModeMatch(features.seasonMode, 80, 'FC Test', 1000, seeded()).state;
+  const html = renderToStaticMarkup(createElement(SeasonPanel, { features }));
+  const cards = html.match(/<details[^>]*season-hub-day-card[^>]*>/g) ?? [];
+  assert.equal(cards.length, SEASON_MODE_MATCHES_PER_SEASON);
+  assert.ok(cards.every((card) => / open=""/.test(card)), 'every matchday is open');
+  const marked = cards.filter((card) => card.includes('season-hub-day-card next'));
+  assert.equal(marked.length, 1);
+  assert.match(marked[0], /aria-current="step"/);
+  assert.match(html, /Spieltag 2<\/span><small>Nächstes Spiel<\/small>/);
+});

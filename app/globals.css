@@ -291,6 +291,9 @@
 .season-hub-day-card { padding: 4px 12px 8px; border: 1px solid var(--line-soft); border-radius: 12px; background: var(--surface-raised); }
 .season-hub-day-card summary { display: flex; align-items: center; justify-content: space-between; min-height: 40px; }
 .season-hub-day-card summary small { color: var(--muted); font-size: var(--text-footnote); font-weight: 600; }
+.season-hub-day-card.next { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--surface-raised)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent); }
+.season-hub-day-card.next summary span { color: var(--text); }
+.season-hub-day-card.next summary small { padding: 3px 9px; border-radius: var(--radius-pill); color: var(--surface-raised); background: var(--accent); font-weight: 800; }
 .season-hub-day-card ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .season-hub-day-card li { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 8px; padding: 6px 4px; border-radius: 8px; color: var(--soft); font-size: var(--text-footnote); }
 .season-hub-day-card li.club { background: color-mix(in srgb, var(--accent) 9%, var(--surface-raised)); }

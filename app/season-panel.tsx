@@ -54,10 +54,11 @@ export function SeasonPanel({ features }: { features: GameFeatures }) {
     </section>
     <section className="season-hub-section" aria-label="Alle Spieltage">
       <h4>Alle Spieltage</h4>
-      <div className="season-hub-days">{schedule.map((day) => <details key={day.matchday} className="season-hub-day-card" open={day.matchday === season.matchday || day.matchday === season.matchday + 1}>
-        <summary><span>Spieltag {day.matchday}</span><small>{day.played ? "gespielt" : day.matchday === season.matchday + 1 ? "als Nächstes" : "offen"}</small></summary>
+      {/* Every matchday starts open; the next one is marked so it stands out at a glance. */}
+      <div className="season-hub-days">{schedule.map((day) => { const next = !day.played && day.matchday === season.matchday + 1; return <details key={day.matchday} className={`season-hub-day-card${next ? " next" : ""}`} open aria-current={next ? "step" : undefined}>
+        <summary><span>Spieltag {day.matchday}</span><small>{day.played ? "gespielt" : next ? "Nächstes Spiel" : "offen"}</small></summary>
         <ul>{day.matches.map((match) => <MatchLine key={`${match.homeId}-${match.awayId}`} match={match} />)}</ul>
-      </details>)}</div>
+      </details>; })}</div>
     </section>
   </div>;
 }

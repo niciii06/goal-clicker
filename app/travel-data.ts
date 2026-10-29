@@ -21,7 +21,7 @@ export function normalizeTravel(value: unknown): TravelState {
 function normalizeTravelUnchecked(value: unknown): TravelState {
  const src=value && typeof value==='object' ? value as TravelState : emptyTravel();
  const j=src.journey;
- const valid=Boolean(j && typeof j.id==='string' && j.fixture && typeof j.fixture.id==='string' && j.fixture.venue && Number.isFinite(j.fixture.venue.lat) && Math.abs(j.fixture.venue.lat)<=85 && Number.isFinite(j.fixture.venue.lon) && Math.abs(j.fixture.venue.lon)<=180 && typeof j.fixture.opponent==='string' && typeof j.fixture.venue.city==='string' && ['walk','bike','car','bus','train','plane'].includes(j.transport) && Number.isFinite(j.startedAt) && Number.isFinite(j.baseMs) && j.baseMs>0 && Number.isFinite(j.endsAt) && j.endsAt>j.startedAt && Array.isArray(j.events) && j.events.length<=2 && j.events.every(e=>Boolean(e)&&typeof e==='object'&&Number.isFinite(e.at)&&e.at>=0&&Number.isFinite(e.delta)&&Math.abs(e.delta)<=Math.max(15000,j.baseMs*MAX_EVENT_SHARE)&&(e.fine===undefined||Number.isFinite(e.fine)&&e.fine>=0&&e.fine<=MAX_EVENT_FINE_SECONDS)));
+ const valid=Boolean(j && typeof j.id==='string' && j.fixture && typeof j.fixture.id==='string' && j.fixture.venue && Number.isFinite(j.fixture.venue.lat) && Math.abs(j.fixture.venue.lat)<=85 && Number.isFinite(j.fixture.venue.lon) && Math.abs(j.fixture.venue.lon)<=180 && typeof j.fixture.opponent==='string' && typeof j.fixture.venue.city==='string' && ['walk','bike','car','bus','train','plane'].includes(j.transport) && Number.isFinite(j.startedAt) && Number.isFinite(j.baseMs) && j.baseMs>0 && Number.isFinite(j.endsAt) && j.endsAt>j.startedAt && Array.isArray(j.events) && j.events.length<=2 && j.events.every(e=>Boolean(e)&&typeof e==='object'&&Number.isFinite(e.at)&&e.at>=0&&Number.isFinite(e.delta)&&e.delta<=Math.max(15000,j.baseMs*MAX_EVENT_SHARE)&&-e.delta<=Math.max(15000,j.baseMs*MAX_EVENT_SAVING)&&(e.fine===undefined||Number.isFinite(e.fine)&&e.fine>=0&&e.fine<=MAX_EVENT_FINE_SECONDS)));
  const planValid=!j?.plan || validPlan(j.plan,j.baseMs)&&Math.abs(j.endsAt-j.startedAt-j.baseMs-j.events.reduce((total,e)=>total+e.delta,0))<2;
  const s=src.stats, n=(v:unknown)=>Math.max(0,Number.isFinite(Number(v))?Number(v):0);
  return {journey: valid && planValid ? structuredClone(j) : null, stats: s ? {recentEvents:Array.isArray(s.recentEvents)?s.recentEvents.filter(e=>typeof e==='string').slice(-8):[],trips:Math.floor(n(s.trips)),km:n(s.km),countries:Array.isArray(s.countries)?[...new Set(s.countries.filter(c=>typeof c==='string').slice(0,80))]:[],furthest:s.furthest&&typeof s.furthest.opponent==='string'?{opponent:s.furthest.opponent.slice(0,100),km:n(s.furthest.km)}:null,opponents:Object.fromEntries(Object.entries(s.opponents||{}).slice(0,200).filter(([,v])=>v&&typeof v.name==='string').map(([k,v])=>[k,{name:v.name.slice(0,100),trips:Math.floor(n(v.trips))}]))} : emptyTravel().stats};
@@ -62,9 +62,13 @@ export function travelTiming(fixture:TravelFixture) {
 }
 /** Longest delay or saving one event may cause, as a share of the planned trip. */
 const MAX_EVENT_SHARE=.4;
+/** Largest saving: a driver three times as fast from the start saves two thirds of the trip. */
+const MAX_EVENT_SAVING=2/3;
 const MAX_EVENT_FINE_SECONDS=300;
 // `share` moves the arrival by that part of the planned trip (negative is earlier); `fine` is paid on arrival.
-const EVENTS: readonly {id:string;text:string;share:number;fine?:number;modes:readonly Journey['transport'][];phase?:'airport'|'station'|'arrival'}[] = [
+// `speed` makes the rest of the trip that many times faster; `player` limits the event to clubs with that card
+// in the starting eleven or on the bench, and that card is the event's player.
+const EVENTS: readonly {id:string;text:string;share:number;fine?:number;speed?:number;player?:string;modes:readonly Journey['transport'][];phase?:'airport'|'station'|'arrival'}[] = [
  {id:'shoelace',text:'Die Mannschaft bindet synchron die Schuhe.',share:0,modes:['walk','bike','car']},
  {id:'route',text:'Der Trainer erklärt den kürzesten Weg zur taktischen Meisterleistung.',share:0,modes:['walk','bike','car']},
  {id:'bundesrat',text:'Der Bundesrat hat den Teambus zugeparkt.',share:.08,modes:['bus']},
@@ -72,7 +76,7 @@ const EVENTS: readonly {id:string;text:string;share:number;fine?:number;modes:re
  {id:'shortcut',text:'Der Busfahrer kennt eine Abkürzung.',share:-.1,modes:['bus']},
  {id:'mikeboy',text:'{player} schläft im Gepäckfach.',share:0,modes:['bus','train','plane']},
  {id:'olten',text:'Die Mannschaft nimmt versehentlich den Zug nach Olten.',share:.15,modes:['train']},
- {id:'pilot',text:'Der Pilot ist YB-Fan und gibt Vollgas.',share:-.08,modes:['plane']},
+ {id:'pilot',text:'Die Flugsicherung gibt eine direktere Route frei.',share:-.08,modes:['plane']},
  {id:'kebab',phase:'airport',text:'Die Mannschaft bestellt 47 Döner am Flughafen.',share:.05,modes:['plane']},
  {id:'walking',text:'Der Trainer hat Google Maps auf Fussweg gestellt.',share:.08,modes:['bus','train']},
  {id:'var',phase:'airport',text:'Das Flughafenpersonal verlangt einen VAR-Check beim Boarding.',share:0,modes:['plane']},
@@ -103,7 +107,29 @@ const EVENTS: readonly {id:string;text:string;share:number;fine?:number;modes:re
  {id:'tailwind',text:'Starker Rückenwind: Der Pilot meldet eine frühere Ankunft.',share:-.1,modes:['plane']},
  {id:'boarding',text:'Verspätetes Boarding: Die Crew ist noch nicht an Bord.',share:.12,modes:['plane'],phase:'airport'},
  {id:'no-parking',text:'Der Teambus steht im Halteverbot. Die Polizei verteilt eine Parkbusse.',share:0,fine:20,modes:['bus','car'],phase:'arrival'},
+ {id:'nedu-driver',text:'{player} übernimmt das Steuer und gibt richtig Gas. Ab jetzt geht es dreimal so schnell.',share:0,speed:3,player:'star-nedu-mann-yesss',modes:['bus','car','train','plane']},
+ {id:'radio',text:'Im Radio läuft das Vereinslied. Der ganze Bus singt mit.',share:0,modes:['bus']},
+ {id:'rest-stop',text:'Kurzer Halt an der Raststätte: Alle wollen noch einen Kaffee.',share:.05,modes:['bus','car']},
+ {id:'cows',text:'Eine Kuhherde überquert gemächlich die Strasse.',share:.04,modes:['bus','car']},
+ {id:'tractor',text:'Ein Traktor fährt vorneweg, überholen ist unmöglich.',share:.06,modes:['bus','car']},
+ {id:'escort',text:'Eine Polizeieskorte lotst den Teambus durch den Feierabendverkehr.',share:-.06,modes:['bus']},
+ {id:'quiet-car',text:'Die Mannschaft landet im Ruheabteil und flüstert über Taktik.',share:0,modes:['train']},
+ {id:'dining-car',text:'{player} reserviert den ganzen Speisewagen für die Mannschaft.',share:0,modes:['train']},
+ {id:'door',text:'Eine Türstörung hält den Zug im Bahnhof fest.',share:.05,modes:['train']},
+ {id:'catch-up',text:'Der Zug holt auf freier Strecke Zeit auf.',share:-.05,modes:['train']},
+ {id:'upgrade',text:'{player} wird spontan in die Business Class umgebucht.',share:0,modes:['plane']},
+ {id:'turbulence',text:'Leichte Turbulenzen. Der Trainer hält sich am Taktikbuch fest.',share:0,modes:['plane']},
+ {id:'holding',text:'Warteschleife über dem Zielflughafen.',share:.1,modes:['plane']},
+ {id:'jass',text:'Die Mannschaft jasst, {player} gewinnt jede Runde.',share:0,modes:['bus','train','plane']},
+ {id:'video',text:'Der Trainer zeigt unterwegs die Videoanalyse des Gegners.',share:0,modes:['bus','train','plane']},
+ {id:'autographs',text:'{player} schreibt vor dem Spielereingang Autogramme.',share:0,modes:['bus','car','train','plane'],phase:'arrival'},
 ];
+/** Real ms still to travel at planned clock `at`, after the events before it (a delay pauses, a saving speeds up). */
+function realTimeLeft(baseMs:number,at:number,events:readonly {at:number;delta:number}[]) {
+ let base=0,speed=1;
+ for(const e of events){if(e.at>at)break;base=Math.max(base,e.at);if(e.delta<0)speed=(baseMs-base)/Math.max(1,(baseMs-base)/speed+e.delta);}
+ return (baseMs-at)/speed;
+}
 export function createJourney(fixture:TravelFixture,now:number,random=Math.random,features?:GameFeatures):Journey {
  if(!fixture.away)throw new Error('Für Heimspiele ist keine Reise nötig.');
  const timing=travelTiming(fixture),events:TravelEvent[]=[],players=features?getEligibleEventPlayers(features):[];
@@ -112,11 +138,13 @@ export function createJourney(fixture:TravelFixture,now:number,random=Math.rando
   const at=Math.round(timing.baseMs*(i===0?.3:.9)),stage=timing.plan?segmentAt(timing.plan,at/1000):null;
   const mode=stage?.segment.mode==='wait'?timing.transport:stage?.segment.mode??timing.transport;
   const phase=stage?.segment.mode==='wait'?(timing.transport==='plane'?'airport':'station'):stage&&stage.index===(timing.plan?.segments.length??0)-1&&stage.fraction>.6?'arrival':undefined;
-  const candidates=EVENTS.filter(e=>e.modes.includes(mode as Journey['transport'])&&(!e.phase||e.phase===phase)&&(!e.text.includes('{player}')||players.length)&&!events.some(v=>v.id===e.id));
+  const candidates=EVENTS.filter(e=>e.modes.includes(mode as Journey['transport'])&&(!e.phase||e.phase===phase)&&(!e.text.includes('{player}')||players.length)&&(!e.player||players.some(p=>p.id===e.player))&&!events.some(v=>v.id===e.id));
   const fresh=candidates.filter(e=>!recent.includes(e.id)),pool=fresh.length?fresh:candidates;if(!pool.length)continue;
   const e=pool[Math.min(pool.length-1,Math.floor(random()*pool.length))];
-  const player=players.length?players[Math.min(players.length-1,Math.floor(random()*players.length))]:null;
-  const delta=Math.round(timing.baseMs*Math.max(-MAX_EVENT_SHARE,Math.min(MAX_EVENT_SHARE,e.share)));
+  const drawn=players.length?players[Math.min(players.length-1,Math.floor(random()*players.length))]:null;
+  const player=e.player?players.find(p=>p.id===e.player)??drawn:drawn;
+  // A speed-up shortens the real time still left: three times as fast leaves a third of it.
+  const delta=e.speed?-Math.round(realTimeLeft(timing.baseMs,at,events)*(1-1/e.speed)):Math.round(timing.baseMs*Math.max(-MAX_EVENT_SHARE,Math.min(MAX_EVENT_SHARE,e.share)));
   events.push({id:e.id,template:e.text,playerId:player?.id,text:pronounText(e.text.replace('{player}',player?.name??'Die Mannschaft'),player),at,delta,...(e.fine?{fine:e.fine}:{})});
  }}
  return {squadLock:features?{fixtureId:fixture.id,playerIds:[...new Set([...features.starXI.lineupIds,...features.starXI.benchIds].filter(Boolean))],startedAt:now,transferRemaining:Math.max(0,features.transferSaga.nextAt-now),eventRemaining:Math.max(0,features.nextEventAt-now),varRemaining:Math.max(0,features.nextVarAt-now),offerRemaining:features.transferSaga.pendingOffer?Math.max(0,features.transferSaga.pendingOffer.expiresAt-now):0}:undefined,plan:timing.plan,id:fixture.id,origin:HOME_VENUE,fixture:{...fixture,region:timing.category},startedAt:now,baseMs:timing.baseMs,endsAt:now+timing.baseMs+events.reduce((total,e)=>total+e.delta,0),transport:timing.transport,km:timing.km,events,consumed:false};

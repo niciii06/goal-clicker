@@ -115,7 +115,7 @@ test('new journeys move the arrival by their events, sized to the trip',()=>{
  const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
  for(let i=0;i<500;i++){const j=createJourney(fixture,now,random,f);
   assert.equal(j.endsAt,j.startedAt+j.baseMs+j.events.reduce((total,e)=>total+e.delta,0));
-  for(const e of j.events)assert.ok(Math.abs(e.delta)<=j.baseMs*.4);
+  for(const e of j.events)assert.ok(e.id==='nedu-driver'||Math.abs(e.delta)<=j.baseMs*.4);
   const total=j.endsAt-j.startedAt-j.baseMs;if(total>0)delayed++;if(total<0)faster++;
   assert.ok(normalizeTravel({journey:j,stats:f.travel.stats}).journey);}
  assert.ok(delayed>0&&faster>0,`${delayed} delayed, ${faster} faster`);
@@ -132,4 +132,23 @@ test('travel fines are paid once on arrival and scale with the passive income',(
  assert.equal(travelFineGoals(60,0),300);
  const poor=ready();poor.travel.journey={...f.travel.journey,finesPaid:false};
  assert.equal(payTravelFines(poor,120,100,poor.travel.journey.endsAt),120);
+});
+test('Nedu Mann Yesss at the wheel makes the rest of the trip three times as fast, only with him in the squad',()=>{
+ const seeded=(seed:number)=>{let state=seed>>>0;return ()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296;};};
+ const withNedu=ready(),without=ready();
+ for(const f of [withNedu,without]){f.seasonMode.matchday=5;}
+ without.starXI={...without.starXI,ownedIds:without.starXI.ownedIds.filter(id=>id!=='star-nedu-mann-yesss'),lineupIds:without.starXI.lineupIds.map(id=>id==='star-nedu-mann-yesss'?'':id),benchIds:without.starXI.benchIds.map(id=>id==='star-nedu-mann-yesss'?'':id)};
+ if(![...withNedu.starXI.lineupIds,...withNedu.starXI.benchIds].includes('star-nedu-mann-yesss'))withNedu.starXI.benchIds[0]='star-nedu-mann-yesss';
+ let found=0;
+ for(let seed=1;seed<4000&&found<3;seed++){
+  const j=createJourney(fixtureFor(withNedu,'season'),now,seeded(seed),withNedu),index=j.events.findIndex(e=>e.id==='nedu-driver');
+  assert.ok(!createJourney(fixtureFor(without,'season'),now,seeded(seed),without).events.some(e=>e.id==='nedu-driver'),'never without Nedu');
+  if(index<0)continue;found++;
+  const e=j.events[index];assert.equal(e.playerId,'star-nedu-mann-yesss');assert.match(e.text,/^Nedu Mann Yesss übernimmt das Steuer/);
+  // From the event on, one real ms covers three planned ms (no other event after it in this trip).
+  const at=j.startedAt+[...Array(200000).keys()].find(ms=>journeyClock(j,now+ms*5)>=e.at)!*5;
+  if(index===j.events.length-1){const later=journeyClock(j,at+300)-journeyClock(j,at);assert.ok(Math.abs(later-900)<15,`moved ${later} planned ms in 300 real ms`);}
+  assert.ok(Math.abs(j.endsAt-j.startedAt-j.baseMs-j.events.reduce((sum,v)=>sum+v.delta,0))<2);
+ }
+ assert.ok(found>0,'the Nedu event appears with him in the squad');
 });
