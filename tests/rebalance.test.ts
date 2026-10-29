@@ -105,7 +105,8 @@ test("economy grows evenly by league and packs cost real playing time", () => {
   for (const pack of STAR_PACKS.filter((item) => item.id !== "scrap")) {
     const league = getPackUnlockLeague(pack.id);
     const income = snapshots.find((snapshot) => snapshot.league === league)!.averageIncomePerSecond;
-    assert.ok(pack.price / income >= 15 * 60, `${pack.label} costs ${(pack.price / income / 60).toFixed(1)} minutes`);
+    // Packs stay a goal, but not a long wait: 8 to 35 minutes of income when they open.
+    assert.ok(pack.price / income >= 8 * 60 && pack.price / income <= 35 * 60, `${pack.label} costs ${(pack.price / income / 60).toFixed(1)} minutes`);
   }
 });
 

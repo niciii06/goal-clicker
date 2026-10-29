@@ -108,3 +108,7 @@ Am 29. Oktober stand der Hobby Plan bei 9,08 von 10 GB "Fast Origin Transfer" (3
 * `app/api/compression.ts`: JSON Antworten ab 1 KB gehen gzip-komprimiert raus, wenn der Browser es annimmt (Koop, Cloud Speichern, Reisen). Spielstände schrumpfen etwa auf ein Zehntel.
 * `app/cloud-sync.ts`: Uploads gehen gzip-komprimiert raus und nur noch jede Minute (plus beim Wegschalten und Schliessen der Seite). Beim Schliessen wird unkomprimiert sofort gesendet.
 * `app/api/request-body.ts` liest komprimierte Anfragen; ausgepackt gilt dasselbe Grössenlimit wie vorher.
+
+## Nachtrag: Mehr Einkommen ab Liga 12
+
+Packs dauerten zu lange. Die passiven Upgrades ab Liga 12 bringen 50% mehr (Talent-Scouting 1'200/s, VAR 2.0 1'950/s, Arena-Ausbau 8'250/s, Weltweite Übertragung 28'500/s, Globaler Sponsor 102'000/s, Superclub-Netzwerk 450'000/s). Das Einkommen ab Liga 11 steigt in der Simulation um etwa 70%; ein neues Pack kostet beim Freischalten 10 bis 14 Minuten Einkommen statt rund 20, das Legenden Pack 28 statt 48 Minuten. Der Balance Test erlaubt 8 bis 35 Minuten.
