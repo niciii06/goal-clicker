@@ -139,6 +139,10 @@ export function getCareerCard(career: CareerState, player: StarXIPlayer) {
   const milestone = [...CAREER_MILESTONES].filter(m => unlocked.includes(m.id)).sort((a,b) => b.bonus - a.bonus)[0];
   return { milestone, bonus: milestone ? Math.min(milestone.bonus, 100 - player.rating) : 0, rating: Math.min(100, player.rating + (milestone?.bonus ?? 0)) };
 }
+/** Album cards show their milestone bonus unless the account switched it off; guests start with the original ratings. */
+export function albumMilestonesFromStorage(raw: string | null, guest: boolean) {
+  return !guest && raw !== 'off';
+}
 export function prepareCareerMatch(features: GameFeatures) {
   const bonuses: Record<string, number> = {};
   // A player kept against his wish after a sale offer plays weaker for a few matches.

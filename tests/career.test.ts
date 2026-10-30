@@ -6,7 +6,7 @@ import { beginSeasonCupMatch, initialGameFeatures, normalizeGameFeatures, pauseG
 import { getMatchScoreImpact } from '../app/feature-data.ts';
 import { getOpponentMatchRatings } from '../app/career-data.ts';
 import { createMatchBroadcast } from '../app/match-broadcast.ts';
-import { claimAlbumReward, emptyPlayerStats, getAlbumGroups, getCareerCard, getMatchRatingBreakdown, getPlayerForm, getPlayerMilestones, normalizeCareerState, prepareCareerMatch, recordCareerMatch, rivalryKey } from '../app/career-data.ts';
+import { albumMilestonesFromStorage, claimAlbumReward, emptyPlayerStats, getAlbumGroups, getCareerCard, getMatchRatingBreakdown, getPlayerForm, getPlayerMilestones, normalizeCareerState, prepareCareerMatch, recordCareerMatch, rivalryKey } from '../app/career-data.ts';
 import { AlbumPanel, CareerPanel, MatchRatingsPanel } from '../app/career-panels.tsx';
 
 function fixture(now=1000000) {
@@ -106,7 +106,7 @@ test('album tracks sold cards and pays only validated completed groups once',()=
 });
 test('career, album and match panels render real populated states with accessible controls and report details',()=>{
  const f=fixture();finishFixture(f,3);recordCareerMatch(f);
- const career=renderToStaticMarkup(React.createElement(CareerPanel,{features:f})),album=renderToStaticMarkup(React.createElement(AlbumPanel,{features:f,busy:false,onClaim:()=>{}})),report=renderToStaticMarkup(React.createElement(MatchRatingsPanel,{features:f,minute:90}));
+ const career=renderToStaticMarkup(React.createElement(CareerPanel,{features:f})),album=renderToStaticMarkup(React.createElement(AlbumPanel,{features:f,busy:false,onClaim:()=>{},showMilestones:true,onShowMilestones:()=>{}})),report=renderToStaticMarkup(React.createElement(MatchRatingsPanel,{features:f,minute:90}));
  assert.match(career,/SPIELERFORM/);assert.match(career,/MEILENSTEINE/);assert.match(career,/SAISONABSCHLUSS/);assert.match(career,/RIVALITÄTEN/);
  assert.match(album,/aria-label="Album Nation"/);assert.match(album,/aria-label="Album Rating"/);assert.match(album,/Prämien|PRÄMIEN/);assert.match(report,/Spieler des Spiels/);assert.match(report,/<details/);assert.match(report,/Vorlage/);
  assert.doesNotMatch(career+album+report,/NaN|undefined/);
@@ -215,4 +215,24 @@ test('after a win the award stays with the club',()=>{
  const f=fixture();finishFixture(f,2);recordCareerMatch(f,2000000);
  const report=f.career.reports.at(-1)!;
  assert.ok(report.motmId);assert.equal(report.opponentMotm,undefined);
+});
+
+test('the album switch shows milestone ratings or the original ratings; guests start with the original ratings',()=>{
+ const f=fixture();
+ // A player near the top of the album, so his card is on the first page with and without the bonus.
+ const top=STAR_XI_PLAYERS.filter(p=>!p.retired).sort((a,b)=>b.rating-a.rating||a.name.localeCompare(b.name)).slice(0,48);
+ const player=top.find(p=>p.rating<=97)!;
+ const milestone=getPlayerMilestones(f.career,player).find(m=>m.bonus===3)!;
+ f.career.milestoneCards[player.id]=[milestone.id];
+ const render=(showMilestones:boolean)=>renderToStaticMarkup(React.createElement(AlbumPanel,{features:f,busy:false,onClaim:()=>{},showMilestones,onShowMilestones:()=>{}}));
+ const card=(html:string)=>html.match(new RegExp(`<b>(\\d+)</b><strong>${player.name}</strong>`))?.[1];
+ const withBonus=render(true),original=render(false);
+ assert.equal(card(withBonus),String(player.rating+3));
+ assert.match(withBonus,new RegExp(`★ ${milestone.label}`));
+ assert.equal(card(original),String(player.rating));
+ assert.doesNotMatch(original,/<em>★/);
+ assert.match(original,/role="switch"/);assert.match(original,/Originalratings/);
+ assert.equal(albumMilestonesFromStorage(null,false),true);
+ assert.equal(albumMilestonesFromStorage('off',false),false);
+ assert.equal(albumMilestonesFromStorage('on',true),false,'a guest starts with the original ratings');
 });

@@ -97,3 +97,5 @@ export const VIBRATION_STORAGE_KEY = "goalClickerVibrationV1";
 export const WHATS_NEW_STORAGE_KEY = "goalClickerWhatsNewSeenV1";
 /** Progress of the new player tutorial; travels with the cloud save like the "Was ist neu" key. */
 export const TUTORIAL_STORAGE_KEY = "goalClickerTutorialV1";
+/** "on" or "off": whether album cards show their milestone bonus; synced with the account, never saved for guests. */
+export const ALBUM_MILESTONES_STORAGE_KEY = "goalClickerAlbumMilestonesV1";

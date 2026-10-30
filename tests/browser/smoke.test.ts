@@ -10,7 +10,8 @@ import type { Browser, Page } from 'playwright-core';
 import { advanceCupMatch, beginSeasonCupMatch, getStarXISelection, normalizeGameFeatures, resumeCupMatch, setBestStarXI, STAR_XI_PLAYERS } from '../../app/feature-data.ts';
 import type { GameFeatures } from '../../app/feature-data.ts';
 import { prepareCareerMatch } from '../../app/career-data.ts';
-import { TUTORIAL_STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from '../../app/game/constants.ts';
+import { ALBUM_MILESTONES_STORAGE_KEY, TUTORIAL_STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from '../../app/game/constants.ts';
+import { getPlayerMilestones } from '../../app/career-data.ts';
 import { TUTORIAL_INTRO_PAGES } from '../../app/tutorial.ts';
 import { WHATS_NEW } from '../../app/whats-new.ts';
 
@@ -400,6 +401,38 @@ test('an existing game never sees the tutorial', async () => {
   assert.equal(JSON.parse((await page.evaluate((key) => localStorage.getItem(key), TUTORIAL_STORAGE_KEY))!).status, 'done');
   assert.deepEqual(problems, []);
   await page.close();
+});
+
+test('the album switch shows milestone ratings or the original ratings and remembers the choice', async () => {
+  const now = Date.now();
+  const f = richFeatures(now);
+  const player = STAR_XI_PLAYERS.find((p) => p.id === f.starXI.lineupIds[0])!;
+  const milestone = getPlayerMilestones(f.career, player).find((m) => m.bonus === 3)!;
+  f.career.milestoneCards[player.id] = [milestone.id];
+  for (const viewport of [VIEWPORTS[0], VIEWPORTS[1]]) {
+    const { page, problems } = await openWithSave(viewport, save(f, now));
+    await openTab(page, 'Packs & Album');
+    await page.getByRole('tab', { name: 'Sammelalbum' }).click();
+    await page.getByLabel('Sammelalbum durchsuchen').fill(player.name);
+    const card = page.locator('.career-album-card').filter({ hasText: player.name }).first();
+    const toggle = page.getByRole('switch', { name: /Meilensteinboni/ });
+    await toggle.waitFor();
+    assert.equal(await toggle.isChecked(), true, `${viewport.name}: an account sees the milestone bonus by default`);
+    assert.equal(await card.locator('b').first().innerText(), String(Math.min(100, player.rating + 3)));
+    assert.deepEqual(await layoutProblems(page), [], `${viewport.name}: album with bonus`);
+    await toggle.click();
+    assert.equal(await card.locator('b').first().innerText(), String(player.rating));
+    assert.equal(await card.locator('em').count(), 0);
+    assert.equal(await page.evaluate((key) => localStorage.getItem(key), ALBUM_MILESTONES_STORAGE_KEY), 'off');
+    assert.deepEqual(await layoutProblems(page), [], `${viewport.name}: album with original ratings`);
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForTimeout(1200);
+    await openTab(page, 'Packs & Album');
+    await page.getByRole('tab', { name: 'Sammelalbum' }).click();
+    assert.equal(await page.getByRole('switch', { name: /Meilensteinboni/ }).isChecked(), false, 'the choice is remembered');
+    assert.deepEqual(problems, []);
+    await page.close();
+  }
 });
 
 test('the layout checker itself reports overlapping text, unreadable text and horizontal overflow', async () => {

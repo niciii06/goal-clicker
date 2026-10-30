@@ -1523,7 +1523,16 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .career-rival-record b { font-size: var(--text-footnote); }
 .career-derby-banner { padding: 14px; margin: 12px 0; border: 1px solid color-mix(in srgb, #c65c1f 36%, var(--surface-raised)); border-radius: 12px; background: color-mix(in srgb, #e64800 6%, var(--surface-raised)); font-size: var(--text-footnote); line-height: 1.5; }
 .career-derby-banner strong { display: block; color: color-mix(in oklab, #ba4c1b, var(--text) var(--tone-mix)); }
-.career-album-filters { display: grid; grid-template-columns: 2fr repeat(4,1fr); gap: 8px; margin: 16px 0; }
+.career-album-filters { display: grid; grid-template-columns: 2fr repeat(4,1fr) auto; gap: 8px; margin: 16px 0; }
+.career-album-switch { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 6px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); cursor: pointer; }
+.career-album-switch input { flex: none; width: 36px; height: 20px; margin: 0; appearance: none; border-radius: var(--radius-pill); background: var(--line); cursor: pointer; transition: background 160ms ease; position: relative; }
+.career-album-switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--surface-raised); box-shadow: 0 1px 3px rgba(15,20,25,.25); transition: transform 160ms ease; }
+.career-album-switch input:checked { background: var(--accent); }
+.career-album-switch input:checked::after { transform: translateX(16px); }
+.career-album-switch input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.career-album-switch span { display: grid; min-width: 0; line-height: 1.2; }
+.career-album-switch strong { color: var(--text); font-size: var(--text-footnote); }
+.career-album-switch small { color: var(--soft); font-size: var(--text-caption1, 12px); }
 .career-album-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(165px,1fr)); gap: 12px; }
 .career-album-card { display: flex; flex-direction: column; gap: 8px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(135deg,var(--surface-raised),color-mix(in srgb, var(--accent) 7%, var(--surface-raised))); min-width: 0; }
 .career-album-card.missing { background: var(--surface-soft); border-style: dashed; }
@@ -1546,7 +1555,7 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .career-album-rewards button { flex-shrink: 0; font-size: var(--text-footnote); }
 .career-album-rewards + button { margin-top: 14px; }
 .career-section button:focus-visible, .career-section summary:focus-visible, .career-section select:focus-visible, .career-section input:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
-@media (max-width: 1000px) { .career-album-filters { grid-template-columns: repeat(2,minmax(0,1fr)); } .career-album-filters > input { grid-column: 1/-1; } .career-milestone-grid, .career-award-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 1000px) { .career-album-filters { grid-template-columns: repeat(2,minmax(0,1fr)); } .career-album-filters > input, .career-album-filters > .career-album-switch { grid-column: 1/-1; } .career-milestone-grid, .career-award-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 600px) { .career-section { padding: 14px; } .career-heading h3, .career-heading h4 { font-size: 18px; } .career-heading select { width: 100%; } .career-album-rewards { grid-template-columns: 1fr; } .career-album-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; } .career-album-card { padding: 12px; } .career-rival-list article { flex-direction: column; gap: 8px; } .career-rival-record { text-align: left; } .career-rating-row em { display: block; margin: 4px 0 0; } .career-form-list > button { flex-wrap: wrap; } }
 
 .career-pitch-badge { position: absolute; right: -5px; top: -7px; padding: 2px 4px; border-radius: 5px; background: color-mix(in srgb, var(--accent) 7%, var(--surface-raised)); color: color-mix(in oklab, #253144, var(--text) var(--tone-mix)); font-size: var(--text-footnote); font-weight: 800; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,.15); }

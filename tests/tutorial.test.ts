@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { STARTER_SQUAD_UNLOCK_CLICKS, beginSeasonCupMatch, getStarXISelection, initialGameFeatures, maybeGrantStarterSquad } from "../app/feature-data.ts";
 import { SYNCED_SAVE_KEYS } from "../app/cloud-save-rules.ts";
-import { TUTORIAL_STORAGE_KEY } from "../app/game/constants.ts";
+import { ALBUM_MILESTONES_STORAGE_KEY, TUTORIAL_STORAGE_KEY } from "../app/game/constants.ts";
 import { TUTORIAL_STEPS, advanceTutorial, currentTutorialStep, hasStartedMatch, newTutorial, parseTutorialState, serializeTutorialState, type TutorialGame, type TutorialState } from "../app/tutorial.ts";
 
 const freshGame = (): TutorialGame => ({ clicks: 0, upgrades: {}, features: initialGameFeatures() });
@@ -17,6 +17,7 @@ test("a missing, broken or unknown tutorial value counts as finished", () => {
 
 test("the tutorial progress travels with the cloud save", () => {
   assert.ok((SYNCED_SAVE_KEYS as readonly string[]).includes(TUTORIAL_STORAGE_KEY));
+  assert.ok((SYNCED_SAVE_KEYS as readonly string[]).includes(ALBUM_MILESTONES_STORAGE_KEY), "the album switch too");
 });
 
 test("tutorial steps tick off from the game in order and stay done", () => {
