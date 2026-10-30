@@ -125,3 +125,5 @@ Die Simulation (`scripts/balance/economy-model.ts`) rechnet jetzt standardmässi
 * **Passive Upgrades günstiger:** halber Grundpreis und 40% weniger Preisaufschlag pro Stufe (z.B. Superclub-Netzwerk 90 Mio statt 180 Mio, +22,8% statt +38% pro Stufe).
 * **Packpreise:** Regional 2 Mio (vorher 10 Mio), Scout 25 Mio (50 Mio), Profi 130 Mio (350 Mio), Elite 1,5 Mrd (3 Mrd), Weltklasse 5 Mrd (6 Mrd), Legenden 10 Mrd (15 Mrd).
 * **Ergebnis beim Freischalten (Median mit VAR):** neue Packs 7 bis 9 Minuten, Legenden Pack gut 12 Minuten. `tests/rebalance.test.ts` hält 6 bis 10 Minuten fest, beim Legenden Pack 10 bis 14.
+
+**Korrektur am selben Tag:** Die Wartezeiten steigen jetzt von Pack zu Pack. Preise: Regional 1,5 Mio, Scout 20 Mio, Profi 130 Mio, Elite 1,6 Mrd, Weltklasse 8 Mrd, Legenden 10 Mrd. Median mit VAR beim Freischalten: 6,5 / 7,9 / 8,2 / 9,4 / 9,8 / 12,2 Minuten. Der Balance Test verlangt, dass jedes spätere Pack länger dauert als das vorherige.

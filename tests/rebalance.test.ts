@@ -105,14 +105,15 @@ test("economy grows evenly by league and packs take minutes, not hours, on passi
     const growth = snapshot.averageIncomePerSecond / snapshots[index].averageIncomePerSecond;
     assert.ok(growth <= 3.7, `Liga ${snapshot.league} grows by ${growth.toFixed(2)}`);
   });
-  for (const pack of STAR_PACKS.filter((item) => item.id !== "scrap")) {
-    const league = getPackUnlockLeague(pack.id);
-    const income = snapshots.find((snapshot) => snapshot.league === league)!.incomePerSecond;
-    // Saved while the VAR and the random events hit the balance: typically about 8 minutes, the legend pack about 12.
-    const minutes = medianSavingMinutes(income, pack.price, 151);
-    const [low, high] = pack.id === "legend" ? [10, 14] : [6, 10];
-    assert.ok(minutes >= low && minutes <= high, `${pack.label} takes ${minutes.toFixed(1)} minutes`);
-  }
+  // Saved while the VAR and the random events hit the balance: from about 6 minutes for the regional pack
+  // up to about 12 for the legend pack, and every later pack takes longer than the one before.
+  const minutes = STAR_PACKS.filter((item) => item.id !== "scrap").map((pack) => {
+    const income = snapshots.find((snapshot) => snapshot.league === getPackUnlockLeague(pack.id))!.incomePerSecond;
+    return { pack, minutes: medianSavingMinutes(income, pack.price) };
+  });
+  assert.ok(minutes[0].minutes >= 4 && minutes[0].minutes <= 8, `${minutes[0].pack.label} takes ${minutes[0].minutes.toFixed(1)} minutes`);
+  assert.ok(minutes.at(-1)!.minutes >= 10 && minutes.at(-1)!.minutes <= 14, `${minutes.at(-1)!.pack.label} takes ${minutes.at(-1)!.minutes.toFixed(1)} minutes`);
+  minutes.slice(1).forEach((entry, index) => assert.ok(entry.minutes > minutes[index].minutes, `${entry.pack.label} (${entry.minutes.toFixed(1)}) must take longer than ${minutes[index].pack.label} (${minutes[index].minutes.toFixed(1)})`));
 });
 
 test("every upgrade description states its gain", () => {

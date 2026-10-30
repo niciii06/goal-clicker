@@ -44,7 +44,7 @@ test('six reward distributions total100%, simulations match configured chances a
   groups.forEach((g,i)=>assert.ok(Math.abs(counts[i]/n-g.chance)<Math.max(.001,6*Math.sqrt(g.chance*(1-g.chance)/n)),`${pack.id} ${g.label}`));assert.ok(total/n>prior);prior=total/n;console.log(`${pack.id}: mean ${prior.toFixed(3)}, counts ${counts.join(',')}`);
  }
  const only=STAR_XI_PLAYERS.filter(p=>!p.isCustom&&p.rating>=80&&p.rating<=85);assert.equal(getRewardPackOdds('reward-6',only)[0].chance,1);
- assert.deepEqual(STAR_PACKS.map(p=>p.id),['scrap','regional','scout','profi','elite','weltklasse','legend']);assert.deepEqual(STAR_PACKS.map(p=>p.price),[15000,2000000,25000000,130000000,1500000000,5000000000,10000000000]);
+ assert.deepEqual(STAR_PACKS.map(p=>p.id),['scrap','regional','scout','profi','elite','weltklasse','legend']);assert.deepEqual(STAR_PACKS.map(p=>p.price),[15000,1500000,20000000,130000000,1600000000,8000000000,10000000000]);
 });
 test('completion and reward openings persist exactly once, replay gives separate valid rewards',()=>{
  let f=ready();f.cup.matchStartedAt=1000;f.cup.mode='tournament';const summary={tournamentId:'stadium' as const,tournamentWon:true,completedRound:3,opponent:'Test',homeScore:1,awayScore:0,tieBreak:false};
