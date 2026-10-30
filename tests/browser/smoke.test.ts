@@ -435,6 +435,24 @@ test('the album switch shows milestone ratings or the original ratings and remem
   }
 });
 
+test('"Kaderlücke schliessen" fills the free place with the best eleven and bench', async () => {
+  const now = Date.now();
+  const f = richFeatures(now);
+  const required = f.starXI.lineupIds.filter(Boolean).length + f.starXI.benchIds.filter(Boolean).length;
+  f.starXI.benchIds = f.starXI.benchIds.map((id, index) => index === 0 ? '' : id);
+  f.transferSaga.vacancies = [{ area: 'bench', index: 0, requiredPlayers: required, createdAt: now }];
+  const { page, problems } = await openWithSave(VIEWPORTS[0], save(f, now));
+  await openTab(page, 'Spiele');
+  const button = page.getByRole('button', { name: 'Kaderlücke schliessen' });
+  await button.waitFor();
+  assert.equal(await button.isEnabled(), true);
+  await button.click();
+  await page.waitForFunction(() => !document.querySelector('.cup-start.vacancy'), undefined, { timeout: 5000 });
+  assert.equal(await page.getByRole('button', { name: 'Kaderlücke schliessen' }).count(), 0);
+  assert.deepEqual(problems, []);
+  await page.close();
+});
+
 test('the layout checker itself reports overlapping text, unreadable text and horizontal overflow', async () => {
   const page = await browser.newPage({ viewport: { width: 400, height: 600 } });
   await page.addInitScript('globalThis.__name = (fn) => fn;');
