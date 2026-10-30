@@ -10,14 +10,14 @@ function StandingsTable({ table, division, caption }: { table: readonly SeasonTa
       <caption>{caption}</caption>
       <thead><tr><th scope="col">#</th><th scope="col">Club</th><th scope="col" title="Spiele">Sp</th><th scope="col" title="Siege">S</th><th scope="col" title="Unentschieden">U</th><th scope="col" title="Niederlagen">N</th><th scope="col">Tore</th><th scope="col" title="Tordifferenz">+/-</th><th scope="col">Pkt</th></tr></thead>
       <tbody>{rows.map((team, index) => {
-        const zone = index < 2 ? (top ? "hall-of-fame" : "promotion") : index >= rows.length - 2 && division > 1 ? "relegation" : "";
+        const zone = top ? (index === 0 ? "hall-of-fame" : index >= rows.length - 2 ? "relegation" : "") : index < 2 ? "promotion" : index >= rows.length - 2 && division > 1 ? "relegation" : "";
         const diff = team.goalsFor - team.goalsAgainst;
         return <tr key={team.id} className={`${zone}${team.id === "club" ? " club" : ""}`}>
           <td>{index + 1}</td><th scope="row">{team.name}</th><td>{team.played}</td><td>{team.wins}</td><td>{team.draws}</td><td>{team.losses}</td><td>{team.goalsFor}:{team.goalsAgainst}</td><td>{diff > 0 ? `+${diff}` : diff}</td><td><b>{team.points}</b></td>
         </tr>;
       })}</tbody>
     </table>
-    <p className="season-hub-legend"><span className={top ? "hall-of-fame" : "promotion"}>{top ? "Platz 1 und 2: Hall of Fame" : "Platz 1 und 2: Aufstieg"}</span>{division > 1 && <span className="relegation">Platz 5 und 6: Abstieg</span>}</p>
+    <p className="season-hub-legend"><span className={top ? "hall-of-fame" : "promotion"}>{top ? "Platz 1: Hall of Fame" : "Platz 1 und 2: Aufstieg"}</span>{division > 1 && <span className="relegation">Platz 5 und 6: Abstieg</span>}</p>
   </div>;
 }
 

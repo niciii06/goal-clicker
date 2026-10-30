@@ -58,6 +58,25 @@ export async function registerWithUsername(username: string, displayName: string
   await signInWithLoginEmail(email, password);
 }
 
+/**
+ * Links Google to the signed in account: afterwards Google and the username open the same account and save.
+ * Supabase needs "manual linking" switched on; it returns through /auth/callback with ?link=google.
+ */
+export async function linkGoogleAccount(returnTo = "/") {
+  const redirectTo = `${window.location.origin}${AUTH_CALLBACK_PATH}?link=google&next=${encodeURIComponent(returnTo)}`;
+  const { error } = await requireClient().auth.linkIdentity({ provider: "google", options: { redirectTo } });
+  if (error) throw error;
+}
+
+/** The Google address linked to the signed in account: "" when Google sends none, null without Google. */
+export async function linkedGoogleEmail() {
+  const { data, error } = await requireClient().auth.getUserIdentities();
+  if (error) throw error;
+  const google = data.identities.find((identity) => identity.provider === "google");
+  if (!google) return null;
+  return typeof google.identity_data?.email === "string" ? google.identity_data.email : "";
+}
+
 /** Changes the password of the signed in account. */
 export async function setAccountPassword(password: string) {
   const { error } = await requireClient().auth.updateUser({ password });
@@ -70,6 +89,8 @@ const AUTH_ERRORS: Record<string, string> = {
   weak_password: "Das Passwort ist zu schwach. Nimm mindestens 8 Zeichen mit Buchstaben und Zahlen.",
   same_password: "Das neue Passwort muss sich vom alten unterscheiden.",
   reauthentication_needed: "Melde dich zuerst neu an, um das Passwort zu ändern.",
+  manual_linking_disabled: "Die Verknüpfung mit Google ist auf dem Server noch nicht freigeschaltet.",
+  identity_already_exists: "Dieses Google Konto gehört schon zu einem anderen Spielerkonto.",
 };
 
 /** A German message for a failed login or password change. */

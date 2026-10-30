@@ -111,3 +111,14 @@ test('the OAuth callback and logout only redirect inside the site', async () => 
   assert.equal(own.headers.get('location'), 'http://localhost/');
 });
 
+test('the return from linking Google reports to the game instead of the login screen', async () => {
+  configure();
+  const { GET } = await import('../app/auth/callback/route.ts');
+  const taken = await GET(new Request('http://localhost/auth/callback?link=google&next=/club&error=server_error&error_code=identity_already_exists'));
+  assert.equal(taken.headers.get('location'), 'http://localhost/?google=vergeben');
+  const cancelled = await GET(new Request('http://localhost/auth/callback?link=google&next=/club&error=access_denied'));
+  assert.equal(cancelled.headers.get('location'), 'http://localhost/?google=abgebrochen');
+  const evil = await GET(new Request('http://localhost/auth/callback?link=google&next=https://evil.example'));
+  assert.equal(evil.headers.get('location'), 'http://localhost/?google=abgebrochen');
+});
+

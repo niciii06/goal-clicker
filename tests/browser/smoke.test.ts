@@ -7,11 +7,11 @@ import { existsSync } from 'node:fs';
 import { after, before, test } from 'node:test';
 import { chromium } from 'playwright-core';
 import type { Browser, Page } from 'playwright-core';
-import { advanceCupMatch, beginSeasonCupMatch, getStarXISelection, normalizeGameFeatures, resumeCupMatch, setBestStarXI, STAR_XI_PLAYERS } from '../../app/feature-data.ts';
+import { SEASON_MODE_MATCHES_PER_SEASON, TOURNAMENTS, advanceCupMatch, beginSeasonCupMatch, getStarXISelection, normalizeGameFeatures, resumeCupMatch, setBestStarXI, STAR_XI_PLAYERS } from '../../app/feature-data.ts';
 import type { GameFeatures } from '../../app/feature-data.ts';
-import { prepareCareerMatch } from '../../app/career-data.ts';
+import { getPlayerMilestones, prepareCareerMatch } from '../../app/career-data.ts';
 import { ALBUM_MILESTONES_STORAGE_KEY, TUTORIAL_STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from '../../app/game/constants.ts';
-import { getPlayerMilestones } from '../../app/career-data.ts';
+import { createJourney, fixtureFor } from '../../app/travel-data.ts';
 import { TUTORIAL_INTRO_PAGES } from '../../app/tutorial.ts';
 import { WHATS_NEW } from '../../app/whats-new.ts';
 
@@ -451,6 +451,56 @@ test('"Kaderlücke schliessen" fills the free place with the best eleven and ben
   assert.equal(await page.getByRole('button', { name: 'Kaderlücke schliessen' }).count(), 0);
   assert.deepEqual(problems, []);
   await page.close();
+});
+
+test('winning the league on the last matchday shows the trophy celebration', async () => {
+  for (const viewport of [VIEWPORTS[0], VIEWPORTS[1]]) {
+    const now = Date.now();
+    const f = richFeatures(now);
+    // Last matchday, the club far ahead: whatever the score, it ends the season first.
+    f.seasonMode = { ...f.seasonMode, matchday: SEASON_MODE_MATCHES_PER_SEASON - 1, table: f.seasonMode.table.map((team) => ({ ...team, played: SEASON_MODE_MATCHES_PER_SEASON - 1, points: team.id === 'club' ? 99 : 0 })) };
+    // The earlier matchdays of the season are in the history, as in a real season.
+    f.seasonMode.history = Array.from({ length: SEASON_MODE_MATCHES_PER_SEASON - 1 }, (_, index) => ({ id: `season-match-${now - 1e6 + index}-${index + 1}`, division: f.seasonMode.division, matchday: index + 1, opponent: 'Testgegner', opponentRating: 70, clubScore: 2, opponentScore: 0, outcome: 'win' as const, completedSeason: false, seasonOutcome: null, createdAt: now - 1e6 + index }));
+    // The match is played almost to the end; the browser plays the last seconds and records the final table.
+    f.cup = beginSeasonCupMatch(f.cup, f.seasonMode, now, getStarXISelection(f.starXI.ownedIds, f.starXI.lineupIds), f.starXI.formationPositions, f.starXI.lineupIds, f.starXI.benchIds);
+    prepareCareerMatch(f);
+    for (let i = 0; i < 2000 && f.cup.active && f.cup.matchEndsAt - f.cup.lastTickAt > 3000; i++) {
+      if (f.cup.matchPaused) f.cup = resumeCupMatch(f.cup, f.cup.lastTickAt);
+      f.cup = advanceCupMatch(f.cup, 85, Math.min(f.cup.matchEndsAt - 2500, f.cup.lastTickAt + 20000), Math.random, getStarXISelection(f.starXI.ownedIds, f.starXI.lineupIds), f.starXI.formationPositions).cup;
+    }
+    if (f.cup.matchPaused) f.cup = resumeCupMatch(f.cup, f.cup.lastTickAt);
+    const shift = now - f.cup.lastTickAt;
+    f.cup = { ...f.cup, matchStartedAt: f.cup.matchStartedAt + shift, matchEndsAt: f.cup.matchEndsAt + shift, lastTickAt: f.cup.lastTickAt + shift, restartAt: f.cup.restartAt === undefined ? undefined : f.cup.restartAt + shift, timedPause: undefined };
+    const { page, problems } = await openWithSave(viewport, save(f, now));
+    const celebration = page.getByRole('dialog', { name: /holt den Titel/ });
+    await celebration.waitFor({ timeout: 20000 });
+    await page.waitForTimeout(2200);
+    assert.match(await celebration.innerText(), /MEISTER/);
+    assert.deepEqual(await layoutProblems(page), [], `${viewport.name}: trophy layout`);
+    await celebration.getByRole('button', { name: 'Weiter' }).click();
+    assert.equal(await celebration.count(), 0);
+    // A goal in the last seconds vibrates; Chrome refuses that before the first tap, which a real player has made.
+    assert.deepEqual(problems.filter((problem) => !problem.includes('navigator.vibrate')), []);
+    await page.close();
+  }
+});
+
+test('while the team travels the match choice is hidden; it comes back without a journey', async () => {
+  const now = Date.now();
+  const f = richFeatures(now);
+  const fixture = [fixtureFor(f, 'season'), ...TOURNAMENTS.map((t) => fixtureFor(f, 'tournament', t.id))].find((candidate) => candidate.away)!;
+  f.travel.journey = createJourney(fixture, now, () => 0.5, f);
+  const { page, problems } = await openWithSave(VIEWPORTS[1], save(f, now));
+  await openTab(page, 'Spiele');
+  await page.getByRole('region', { name: 'Auswärtsreise' }).waitFor();
+  assert.equal(await page.getByRole('region', { name: 'Saisonspiele und Turniere' }).count(), 0, 'no match choice while travelling');
+  // The server keeps solo journeys in the database, which this test server does not have.
+  assert.deepEqual(problems.filter((problem) => !problem.endsWith('/api/travel')), []);
+  await page.close();
+  const home = await openWithSave(VIEWPORTS[1], save(richFeatures(now), now));
+  await openTab(home.page, 'Spiele');
+  await home.page.getByRole('region', { name: 'Saisonspiele und Turniere' }).waitFor();
+  await home.page.close();
 });
 
 test('the layout checker itself reports overlapping text, unreadable text and horizontal overflow', async () => {

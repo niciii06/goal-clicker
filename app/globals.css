@@ -1932,6 +1932,10 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .profile-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
 .profile-row label { display: grid; flex: 1 1 180px; gap: 4px; min-width: 0; }
 .profile-row label span { color: var(--soft); font-size: var(--text-footnote); font-weight: 700; }
+.profile-google { align-items: center; }
+.profile-google p { display: grid; flex: 1 1 220px; gap: 4px; min-width: 0; margin: 0; }
+.profile-google strong { color: var(--text); font-size: var(--text-footnote); }
+.profile-google small { color: var(--soft); font-size: var(--text-footnote); line-height: 1.4; overflow-wrap: anywhere; }
 .profile-row .mode-input { min-height: 40px; font-size: 14px; }
 .profile-row small { flex-basis: 100%; color: var(--muted); font-size: var(--text-footnote); line-height: 1.4; }
 .profile-danger summary { color: color-mix(in oklab, #b52a4c, var(--text) var(--tone-mix)); font-size: var(--text-footnote); font-weight: 700; cursor: pointer; }
@@ -2088,6 +2092,33 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .whats-new-dialog .eyebrow { margin: 0 0 6px; }
 .whats-new-dialog h2 { margin: 0 0 12px; font-size: var(--text-title3); }
 .whats-new-dialog ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--soft); line-height: 1.45; }
+
+/* League title: a gold trophy rises over the final table, with light rays, shine and confetti. */
+.season-trophy { position: fixed; z-index: 60; inset: 0; display: grid; place-items: center; padding: 20px; overflow: hidden; background: radial-gradient(circle at 50% 40%, rgba(246,201,76,.28), transparent 45%), rgba(8,12,10,.86); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); animation: season-trophy-fade 320ms ease-out both; }
+.season-trophy.hall-of-fame { background: radial-gradient(circle at 50% 40%, rgba(246,201,76,.42), transparent 50%), radial-gradient(circle at 50% 120%, rgba(139,92,246,.35), transparent 60%), rgba(6,6,10,.92); }
+.season-trophy-rays { position: absolute; top: 40%; left: 50%; width: 160vmax; height: 160vmax; margin: -80vmax 0 0 -80vmax; background: repeating-conic-gradient(from 0deg, rgba(255,226,141,.16) 0deg 7deg, transparent 7deg 22deg); -webkit-mask-image: radial-gradient(circle, #000 0, transparent 55%); mask-image: radial-gradient(circle, #000 0, transparent 55%); animation: season-trophy-rays 18s linear infinite; pointer-events: none; }
+.season-trophy-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.season-trophy-confetti i { position: absolute; top: -24px; width: 8px; height: 16px; border-radius: 2px; opacity: 0; animation: season-trophy-confetti 3.2s linear forwards; }
+.season-trophy-card { position: relative; width: min(460px, 100%); max-height: calc(100dvh - 40px); overflow: auto; padding: 8px 24px 26px; color: #fff; text-align: center; }
+.season-trophy-cup { display: block; width: min(190px, 46vw); height: auto; margin: 0 auto 10px; filter: drop-shadow(0 0 28px rgba(246,201,76,.55)) drop-shadow(0 18px 24px rgba(0,0,0,.45)); transform-origin: 50% 85%; animation: season-trophy-rise 1100ms cubic-bezier(.2,1.3,.4,1) 150ms both, season-trophy-float 3.4s ease-in-out 1.4s infinite; }
+.season-trophy-shine { animation: season-trophy-shine 2.6s ease-in-out 1.1s infinite; }
+.season-trophy-eyebrow { margin: 0 0 8px; color: #f6c94c; font-size: var(--text-footnote); font-weight: 800; letter-spacing: .16em; animation: season-trophy-text 500ms ease-out 900ms both; }
+.season-trophy-card h2 { margin: 0 0 10px; font-size: clamp(28px, 7vw, 40px); line-height: 1.08; letter-spacing: -.03em; animation: season-trophy-text 500ms ease-out 1050ms both; }
+.season-trophy-card p:not(.season-trophy-eyebrow) { margin: 0 0 8px; color: #e9e2c9; font-size: var(--text-footnote); line-height: 1.45; animation: season-trophy-text 500ms ease-out 1200ms both; }
+.season-trophy-card .season-trophy-note { color: #fff4bd; font-weight: 700; }
+.season-trophy-close { min-height: 44px; margin-top: 12px; padding: 0 28px; border: 0; border-radius: var(--radius-pill); color: #2b2110; background: linear-gradient(135deg, #fff4bd, #f6c94c 55%, #d49b19); font-size: var(--text-subhead); font-weight: 800; cursor: pointer; box-shadow: 0 10px 26px rgba(246,201,76,.35); animation: season-trophy-text 500ms ease-out 1350ms both; }
+.season-trophy-close:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+@keyframes season-trophy-fade { from { opacity: 0; } }
+@keyframes season-trophy-rays { to { transform: rotate(360deg); } }
+@keyframes season-trophy-rise { 0% { opacity: 0; transform: translateY(90px) scale(.4) rotate(-8deg); } 60% { opacity: 1; transform: translateY(-10px) scale(1.08) rotate(3deg); } 100% { opacity: 1; transform: none; } }
+@keyframes season-trophy-float { 50% { transform: translateY(-8px); } }
+@keyframes season-trophy-shine { 0% { transform: skewX(-18deg) translateX(0); } 60%, 100% { transform: skewX(-18deg) translateX(190px); } }
+@keyframes season-trophy-text { from { opacity: 0; transform: translateY(12px); } }
+@keyframes season-trophy-confetti { 0% { opacity: 0; transform: translate3d(0,-25px,0) rotate(0); } 10% { opacity: 1; } 100% { opacity: 0; transform: translate3d(30px,105vh,0) rotate(720deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .season-trophy, .season-trophy-rays, .season-trophy-cup, .season-trophy-shine, .season-trophy-eyebrow, .season-trophy-card h2, .season-trophy-card p, .season-trophy-close { animation: none; }
+  .season-trophy-confetti { display: none; }
+}
 
 /* Tutorial for a new club: the welcome window, the card with the next task and the restart in the club tab. */
 .tutorial-dialog { width: min(480px, 100%); }

@@ -949,11 +949,12 @@ export function recordSeasonModeMatch(value: unknown, clubScore: number, opponen
   let lastResult = `${safeClubScore}:${safeOpponentScore} gegen ${opponent?.name ?? nextOpponent.name}. ${matchday} von ${SEASON_MODE_MATCHES_PER_SEASON} Saisonspielen gespielt.`;
   if (completedSeason) {
     const position = lastTable.findIndex((team) => team.id === "club") + 1;
-    if (state.division === SEASON_MODE_DIVISION_COUNT && position <= 2) {
+    // In Liga 1 only the champion reaches the Hall of Fame; second place stays in the league.
+    if (state.division === SEASON_MODE_DIVISION_COUNT && position === 1) {
       hallOfFame = true;
       seasonOutcome = "hall-of-fame";
       nextDivision = SEASON_MODE_DIVISION_COUNT;
-      lastResult = `Hall of Fame erreicht. Dein Club beendet die Saison auf Platz ${position}.`;
+      lastResult = "Hall of Fame erreicht. Dein Club ist Meister der Weltliga.";
     } else if (position <= 2 && state.division < SEASON_MODE_DIVISION_COUNT) {
       seasonOutcome = "promoted";
       nextDivision = state.division + 1;

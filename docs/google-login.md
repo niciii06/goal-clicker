@@ -50,6 +50,14 @@ Dafür ist in Supabase nichts einzustellen. Supabase Auth braucht für ein Passw
 * **Passwort ändern**: über den Konto Knopf (👤) oben neben der Glocke.
 * **Passwort vergessen** gibt es nicht, weil keine Mailadresse bekannt ist. Im Notfall kann der Besitzer im Supabase Dashboard unter *Authentication* → *Users* beim betroffenen Login ein neues Passwort setzen (die Adresse steht in `profiles.login_email`).
 
+### Google mit einem Benutzernamen Konto verknüpfen
+
+Wer ein Konto mit Benutzername und Passwort hat, kann im Konto Fenster (👤) später Google verknüpfen. Danach öffnen Google und Benutzername dasselbe Konto mit demselben Spielstand. Der Code nutzt `supabase.auth.linkIdentity` (`app/auth/browser.ts`, `linkGoogleAccount`), die Rückkehr läuft über `/auth/callback?link=google`, und das Spiel meldet das Ergebnis im Konto Fenster (`?google=verknuepft`, `vergeben`, `abgebrochen` oder `fehler`).
+
+**Einmalig in Supabase einschalten:** *Authentication* → *Sign In / Providers* → **Allow manual linking** (Manuelles Verknüpfen erlauben). Ohne diese Einstellung meldet das Spiel "Die Verknüpfung mit Google ist auf dem Server noch nicht freigeschaltet."
+
+Ein Google Konto, mit dem schon einmal ein eigenes Spielerkonto angelegt wurde, lässt sich nicht zusätzlich verknüpfen ("Dieses Google Konto gehört schon zu einem anderen Spielerkonto.").
+
 Ein späterer Login per E-Mail bräuchte einen eigenen Mailversand (eigene Domain mit einem Dienst wie Resend) und Mailvorlagen mit `{{ .Token }}`.
 
 ## Was der Code macht

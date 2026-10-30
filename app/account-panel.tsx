@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import type { FormEvent } from "react";
 import { AccountContext, GuestContext } from "./account-gate";
 import { useDialogFocus } from "./confirm-dialog";
-import { authErrorMessage, setAccountPassword } from "./auth/browser";
+import { authErrorMessage, linkGoogleAccount, linkedGoogleEmail, setAccountPassword } from "./auth/browser";
 import { subscribeSyncStatus } from "./cloud-sync";
 import type { SyncStatus } from "./cloud-sync";
 import { getInstallState, promptInstall, subscribeInstallState } from "./pwa";
@@ -15,6 +15,15 @@ import { DISPLAY_NAME_MAX, displayNameError, PASSWORD_MAX, PASSWORD_MIN, passwor
 import type { PublicProfile } from "./profile-rules";
 import { readThemePreference, setThemePreference, THEME_OPTIONS } from "./theme";
 import type { ThemePreference } from "./theme";
+
+/** What the return from linking Google (?google=...) tells the player. */
+const GOOGLE_LINK_MESSAGES: Record<string, string> = {
+  verknuepft: "Google ist jetzt mit deinem Konto verknüpft. Du kannst dich ab sofort auch mit Google anmelden.",
+  vergeben: "Dieses Google Konto gehört schon zu einem anderen Spielerkonto.",
+  abgebrochen: "Die Verknüpfung mit Google wurde abgebrochen.",
+  fehler: "Die Verknüpfung mit Google hat nicht geklappt. Bitte versuche es nochmal.",
+  "nicht-konfiguriert": "Der Login ist auf diesem Server noch nicht eingerichtet.",
+};
 
 const SYNC_LABELS: Record<SyncStatus, string> = { saved: "Gespeichert", saving: "Speichert …", offline: "Offline, wird später gespeichert", failed: "Nicht gespeichert, der Browser Speicher ist voll" };
 
@@ -74,6 +83,15 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState("");
   const [now, setNow] = useState(() => Date.now());
+  // Username accounts can add Google as a second way in: undefined while loading, null without Google.
+  const [googleEmail, setGoogleEmail] = useState<string | null | undefined>(undefined);
+  const passwordLogin = Boolean(account?.passwordLogin);
+  useEffect(() => {
+    if (!passwordLogin) return;
+    let cancelled = false;
+    linkedGoogleEmail().then((email) => { if (!cancelled) setGoogleEmail(email); }, () => { if (!cancelled) setGoogleEmail(null); });
+    return () => { cancelled = true; };
+  }, [passwordLogin]);
   const nextUsernameChangeAt = account ? new Date(account.profile.nextUsernameChangeAt).getTime() : 0;
   // The lock ends while the dialog may still be open; re-render once it does.
   useEffect(() => {
@@ -119,6 +137,10 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
     void run("password", async () => { await setAccountPassword(password); setPassword(""); setPasswordRepeat(""); onMessage("Neues Passwort gespeichert."); });
   }
 
+  function linkGoogle() {
+    void run("google", () => linkGoogleAccount(window.location.pathname));
+  }
+
   function deleteProfile(event: FormEvent) {
     event.preventDefault();
     if (!window.confirm("Profil, Spielstand und Login werden endgültig gelöscht. Das lässt sich nicht rückgängig machen. Wirklich löschen?")) return;
@@ -132,6 +154,10 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
       <small>{nextChange.getTime() > now ? `Nächste Änderung ab ${nextChange.toLocaleDateString("de-CH")} möglich (nur Gross und Kleinschreibung jederzeit).` : "Du kannst den Benutzernamen jetzt ändern. Danach erst wieder in 30 Tagen."}{account.passwordLogin ? " Du meldest dich danach mit dem neuen Namen an." : ""}</small></form>
     {account.passwordLogin && <form className="profile-row" onSubmit={savePassword}><label><span>Neues Passwort</span><input className="mode-input" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} maxLength={PASSWORD_MAX} value={password} onChange={(event) => setPassword(event.target.value)} /></label><label><span>Wiederholen</span><input className="mode-input" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} maxLength={PASSWORD_MAX} value={passwordRepeat} onChange={(event) => setPasswordRepeat(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || !password}>Passwort ändern</button>
       <small>Du meldest dich mit deinem Benutzernamen und diesem Passwort an.</small></form>}
+    {account.passwordLogin && <div className="profile-row profile-google">
+      {typeof googleEmail === "string" ? <p><strong>Mit Google verknüpft</strong><small>{googleEmail ? `${googleEmail} · ` : ""}Du kannst dich mit Google oder mit Benutzername und Passwort anmelden, es ist dasselbe Konto.</small></p>
+        : <><p><strong>Google verknüpfen</strong><small>Danach meldest du dich wahlweise mit Google oder mit Benutzername und Passwort an. Spielstand und Profil bleiben gleich.</small></p><button type="button" className="mode-secondary" disabled={Boolean(busy) || googleEmail === undefined} onClick={linkGoogle}>{busy === "google" ? "Weiter zu Google …" : "Mit Google verknüpfen"}</button></>}
+    </div>}
     <details className="profile-danger"><summary>Profil löschen</summary>
       <form className="profile-row" onSubmit={deleteProfile}><label><span>Zur Bestätigung „{profile.username}“ eintippen</span><input className="mode-input" autoCapitalize="none" spellCheck={false} value={confirm} onChange={(event) => setConfirm(event.target.value)} /></label><button type="submit" className="mode-secondary danger" disabled={Boolean(busy) || confirm.trim().toLowerCase() !== profile.username.toLowerCase()}>Endgültig löschen</button>
         <small>Löscht Profil, Spielstand und Login. Multiplayer Welten bleiben für die anderen Spieler bestehen.</small></form>
@@ -149,6 +175,17 @@ export function AccountButton() {
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useDialogFocus(open, dialogRef, () => setOpen(false));
+  // Back from linking Google: the account dialog opens and says how it went.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get("google");
+    if (!result || !account) return;
+    params.delete("google");
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
+    const timer = window.setTimeout(() => { setNotice(GOOGLE_LINK_MESSAGES[result] ?? GOOGLE_LINK_MESSAGES.fehler); setOpen(true); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [account]);
 
   if (!account && guest) return <>
     <button type="button" className="account-signin-button" aria-haspopup="dialog" aria-expanded={open} onClick={() => { setNotice(""); setOpen(true); }}>Anmelden</button>

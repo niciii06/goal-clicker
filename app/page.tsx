@@ -19,6 +19,7 @@ import { ConfirmDialog } from "./confirm-dialog";
 import { WHATS_NEW } from "./whats-new";
 import { WhatsNewDialog } from "./whats-new-dialog";
 import { TutorialCoach, TutorialIntroDialog } from "./tutorial-panel";
+import { SeasonTrophyCelebration, getSeasonTitle, type SeasonTitle } from "./season-trophy";
 import { advanceTutorial, finishedTutorial, newTutorial, parseTutorialState, serializeTutorialState, type TutorialState, type TutorialStep } from "./tutorial";
 import { TAB_PATHS, tabForPath } from "./tab-routes";
 import type { RoutedTab } from "./tab-routes";
@@ -249,6 +250,7 @@ function App() {
   const [gazetteAnnouncement, setGazetteAnnouncement] = useState<TournamentGazetteIssue | null>(null);
   const [cupCardAnnouncement, setCupCardAnnouncement] = useState<CupCardEvent | null>(null);
   const [seasonStandingsAnnouncement, setSeasonStandingsAnnouncement] = useState<SeasonStandingsAnnouncement | null>(null);
+  const [seasonTitle, setSeasonTitle] = useState<SeasonTitle | null>(null);
   const [starReveal, setStarReveal] = useState<StarPackReveal | null>(null);
   const [starWalkoutReady, setStarWalkoutReady] = useState(false);
   // How far the reveal had already run when it appeared (after a reload); fixed for the whole animation.
@@ -531,6 +533,8 @@ function App() {
   const starXIComplete = startingStarXISelection.length === STAR_XI_SQUAD_SIZE;
   const openTransferSquadVacancies = getOpenTransferSquadVacancies(displayGame.features);
   const hasTransferSquadVacancy = openTransferSquadVacancies.length > 0;
+  // While the team travels to a match (or a match runs) no other match can start, so the match choice is hidden.
+  const journeyUnderway = Boolean(displayGame.features.travel.journey && !displayGame.features.travel.journey.consumed);
   const transferSquadVacancyLabel = startingStarXISelection.length < STAR_XI_SQUAD_SIZE ? "in der Startelf" : "auf der Bank";
   const filteredReserveStarXIPlayers = useMemo(() => {
     const search = starSearch.trim().toLocaleLowerCase("de-CH");
@@ -671,6 +675,12 @@ function App() {
     seasonHistoryRef.current = latest.id;
     setSeasonStandingsAnnouncement({ entry: latest, table: displayGame.features.seasonMode.lastTable });
     showToast("Rangliste aktualisiert");
+    // A league title gets the trophy celebration on top of the final table.
+    const title = getSeasonTitle(latest, displayGame.features.seasonMode.lastTable);
+    if (title) {
+      setSeasonTitle(title);
+      [523, 659, 784, 1047].forEach((frequency, index) => playTone(frequency, index === 3 ? 0.5 : 0.16, "triangle", 0.045, 0.35 + index * 0.16));
+    }
     const dismissTimer = window.setTimeout(() => {
       setSeasonStandingsAnnouncement((current) => current?.entry.id === latest.id ? null : current);
     }, 8500);
@@ -2665,6 +2675,7 @@ function App() {
         <div className="top-actions"><AccountButton /><button className="icon-button" aria-label="Benachrichtigungsverlauf" onClick={()=>openFeatureTab("history")}><Icon name="bell" size={18} /></button><button className="icon-button" onClick={toggleSound} aria-label={game.sound ? "Sound ausschalten" : "Sound einschalten"}><Icon name={game.sound ? "sound" : "mute"} size={17} /></button>{vibrationSupported && <button className={`icon-button vibration-toggle${vibrationEnabled ? "" : " off"}`} onClick={toggleVibration} aria-pressed={vibrationEnabled} aria-label={vibrationEnabled ? "Vibration ausschalten" : "Vibration einschalten"}><Icon name="vibrate" size={18} /></button>}</div>
       </header>
 
+      {seasonTitle && <SeasonTrophyCelebration title={seasonTitle} clubName={displayClubName} onClose={() => setSeasonTitle(null)} />}
       {whatsNewOpen && WHATS_NEW[0] && <WhatsNewDialog entry={WHATS_NEW[0]} onClose={closeWhatsNew} />}
       {hydrated && tutorial.status === "intro" && !starReveal && !whatsNewOpen && appMode === "single" && <TutorialIntroDialog onStart={() => setTutorial({ ...tutorial, status: "active" })} onSkip={endTutorial} />}
       {guestCoopPrompt && guest && <ConfirmDialog title="Koop braucht ein Konto" confirmLabel="Anmelden" onCancel={() => setGuestCoopPrompt(false)} onConfirm={() => { setGuestCoopPrompt(false); guest.signIn(); }}>
@@ -2767,7 +2778,7 @@ function App() {
             {suspendedStarPlayers.length > 0 && <div className="red-card-warning" role="alert"><span>🟥</span><div><strong>{suspendedStarPlayers.map((player) => player.name).join(", ")} nach Roter Karte gesperrt</strong><small>{suspendedStarPlayers.length === 1 ? pronounText("Ersetze {den Spieler} in der Startelf. {Er} darf", suspendedStarPlayers[0]) : "Ersetze die Spieler in der Startelf. Sie dürfen"} bis zum nächsten Anpfiff nicht auf die Bank.</small></div></div>}
             {displayGame.features.discipline.bans.length > 0 && <div className="discipline-warning" role="status"><span aria-hidden="true">🟨</span><div><strong>Gelbsperren</strong>{displayGame.features.discipline.bans.map((ban) => <span key={ban.id}>{getStarXIPlayer(ban.playerId)?.name ?? "Spieler"}: {suspensionLabel(ban)}. </span>)}<small>Gesperrte Spieler dürfen in diesem Wettbewerb weder in der Startelf noch auf der Bank stehen.</small></div></div>}
             {injuredStarPlayers.length > 0 && <div className="injury-warning" role="status"><span>🩹</span><div><strong>{injuredStarPlayers.map(({ player }) => player.name).join(", ")} verletzt</strong><small>{injuredStarPlayers.map(({ player, matches }) => `${player.name}: noch ${matches} ${matches === 1 ? "Spiel" : "Spiele"}`).join(" · ")}. Verletzungen entstehen nur im laufenden Saisonspiel.</small></div></div>}
-            {!displayGame.features.cup.active && <section className="tournament-picker competition-picker" aria-label="Saisonspiele und Turniere">
+            {!displayGame.features.cup.active && !journeyUnderway && <section className="tournament-picker competition-picker" aria-label="Saisonspiele und Turniere">
               <div className="tournament-picker-heading"><div><p className="eyebrow">SPIELE / SAISON + TURNIERE</p><h4>Wähle deine nächste Partie.</h4></div><span>{displayGame.features.cup.pendingNextRound ? "POKALLAUF FORTSETZEN" : "JEDE PARTIE · 06:00"}</span></div>
               <div className="tournament-grid competition-grid">
                 <article className="competition-card season-competition-card">
