@@ -30,10 +30,10 @@ test('daily reward streak grows on consecutive days, blocks a second claim and r
   assert.equal(getDailyRewardStatus(second.state, 'guest', day('2026-10-17T07:00:00Z')).available, true);
 });
 
-test('day seven grants a reward pack and the cycle starts over afterwards', () => {
+test('day seven grants a special card pack and the cycle starts over afterwards', () => {
   let state = {}; let claim;
   for (let i = 0; i < 7; i++) { claim = claimDailyReward(state, 'host', 0, 0, day(`2026-10-${String(10 + i).padStart(2, '0')}T12:00:00Z`))!; state = claim.state; }
-  assert.equal(claim!.dayIndex, 7); assert.equal(claim!.pack?.packId, 'reward-2'); assert.equal(claim!.pack?.id, 'daily-host-2026-10-16');
+  assert.equal(claim!.dayIndex, 7); assert.equal(claim!.pack?.packId, 'special'); assert.equal(claim!.pack?.id, 'daily-host-2026-10-16');
   const eighth = claimDailyReward(state, 'host', 0, 0, day('2026-10-17T12:00:00Z'))!;
   assert.equal(eighth.dayIndex, 1); assert.equal(eighth.streak, 8); assert.equal(eighth.pack, undefined);
 });

@@ -12,12 +12,13 @@ export const FC27_INDIA_PROFILES = source.items.map(player => {
   return { sourceId:String(player.id), name:player.commonName || `${player.firstName} ${player.lastName}`.trim(), rating:player.overallRating, positions:[...new Set(playable)], attributes:player };
 });
 
+/** No scrap card below what an empty lineup slot counts (55): every pack card can still help the eleven. */
+export const SCRAP_PACK_MIN_RATING = 55;
 // Shared rating probabilities for selection and public pack display.
 export const SCRAP_RATING_GROUPS = [
-  { minRating:0, maxRating:54, chance:0.50 },
   { minRating:55, maxRating:59, chance:0.35 },
-  { minRating:60, maxRating:64, chance:0.13 },
-  { minRating:65, maxRating:69, chance:0.02 },
+  { minRating:60, maxRating:64, chance:0.50 },
+  { minRating:65, maxRating:69, chance:0.15 },
 ] as const;
 
 export function drawScrapPlayer<T extends { rating:number }>(players:readonly T[], random:()=>number):T {

@@ -3,7 +3,7 @@ export const revalidate = 0;
 
 import { getDb } from '../../../db';
 import { resolvePlayer } from '../../auth/player';
-import { normalizeGameFeatures, openStarPack } from '../../feature-data';
+import { normalizeGameFeatures, openEarnedPackDraw } from '../../feature-data';
 import { MAX_GAME_STATE_BODY_BYTES, readJsonBody, RequestBodyTooLargeError } from '../request-body';
 import { rateLimited } from '../rate-limit';
 // Reuse the existing insert-once solo receipt ledger with a separate key namespace.
@@ -19,7 +19,7 @@ export async function POST(request:Request) {
   const db=getDb(),key=`reward:${earned.id}`;
   let receipt=await db.getSoloJourney(p.playerId,key);
   // The first draw is always the server's own; a card the request names is never written into the receipt.
-  if(!receipt)receipt=await db.putSoloJourney(p.playerId,key,{opening:openStarPack(earned.packId,f.starXI.ownedIds)});
+  if(!receipt)receipt=await db.putSoloJourney(p.playerId,key,{opening:openEarnedPackDraw(earned.packId,f.starXI.ownedIds,f.seasonMode.highestDivision)});
   return Response.json(receipt,{headers:{'cache-control':'no-store'}});
  }catch(error){if(error instanceof RequestBodyTooLargeError)return Response.json({error:error.message},{status:413});return Response.json({error:'Prämie bleibt gespeichert. Bitte erneut versuchen.'},{status:503});}
 }

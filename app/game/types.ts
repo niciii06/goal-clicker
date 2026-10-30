@@ -56,7 +56,7 @@ export type CoopRoom = {
 
 export type CoopSession = { code: string; role: CoopRole; playerId: string; room: CoopRoom };
 
-export type CoopApiResponse = { room?: CoopRoom; rooms?: CoopRoom[]; role?: CoopRole; deleted?: boolean; error?: string; errorCode?: string; packReveal?: StarPackReveal; dailyReward?: { amount: number; dayIndex: number; streak: number; pack: boolean }; press?: { reward: number; mood: number; fanMood: number } };
+export type CoopApiResponse = { room?: CoopRoom; rooms?: CoopRoom[]; role?: CoopRole; deleted?: boolean; error?: string; errorCode?: string; packReveal?: StarPackReveal; dailyReward?: { amount: number; dayIndex: number; streak: number; pack: boolean }; starterSquad?: { added: number; complete: boolean }; press?: { reward: number; mood: number; fanMood: number } };
 
 export type UpgradeDefinition = {
   id: string;
@@ -68,6 +68,10 @@ export type UpgradeDefinition = {
   kind: UpgradeKind;
   /** Goals per click or per second for each level; for multipliers the factor per level (0.1 = +10%). */
   gain: number;
+  /** Click upgrades: share of the passive income each click earns per level, on top of `gain` (0.001 = 0.1%). */
+  passiveShare?: number;
+  /** Most share one click upgrade can give; together the click upgrades reach exactly CLICK_PASSIVE_SHARE_CAP. */
+  passiveShareMax?: number;
 };
 
 export type GameState = {

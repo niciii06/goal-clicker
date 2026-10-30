@@ -1,7 +1,7 @@
 import { competitionOfCup, emptyDiscipline, getBannedPlayerIds, nextCompetition, normalizeDiscipline } from './discipline';
 import type { DisciplineState } from './discipline';
 import type { CareerState } from "./career-data";
-import type { ClubProfile, CoopMission, CupCardEvent, CupGoalEvent, CupInjuryEvent, CupMatchMode, CupMatchPhase, CupPenaltyEvent, CupState, CupStrategyId, CupSubstitutionImpact, EarnedPack, GoalBoostState, IconSeed, MatchChange, MatchHistoryEntry, MissionProgressSource, PenaltyDirection, RandomEvent, RewardPackId, SeasonFixture, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationId, StarPackDefinition, StarPackId, StarPackOpening, StarPackReveal, StarXIEvaluationContext, StarXIPlayer, StarXIState, TournamentCompletionSummary, TournamentDefinition, TournamentGazetteIssue, TournamentId, TransferInsiderEvent, TransferInsiderOutcome, TransferMarketState, TransferOffer, TransferSagaState, TransferSquadVacancy, TransferUnhappyPlayer } from "./features/types";
+import type { ClubProfile, CoopMission, CupCardEvent, CupGoalEvent, CupInjuryEvent, CupMatchMode, CupMatchPhase, CupPenaltyEvent, CupState, CupStrategyId, CupSubstitutionImpact, EarnedPack, EarnedPackId, GoalBoostState, IconSeed, MatchChange, MatchHistoryEntry, MissionProgressSource, PenaltyDirection, RandomEvent, RewardPackId, SeasonFixture, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationId, StarPackDefinition, StarPackId, StarPackOpening, StarPackReveal, StarXIEvaluationContext, StarXIPlayer, StarXIState, TournamentCompletionSummary, TournamentDefinition, TournamentGazetteIssue, TournamentId, TransferInsiderEvent, TransferInsiderOutcome, TransferMarketState, TransferOffer, TransferSagaState, TransferSquadVacancy, TransferUnhappyPlayer } from "./features/types";
 import type { DailyRewardState } from "./daily-reward";
 import type { GoalPattern } from "./match-broadcast";
 import type { PressState } from "./press-conference";
@@ -14,7 +14,7 @@ import { FC27_RATING_BY_SOURCE_ID, getFC27CardAccent, isFC27Unavailable } from "
 import { FC27_WOMEN_PROFILES } from "./fc27-women-pool";
 import { FC27_ADDED_MEN_SEEDS, FC27_ADDED_WOMEN_SEEDS, FC27_WITHDRAWN_SEEDS, withdrawnPositions } from "./fc27-added-players";
 import { FC27_POSITION_BY_SOURCE_ID } from "./fc27-positions";
-import { FC27_INDIA_PROFILES, SCRAP_RATING_GROUPS, drawScrapPlayer } from "./scrap-pack";
+import { FC27_INDIA_PROFILES, SCRAP_PACK_MIN_RATING, SCRAP_RATING_GROUPS, drawScrapPlayer } from "./scrap-pack";
 import { GAZETTE_CHAMPION_HEADLINES, GAZETTE_EXIT_HEADLINES, TRANSFER_INTERESTED_CLUBS, transferClubsForRating } from "./features/news-data";
 import { HOME_VENUE, LEAGUE_LABELS, seasonGeography, venueForClubName } from "./travel-geography";
 import { addBroadcastSubstitution, advanceMatchBroadcast, chooseGoalPattern, createMatchBroadcast, normalizeMatchBroadcast, recordedActionRating } from "./match-broadcast";
@@ -26,7 +26,7 @@ import { getFunnyPlayerName } from "./funny-player-names";
 import { normalizeDailyRewards } from "./daily-reward";
 import { normalizePress } from "./press-conference";
 import { pronounText } from "./player-pronouns";
-export type { ClubProfile, CoopMission, CupCardEvent, CupGoalEvent, CupInjuryEvent, CupMatchMode, CupMatchPhase, CupPenaltyEvent, CupState, CupStrategyId, CupSubstitutionImpact, EarnedPack, GoalBoostState, HistoryTone, MatchChange, MatchHistoryEntry, MissionKind, MissionProgressSource, PenaltyDirection, RandomEvent, RewardPackId, SeasonFixture, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationDefinition, StarFormationId, StarFormationSlot, StarPackDefinition, StarPackId, StarPackOdds, StarPackOpening, StarPackReveal, StarXIEvaluationContext, StarXIPlayer, StarXIState, TournamentCompletionSummary, TournamentDefinition, TournamentGazetteIssue, TournamentId, TournamentOpponent, TransferInsiderEvent, TransferInsiderOutcome, TransferLoan, TransferMarketState, TransferPlayer, TransferOffer, TransferSagaState, TransferSquadVacancy, TransferUnhappyPlayer } from "./features/types";
+export type { ClubProfile, CoopMission, CupCardEvent, CupGoalEvent, CupInjuryEvent, CupMatchMode, CupMatchPhase, CupPenaltyEvent, CupState, CupStrategyId, CupSubstitutionImpact, EarnedPack, EarnedPackId, GoalBoostState, HistoryTone, MatchChange, MatchHistoryEntry, MissionKind, MissionProgressSource, PenaltyDirection, RandomEvent, RewardPackId, SeasonFixture, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationDefinition, StarFormationId, StarFormationSlot, StarPackDefinition, StarPackId, StarPackOdds, StarPackOpening, StarPackReveal, StarXIEvaluationContext, StarXIPlayer, StarXIState, TournamentCompletionSummary, TournamentDefinition, TournamentGazetteIssue, TournamentId, TournamentOpponent, TransferInsiderEvent, TransferInsiderOutcome, TransferLoan, TransferMarketState, TransferPlayer, TransferOffer, TransferSagaState, TransferSquadVacancy, TransferUnhappyPlayer } from "./features/types";
 export { STAR_FORMATIONS, STAR_POSITIONS, STAR_POSITION_NAMES, STAR_XI_FORMATION_POSITIONS, TOURNAMENTS, TOURNAMENT_OPPONENT_MULTIPLIER, TRANSFER_PLAYERS, YB_FC26_SOURCE_IDS, getStarFormation } from "./features/catalog";
 
 export type { StarPosition } from "./fc26-player-pool";
@@ -87,6 +87,10 @@ export type SeasonModeState = {
 
 export type GameFeatures = {
   schemaVersion: number;
+  /** The one time starter squad after the first STARTER_SQUAD_UNLOCK_CLICKS clicks was handed out (once per club or world). */
+  starterSquadGranted: boolean;
+  /** Finished league matches towards the next match stamp pack (0 to MATCH_PACK_STAMP_TARGET - 1). */
+  matchStamps: number;
   earnedPacks: EarnedPack[];
   completedTournamentRuns: string[];
   travel: TravelState;
@@ -549,6 +553,8 @@ export const SCRAP_PLAYERS: StarXIPlayer[] = FC27_INDIA_PROFILES.map(profile => 
   const existing = EXISTING_STAR_XI_PLAYERS.find(p => p.sourceId === profile.sourceId);
   return { ...existing, id:existing?.id ?? `scrap-ea-${profile.sourceId}`, sourceId:profile.sourceId, countryCode:'IN', name:profile.name, position:profile.positions[0], positions:[...profile.positions], rating:profile.rating, price:existing?.price ?? Math.round(5000 * 1.28 ** (profile.rating - 70)), accent:existing?.accent ?? '#8b8177', cardType:'base', originalAttributes:profile.attributes };
 });
+/** The scrap cards the Schrott-Pack still holds; weaker ones stay with the clubs that own them. */
+export const SCRAP_PACK_PLAYERS = SCRAP_PLAYERS.filter(p => p.rating >= SCRAP_PACK_MIN_RATING);
 const SCRAP_PLAYER_IDS = new Set(SCRAP_PLAYERS.map(p => p.id));
 export const STAR_XI_PLAYERS: StarXIPlayer[] = [...EXISTING_STAR_XI_PLAYERS.filter(p => !SCRAP_PLAYER_IDS.has(p.id)), ...SCRAP_PLAYERS];
 
@@ -616,24 +622,44 @@ function tierBand(minRating: number, maxRating: number, chance: number) {
 // 100 rated cards are mostly a special card pack draw; the two top packs hold them at 0.001% and 0.01%.
 export const STAR_PACKS: readonly StarPackDefinition[] = [
   { id: "scrap", label: "Schrott-Pack", price: 15000, description: "Günstig einsteigen und dein Team ergänzen. Enthält eine Basiskarte.", odds: SCRAP_RATING_GROUPS.map(group => tierBand(group.minRating, group.maxRating, group.chance)) },
-  { id: "regional", label: "Regional-Pack", price: 1500000, description: "Gewöhnliche und Profi Karten für den Aufbau", odds: [tierBand(65, 70, 0.7), tierBand(71, 79, 0.3)] },
-  { id: "scout", label: "Scout Pack", price: 20000000, description: "Meist Profis, seltene Karten sind die Ausnahme", odds: [tierBand(68, 70, 0.35), tierBand(71, 79, 0.62), tierBand(80, 85, 0.03)] },
-  { id: "profi", label: "Profi-Pack", price: 130000000, description: "Profis für die Liga Mitte, Walkouts sind sehr selten", odds: [tierBand(71, 79, 0.85), tierBand(80, 85, 0.14), tierBand(86, 89, 0.01)] },
-  { id: "elite", label: "Elite Pack", price: 1600000000, description: "Für die oberen Ligen, Walkouts sind möglich, aber selten", odds: [tierBand(75, 79, 0.6), tierBand(80, 85, 0.33), tierBand(86, 89, 0.06), tierBand(90, 99, 0.01)] },
-  { id: "weltklasse", label: "Weltklasse-Pack", price: 8000000000, description: "Starke Karten für den Aufstiegskampf, mehr Walkouts", odds: [tierBand(77, 79, 0.4), tierBand(80, 85, 0.47999), tierBand(86, 89, 0.1), tierBand(90, 99, 0.02), tierBand(100, 100, 0.00001)] },
-  { id: "legend", label: "Legenden Pack", price: 10000000000, description: "Das teuerste Pack mit den besten Walkout Chancen", odds: [tierBand(80, 85, 0.5499), tierBand(86, 89, 0.35), tierBand(90, 99, 0.1), tierBand(100, 100, 0.0001)] },
+  { id: "regional", label: "Regional-Pack", price: 1000000, description: "Gewöhnliche und Profi Karten für den Aufbau", odds: [tierBand(65, 70, 0.7), tierBand(71, 79, 0.3)] },
+  { id: "scout", label: "Scout Pack", price: 15000000, description: "Meist Profis, seltene Karten sind die Ausnahme", odds: [tierBand(68, 70, 0.35), tierBand(71, 79, 0.62), tierBand(80, 85, 0.03)] },
+  { id: "profi", label: "Profi-Pack", price: 100000000, description: "Profis für die Liga Mitte, Walkouts sind sehr selten", odds: [tierBand(71, 79, 0.85), tierBand(80, 85, 0.14), tierBand(86, 89, 0.01)] },
+  { id: "elite", label: "Elite Pack", price: 1500000000, description: "Für die oberen Ligen, Walkouts sind möglich, aber selten", odds: [tierBand(75, 79, 0.6), tierBand(80, 85, 0.33), tierBand(86, 89, 0.06), tierBand(90, 99, 0.01)] },
+  { id: "weltklasse", label: "Weltklasse-Pack", price: 10000000000, description: "Starke Karten für den Aufstiegskampf, mehr Walkouts", odds: [tierBand(77, 79, 0.4), tierBand(80, 85, 0.47999), tierBand(86, 89, 0.1), tierBand(90, 99, 0.02), tierBand(100, 100, 0.00001)] },
+  { id: "legend", label: "Legenden Pack", price: 20000000000, description: "Das teuerste Pack mit den besten Walkout Chancen", odds: [tierBand(80, 85, 0.5499), tierBand(86, 89, 0.35), tierBand(90, 99, 0.1), tierBand(100, 100, 0.0001)] },
 ];
 
 const REWARD_BRACKETS = [[0,64],[65,70],[71,79],[80,85],[86,89],[90,99]] as const;
 const REWARD_PERCENTAGES = [[60,30,9,1,0,0],[25,45,25,4.5,.5,0],[5,20,55,18,1.9,.1],[0,5,40,48,6.5,.5],[0,0,20,55,23,2],[0,0,5,50,40,5]] as const;
 export const REWARD_PACKS:readonly StarPackDefinition[] = ['Kleines Prämienpack','Basis-Prämienpack','Solides Prämienpack','Hochwertiges Prämienpack','Premium-Prämienpack','Top-Prämienpack'].map((label,i)=>({id:`reward-${i+1}` as RewardPackId,label,price:0,description:'Eine originale Basiskarte als Turnierprämie. Doppelte Karten geben Fragmente.',odds:REWARD_BRACKETS.map(([minRating,maxRating],b)=>tierBand(minRating,maxRating,REWARD_PERCENTAGES[i][b]/100))}));
-/** Reward tier by the best league reached (Liga 15 to 13 the smallest pack, Liga 2 and 1 the top pack); the World Cup adds one tier. */
-export function getTournamentRewardPack(id:TournamentId, highestDivision=1) {
+/** Every MATCH_PACK_STAMP_TARGET finished league matches, won or lost, earn a reward pack for the best league reached. */
+export const MATCH_PACK_STAMP_TARGET = 4;
+export function awardMatchStamp(features:GameFeatures, now=Date.now()) {
+  const stamps=clamp(Math.floor(Number(features.matchStamps)||0),0,MATCH_PACK_STAMP_TARGET-1)+1;
+  if(stamps<MATCH_PACK_STAMP_TARGET){features.matchStamps=stamps;return null;}
+  features.matchStamps=0;
+  const pack=getTournamentRewardPack('cup',features.seasonMode.highestDivision);
+  const earned:EarnedPack={id:`stamp-${now}`,packId:pack.id as RewardPackId,earnedAt:now};
+  if(!features.earnedPacks.some(p=>p.id===earned.id))features.earnedPacks.push(earned);
+  addHistory(features,{title:`Matchstempel voll: ${pack.label}`,detail:`${MATCH_PACK_STAMP_TARGET} Ligaspiele gespielt. Das Pack liegt unter Packs & Album bereit.`,tone:'positive'},now);
+  return earned;
+}
+
+/** Highest reward tier (index into REWARD_PACKS) per tournament: the easy Stadionpokal cannot farm the top pack. */
+export const TOURNAMENT_REWARD_TIER_CAP: Record<TournamentId, number> = { stadium:1, champions:3, world:5 };
+/**
+ * Reward tier by the best league reached (Liga 15 to 13 the smallest pack, Liga 2 and 1 the top pack); the World Cup
+ * adds one tier. Each tournament stops at its cap; `cup` (match stamps) follows the league alone.
+ */
+export function getTournamentRewardPack(id:TournamentId|'cup', highestDivision=1) {
   const league=SEASON_MODE_DIVISION_COUNT+1-clamp(Math.floor(Number(highestDivision))||1,1,SEASON_MODE_DIVISION_COUNT);
   const tier=league>=13?0:league>=10?1:league>=7?2:league>=5?3:league>=3?4:5;
-  return REWARD_PACKS[Math.min(REWARD_PACKS.length-1,tier+(id==='world'?1:0))];
+  const cap=id==='cup'?REWARD_PACKS.length-1:TOURNAMENT_REWARD_TIER_CAP[id]??REWARD_PACKS.length-1;
+  return REWARD_PACKS[Math.min(cap,tier+(id==='world'?1:0))];
 }
 export function isRewardPack(id:string):id is RewardPackId {return REWARD_PACKS.some(p=>p.id===id);}
+export function isEarnedPackId(id:string):id is EarnedPackId {return id==='special'||isRewardPack(id);}
 const rewardPoolCache=new Map<RewardPackId,ReturnType<typeof calculateRewardPackOdds>>();
 export function getRewardPackOdds(id:RewardPackId,players:readonly StarXIPlayer[]=STAR_XI_ACTIVE_PLAYERS) {
  if(players===STAR_XI_ACTIVE_PLAYERS){const cached=rewardPoolCache.get(id);if(cached)return cached;const groups=calculateRewardPackOdds(id,players);rewardPoolCache.set(id,groups);return groups;}return calculateRewardPackOdds(id,players);
@@ -645,18 +671,31 @@ function calculateRewardPackOdds(id:RewardPackId,players:readonly StarXIPlayer[]
  const total=groups.reduce((sum,o)=>sum+o.chance,0);if(!total)throw new Error('Keine gültigen Prämienkarten verfügbar.');
  return groups.map(o=>({...o,chance:o.chance/total}));
 }
+/** 100 rated special cards come only from Liga 3 on, also from a free special card pack. */
+export function canDrawHundredSpecialCards(highestDivision:number) {
+  return hasReachedLeague(getPackUnlockLeague(SPECIAL_CARD_PACK.id), leagueForTier(Math.floor(Number(highestDivision))||1));
+}
+/** The draw of an earned pack: a reward pack like a shop pack, a special card pack for free. */
+export function openEarnedPackDraw(packId:EarnedPackId, ownedIds:string[], highestDivision:number, random=Math.random):StarPackOpening {
+  if(packId!=='special')return openStarPack(packId,ownedIds,random);
+  const draw=drawRandomStarXICustomCard({...initialGameFeatures().starXI,ownedIds:[...ownedIds]},random,{free:true,allowHundred:canDrawHundredSpecialCards(highestDivision)});
+  return {packId:'legend',packName:SPECIAL_CARD_PACK.label,player:draw.player!,duplicate:draw.duplicate,fragmentCompensation:draw.fragmentCompensation,source:'custom-draw'};
+}
+const earnedOpeningMatches=(earned:EarnedPack,opening:StarPackOpening)=>earned.packId==='special'?opening.source==='custom-draw'&&Boolean(opening.player?.isCustom):opening.packId===earned.packId;
 export function openEarnedPack(features:GameFeatures,id:string,now=Date.now(),random=Math.random,canonical?:StarPackOpening) {
  const earned=features.earnedPacks.find(p=>p.id===id);
  if(!earned||earned.opening||features.cup.active)return null;
- const opening=canonical??openStarPack(earned.packId,features.starXI.ownedIds,random);
- if(opening.packId!==earned.packId||!getStarXIPlayer(opening.player.id))return null;
+ const opening=canonical??openEarnedPackDraw(earned.packId,features.starXI.ownedIds,features.seasonMode.highestDivision,random);
+ if(!earnedOpeningMatches(earned,opening)||!getStarXIPlayer(opening.player.id))return null;
+ // A free special card pack below Liga 3 never hands out a 100.
+ if(earned.packId==='special'&&!canDrawHundredSpecialCards(features.seasonMode.highestDivision)&&isHundredSpecialCard(getStarXIPlayer(opening.player.id)!))return null;
  // Duplicate compensation is decided against the collection at application time.
  const player=getStarXIPlayer(opening.player.id)!,duplicate=features.starXI.ownedIds.includes(player.id);
  const result={...opening,player,duplicate,fragmentCompensation:duplicate?getStarXIFragmentCompensation(player):0};
  earned.opening=result;
  if(duplicate)features.starXI.fragments+=result.fragmentCompensation;else features.starXI=addStarXIPlayer(features.starXI,player.id);
  features.starPackReveal={...result,openedAt:now,openedBy:'Du',troll:shouldTriggerPackTroll(player)};
- addHistory(features,{title:`${earned.packId}: ${player.name}`,detail:duplicate?`+${result.fragmentCompensation} Fragmente`:`${player.positions.join(' / ')} · Rating ${player.rating}`,tone:'positive'},now);
+ addHistory(features,{title:`${earned.packId==='special'?SPECIAL_CARD_PACK.label:getStarPack(earned.packId)?.label??earned.packId}: ${player.name}`,detail:duplicate?`+${result.fragmentCompensation} Fragmente`:`${player.positions.join(' / ')} · Rating ${player.rating}`,tone:'positive'},now);
  return features.starPackReveal;
 }
 
@@ -701,8 +740,8 @@ export function getSeasonModeDivisionLabel(division: number) {
   return `Liga ${15-index} · ${SEASON_DIVISION_LABELS[index] ?? SEASON_DIVISION_LABELS[0]}`;
 }
 
-function getSeasonOpponentRating(division: number, index: number) {
-  if(division===15)return [98,92,91,96,94][Math.max(0,Math.min(4,index-1))];
+export function getSeasonOpponentRating(division: number, index: number) {
+  if(division===15)return [96,90,91,94,92][Math.max(0,Math.min(4,index-1))];
   return Math.round(clamp(40 + (Math.max(1, division) - 1) * 3.4 + index * 1.5, 40, 99));
 }
 
@@ -994,16 +1033,18 @@ export function getStarXIPlayer(id: string) {
   return STAR_XI_PLAYER_BY_ID.get(id);
 }
 
-export function drawRandomStarXICustomCard(state: StarXIState, random = Math.random) {
+/** `free`: an earned pack that costs no fragments. `allowHundred: false` draws only the special cards below 100. */
+export function drawRandomStarXICustomCard(state: StarXIState, random = Math.random, options: { free?: boolean; allowHundred?: boolean } = {}) {
   const next = normalizeStarXIState(state);
-  const cost = STAR_XI_RANDOM_CUSTOM_CARD_COST;
+  const cost = options.free ? 0 : STAR_XI_RANDOM_CUSTOM_CARD_COST;
   if (next.fragments < cost || STAR_XI_CUSTOM_PLAYERS.length === 0) {
     return { state: next, drawn: false, cost, player: null, duplicate: false, fragmentCompensation: 0, source: "custom-draw" as const };
   }
   // First the rarity (8% for a 100 rated card), then the card within it by pack weight.
-  const groupTotal = SPECIAL_PACK_GROUPS.reduce((sum, group) => sum + group.chance, 0);
+  const groups = options.allowHundred === false ? SPECIAL_PACK_GROUPS.filter((group) => !group.players.some(isHundredSpecialCard)) : SPECIAL_PACK_GROUPS;
+  const groupTotal = groups.reduce((sum, group) => sum + group.chance, 0);
   let groupRoll = clamp(Number(random()) || 0, 0, 0.999999999) * groupTotal;
-  const group = SPECIAL_PACK_GROUPS.find((entry) => (groupRoll -= entry.chance) < 0) ?? SPECIAL_PACK_GROUPS[SPECIAL_PACK_GROUPS.length - 1];
+  const group = groups.find((entry) => (groupRoll -= entry.chance) < 0) ?? groups[groups.length - 1];
   const player = pickByPackWeight(group.players, clamp(Number(random()) || 0, 0, 0.999999999));
   const duplicate = next.ownedIds.includes(player.id);
   next.fragments -= cost;
@@ -1715,6 +1756,44 @@ export function grantWelcomePack(features: GameFeatures, now = Date.now(), rando
   return reveal;
 }
 
+export const STARTER_SQUAD_UNLOCK_CLICKS = 50;
+const STARTER_SQUAD_MAX_RATING = 59;
+
+/**
+ * Fills every empty lineup slot with a different scrap card that plays the slot, 55 to 59 rated where the
+ * position allows. Returns the cards it added; the caller marks the club as served.
+ */
+export function grantStarterSquad(features: GameFeatures, random: () => number = Math.random) {
+  const starXI = normalizeStarXIState(features.starXI);
+  const added: StarXIPlayer[] = [];
+  starXI.lineupIds.forEach((id, index) => {
+    if (id) return;
+    const fits = (player: StarXIPlayer) => !starXI.ownedIds.includes(player.id) && canStarXIPlayerFillSlot(player.id, index, starXI.formationPositions);
+    const weak = SCRAP_PACK_PLAYERS.filter((player) => player.rating <= STARTER_SQUAD_MAX_RATING && fits(player));
+    const pool = weak.length ? weak : SCRAP_PACK_PLAYERS.filter(fits);
+    if (!pool.length) return;
+    const player = pool[Math.min(pool.length - 1, Math.floor(clamp(Number(random()) || 0, 0, 0.999999) * pool.length))];
+    starXI.ownedIds = [...starXI.ownedIds, player.id];
+    starXI.lineupIds[index] = player.id;
+    added.push(player);
+  });
+  features.starXI = starXI;
+  return added;
+}
+
+/**
+ * The starter squad once the club has clicked STARTER_SQUAD_UNLOCK_CLICKS times, also for a loaded save that
+ * is already past it. Null when nothing is due; `complete` only when eleven players really stand in the lineup.
+ */
+export function maybeGrantStarterSquad(features: GameFeatures, clicks: number, now = Date.now(), random: () => number = Math.random) {
+  if (features.starterSquadGranted || !(clicks >= STARTER_SQUAD_UNLOCK_CLICKS) || features.cup.active || features.squadLock) return null;
+  features.starterSquadGranted = true;
+  const added = grantStarterSquad(features, random);
+  const complete = features.starXI.lineupIds.filter(Boolean).length >= STAR_XI_SQUAD_SIZE;
+  if (added.length) addHistory(features, { title: `Starterkader: ${added.length} Spieler für deine Elf`, detail: added.map((player) => `${player.name} (${player.positions.join(" / ")}, ${player.rating})`).join(", "), tone: "positive" }, now);
+  return { added, complete };
+}
+
 export function openStarPack(packId: StarPackId, ownedIds: string[], random = Math.random, formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS): StarPackOpening {
   void formationPositions;
   const pack = getStarPack(packId) ?? getStarPack("scout")!;
@@ -1727,7 +1806,7 @@ export function openStarPack(packId: StarPackId, ownedIds: string[], random = Ma
   }
   if (pack.id === 'scrap') {
     const owned = new Set(ownedIds);
-    const player = drawScrapPlayer(SCRAP_PLAYERS, random);
+    const player = drawScrapPlayer(SCRAP_PACK_PLAYERS, random);
     const duplicate = owned.has(player.id);
     return { packId: pack.id, packName: pack.label, player, duplicate, fragmentCompensation: duplicate ? getStarXIFragmentCompensation(player) : 0 };
   }
@@ -2390,6 +2469,8 @@ export function initialMissions() {
 export function initialGameFeatures(now = Date.now()): GameFeatures {
   return {
     schemaVersion: GAME_FEATURES_SCHEMA_VERSION,
+    starterSquadGranted: false,
+    matchStamps: 0,
     earnedPacks: [],
     completedTournamentRuns: [],
     travel: emptyTravel(),
@@ -2806,8 +2887,11 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
   });
   const normalized: GameFeatures = {
     schemaVersion: GAME_FEATURES_SCHEMA_VERSION,
+    // Clubs that already field eleven never need the starter squad.
+    starterSquadGranted: source.starterSquadGranted === true || getStarXISelection(normalizedStarXI.ownedIds, normalizedStarXI.lineupIds).length >= STAR_XI_SQUAD_SIZE,
+    matchStamps: clamp(Math.floor(Number(source.matchStamps) || 0), 0, MATCH_PACK_STAMP_TARGET - 1),
     completedTournamentRuns: Array.isArray(source.completedTournamentRuns)?[...new Set(source.completedTournamentRuns.filter((id):id is string=>typeof id==='string'))].slice(-MAX_COMPLETED_TOURNAMENT_RUNS):[],
-    earnedPacks: keepRecentOpenedPacks((Array.isArray(source.earnedPacks)?source.earnedPacks:[]).map(asRecord).filter(p=>typeof p.id==='string'&&isRewardPack(String(p.packId))).filter((p,i,a)=>a.findIndex(x=>x.id===p.id)===i).map(p=>{const saved=asRecord(p.opening),player=getStarXIPlayer(String(asRecord(saved.player).id));return {id:String(p.id),packId:p.packId as RewardPackId,earnedAt:Number(p.earnedAt)||0,...(player?{opening:{packId:p.packId as RewardPackId,packName:getStarPack(String(p.packId))!.label,player,duplicate:saved.duplicate===true,fragmentCompensation:Math.max(0,Number(saved.fragmentCompensation)||0)}}:{})};})),
+    earnedPacks: keepRecentOpenedPacks((Array.isArray(source.earnedPacks)?source.earnedPacks:[]).map(asRecord).filter(p=>typeof p.id==='string'&&isEarnedPackId(String(p.packId))).filter((p,i,a)=>a.findIndex(x=>x.id===p.id)===i).map(p=>{const saved=asRecord(p.opening),player=getStarXIPlayer(String(asRecord(saved.player).id)),special=p.packId==='special';return {id:String(p.id),packId:p.packId as EarnedPackId,earnedAt:Number(p.earnedAt)||0,...(player?{opening:special?{packId:'legend' as const,packName:SPECIAL_CARD_PACK.label,player,duplicate:saved.duplicate===true,fragmentCompensation:Math.max(0,Number(saved.fragmentCompensation)||0),source:'custom-draw' as const}:{packId:p.packId as RewardPackId,packName:getStarPack(String(p.packId))!.label,player,duplicate:saved.duplicate===true,fragmentCompensation:Math.max(0,Number(saved.fragmentCompensation)||0)}}:{})};})),
     travel: normalizeTravel(source.travel),
     miniGameRuns: Object.fromEntries(Object.entries(asRecord(source.miniGameRuns)).filter(([key, startedAt]) => /^[a-z]+:[a-z0-9]+$/.test(key) && Number.isFinite(Number(startedAt))).slice(0, 16).map(([key, startedAt]) => [key, Number(startedAt)])),
     squadLock: normalizeSquadLock(source.squadLock ?? asRecord(asRecord(source.travel).journey).squadLock),

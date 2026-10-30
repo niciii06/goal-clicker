@@ -271,6 +271,7 @@
 .season-hub-table tr.promotion td:first-child, .season-hub-table tr.hall-of-fame td:first-child { border-left-color: #22a447; }
 .season-hub-table tr.relegation td:first-child { border-left-color: #e5484d; }
 .season-hub-table tr.club td, .season-hub-table tr.club th { background: color-mix(in srgb, var(--accent) 11%, var(--surface-raised)); }
+.season-hub-stamps { margin: 0 0 8px; padding: 8px 12px; border: 1px solid var(--line-soft); border-radius: 12px; color: var(--soft); font-size: var(--fs-sm); font-weight: 650; }
 .season-hub-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 6px 0 0; color: var(--muted); font-size: var(--text-footnote); }
 .season-hub-legend span::before { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 3px; background: #22a447; content: ""; }
 .season-hub-legend span.relegation::before { background: #e5484d; }

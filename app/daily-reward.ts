@@ -1,9 +1,9 @@
-import type { EarnedPack, RewardPackId } from './feature-data';
+import type { EarnedPack, EarnedPackId } from './feature-data';
 
-/** One entry per claimer: "solo" in singleplayer, the seat role in a shared world. */
+/** One entry per claimer: "solo" in singleplayer, "world" for a whole shared world (older worlds kept one per seat role). */
 export type DailyRewardEntry = { day: string; streak: number };
 export type DailyRewardState = Record<string, DailyRewardEntry>;
-export type DailyRewardDay = { day: number; minutes: number; floor: number; pack?: RewardPackId; label: string };
+export type DailyRewardDay = { day: number; minutes: number; floor: number; pack?: EarnedPackId; label: string };
 
 export const DAILY_REWARD_TIME_ZONE = 'Europe/Zurich';
 export const DAILY_REWARD_DAYS: readonly DailyRewardDay[] = [
@@ -13,9 +13,12 @@ export const DAILY_REWARD_DAYS: readonly DailyRewardDay[] = [
   { day: 4, minutes: 20, floor: 4000, label: 'Abschlusstraining' },
   { day: 5, minutes: 30, floor: 6500, label: 'Teambus' },
   { day: 6, minutes: 45, floor: 10000, label: 'Kabinenansprache' },
-  { day: 7, minutes: 60, floor: 15000, pack: 'reward-2', label: 'Matchday' },
+  { day: 7, minutes: 60, floor: 15000, pack: 'special', label: 'Matchday' },
 ];
-const DAILY_KEYS = new Set(['solo', 'host', 'guest', 'player3', 'player4']);
+/** A shared world claims once per day for everybody, under this key. */
+export const WORLD_DAILY_KEY = 'world';
+const ROLE_KEYS = ['host', 'guest', 'player3', 'player4'];
+const DAILY_KEYS = new Set(['solo', WORLD_DAILY_KEY, ...ROLE_KEYS]);
 const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function zurichParts(now: number) {
@@ -63,6 +66,24 @@ export function normalizeDailyRewards(value: unknown): DailyRewardState {
     result[key] = { day: entry.day, streak: Math.max(1, Math.min(100000, Math.floor(Number(entry.streak) || 1))) };
   }
   return result;
+}
+
+/**
+ * One shared reward for a world that still holds one entry per seat role (older saves). The claim day and the
+ * streak are taken separately: if any role already claimed today, the world counts as claimed today, whichever
+ * role has the longest streak; the streak is the longest one still alive on that day (claimed then or the day
+ * before). Leaves a state that already has a world entry as it is.
+ */
+export function mergeDailyRewardsForWorld(state: DailyRewardState | undefined): DailyRewardState {
+  const source = normalizeDailyRewards(state);
+  if (source[WORLD_DAILY_KEY]) return { [WORLD_DAILY_KEY]: source[WORLD_DAILY_KEY] };
+  const entries = ROLE_KEYS.map((key) => source[key]).filter((entry): entry is DailyRewardEntry => Boolean(entry));
+  if (!entries.length) return {};
+  const day = entries.map((entry) => entry.day).sort().at(-1)!;
+  const before = getPreviousRewardDay(day);
+  const alive = entries.filter((entry) => entry.day === day || entry.day === before);
+  const streak = Math.max(...alive.map((entry) => entry.streak));
+  return { [WORLD_DAILY_KEY]: { day, streak } };
 }
 
 export function getDailyRewardStatus(state: DailyRewardState | undefined, key: string, now = Date.now()) {

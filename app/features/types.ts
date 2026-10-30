@@ -214,7 +214,9 @@ export type StarXIState = {
 
 export type RewardPackId = `reward-${1|2|3|4|5|6}`;
 export type StarPackId = "scrap" | "regional" | "scout" | "profi" | "elite" | "weltklasse" | "legend" | RewardPackId;
-export type EarnedPack = { id:string; packId:RewardPackId; earnedAt:number; opening?:StarPackOpening };
+/** A pack won or earned for free: a reward pack, or a special card pack (day 7 of the daily reward). */
+export type EarnedPackId = RewardPackId | 'special';
+export type EarnedPack = { id:string; packId:EarnedPackId; earnedAt:number; opening?:StarPackOpening };
 
 export type StarPackOdds = {
   label: string;

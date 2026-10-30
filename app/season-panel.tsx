@@ -1,6 +1,6 @@
 "use client";
 
-import { getSeasonModeDivisionLabel, getSeasonSchedule, SEASON_MODE_DIVISION_COUNT, SEASON_MODE_MATCHES_PER_SEASON, sortSeasonTable } from "./feature-data";
+import { getSeasonModeDivisionLabel, getSeasonSchedule, getTournamentRewardPack, MATCH_PACK_STAMP_TARGET, SEASON_MODE_DIVISION_COUNT, SEASON_MODE_MATCHES_PER_SEASON, sortSeasonTable } from "./feature-data";
 import type { GameFeatures, SeasonScheduleMatch, SeasonTableRow } from "./feature-data";
 
 function StandingsTable({ table, division, caption }: { table: readonly SeasonTableRow[]; division: number; caption: string }) {
@@ -38,6 +38,7 @@ export function SeasonPanel({ features }: { features: GameFeatures }) {
   const showLastSeason = season.matchday === 0 && season.lastMatchAt > 0 && season.lastTable.some((team) => team.played > 0) && !season.hallOfFame;
   return <div className="feature-panel season-hub">
     <div className="feature-panel-heading"><div><p className="eyebrow">SAISON {features.career.seasonNumber} / {getSeasonModeDivisionLabel(season.division).toUpperCase()}</p><h3>{season.hallOfFame ? "Hall of Fame erreicht." : `Spieltag ${season.matchday + 1} von ${SEASON_MODE_MATCHES_PER_SEASON}`}</h3></div></div>
+    {!season.hallOfFame && <p className="season-hub-stamps" aria-label="Matchstempel">Matchstempel {features.matchStamps} / {MATCH_PACK_STAMP_TARGET} · beim {MATCH_PACK_STAMP_TARGET}. Ligaspiel gibt es ein {getTournamentRewardPack("cup", season.highestDivision).label}</p>}
     <StandingsTable table={season.table} division={season.division} caption="Tabelle" />
     {showLastSeason && <details className="season-hub-last"><summary>Abschlusstabelle der letzten Saison</summary><StandingsTable table={season.lastTable} division={Math.max(1, season.division - (season.history.at(-1)?.seasonOutcome === "promoted" ? 1 : season.history.at(-1)?.seasonOutcome === "relegated" ? -1 : 0))} caption="Letzte Saison" /></details>}
     <section className="season-hub-section" aria-label="Deine nächsten Spiele">

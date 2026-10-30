@@ -14,4 +14,4 @@ Wenn ein Eintrag gewünscht ist:
 
 ## Balance
 
-`npx tsx scripts/balance/simulate-economy.mts` zeigt passives Einkommen pro Liga (ohne Klicks), Amortisation der Upgrades und wie lange ein Pack beim Freischalten zum Ansparen braucht, mit VAR und Ereignissen; `tests/rebalance.test.ts` hält die Grenzen fest (siehe `docs/balance-update.md`).
+`npx tsx scripts/balance/simulate-economy.mts` zeigt passives Einkommen pro Liga, Amortisation der Upgrades, wie lange ein Pack beim Freischalten zum Ansparen braucht (Median und P90, passiv, aktiv und Koop, mit VAR und Ereignissen), den tatsächlichen Mehrertrag der Klickupgrades und ganze Karrieren mit Packkäufen und Partien (`scripts/balance/progression-model.ts`). `tests/rebalance.test.ts` und `tests/balance-review.test.ts` halten die Grenzen fest (siehe `docs/balance-update.md`). Alle Preise sind runde Beträge (1 / 1,5 / 2 / 2,5 / 3 / 4 / 5 / 6 / 7,5 / 8 mal einer Zehnerpotenz).

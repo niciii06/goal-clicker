@@ -83,6 +83,8 @@ export const RANKS: { icon: IconName; name: string; minimum: number }[] = [
   { icon: "rocket", name: "Ewige Nummer 1", minimum: 1000000000000 },
 ];
 // Every click adds to the combo. The multiplier never exceeds x2; tier names the look of each level.
+/** At most 5% of the passive income per click from the click upgrades, before combo, streak and critical hits. */
+export const CLICK_PASSIVE_SHARE_CAP = 0.05;
 export const COMBO_LEVELS = [{ clicks: 0, multiplier: 1, tier: 1 }, { clicks: 20, multiplier: 1.5, tier: 2 }, { clicks: 50, multiplier: 2, tier: 3 }] as const;
 // After the last click the combo holds for three seconds (also after a full screen announcement closed),
 // then drains by one click every third of a second instead of ending at once.

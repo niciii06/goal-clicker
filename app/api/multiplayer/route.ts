@@ -11,13 +11,13 @@ import { getDb } from "../../../db";
 import { nameRecoveryAllowed, resolvePlayer } from "../../auth/player";
 import type { LightRoomRow, RoomRow, RoomSeats, RoomUpdate } from "../../../db";
 import { createHash } from "node:crypto";
-import { SPECIAL_CARD_PACK, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
+import { SPECIAL_CARD_PACK, awardMatchStamp, maybeGrantStarterSquad, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
 import type { GameFeatures, PenaltyDirection, StarFormationId } from "../../feature-data";
 import { isSupportedMultiplayerProtocol, MULTIPLAYER_UPDATE_MESSAGE } from "../../multiplayer-protocol";
 import { getFormationUnlockLeague, getPackUnlockLeague, getReachedLeague, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked, MAX_CAREER_SEASON } from "../../season-progression";
 import { calculateBulkUpgradePurchase } from "../../upgrade-purchase";
 import { MAX_MULTIPLAYER_BODY_BYTES, readJsonBody, RequestBodyTooLargeError } from "../request-body";
-import { claimDailyReward } from "../../daily-reward";
+import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "../../daily-reward";
 import { ACHIEVEMENTS, BALANCE_VERSION, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_IDS } from "../../game/constants";
 import { capGoalsAfterRebalance, getBaseClickPower, getBasePassivePower, getClickPower, getCost, getLevel } from "../../game/economy";
 import { getUpgrade } from "../../game/upgrades";
@@ -200,6 +200,8 @@ function readGame(row: RoomRow): CoopGameState {
   game.miniGameCooldowns = normalizeCooldowns(storedCooldowns);
   game.minigameWins = Math.max(0, Math.floor(finite(row.sharedMinigameWins)));
   game.features = normalizeGameFeatures(storedFeatures);
+  // The whole world shares one daily reward; older worlds still keep one entry per seat.
+  game.features.dailyRewards = mergeDailyRewardsForWorld(game.features.dailyRewards);
   game.goals = capGoalsAfterRebalance(game.goals, storedFeatures, game.upgrades, game.stars, game.features);
   unlockAchievements(game);
   return game;
@@ -265,6 +267,7 @@ function recordMultiplayerSeasonMatch(game: CoopGameState, now: number) {
   }
   game.features.seasonMode = result.state;
   game.features.seasonMode.table = game.features.seasonMode.table.map((team) => team.id === "club" ? { ...team, name: game.features.club.name } : team);
+  awardMatchStamp(game.features, now);
   game.features = finishActiveTransferLoans(game.features, now).features;
   game.seasons = Math.max(game.seasons, result.state.highestDivision - 1);
   if (result.entry.seasonOutcome === "promoted") game.stars = Math.min(MAX_SEASON_STARS, game.stars + 1);
@@ -743,8 +746,15 @@ async function handlePost(request: Request) {
       return jsonError("Die Klicks konnten gerade nicht gezählt werden.", 409);
     }
 
+    if (action === "starter-squad") {
+      // Once per world: the flag lives in the shared features and is written with the version check.
+      const result = maybeGrantStarterSquad(game.features, game.clicks, Date.now());
+      if (!result) return jsonError("Der Starterkader wurde in dieser Welt schon vergeben.", 409);
+      return persistGameResponse(db, room, game, timestamp, playerId, role, {}, { starterSquad: { added: result.added.length, complete: result.complete } });
+    }
+
     if (action === "daily-claim") {
-      const claim = claimDailyReward(game.features.dailyRewards, role, getBasePassivePower(game.upgrades, game.stars, game.features), getBaseClickPower(game.upgrades, game.stars, game.features), Date.now());
+      const claim = claimDailyReward(game.features.dailyRewards, WORLD_DAILY_KEY, getBasePassivePower(game.upgrades, game.stars, game.features), getBaseClickPower(game.upgrades, game.stars, game.features), Date.now());
       if (!claim) return jsonError("Die tägliche Prämie für heute ist schon abgeholt.", 409);
       game.features.dailyRewards = claim.state;
       game.goals += claim.amount;

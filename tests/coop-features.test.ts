@@ -35,14 +35,34 @@ function setup(features=initialGameFeatures(Date.now())){
 }
 async function action(name:string,extra:Record<string,unknown>={},playerId='host-player-123'){const r=await POST(new Request('http://localhost/api/multiplayer',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:name,code:'FEATUR',playerId,protocol:MULTIPLAYER_PROTOCOL_VERSION,...extra})}));return{status:r.status,data:await r.json() as {dailyReward?:{amount:number;dayIndex:number};press?:{reward:number};error?:string}};}
 
-test('each coop player claims the daily reward once per day for the shared world',async t=>{
+test('a coop world claims the daily reward once per day for all players',async t=>{
  const clock=Date.now();t.mock.method(Date,'now',()=>clock);setup();
  const before=row.sharedCoins;
  const first=await action('daily-claim');assert.equal(first.status,200);assert.equal(first.data.dailyReward?.dayIndex,1);
  assert.equal(row.sharedCoins-before,first.data.dailyReward!.amount);
  assert.equal((await action('daily-claim')).status,409);
- assert.equal((await action('daily-claim',{},'guest-player-123')).status,200);
- const features=JSON.parse(row.sharedFeaturesJson);assert.ok(features.dailyRewards.host&&features.dailyRewards.guest);
+ // One reward for the whole world: once anybody claimed, every seat sees today as claimed.
+ assert.equal((await action('daily-claim',{},'guest-player-123')).status,409);
+ assert.equal(row.sharedCoins-before,first.data.dailyReward!.amount);
+ const features=JSON.parse(row.sharedFeaturesJson);assert.deepEqual(Object.keys(features.dailyRewards),['world']);
+});
+
+test('an older world where one seat already claimed today gets no second claim after the merge',async()=>{
+ const { getRewardDay, getPreviousRewardDay }=await import('../app/daily-reward.ts');
+ const today=getRewardDay(),features=initialGameFeatures(Date.now());
+ features.dailyRewards={host:{day:today,streak:2},guest:{day:getPreviousRewardDay(today),streak:6}};setup(features);
+ assert.equal((await action('daily-claim',{},'guest-player-123')).status,409);
+ assert.equal((await action('daily-claim')).status,409);
+});
+
+test('the coop starter squad is handed out once per world after fifty shared clicks',async()=>{
+ const features=initialGameFeatures(Date.now());setup(features);
+ assert.equal((await action('starter-squad')).status,409,'not before fifty clicks');
+ row={...row,hostClicks:30,guestClicks:25};
+ const first=await action('starter-squad');assert.equal(first.status,200);
+ const stored=JSON.parse(row.sharedFeaturesJson);assert.equal(stored.starterSquadGranted,true);assert.equal(stored.starXI.lineupIds.filter(Boolean).length,11);
+ assert.equal((await action('starter-squad',{},'guest-player-123')).status,409);
+ assert.equal(JSON.parse(row.sharedFeaturesJson).starXI.ownedIds.length,11);
 });
 
 test('the shared press conference is answered once per match and pays a media reward',async t=>{

@@ -79,15 +79,22 @@ test("100 rated special cards drawn before Liga 3 leave an old save once", () =>
   assert.equal(normalizeGameFeatures(top).starXI.ownedIds.length, 4);
 });
 
-test("tournament rewards follow the best league reached and the World Cup adds one tier", () => {
+test("tournament rewards follow the best league reached up to each tournament's cap; the World Cup adds one tier", () => {
   assert.equal(getTournamentRewardPack("stadium", 1).id, "reward-1");
   assert.equal(getTournamentRewardPack("stadium", 3).id, "reward-1");
   assert.equal(getTournamentRewardPack("champions", 6).id, "reward-2");
   assert.equal(getTournamentRewardPack("champions", 9).id, "reward-3");
-  assert.equal(getTournamentRewardPack("stadium", 11).id, "reward-4");
+  // The easy Stadionpokal stops at the second pack, the Champions Cup at the fourth.
+  assert.equal(getTournamentRewardPack("stadium", 6).id, "reward-2");
+  assert.equal(getTournamentRewardPack("stadium", 11).id, "reward-2");
+  assert.equal(getTournamentRewardPack("stadium", 15).id, "reward-2");
+  assert.equal(getTournamentRewardPack("champions", 11).id, "reward-4");
+  assert.equal(getTournamentRewardPack("champions", 15).id, "reward-4");
   assert.equal(getTournamentRewardPack("world", 12).id, "reward-6");
   assert.equal(getTournamentRewardPack("world", 15).id, "reward-6");
-  assert.equal(getTournamentRewardPack("champions", 15).id, "reward-6");
+  // Match stamps follow the league alone.
+  assert.equal(getTournamentRewardPack("cup", 15).id, "reward-6");
+  assert.equal(getTournamentRewardPack("cup", 1).id, "reward-1");
 });
 
 test("economy grows evenly by league and packs take minutes, not hours, on passive income with the VAR", () => {
@@ -105,14 +112,14 @@ test("economy grows evenly by league and packs take minutes, not hours, on passi
     const growth = snapshot.averageIncomePerSecond / snapshots[index].averageIncomePerSecond;
     assert.ok(growth <= 3.7, `Liga ${snapshot.league} grows by ${growth.toFixed(2)}`);
   });
-  // Saved while the VAR and the random events hit the balance: from about 6 minutes for the regional pack
-  // up to about 12 for the legend pack, and every later pack takes longer than the one before.
+  // Passive median when the pack opens, saved while the VAR and the random events hit the balance: from about
+  // 4 minutes for the regional pack up to 12 to 14 for the legend pack, every later pack takes longer.
   const minutes = STAR_PACKS.filter((item) => item.id !== "scrap").map((pack) => {
     const income = snapshots.find((snapshot) => snapshot.league === getPackUnlockLeague(pack.id))!.incomePerSecond;
     return { pack, minutes: medianSavingMinutes(income, pack.price) };
   });
   assert.ok(minutes[0].minutes >= 4 && minutes[0].minutes <= 8, `${minutes[0].pack.label} takes ${minutes[0].minutes.toFixed(1)} minutes`);
-  assert.ok(minutes.at(-1)!.minutes >= 10 && minutes.at(-1)!.minutes <= 14, `${minutes.at(-1)!.pack.label} takes ${minutes.at(-1)!.minutes.toFixed(1)} minutes`);
+  assert.ok(minutes.at(-1)!.minutes >= 12 && minutes.at(-1)!.minutes <= 14, `${minutes.at(-1)!.pack.label} takes ${minutes.at(-1)!.minutes.toFixed(1)} minutes`);
   minutes.slice(1).forEach((entry, index) => assert.ok(entry.minutes > minutes[index].minutes, `${entry.pack.label} (${entry.minutes.toFixed(1)}) must take longer than ${minutes[index].pack.label} (${minutes[index].minutes.toFixed(1)})`));
 });
 

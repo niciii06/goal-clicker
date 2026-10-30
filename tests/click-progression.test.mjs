@@ -35,7 +35,7 @@ test("singleplayer and multiplayer share the complete click progression", async 
   assert.match(apiSource, /import \{[^}]*\bgetClickPower\b[^}]*\} from "\.\.\/\.\.\/game\/economy";/);
   assert.doesNotMatch(apiSource, /const UPGRADES|function getBaseClickPower|function getBasePassivePower/);
   assert.doesNotMatch(pageSource, /const UPGRADES|function getBaseClickPower/);
-  assert.match(pageSource, /CLUB OFFICE \/ 21 AUSBAUSTUFEN/);
+  assert.match(pageSource, /CLUB OFFICE \/ \{UPGRADES.length\} AUSBAUSTUFEN/);
 });
 
 test("holding Enter or Space cannot repeat ball clicks", async () => {

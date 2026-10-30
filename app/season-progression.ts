@@ -26,8 +26,14 @@ const UPGRADE_UNLOCK_SEASONS: Record<string, number> = {
   sponsor: 8,
   superclub: 9,
   captain: 10,
+  rights: 10,
   golden: 11,
+  merch: 11,
+  brand: 12,
+  campus: 13,
   legacy: 14,
+  franchise: 14,
+  empire: 15,
 };
 
 // Tier = 16 - league: every pack opens in the league whose opponents match its cards.

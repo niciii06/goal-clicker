@@ -1,7 +1,7 @@
 // Upgrade costs, click and passive power, ranks and the click combo.
 import type { GameFeatures } from "../feature-data";
 import type { PurchaseMode, UpgradeDefinition } from "./types";
-import { COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, RANKS } from "./constants";
+import { CLICK_PASSIVE_SHARE_CAP, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, RANKS } from "./constants";
 import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../upgrade-purchase";
 import { addHistory, getGoalBoostMultiplier, getTransferBonuses } from "../feature-data";
 import { UPGRADES, getUpgrade } from "./upgrades";
@@ -38,10 +38,23 @@ export function getIncomeMultiplier(upgrades: Record<string, number>, stars: num
   return (1 + Math.min(MAX_SEASON_STARS, Math.max(0, stars)) * 0.02) * getMultiplierFactor(upgrades, "legacy");
 }
 
+/**
+ * Share of the passive income one click earns. Every click upgrade adds its share per level up to its own
+ * maximum, so a dearer upgrade always still adds something; all together stop at CLICK_PASSIVE_SHARE_CAP.
+ * The Golden Boot raises the fixed goals per click, not this share.
+ */
+export function getClickPassiveShare(upgrades: Record<string, number>) {
+  const share = UPGRADES.reduce((total, upgrade) => total + Math.min(upgrade.passiveShareMax ?? Infinity, getLevel(upgrades, upgrade.id) * (upgrade.passiveShare ?? 0)), 0);
+  return Math.min(CLICK_PASSIVE_SHARE_CAP, share);
+}
+
 export function getBaseClickPower(upgrades: Record<string, number>, stars = 0, features?: GameFeatures) {
   const flat = 1 + getFlatGain(upgrades, "click");
   const transfer = getTransferBonuses(features?.transferMarket.ownedIds ?? []);
-  return (flat + transfer.clickBonus) * getMultiplierFactor(upgrades, "golden") * getIncomeMultiplier(upgrades, stars) * (1 + transfer.incomeBonus);
+  const fixed = (flat + transfer.clickBonus) * getMultiplierFactor(upgrades, "golden") * getIncomeMultiplier(upgrades, stars) * (1 + transfer.incomeBonus);
+  // The passive part already carries the income multipliers; temporary boosts follow in getClickPower.
+  const share = getClickPassiveShare(upgrades);
+  return share > 0 ? fixed + share * getBasePassivePower(upgrades, stars, features) : fixed;
 }
 
 export function getClickPower(upgrades: Record<string, number>, stars = 0, features?: GameFeatures, now = Date.now()) {
@@ -77,10 +90,15 @@ export function capGoalsAfterRebalance(goals: number, rawFeatures: unknown, upgr
   return cap;
 }
 
+function formatShare(share: number) {
+  return `${(share * 100).toLocaleString("de-CH", { maximumFractionDigits: 2 })}%`;
+}
+
 export function getUpgradeEffect(upgrade: UpgradeDefinition, level: number) {
   const effectiveLevel = Math.min(level, MAX_MULTIPLIER_LEVEL);
   if (upgrade.id === "golden") return `Stufe ${effectiveLevel}: x${((1 + upgrade.gain) ** effectiveLevel).toFixed(2)} Klickpower`;
   if (upgrade.id === "legacy") return `Stufe ${effectiveLevel}: x${((1 + upgrade.gain) ** effectiveLevel).toFixed(2)} alle Einnahmen`;
+  if (upgrade.passiveShare) return `${upgrade.description}, dazu ${formatShare(upgrade.passiveShare)} vom Einkommen pro Sekunde (bis ${formatShare(upgrade.passiveShareMax ?? upgrade.passiveShare)}) · Stufe ${level}`;
   return `${upgrade.description} · Stufe ${level}`;
 }
 

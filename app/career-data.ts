@@ -1,7 +1,7 @@
 import { createInteractiveMatch } from './interactive-match';
 import { goalLabel } from './match-goals';
 import { recordedActionRating } from './match-broadcast';
-import { addHistory, getMatchScoreImpact, TRANSFER_UNHAPPY_PENALTY, transferUnhappyMatches, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, removeStarXIPlayersFromSquad, STAR_XI_ACTIVE_PLAYERS, SCRAP_PLAYERS } from './feature-data';
+import { addHistory, getMatchScoreImpact, TRANSFER_UNHAPPY_PENALTY, transferUnhappyMatches, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, removeStarXIPlayersFromSquad, STAR_XI_ACTIVE_PLAYERS, SCRAP_PACK_PLAYERS } from './feature-data';
 import { getBannedPlayerIds, nextCompetition, processMatchDiscipline, suspensionLabel } from './discipline';
 import type { CupState, GameFeatures, SeasonMatchHistoryEntry, StarPosition, StarXIPlayer } from './feature-data';
 
@@ -290,20 +290,24 @@ export function getAlbumGroups(career: CareerState): AlbumGroup[] {
   const owned = new Set(career.collectedIds), claimed = new Set(career.claimedAlbumRewards);
   const definitions = [
     { id:'base',label:'Alle Basiskarten',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>!p.id.startsWith('scrap-')&&!p.isCustom&&p.cardType!=='icon'&&p.cardType!=='legendary'),reward:10000 },
-    { id:'scrap',label:'Alle Schrottkarten',players:SCRAP_PLAYERS,reward:500 },
+    { id:'scrap',label:'Alle Schrottkarten',players:SCRAP_PACK_PLAYERS,reward:500 },
     { id:'icons',label:'Alle Icons',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.cardType==='icon'),reward:5000 },
     { id:'custom',label:'Alle Custom-Karten',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.isCustom),reward:5000 },
     { id:'legendary',label:'Alle legendären Karten',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.cardType==='legendary'),reward:5000 },
     ...[...new Set(STAR_XI_ACTIVE_PLAYERS.map(p=>p.countryCode).filter(Boolean))].sort().map(code=>({ id:`nation-${code}`,label:`Nation ${code}`,players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.countryCode===code),reward:500 })),
   ];
-  return definitions.filter(d=>d.players.length).map(d=>({id:d.id,label:d.label,total:d.players.length,collected:d.players.filter(p=>owned.has(p.id)).length,reward:d.reward,claimed:claimed.has(d.id)}));
+  const distinct = STAR_XI_ACTIVE_PLAYERS.filter(p=>owned.has(p.id)).length;
+  // Near goals on the way to the full collections: a few different cards already pay out once.
+  const milestones = ALBUM_MILESTONES.map(m=>({id:`collect-${m.cards}`,label:`${m.cards} verschiedene Karten`,total:m.cards,collected:Math.min(m.cards,distinct),reward:m.reward,claimed:claimed.has(`collect-${m.cards}`)}));
+  return [...milestones, ...definitions.filter(d=>d.players.length).map(d=>({id:d.id,label:d.label,total:d.players.length,collected:d.players.filter(p=>owned.has(p.id)).length,reward:d.reward,claimed:claimed.has(d.id)}))];
 }
+export const ALBUM_MILESTONES = [{ cards:10, reward:100 }, { cards:25, reward:250 }, { cards:50, reward:500 }] as const;
 export function claimAlbumReward(features: GameFeatures, groupId: string) {
   features.career.collectedIds = [...new Set([...features.career.collectedIds,...features.starXI.ownedIds])];
   const group = getAlbumGroups(features.career).find(g=>g.id===groupId);
   if (!group || group.claimed || group.collected < group.total) return false;
   features.career.claimedAlbumRewards.push(group.id); features.starXI.fragments += group.reward;
-  addHistory(features,{title:`Sammelalbum: ${group.label} komplett`,detail:`+${group.reward} Fragmente. Einmalige Sammlungsprämie.`,tone:'positive'});
+  addHistory(features,{title:group.id.startsWith('collect-')?`Sammelalbum: ${group.label}`:`Sammelalbum: ${group.label} komplett`,detail:`+${group.reward} Fragmente. Einmalige Sammlungsprämie.`,tone:'positive'});
   return true;
 }
 

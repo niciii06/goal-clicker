@@ -3,6 +3,7 @@ import test from 'node:test';
 import { getTableColumns } from 'drizzle-orm';
 import { coopRooms } from '../db/schema.ts';
 import { initialGameFeatures, normalizeGameFeatures, STAR_XI_PLAYERS } from '../app/feature-data.ts';
+import { WORLD_DAILY_KEY, getDailyRewardStatus, getPreviousRewardDay, getRewardDay } from '../app/daily-reward.ts';
 import type { GameFeatures } from '../app/feature-data.ts';
 import type { RoomRow, RoomUpdate } from '../db/index.ts';
 import { MULTIPLAYER_PROTOCOL_VERSION } from '../app/multiplayer-protocol.ts';
@@ -43,4 +44,27 @@ test('a long career keeps every unopened pack but only the latest opened ones an
  assert.equal(normalized.earnedPacks.at(-11)!.id,'run:389');
  assert.equal(normalized.completedTournamentRuns.length,200);
  assert.equal(normalized.completedTournamentRuns.at(-1),'run:999');
+});
+test('four coop players claiming day seven at once get one reward and one special card pack for the world',async()=>{
+ const today=getRewardDay(),f=ready();f.earnedPacks=[];f.dailyRewards={[WORLD_DAILY_KEY]:{day:getPreviousRewardDay(today),streak:6}};setup(f);
+ const iso=new Date().toISOString();
+ row={...row,player3PlayerId:'player3-12345678',player3Name:'Flurin',player3LastSeenAt:iso,player4PlayerId:'player4-12345678',player4Name:'Gian',player4LastSeenAt:iso};
+ const players=['host-12345678','guest-12345678','player3-12345678','player4-12345678'],start=row.sharedCoins;
+ const results=await Promise.all(players.map(p=>action('daily-claim',{},p)));
+ const winners=results.filter(r=>r.status===200);
+ assert.equal(winners.length,1,'exactly one claim succeeds');
+ assert.ok(results.filter(r=>r.status!==200).every(r=>r.status===409));
+ // A retry of the losers changes nothing any more.
+ const retries=await Promise.all(players.map(p=>action('daily-claim',{},p)));
+ assert.ok(retries.every(r=>r.status===409));
+ // The stored row: one reward on the balance, one special card pack, today claimed for every seat.
+ const amount=(winners[0].data as {dailyReward?:{amount:number;dayIndex:number;pack:boolean}}).dailyReward!;
+ assert.equal(amount.dayIndex,7);assert.equal(amount.pack,true);
+ assert.equal(row.sharedCoins-start,amount.amount);
+ const stored=JSON.parse(row.sharedFeaturesJson) as GameFeatures;
+ const daily=stored.earnedPacks.filter(p=>p.id.startsWith('daily-'));
+ assert.deepEqual(daily.map(p=>[p.id,p.packId]),[[`daily-world-${today}`,'special']]);
+ assert.deepEqual(Object.keys(stored.dailyRewards),[WORLD_DAILY_KEY]);
+ assert.equal(getDailyRewardStatus(stored.dailyRewards,WORLD_DAILY_KEY).claimedToday,true);
+ for(const p of players){const seen=await action('tick',{},p);const features=seen.data.room?.game.features;assert.ok(features,`${p} sees the shared world`);assert.equal(getDailyRewardStatus(features.dailyRewards,WORLD_DAILY_KEY).claimedToday,true);}
 });
