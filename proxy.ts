@@ -31,5 +31,9 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // Everything except static files and the app shell files; the OAuth callback exchanges its code itself.
-  matcher: ["/((?!_next/static|_next/image|auth/callback|favicon\\.ico|sw\\.js|manifest\\.webmanifest|offline\\.html|sounds/|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)"],
+  // Background polls skip it too (BACKGROUND_POLL_HEADER; the config must be literal for the build).
+  matcher: [{
+    source: "/((?!_next/static|_next/image|auth/callback|favicon\\.ico|sw\\.js|manifest\\.webmanifest|offline\\.html|sounds/|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
+    missing: [{ type: "header", key: "x-goal-poll" }],
+  }],
 };

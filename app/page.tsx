@@ -39,7 +39,7 @@ import { competitionFor, squadBanError, suspensionLabel } from "./discipline";
 import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "./daily-reward";
 import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
 import { consumeTravel, eligibilityError, fixtureFor, journeyView, payTravelFines, settleTravel, travelTiming } from "./travel-data";
-import { coopRoleLabel, isCoopRole, multiplayerUrl, notifyCoopOffline, occupiedCoopPlayers, readCoopResponse, upsertSavedRoom } from "./game/coop";
+import { BACKGROUND_POLL_HEADERS, COOP_POLL_INTERVAL_MS, coopRoleLabel, isCoopRole, multiplayerUrl, notifyCoopOffline, occupiedCoopPlayers, readCoopResponse, upsertSavedRoom } from "./game/coop";
 import { capGoalsAfterRebalance, createClickResult, decayComboCount, formatComboMultiplier, getBaseClickPower, getBasePassivePower, getBulkPurchase, getClickPower, getComboLevel, getComboProgress, getCost, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades } from "./game/economy";
 import { UPGRADES } from "./game/upgrades";
 import { TransferOfferActions } from "./transfer-offer-actions";
@@ -81,6 +81,8 @@ function WalkoutCountryFlag({ code, country, compact = false }: { code: string; 
 
 
 const SAVE_FAILED_MESSAGE = "Speichern fehlgeschlagen: Der Browser Speicher ist voll. Lade deinen Spielstand als Datei herunter, bevor du die Seite schliesst.";
+// The travel clock runs on in the browser; the server only corrects it now and then and at kickoff.
+const TRAVEL_SYNC_INTERVAL_MS = 15_000;
 const STAR_WALKOUT_ANIMATION_MS = 9500;
 const STAR_TOP_WALKOUT_ANIMATION_MS = 11500;
 const STAR_WALKOUT_READY_MS = 7500;
@@ -358,7 +360,7 @@ function App() {
   const syncCoopRoom = useCallback(async () => {
     if (!activeCoopCode || !activeCoopPlayerId) return;
     try {
-      const response = await fetch(multiplayerUrl({ code: activeCoopCode, playerId: activeCoopPlayerId, featuresKey: coopFeaturesKeyRef.current }), { cache: "no-store" });
+      const response = await fetch(multiplayerUrl({ code: activeCoopCode, playerId: activeCoopPlayerId, featuresKey: coopFeaturesKeyRef.current }), { cache: "no-store", headers: BACKGROUND_POLL_HEADERS });
       const data = await readCoopResponse(response);
       syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
       if (!response.ok) {
@@ -369,7 +371,8 @@ function App() {
           setCoopSession(null);
           void loadSavedRooms();
         }
-        if (data.error) setCoopMessage(data.error);
+        // A poll right after the tab wakes can beat the browser's session refresh; the next one works again.
+        if (data.error && response.status !== 401) setCoopMessage(data.error);
         return;
       }
       if (data.room) {
@@ -400,7 +403,7 @@ function App() {
     if(!hydrated||!playerId||!soloJourneyId)return;
     let stopped=false;
     const sync=async()=>{try{
-      const response=await fetch('/api/travel',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'status',playerId,fixtureId:soloJourneyId})});
+      const response=await fetch('/api/travel',{method:'POST',headers:{'content-type':'application/json',...BACKGROUND_POLL_HEADERS},body:JSON.stringify({action:'status',playerId,fixtureId:soloJourneyId})});
       const data=await response.json() as {journey?:Journey;serverNow?:number};
       const serverJourney=data.journey, serverNow=data.serverNow;
       if(stopped||!response.ok||!serverJourney||typeof serverNow!=='number'||!Number.isFinite(serverNow))return;
@@ -414,7 +417,7 @@ function App() {
         return {...current,features:{...current.features,travel,squadLock:serverJourney.squadLock}};
       });
     }catch{ /* Last authoritative clock continues; kickoff always revalidates. */ }};
-    void sync();const timer=window.setInterval(()=>{const j=gameRef.current.features.travel.journey;if(j&&!journeyView(j,getTravelTime()).arrived)void sync();},5000);
+    void sync();const timer=window.setInterval(()=>{const j=gameRef.current.features.travel.journey;if(j&&!journeyView(j,getTravelTime()).arrived)void sync();},TRAVEL_SYNC_INTERVAL_MS);
     const visible=()=>{if(document.visibilityState==='visible')void sync();};
     document.addEventListener('visibilitychange',visible);
     return ()=>{stopped=true;clearInterval(timer);document.removeEventListener('visibilitychange',visible);};
@@ -738,7 +741,7 @@ function App() {
     // A tab in the background does not poll; it catches up as soon as it is visible again.
     const syncWhileOpen = () => { if (document.visibilityState === "visible") void syncCoopRoom(); };
     const initialSync = window.setTimeout(syncWhileOpen, 0);
-    const timer = window.setInterval(syncWhileOpen, 1500);
+    const timer = window.setInterval(syncWhileOpen, COOP_POLL_INTERVAL_MS);
     document.addEventListener("visibilitychange", syncWhileOpen);
     return () => { window.clearTimeout(initialSync); window.clearInterval(timer); document.removeEventListener("visibilitychange", syncWhileOpen); };
   }, [activeCoopCode, activeCoopPlayerId, appMode, coopSession?.room.status, hydrated, syncCoopRoom]);
@@ -746,7 +749,7 @@ function App() {
   useEffect(() => {
     if (!hydrated || appMode !== "coop" || !activeCoopCode || !activeCoopPlayerId || coopSession?.room.status !== "live") return;
     const tick = () => { if (document.visibilityState === "visible") void sendCoopAction("tick", { featuresKey: coopFeaturesKeyRef.current }); };
-    const timer = window.setInterval(tick, 1500);
+    const timer = window.setInterval(tick, COOP_POLL_INTERVAL_MS);
     document.addEventListener("visibilitychange", tick);
     return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", tick); };
     // Background synchronisation is coalesced by sendCoopAction and must not restart on every room update.
@@ -1167,13 +1170,14 @@ function App() {
   }, [latestClubGoalId, liveMatch]);
   async function sendCoopAction(action: string, extra: Record<string, unknown> = {}) {
     if (!coopSession) return null;
+    const isBackgroundAction = action === "tick" || action === "cup-tick";
     const run = async () => {
       const maxAttempts = action === "click" ? 1 : 4;
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         try {
           const response = await fetch("/api/multiplayer", {
             method: "POST",
-            headers: { "content-type": "application/json" },
+            headers: { "content-type": "application/json", ...(isBackgroundAction ? BACKGROUND_POLL_HEADERS : {}) },
             body: JSON.stringify({ action, code: coopSession.code, playerId: coopSession.playerId, protocol: MULTIPLAYER_PROTOCOL_VERSION, ...extra }),
           });
           const data = await readCoopResponse(response);
@@ -1182,7 +1186,8 @@ function App() {
           if (!response.ok && data.errorCode === "STALE_STATE" && attempt + 1 < maxAttempts) continue;
           if (!response.ok) {
             // Clicks beyond the server's click budget are simply not counted; that is no error to show.
-            if (action !== "click" || response.status !== 429) setCoopMessage(data.error ?? "Die Koop-Aktion ist fehlgeschlagen.");
+            // A background tick right after the tab wakes can beat the browser's session refresh; the next one works.
+            if ((action !== "click" || response.status !== 429) && !(isBackgroundAction && response.status === 401)) setCoopMessage(data.error ?? "Die Koop-Aktion ist fehlgeschlagen.");
             return null;
           }
           if (data.packReveal) {
@@ -1204,7 +1209,7 @@ function App() {
     // Klicks werden serverseitig atomar addiert. Hintergrund-Ticks werden
     // zusammengefasst, damit sie Käufe während eines Live-Spiels nie blockieren.
     if (action === "click") return run();
-    if (action === "tick" || action === "cup-tick") {
+    if (isBackgroundAction) {
       if (coopForegroundPendingRef.current > 0 || coopBackgroundActionRef.current) return null;
       const backgroundAction = run();
       coopBackgroundActionRef.current = backgroundAction;
@@ -2003,7 +2008,8 @@ function App() {
   useEffect(() => {
     if (!hydrated || (appMode !== "single" && !isCoopLive)) return;
     const timer = window.setInterval(() => {
-      if (appMode === "coop" && isCoopLive && displayGame.features.cup.active && displayGame.features.cup.phase !== "penalties") void sendCoopAction("cup-tick");
+      // A world in a background tab does not drive the match; the others or the tab itself once visible again do.
+      if (appMode === "coop" && isCoopLive && displayGame.features.cup.active && displayGame.features.cup.phase !== "penalties") { if (document.visibilityState === "visible") void sendCoopAction("cup-tick"); }
       else if (appMode === "single" && gameRef.current.features.cup.active) advanceLocalCup();
     }, 1000);
     return () => window.clearInterval(timer);

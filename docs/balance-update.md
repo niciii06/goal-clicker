@@ -109,6 +109,13 @@ Am 29. Oktober stand der Hobby Plan bei 9,08 von 10 GB "Fast Origin Transfer" (3
 * `app/cloud-sync.ts`: Uploads gehen gzip-komprimiert raus und nur noch jede Minute (plus beim Wegschalten und Schliessen der Seite). Beim Schliessen wird unkomprimiert sofort gesendet.
 * `app/api/request-body.ts` liest komprimierte Anfragen; ausgepackt gilt dasselbe Grössenlimit wie vorher.
 
+Am 30. Oktober war das Limit trotzdem überschritten (10,11 von 10 GB; 4,17 GB eingehend, 5,94 GB ausgehend). Beim Eingang zählt jede Anfrage mit allen Headern, also auch mit dem mehrere KB grossen Login Cookie, und jede Anfrage lief zweimal durch Vercel: erst durch den Proxy, dann durch die Funktion.
+
+* `proxy.ts`: Hintergrundabfragen mit dem Header `x-goal-poll` (Koop Tick, Koop Abfrage im Warteraum, Spiel Tick im Koop Match, Reisestatus) laufen nicht mehr durch den Proxy. Die Sitzung hält der Browser selbst frisch; ein einzelner 401 direkt nach dem Aufwachen eines Tabs wird still übergangen.
+* `app/game/coop.ts`: Koop Abfragen alle 3 statt alle 1,5 Sekunden (passives Einkommen wird ohnehin nur alle 5 Sekunden gebucht).
+* Spiel Ticks im Koop Match schickt nur noch ein sichtbarer Tab; das Match rechnet nach Uhrzeit und holt verpasste Minuten nach.
+* Laufende Reisen gleichen ihre Uhr alle 15 statt alle 5 Sekunden mit dem Server ab.
+
 ## Nachtrag: Mehr Einkommen ab Liga 12
 
 Packs dauerten zu lange. Die passiven Upgrades ab Liga 12 bringen 50% mehr (Talent-Scouting 1'200/s, VAR 2.0 1'950/s, Arena-Ausbau 8'250/s, Weltweite Übertragung 28'500/s, Globaler Sponsor 102'000/s, Superclub-Netzwerk 450'000/s). Das Einkommen ab Liga 11 steigt in der Simulation um etwa 70%; ein neues Pack kostet beim Freischalten 10 bis 14 Minuten Einkommen statt rund 20, das Legenden Pack 28 statt 48 Minuten. Der Balance Test erlaubt 8 bis 35 Minuten.

@@ -22,6 +22,13 @@ export function authMode(): "supabase" | "anonymous" | "misconfigured" {
   return process.env.VERCEL || process.env.AUTH_REQUIRED === "1" ? "misconfigured" : "anonymous";
 }
 
+/**
+ * Marks the frequent background polls (coop ticks, travel status). The proxy skips them: each pass through it
+ * costs the whole request with its login cookies a second time in Fast Origin Transfer, and the browser client
+ * keeps the session fresh on its own while the tab is open.
+ */
+export const BACKGROUND_POLL_HEADER = "x-goal-poll";
+
 export const AUTH_CALLBACK_PATH = "/auth/callback";
 export const AUTH_SIGNOUT_PATH = "/auth/signout";
 

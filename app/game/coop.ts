@@ -2,6 +2,12 @@
 import type { CoopApiResponse, CoopRole, CoopRoom } from "./types";
 import { COOP_ROLES } from "./constants";
 import { MULTIPLAYER_PROTOCOL_VERSION } from "../multiplayer-protocol";
+import { BACKGROUND_POLL_HEADER } from "../auth/config";
+
+/** How often an open world asks for news. Passive income is booked every 5 s anyway; this mostly brings the others' clicks. */
+export const COOP_POLL_INTERVAL_MS = 3000;
+/** Sent with background polls so they skip the proxy (see BACKGROUND_POLL_HEADER). */
+export const BACKGROUND_POLL_HEADERS: Record<string, string> = { [BACKGROUND_POLL_HEADER]: "1" };
 
 export function isCoopRole(value: unknown): value is CoopRole {
   return typeof value === "string" && COOP_ROLES.includes(value as CoopRole);
