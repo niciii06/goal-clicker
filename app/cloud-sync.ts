@@ -200,7 +200,8 @@ export class CloudSync {
     if (!this.stopped) return;
     this.stopped = false;
     this.inputsAtLastSave = this.inputs - (readCloudMeta(this.userId)?.played ? 1 : 0);
-    this.timer = window.setInterval(() => void this.upload(), UPLOAD_INTERVAL_MS);
+    // A tab in the background uploaded when it was hidden; its passive goals follow once it is visible again.
+    this.timer = window.setInterval(() => { if (document.visibilityState === "visible") void this.upload(); }, UPLOAD_INTERVAL_MS);
     document.addEventListener("visibilitychange", this.handleVisibility);
     window.addEventListener("pagehide", this.handlePageHide);
     window.addEventListener("pointerdown", this.handleInput, { capture: true, passive: true });

@@ -92,3 +92,18 @@ test('the world list and the server cache never read the backup copy', async () 
   assert.equal(rooms[0].game.features, undefined);
   assert.equal(featureReads.count, 0);
 });
+
+test('the leading player booking income every few seconds gets no features while they stay the same', async () => {
+  setup(new Date(Date.now() - 60_000).toISOString());
+  const { room } = await post('tick');
+  for (let i = 0; i < 5; i++) {
+    row.lastPassiveAt = new Date(Date.now() - 60_000).toISOString();
+    const booked = await post('tick', { featuresKey: room.featuresKey });
+    assert.equal(booked.room.featuresOmitted, true);
+    assert.equal(booked.room.featuresKey, room.featuresKey);
+  }
+  // A full poll of the waiting room with the current key is slim as well.
+  row.lastPassiveAt = new Date(Date.now() - 60_000).toISOString();
+  const polled = await get(room.featuresKey);
+  assert.equal(polled.room.featuresOmitted, true);
+});

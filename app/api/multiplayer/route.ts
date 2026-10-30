@@ -363,8 +363,10 @@ function featuresKeyOf(row: AnyRoomRow) {
  * The room as the client sees it. From a light row (no features read) the game comes without its features,
  * marked `featuresOmitted`; the client keeps the features it already has for the same `featuresKey`.
  */
-function shapeRoom(source: AnyRoomRow, viewerId?: string) {
-  const light = !("sharedFeaturesJson" in source);
+/** `knownFeaturesKey`: the features the client already holds; when they are current they stay out of the answer. */
+function shapeRoom(source: AnyRoomRow, viewerId?: string, knownFeaturesKey = "") {
+  const featuresKey = featuresKeyOf(source);
+  const light = !("sharedFeaturesJson" in source) || (knownFeaturesKey !== "" && knownFeaturesKey === featuresKey);
   const row: RoomRow = light ? { ...source, sharedFeaturesJson: "{}", sharedStateBackupJson: "" } : source as RoomRow;
   const game = readGame(row);
   if (!light) game.features.travel = settleTravel(game.features.travel, Date.now());
@@ -405,7 +407,7 @@ function shapeRoom(source: AnyRoomRow, viewerId?: string) {
     revision: Math.max(0, Math.floor(row.sharedStateVersion)),
     testMode: redeemedCodes.includes("AZB"),
     lastPassiveAt: row.lastPassiveAt,
-    featuresKey: featuresKeyOf(source),
+    featuresKey,
     featuresOmitted: light,
     game: light ? withoutFeatures({ ...game, lastSaved: Date.now(), sound: true }) : { ...game, lastSaved: Date.now(), sound: true },
   };
@@ -548,7 +550,7 @@ async function handleGet(request: Request) {
     const role = roomRole(room, playerId);
     if (!role) return jsonError("Du bist nicht in diesem Raum.", 403);
     const refreshed = await refreshPassive(db, room, GET_PASSIVE_REFRESH_MIN_MS);
-    return Response.json({ serverNow: Date.now(), room: shapeRoom(await touchPresence(db, refreshed, role), playerId), role });
+    return Response.json({ serverNow: Date.now(), room: shapeRoom(await touchPresence(db, refreshed, role), playerId, url.searchParams.get("featuresKey") ?? ""), role });
   } catch (error) {
     return Response.json({ error: errorMessage(error) }, { status: 500 });
   }
@@ -707,9 +709,11 @@ async function handlePost(request: Request) {
       const presenceTimestamp = new Date().toISOString();
       const beforePresence = room;
       room = await touchPresence(db, room, role, presenceTimestamp);
-      if (getSimulationLeaderRole(room, Date.parse(presenceTimestamp)) !== role) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
+      // The regular tick sends the features key it holds, so an unchanged world goes back without its features.
+      const knownFeaturesKey = typeof payload.featuresKey === "string" ? payload.featuresKey : "";
+      if (getSimulationLeaderRole(room, Date.parse(presenceTimestamp)) !== role) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId, knownFeaturesKey), role });
       room = await refreshPassive(db, room, 0, beforePresence);
-      if (action === "tick") return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
+      if (action === "tick") return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId, knownFeaturesKey), role });
     } else if (action === "click") {
       // Clicks arrive every few hundred milliseconds. Passive income adds up over time, so it is booked at most every
       // few seconds instead of rewriting the whole world on each batch; the click itself marks the player present.

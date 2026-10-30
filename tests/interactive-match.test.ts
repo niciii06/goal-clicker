@@ -203,3 +203,12 @@ test('an injury picked up in a match keeps its full absence; older injuries coun
  assert.equal(f.cup.injuredPlayerIds[hurt],1,'still misses the next match');
  assert.equal(f.cup.injuredPlayerIds['older-injury'],1,'an older injury served this match');
 });
+test('a finished match keeps its final frame but not the prepared plays and older history',()=>{
+ const f=complete(fixture(502));const end=f.cup.simulation!.time,before=interactiveFrame(f.cup,f.cup.matchEndsAt+5000);
+ const restored=normalizeGameFeatures(JSON.parse(JSON.stringify(f))),sim=restored.cup.simulation!;
+ assert.equal(sim.status,'completed');assert.equal(sim.time,end);assert.ok(sim.buffer.length<=1);assert.ok(sim.recent.length<=4);
+ const after=interactiveFrame(restored.cup,restored.cup.matchEndsAt+5000);
+ assert.deepEqual(after.ball,before.ball);assert.deepEqual(after.players,before.players);
+ assert.ok(JSON.stringify(sim).length<JSON.stringify(f.cup.simulation).length/2,'the saved match shrinks');
+ assert.equal(JSON.stringify(normalizeGameFeatures(JSON.parse(JSON.stringify(restored))).cup.simulation),JSON.stringify(sim),'stable on the next load');
+});

@@ -387,9 +387,13 @@ export function normalizeInteractive(value:unknown):InteractiveMatch|undefined {
  // Speculation is rebuilt from the committed RNG checkpoint. Never accept saved prepared outcomes.
  const validCheckpoint=(c:SimCheckpoint)=>c&&Number.isFinite(c.time)&&validPoint(c.ball)&&Array.isArray(c.players)&&c.players.length<=22&&c.players.every(p=>p&&typeof p.id==='string'&&validPoint(p));
  const recent=(Array.isArray(s.recent)?s.recent:[]).slice(-12).filter(a=>a&&typeof a.id==='string'&&Number.isFinite(a.start)&&Number.isFinite(a.end)&&a.start>=0&&a.start<a.end&&a.end<=s.committed.time&&validPoint(a.from)&&validPoint(a.to)&&validCheckpoint(a.before)&&validCheckpoint(a.after)&&a.before.time===a.start&&a.after.time===a.end);
- const result={...s,buffer:[],recent,generation:Number(s.generation)||0};
+ // A finished match only shows its last plays (a late goal, its restart, a playback still catching up); the prepared
+ // plays and the older ones made up most of a world's size and went to every player with each save and sync.
+ const completed=s.status==='completed';
+ const result={...s,buffer:[],recent:completed?recent.slice(-4):recent,generation:Number(s.generation)||0};
  delete (result as InteractiveMatch & {quick?:boolean}).quick; // Migrate the removed public fast-forward mode.
- refill(result);return result;
+ // The final frame is the start of the next prepared play, so a finished match keeps exactly that one.
+ refill(result);if(completed)result.buffer=result.buffer.slice(0,1);return result;
 }
 export function interactiveFrame(cup:CupState,now:number) {
  const s=cup.simulation!,scale=5400/getCupRegularDurationMs(cup),earliest=s.recent[0]?.start??s.committed.time,latest=cup.matchPaused||!cup.active?s.time:s.buffer.at(-1)?.end??s.time;
