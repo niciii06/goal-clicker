@@ -14,4 +14,4 @@ Wenn ein Eintrag gewünscht ist:
 
 ## Balance
 
-`npx tsx scripts/balance/simulate-economy.mts` zeigt Einkommen pro Liga, Amortisation der Upgrades und Packpreise in Minuten Einkommen; `tests/rebalance.test.ts` hält die Grenzen fest (siehe `docs/balance-update.md`).
+`npx tsx scripts/balance/simulate-economy.mts` zeigt passives Einkommen pro Liga (ohne Klicks), Amortisation der Upgrades und wie lange ein Pack beim Freischalten zum Ansparen braucht, mit VAR und Ereignissen; `tests/rebalance.test.ts` hält die Grenzen fest (siehe `docs/balance-update.md`).

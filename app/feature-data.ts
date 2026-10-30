@@ -616,12 +616,12 @@ function tierBand(minRating: number, maxRating: number, chance: number) {
 // 100 rated cards are mostly a special card pack draw; the two top packs hold them at 0.001% and 0.01%.
 export const STAR_PACKS: readonly StarPackDefinition[] = [
   { id: "scrap", label: "Schrott-Pack", price: 15000, description: "Günstig einsteigen und dein Team ergänzen. Enthält eine Basiskarte.", odds: SCRAP_RATING_GROUPS.map(group => tierBand(group.minRating, group.maxRating, group.chance)) },
-  { id: "regional", label: "Regional-Pack", price: 10000000, description: "Gewöhnliche und Profi Karten für den Aufbau", odds: [tierBand(65, 70, 0.7), tierBand(71, 79, 0.3)] },
-  { id: "scout", label: "Scout Pack", price: 50000000, description: "Meist Profis, seltene Karten sind die Ausnahme", odds: [tierBand(68, 70, 0.35), tierBand(71, 79, 0.62), tierBand(80, 85, 0.03)] },
-  { id: "profi", label: "Profi-Pack", price: 350000000, description: "Profis für die Liga Mitte, Walkouts sind sehr selten", odds: [tierBand(71, 79, 0.85), tierBand(80, 85, 0.14), tierBand(86, 89, 0.01)] },
-  { id: "elite", label: "Elite Pack", price: 3000000000, description: "Für die oberen Ligen, Walkouts sind möglich, aber selten", odds: [tierBand(75, 79, 0.6), tierBand(80, 85, 0.33), tierBand(86, 89, 0.06), tierBand(90, 99, 0.01)] },
-  { id: "weltklasse", label: "Weltklasse-Pack", price: 6000000000, description: "Starke Karten für den Aufstiegskampf, mehr Walkouts", odds: [tierBand(77, 79, 0.4), tierBand(80, 85, 0.47999), tierBand(86, 89, 0.1), tierBand(90, 99, 0.02), tierBand(100, 100, 0.00001)] },
-  { id: "legend", label: "Legenden Pack", price: 15000000000, description: "Das teuerste Pack mit den besten Walkout Chancen", odds: [tierBand(80, 85, 0.5499), tierBand(86, 89, 0.35), tierBand(90, 99, 0.1), tierBand(100, 100, 0.0001)] },
+  { id: "regional", label: "Regional-Pack", price: 2000000, description: "Gewöhnliche und Profi Karten für den Aufbau", odds: [tierBand(65, 70, 0.7), tierBand(71, 79, 0.3)] },
+  { id: "scout", label: "Scout Pack", price: 25000000, description: "Meist Profis, seltene Karten sind die Ausnahme", odds: [tierBand(68, 70, 0.35), tierBand(71, 79, 0.62), tierBand(80, 85, 0.03)] },
+  { id: "profi", label: "Profi-Pack", price: 130000000, description: "Profis für die Liga Mitte, Walkouts sind sehr selten", odds: [tierBand(71, 79, 0.85), tierBand(80, 85, 0.14), tierBand(86, 89, 0.01)] },
+  { id: "elite", label: "Elite Pack", price: 1500000000, description: "Für die oberen Ligen, Walkouts sind möglich, aber selten", odds: [tierBand(75, 79, 0.6), tierBand(80, 85, 0.33), tierBand(86, 89, 0.06), tierBand(90, 99, 0.01)] },
+  { id: "weltklasse", label: "Weltklasse-Pack", price: 5000000000, description: "Starke Karten für den Aufstiegskampf, mehr Walkouts", odds: [tierBand(77, 79, 0.4), tierBand(80, 85, 0.47999), tierBand(86, 89, 0.1), tierBand(90, 99, 0.02), tierBand(100, 100, 0.00001)] },
+  { id: "legend", label: "Legenden Pack", price: 10000000000, description: "Das teuerste Pack mit den besten Walkout Chancen", odds: [tierBand(80, 85, 0.5499), tierBand(86, 89, 0.35), tierBand(90, 99, 0.1), tierBand(100, 100, 0.0001)] },
 ];
 
 const REWARD_BRACKETS = [[0,64],[65,70],[71,79],[80,85],[86,89],[90,99]] as const;

@@ -117,3 +117,11 @@ Packs dauerten zu lange. Die passiven Upgrades ab Liga 12 bringen 50% mehr (Tale
 
 * **Willkommenspack:** Ein ganz neuer Club (kein Spielstand im Browser und keiner im Konto) öffnet beim ersten Start ein Gratis-Pack mit einer garantierten Walkout-Karte 86 bis 89 (keine Icons, keine Spezialkarten) und sieht die Walkout-Show (`grantWelcomePack` in `app/feature-data.ts`).
 * **Schnellerer Anfang:** Die fünf Upgrades aus Liga 15 kosten die Hälfte und bringen dreimal so viel (Schnellere Stiefel +3 pro Klick ab 12, Balljunge +3/s ab 60, Schusstechnik +9 pro Klick ab 130, Torinstinkt +15 pro Klick ab 700, Taktiktafel +45/s ab 1'750). Erstes gekauftes Pack nach etwa 3 Minuten bei 3 Klicks pro Sekunde (vorher 9), nach etwa 5 Minuten bei 1 Klick pro Sekunde (vorher 21); volle Startelf nach 5 bzw. 8 Minuten. Das Regional-Pack kostet beim Freischalten 11 statt 19 Minuten Einkommen; ab Liga 12 bleibt alles gleich.
+
+## Nachtrag: Rechnung nur mit Einkommen pro Sekunde und VAR
+
+Die Simulation (`scripts/balance/economy-model.ts`) rechnet jetzt standardmässig nur mit passivem Einkommen: Der erste Balljunge kommt aus ein paar Klicks (60 Tore), danach klickt niemand mehr. Packzeiten werden als Median aus vielen Durchläufen gemessen, in denen VAR und Ereignisse wie im Spiel alle 1 bis 3 Minuten den Kontostand treffen (`medianSavingMinutes`). VAR und Johhny Elefantino bleiben unverändert.
+
+* **Passive Upgrades günstiger:** halber Grundpreis und 40% weniger Preisaufschlag pro Stufe (z.B. Superclub-Netzwerk 90 Mio statt 180 Mio, +22,8% statt +38% pro Stufe).
+* **Packpreise:** Regional 2 Mio (vorher 10 Mio), Scout 25 Mio (50 Mio), Profi 130 Mio (350 Mio), Elite 1,5 Mrd (3 Mrd), Weltklasse 5 Mrd (6 Mrd), Legenden 10 Mrd (15 Mrd).
+* **Ergebnis beim Freischalten (Median mit VAR):** neue Packs 7 bis 9 Minuten, Legenden Pack gut 12 Minuten. `tests/rebalance.test.ts` hält 6 bis 10 Minuten fest, beim Legenden Pack 10 bis 14.

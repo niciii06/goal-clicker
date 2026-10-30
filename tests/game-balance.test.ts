@@ -67,7 +67,7 @@ test("pack rows follow the card tiers and a dearer pack is never worse in any ti
 test("pack prices and season unlocks match the current progression", () => {
   const scout = STAR_PACKS.find((pack) => pack.id === "scout")!;
   const legend = STAR_PACKS.find((pack) => pack.id === "legend")!;
-  assert.equal(scout.price, 50000000);
+  assert.equal(scout.price, 25000000);
   assert.equal(getPackUnlockLeague("scout"), 11);
   assert.equal(getPackUnlockLeague("legend"), 4);
   assert.equal(legend.label, "Legenden Pack");

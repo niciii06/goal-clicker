@@ -7,7 +7,7 @@ import { cleanCloudSaveKeys } from "../app/cloud-save-rules.ts";
 import { WHATS_NEW } from "../app/whats-new.ts";
 import { GAME_FEATURES_SCHEMA_VERSION, grantWelcomePack, WELCOME_PACK_LABEL, drawRandomStarXICustomCard, getSpecialCardChances, getStarXIPlayer, getTournamentRewardPack, initialGameFeatures, normalizeGameFeatures, SPECIAL_PACK_HUNDRED_CHANCE, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_RANDOM_CUSTOM_CARD_COST } from "../app/feature-data.ts";
 import { getPackUnlockLeague, getUpgradeUnlockLeague } from "../app/season-progression.ts";
-import { getFirstLevelPayback, simulateEconomy } from "../scripts/balance/economy-model.ts";
+import { getFirstLevelPayback, medianSavingMinutes, simulateEconomy } from "../scripts/balance/economy-model.ts";
 
 function seededRandom(seed = 97531) {
   let state = seed >>> 0;
@@ -90,11 +90,12 @@ test("tournament rewards follow the best league reached and the World Cup adds o
   assert.equal(getTournamentRewardPack("champions", 15).id, "reward-6");
 });
 
-test("economy grows evenly by league and packs cost real playing time", () => {
+test("economy grows evenly by league and packs take minutes, not hours, on passive income with the VAR", () => {
+  // Passive income only: after the first Balljunge nobody clicks.
   const snapshots = simulateEconomy();
   for (const upgrade of UPGRADES.filter((item) => item.kind === "auto")) {
     // The Liga 15 upgrades pay back within a minute on purpose, so a new club gets going quickly.
-    const minimum = getUpgradeUnlockLeague(upgrade.id) === 15 ? 10 : 115;
+    const minimum = getUpgradeUnlockLeague(upgrade.id) === 15 ? 10 : 60;
     assert.ok(getFirstLevelPayback(upgrade.id) >= minimum, `${upgrade.id} pays back too fast`);
   }
   // Later upgrades take longer to pay back than earlier ones.
@@ -102,13 +103,15 @@ test("economy grows evenly by league and packs cost real playing time", () => {
   lateAuto.slice(1).forEach((upgrade, index) => assert.ok(getFirstLevelPayback(upgrade.id) > getFirstLevelPayback(lateAuto[index].id), upgrade.id));
   snapshots.slice(1).forEach((snapshot, index) => {
     const growth = snapshot.averageIncomePerSecond / snapshots[index].averageIncomePerSecond;
-    assert.ok(growth <= 3.5, `Liga ${snapshot.league} grows by ${growth.toFixed(2)}`);
+    assert.ok(growth <= 3.7, `Liga ${snapshot.league} grows by ${growth.toFixed(2)}`);
   });
   for (const pack of STAR_PACKS.filter((item) => item.id !== "scrap")) {
     const league = getPackUnlockLeague(pack.id);
-    const income = snapshots.find((snapshot) => snapshot.league === league)!.averageIncomePerSecond;
-    // Packs stay a goal, but not a long wait: 8 to 35 minutes of income when they open.
-    assert.ok(pack.price / income >= 8 * 60 && pack.price / income <= 35 * 60, `${pack.label} costs ${(pack.price / income / 60).toFixed(1)} minutes`);
+    const income = snapshots.find((snapshot) => snapshot.league === league)!.incomePerSecond;
+    // Saved while the VAR and the random events hit the balance: typically about 8 minutes, the legend pack about 12.
+    const minutes = medianSavingMinutes(income, pack.price, 151);
+    const [low, high] = pack.id === "legend" ? [10, 14] : [6, 10];
+    assert.ok(minutes >= low && minutes <= high, `${pack.label} takes ${minutes.toFixed(1)} minutes`);
   }
 });
 
