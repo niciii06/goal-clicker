@@ -95,3 +95,5 @@ export const COMBO_MAX_COUNT = 50;
 export const VIBRATION_STORAGE_KEY = "goalClickerVibrationV1";
 /** Id of the newest "Was ist neu" entry the player closed; synced with the cloud save like the layout. */
 export const WHATS_NEW_STORAGE_KEY = "goalClickerWhatsNewSeenV1";
+/** Progress of the new player tutorial; travels with the cloud save like the "Was ist neu" key. */
+export const TUTORIAL_STORAGE_KEY = "goalClickerTutorialV1";

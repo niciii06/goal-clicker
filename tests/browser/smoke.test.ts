@@ -10,7 +10,8 @@ import type { Browser, Page } from 'playwright-core';
 import { advanceCupMatch, beginSeasonCupMatch, getStarXISelection, normalizeGameFeatures, resumeCupMatch, setBestStarXI, STAR_XI_PLAYERS } from '../../app/feature-data.ts';
 import type { GameFeatures } from '../../app/feature-data.ts';
 import { prepareCareerMatch } from '../../app/career-data.ts';
-import { WHATS_NEW_STORAGE_KEY } from '../../app/game/constants.ts';
+import { TUTORIAL_STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from '../../app/game/constants.ts';
+import { TUTORIAL_INTRO_PAGES } from '../../app/tutorial.ts';
 import { WHATS_NEW } from '../../app/whats-new.ts';
 
 const PORT = Number(process.env.SMOKE_PORT ?? 8799);
@@ -331,6 +332,74 @@ test('the "Was ist neu" window opens once for an existing game and stays closed 
   assert.equal(await fresh.getByRole('dialog', { name: WHATS_NEW[0].title }).count(), 0, 'no release notes for a new game');
   assert.equal(await fresh.evaluate((key) => localStorage.getItem(key), WHATS_NEW_STORAGE_KEY), WHATS_NEW[0].id);
   await fresh.close();
+});
+
+/** A brand new game opens the free welcome pack first; its walkout covers the game until it is taken over. */
+async function closeWelcomePack(page: Page) {
+  const reveal = page.locator('.star-reveal');
+  await reveal.waitFor({ timeout: 10000 });
+  const takeOver = reveal.getByRole('button', { name: 'In Star XI übernehmen' });
+  await takeOver.waitFor({ timeout: 20000 });
+  await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('.star-reveal .star-walkout-dismiss')?.disabled, undefined, { timeout: 20000 });
+  await takeOver.click();
+  await reveal.waitFor({ state: 'detached', timeout: 10000 });
+}
+
+test('a new player gets the welcome window after the walkout, then guided tasks that tick off and can be ended', async () => {
+  for (const viewport of [VIEWPORTS[0], VIEWPORTS[1]]) {
+    const page = await browser.newPage({ viewport });
+    await page.addInitScript('globalThis.__name = (fn) => fn;');
+    const problems: string[] = [];
+    page.on('pageerror', (error) => problems.push(`page error: ${error.message}`));
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    const intro = page.getByRole('dialog', { name: TUTORIAL_INTRO_PAGES[0].title });
+    assert.equal(await intro.count(), 0, `${viewport.name}: the walkout comes first`);
+    await closeWelcomePack(page);
+    await intro.waitFor();
+    assert.deepEqual(await layoutProblems(page), [], `${viewport.name}: welcome window layout`);
+    for (const pageInfo of TUTORIAL_INTRO_PAGES.slice(1)) {
+      await page.getByRole('dialog').getByRole('button', { name: 'Weiter' }).click();
+      await page.getByRole('dialog', { name: pageInfo.title }).waitFor();
+    }
+    await page.getByRole('dialog').getByRole('button', { name: "Los geht's" }).click();
+    const coach = page.getByRole('region', { name: 'Tutorial' });
+    await coach.waitFor();
+    assert.match(await coach.innerText(), /SCHRITT 1 \/ 5/);
+    assert.deepEqual(await layoutProblems(page), [], `${viewport.name}: tutorial card layout`);
+    const ball = page.getByRole('button', { name: 'Fussball anklicken' });
+    await ball.scrollIntoViewIfNeeded();
+    for (let i = 0; i < 50; i++) await ball.click({ delay: 5 });
+    await page.waitForFunction(() => /SCHRITT 2 \/ 5/.test(document.querySelector('.tutorial-coach')?.textContent ?? ''), undefined, { timeout: 10000 });
+    // The progress survives a reload.
+    await page.waitForTimeout(2500);
+    await page.reload({ waitUntil: 'networkidle' });
+    await coach.waitFor();
+    assert.match(await coach.innerText(), /SCHRITT 2 \/ 5/);
+    await coach.getByRole('button', { name: 'Tutorial beenden' }).click();
+    assert.equal(await coach.count(), 0);
+    assert.equal(JSON.parse((await page.evaluate((key) => localStorage.getItem(key), TUTORIAL_STORAGE_KEY))!).status, 'done');
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForTimeout(1200);
+    assert.equal(await page.getByRole('region', { name: 'Tutorial' }).count(), 0, `${viewport.name}: ended stays ended`);
+    // Club & Mehr starts it again.
+    await openTab(page, 'Club & Mehr');
+    await page.getByRole('button', { name: 'Tutorial erneut starten' }).click();
+    await intro.waitFor();
+    await page.keyboard.press('Escape');
+    assert.equal(await intro.count(), 0, 'Escape skips the welcome window');
+    assert.deepEqual(problems, []);
+    await page.close();
+  }
+});
+
+test('an existing game never sees the tutorial', async () => {
+  const now = Date.now();
+  const { page, problems } = await openWithSave(VIEWPORTS[1], save(richFeatures(now), now));
+  assert.equal(await page.getByRole('dialog', { name: TUTORIAL_INTRO_PAGES[0].title }).count(), 0);
+  assert.equal(await page.getByRole('region', { name: 'Tutorial' }).count(), 0);
+  assert.equal(JSON.parse((await page.evaluate((key) => localStorage.getItem(key), TUTORIAL_STORAGE_KEY))!).status, 'done');
+  assert.deepEqual(problems, []);
+  await page.close();
 });
 
 test('the layout checker itself reports overlapping text, unreadable text and horizontal overflow', async () => {

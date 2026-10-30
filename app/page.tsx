@@ -7,7 +7,7 @@ import type { AppMode, ClickEffect, CoopRole, CoopRoom, CoopSession, CrossbarGam
 import type { CoopMission, CupCardEvent, GameFeatures, PenaltyDirection as CupPenaltyDirection, RandomEvent, StarFormationId, StarPackId, StarPackReveal, TournamentGazetteIssue, TournamentId, TransferInsiderEvent } from "./feature-data";
 import type { Journey, TravelFixture } from "./travel-data";
 import type { MatchDraft } from "./match-commands";
-import { ACHIEVEMENTS, BALANCE_VERSION, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, COMBO_MAX_COUNT, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, STAR_RATING_FILTERS, VIBRATION_STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from "./game/constants";
+import { ACHIEVEMENTS, BALANCE_VERSION, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, COMBO_MAX_COUNT, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, STAR_RATING_FILTERS, TUTORIAL_STORAGE_KEY, VIBRATION_STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from "./game/constants";
 import { AL, AR, AT, AU, AZ, BA, BE, BF, BG, BR, CA, CD, CH, CI, CL, CM, CN, CO, CR, CZ, DE, DK, DZ, EC, EG, ES, FI, FR, GB_ENG, GB_NIR, GB_SCT, GB_WLS, GE, GH, GM, GN, GR, GT, HR, HT, HU, IE, IL, IS, IT, JM, JP, KN, KR, MA, ME, ML, MW, MX, NG, NL, NO, NZ, PA, PH, PL, PT, PY, RO, RS, RU, SE, SI, SK, SN, SR, TR, UA, US, UY, VE, XK, ZA, ZM } from "country-flag-icons/react/3x2";
 import { AlbumPanel, CareerPanel, CareerPlayerBadge, MatchRatingsPanel, PostMatchSummary } from "./career-panels";
 import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, SPECIAL_CARD_PACK, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_SQUAD_SIZE, STAR_XI_TOTAL_CARD_COUNT, TOURNAMENTS, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, applyPendingMatchChanges, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, getSpecialCardPackOdds, purchaseSpecialCardPack, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getRewardPackOdds, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXIRating, getStarXISelection, getTournament, getTournamentRewardPack, getBestXIUnavailablePlayerIds, grantWelcomePack, awardMatchStamp, canDrawHundredSpecialCards, maybeGrantStarterSquad, STARTER_SQUAD_UNLOCK_CLICKS, getUnavailableStarXIPlayerIds, initialGameFeatures, isRewardPack, isTransferDeadlineDay, normalizeGameFeatures, openEarnedPack, openStarPack, pauseGameFeatureTimers, queueMatchChanges, recordSeasonModeMatch, releaseMatchSquad, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, TRANSFER_UNHAPPY_MATCHES, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige } from "./feature-data";
@@ -18,6 +18,8 @@ import { AccountButton, AccountLink } from "./account-panel";
 import { ConfirmDialog } from "./confirm-dialog";
 import { WHATS_NEW } from "./whats-new";
 import { WhatsNewDialog } from "./whats-new-dialog";
+import { TutorialCoach, TutorialIntroDialog } from "./tutorial-panel";
+import { advanceTutorial, finishedTutorial, newTutorial, parseTutorialState, serializeTutorialState, type TutorialState, type TutorialStep } from "./tutorial";
 import { TAB_PATHS, tabForPath } from "./tab-routes";
 import type { RoutedTab } from "./tab-routes";
 import { gameAudioContext, playPackReveal } from "./match-audio";
@@ -171,6 +173,8 @@ function App() {
   const [game, setGame] = useState<GameState>(initialGame);
   const [hydrated, setHydrated] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+  // Finished until the start decides: only a brand new club gets the tutorial.
+  const [tutorial, setTutorialState] = useState<TutorialState>(finishedTutorial);
   const [appMode, setAppMode] = useState<AppMode>("single");
   const [playerId, setPlayerId] = useState("");
   const [playerName, setPlayerName] = useState("");
@@ -2416,6 +2420,7 @@ function App() {
     gameRef.current = freshGame;
     setGame(freshGame);
     clearStoredGames();
+    setTutorial(newTutorial());
     setOffline("");
     setFeed([{ id: feedIdRef.current++, icon: "broadcast", text: "Neuer Spielstand. Die Fans sind wieder da." }]);
     showToast("Spielstand zurückgesetzt");
@@ -2429,6 +2434,36 @@ function App() {
     } catch {
       // The window closes even when the browser storage refuses the write.
     }
+  }
+
+  function setTutorial(next: TutorialState) {
+    setTutorialState(next);
+    try {
+      // A synced key: the cloud upload carries the progress to the player's other devices.
+      localStorage.setItem(TUTORIAL_STORAGE_KEY, serializeTutorialState(next));
+    } catch {
+      // Without browser storage the tutorial still runs until the page closes.
+    }
+  }
+
+  function endTutorial() {
+    setTutorial({ ...tutorial, status: "done" });
+  }
+
+  function restartTutorial() {
+    setTutorial(newTutorial());
+    openFeatureTab("home");
+  }
+
+  // "Zeig es mir": open the tab of the task, or bring the ball or the upgrade shop on the home screen into view.
+  function showTutorialStep(step: TutorialStep) {
+    const target = step.target;
+    const homeTarget = target === "ball" || target === "shop";
+    openFeatureTab(target === "ball" || target === "shop" ? "home" : target);
+    window.setTimeout(() => {
+      const element = target === "ball" ? stageRef.current : target === "shop" ? document.querySelector(".shop-card") : document.querySelector(".feature-card");
+      element?.scrollIntoView({ behavior: "smooth", block: homeTarget ? "center" : "start" });
+    }, 50);
   }
 
   // What the autosave did: another tab saved meanwhile (load that game), or the browser storage is full.
@@ -2459,6 +2494,15 @@ function App() {
       }
     } catch {
       // Without browser storage the window simply stays closed.
+    }
+    // A brand new club starts the tutorial; a game saved before the tutorial existed never sees it.
+    try {
+      const raw = localStorage.getItem(TUTORIAL_STORAGE_KEY);
+      const next = raw ? parseTutorialState(raw) : stored.saved ? finishedTutorial() : newTutorial();
+      if (!raw) localStorage.setItem(TUTORIAL_STORAGE_KEY, serializeTutorialState(next));
+      window.setTimeout(() => setTutorialState(next), 0);
+    } catch {
+      if (!stored.saved) window.setTimeout(() => setTutorialState(newTutorial()), 0);
     }
     if (document.visibilityState === "visible") claimLocalSave();
     if (stored.saved) {
@@ -2586,6 +2630,23 @@ function App() {
     return () => { window.removeEventListener("beforeunload", saveOnExit); window.removeEventListener("pagehide", saveOnExit); window.removeEventListener(FLUSH_SAVE_EVENT, saveOnExit); window.removeEventListener("pointerdown", claim, { capture: true }); window.removeEventListener("keydown", claim, { capture: true }); document.removeEventListener("visibilitychange", onVisibility); };
   }, [hydrated, handleLocalSave]);
 
+  // Tutorial tasks tick off from the game itself; a league match counts at kick off, before its history exists.
+  const tutorialCup = game.features.cup;
+  useEffect(() => {
+    if (!hydrated || tutorial.status === "done") return;
+    const next = advanceTutorial(tutorial, game, featureTab);
+    if (next === tutorial) return;
+    const finished = next.status === "done";
+    window.setTimeout(() => {
+      setTutorial(next);
+      if (finished) {
+        showToast("Tutorial geschafft! Viel Erfolg mit deinem Club.");
+        addFeed("Tutorial geschafft. Jetzt gehört der Club ganz dir.", "star");
+      }
+    }, 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, tutorial, game.clicks, game.upgrades, featureTab, tutorialCup.active, tutorialCup.mode, tutorialCup.matchStartedAt, game.features.squadLock, game.features.seasonMode.history.length, game.features.seasonMode.lastMatchAt]);
+
   const rankRange = nextRank ? nextRank.minimum - currentRank.minimum : 1;
   const rankProgress = nextRank ? Math.max(0, Math.min(100, ((displayGame.totalGoals - currentRank.minimum) / rankRange) * 100)) : 100;
   const activeTournament = getTournament(displayGame.features.cup.tournamentId) ?? TOURNAMENTS[0];
@@ -2610,6 +2671,7 @@ function App() {
       </header>
 
       {whatsNewOpen && WHATS_NEW[0] && <WhatsNewDialog entry={WHATS_NEW[0]} onClose={closeWhatsNew} />}
+      {hydrated && tutorial.status === "intro" && !starReveal && !whatsNewOpen && appMode === "single" && <TutorialIntroDialog onStart={() => setTutorial({ ...tutorial, status: "active" })} onSkip={endTutorial} />}
       {guestCoopPrompt && guest && <ConfirmDialog title="Koop braucht ein Konto" confirmLabel="Anmelden" onCancel={() => setGuestCoopPrompt(false)} onConfirm={() => { setGuestCoopPrompt(false); guest.signIn(); }}>
         <p>Als Gast spielst du nur Einzelspieler. Melde dich an oder erstelle ein Konto, um mit anderen in einer Koop Welt zu spielen. Hat dein Konto noch keinen Spielstand, nimmt es deinen Gast Spielstand mit.</p>
       </ConfirmDialog>}
@@ -2622,6 +2684,7 @@ function App() {
       </nav>
       <AccountLink playerId={playerId} onPlayerId={adoptAccountPlayerId} onMessage={accountMessage} />
 
+      {hydrated && appMode === "single" && tutorial.status === "active" && <TutorialCoach state={tutorial} game={game} onShow={showTutorialStep} onEnd={endTutorial} />}
       {(appMode === 'single' || isCoopLive) && <nav className="section-navigation" aria-label="Hauptnavigation">{primaryTabs.map(tab=><button type="button" key={tab.id} aria-label={tab.label} aria-current={primarySection===tab.id?'page':undefined} className={primarySection===tab.id?'active':''} onClick={()=>{openFeatureTab(tab.id);setLayoutEditMode(false);}}><span className="tab-icon"><Icon name={tab.icon} size={22} />{tab.id==='cup'&&displayGame.features.cup.active&&<i className="tab-live-dot" aria-hidden="true" />}{tab.id==='club'&&pendingTransferOffer&&<i className="tab-live-dot offer" aria-hidden="true" />}</span><span className="tab-label-full">{tab.text ?? tab.label}{tab.id==='cup'&&displayGame.features.cup.active&&<span className="tab-live-badge" aria-hidden="true">LIVE</span>}</span><span className="tab-label-short" aria-hidden="true">{tab.short}</span></button>)}</nav>}
       {(appMode === "single" || isCoopLive) && <main className={`clicker-layout${isCoopLive ? " coop-clicker-layout" : ""}`}>
         {isCoopLive && coopSession && <><div className="coop-inline-room-bar"><div><p className="eyebrow">KOOP / {coopSession.room.roomName}</p><strong>{coopSession.code}</strong><span>{occupiedCoopPlayers(coopSession.room).map((player) => player.name).join(" · ")}</span></div><div className="coop-inline-room-actions"><span className={`coop-presence${otherCoopOnline ? " online" : ""}`}><i />{otherCoopOnline ? `${otherCoopOnlineCount} ${otherCoopOnlineCount === 1 ? "MITSPIELER" : "MITSPIELER"} ONLINE` : "MITSPIELER OFFLINE"}</span><span className="coop-live-badge">{coopSession.room.playerCount} / 4 SPIELER</span><span className="coop-live-badge">{hasInfiniteMoney ? "AZB VOLLZUGRIFF" : "GEMEINSAM GESPEICHERT"}</span><button className="mode-secondary" onClick={() => void copyCoopCode()}>Code kopieren</button>{coopSession.role === "host" && <button className="mode-secondary danger" onClick={() => void deleteCoopRoom(coopSession.code)}>Raum löschen</button>}<button className="mode-secondary quiet" onClick={leaveCoopRoom}>Verlassen</button></div></div><div className="coop-world-tools"><div><p className="eyebrow">WELT VERWALTEN</p>{coopSession.role === "host" ? <div className="coop-tool-input"><input className="mode-input" value={coopRoomName} maxLength={28} onChange={(event) => setCoopRoomName(event.target.value)} aria-label="Name der Welt" /><button className="mode-secondary" onClick={() => void renameCoopRoom()} disabled={coopBusy}>Name speichern</button></div> : <strong>{coopSession.room.roomName}</strong>}</div></div></>}
@@ -2786,6 +2849,7 @@ function App() {
           {featureTab === "club" && <div className="feature-panel">            <section className="trophy-room" aria-label="Gewonnene Pokale"><div className="trophy-room-heading"><div><p className="eyebrow">TROPHÄENRAUM</p><h4>Deine gewonnenen Pokale.</h4></div><span>{totalTrophies} GESAMT</span></div><div className="trophy-grid">{TOURNAMENTS.map((tournament) => { const count = displayGame.features.cup.trophies[tournament.id]; return <article className={`trophy-card${count > 0 ? " earned" : " locked"}`} key={`trophy-${tournament.id}`} style={{ "--trophy-accent": tournament.accent } as CSSProperties}><span className="trophy-icon" aria-hidden="true">{tournament.trophyIcon}</span><div><strong>{tournament.trophyName}</strong><small>{count > 0 ? `${count} Mal gewonnen` : `${tournament.rounds} Runden bis zum Pokal`}</small></div><b>{count}</b></article>; })}</div></section>
             <section className="club-scorer-board" aria-label="Ewige Torschützenliste"><div className="club-scorer-heading"><div><p className="eyebrow">CLUBREKORDE / EWIG</p><h4>Deine drei besten Torschützen.</h4></div><span>ALLE SPIELE</span></div>{allTimeTopScorers.length ? <ol>{allTimeTopScorers.map(({ player, goals, appearances }, index) => <li key={`all-time-${player.id}`}><span>{index + 1}</span><div><strong>{player.name}</strong><small>{formatStarXIPositions(player)} · OVR {player.rating}</small></div><b>{goals} {goals === 1 ? "TOR" : "TORE"} · {appearances} {appearances === 1 ? "SPIEL" : "SPIELE"}</b></li>)}</ol> : <div className="club-scorer-empty"><strong>Die Rekordliste wartet.</strong><small>Das erste Tor eröffnet deine Klubgeschichte.</small></div>}</section>
             <TravelStatsPanel travel={displayGame.features.travel} now={getTravelTime()} clubName={displayGame.features.club.name} />
+            <section className="tutorial-restart" aria-label="Tutorial"><div><p className="eyebrow">TUTORIAL / ERSTE SCHRITTE</p><strong>Noch einmal von vorn erklärt.</strong><small>Das Begrüssungsfenster und die Aufgaben für den Einstieg. Dein Spielstand bleibt, wie er ist.</small></div><button type="button" className="mode-secondary" onClick={restartTutorial}>Tutorial erneut starten</button></section>
 <div className="feature-panel-heading"><div><p className="eyebrow">CLUBIDENTITÄT / DEIN VEREIN</p><h3>Mach ihn zu deinem Club.</h3></div><span className="club-preview" style={{ color: clubDraft.color, borderColor: clubDraft.color }}>{clubDraft.badge}</span></div><div className="club-form"><label htmlFor="club-name">Clubname</label><input id="club-name" className="mode-input" value={clubDraft.name} maxLength={22} onChange={(event) => setClubDraft((current) => ({ ...current, name: event.target.value }))} /><div><span className="club-form-label">Wappen</span><div className="club-choice-row">{CLUB_BADGES.map((badge) => <button key={badge} className={clubDraft.badge === badge ? "selected" : ""} onClick={() => setClubDraft((current) => ({ ...current, badge }))}>{badge}</button>)}</div></div><div><span className="club-form-label">Clubfarbe</span><div className="club-choice-row colors">{CLUB_COLORS.map((color) => <button key={color} className={clubDraft.color === color ? "selected" : ""} style={{ background: color }} aria-label={`Clubfarbe ${color}`} onClick={() => setClubDraft((current) => ({ ...current, color }))} />)}</div></div><button className="mode-primary" onClick={() => void saveClubProfile()} disabled={coopBusy}>Clubprofil speichern</button></div></div>}
 
           {featureTab === "missions" && <div className="feature-panel">{!isCoopLive ? <div className="feature-empty"><Icon name="stadium" size={25} /><strong>Koop Missionen</strong><p>Starte ein Koop Match, um gemeinsame Ziele mit deinem Team freizuschalten.</p></div> : <><div className="feature-panel-heading"><div><p className="eyebrow">KOOP / GEMEINSAME ZIELE</p><h3>Missionen für euer Team.</h3></div><span className="feature-stat">SAISON {currentSeason}</span></div><div className="mission-list">{featureMissions.map((mission) => { const progress = getMissionProgress(mission, { seasonGoals: displayGame.seasonGoals, clicks: displayGame.clicks, minigameWins: displayGame.minigameWins, cupWins: displayGame.features.cup.wins }); const complete = progress >= mission.target; return <div className={`mission-row${mission.claimed ? " claimed" : ""}`} key={mission.id}><div className="mission-copy"><strong>{mission.title}</strong><small>{mission.description}</small><div className="mission-progress"><span style={{ width: `${Math.min(100, (progress / mission.target) * 100)}%` }} /></div><em>{formatNumber(Math.min(progress, mission.target))} / {formatNumber(mission.target)}</em></div><button className="feature-buy-button" onClick={() => void claimMission(mission)} disabled={mission.claimed || !complete || coopBusy}>{mission.claimed ? "Abgeholt" : complete ? `+${formatNumber(mission.reward)}` : "offen"}</button></div>; })}</div></>}</div>}

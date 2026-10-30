@@ -2084,6 +2084,42 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .whats-new-dialog h2 { margin: 0 0 12px; font-size: var(--text-title3); }
 .whats-new-dialog ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--soft); line-height: 1.45; }
 
+/* Tutorial for a new club: the welcome window, the card with the next task and the restart in the club tab. */
+.tutorial-dialog { width: min(480px, 100%); }
+.tutorial-dialog .eyebrow { margin: 0 0 6px; }
+.tutorial-dialog h2 { margin: 0 0 10px; font-size: var(--text-title3); }
+.tutorial-dialog p:not(.eyebrow) { min-height: 4.4em; margin: 0; color: var(--soft); line-height: 1.5; }
+.tutorial-dots { display: flex; gap: 6px; margin: 16px 0 4px; }
+.tutorial-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); transition: 160ms ease; }
+.tutorial-dots i.active { width: 22px; border-radius: var(--radius-pill); background: var(--accent); }
+.tutorial-dialog-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 16px; }
+.tutorial-dialog-actions > div { display: flex; gap: 8px; margin-left: auto; }
+.tutorial-coach { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 18px; max-width: 980px; margin: var(--space-4) auto 0; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line)); border-radius: 20px; background: var(--surface-raised); box-shadow: 0 10px 28px rgba(15,20,25,.08); }
+.tutorial-coach-copy { display: grid; flex: 1 1 280px; gap: 4px; min-width: 0; }
+.tutorial-coach-copy .eyebrow { margin: 0; }
+.tutorial-coach-copy strong { color: var(--text); font-size: var(--text-subhead, 16px); }
+.tutorial-coach-copy small { color: var(--soft); font-size: var(--text-footnote); line-height: 1.4; }
+.tutorial-coach-progress { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.tutorial-coach-progress span { flex: 1; height: 6px; overflow: hidden; border-radius: var(--radius-pill); background: var(--surface-soft); }
+.tutorial-coach-progress i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width 200ms ease; }
+.tutorial-coach-progress b { color: var(--text); font-size: var(--text-footnote); font-variant-numeric: tabular-nums; }
+.tutorial-coach-steps { display: flex; gap: 5px; margin: 6px 0 0; padding: 0; list-style: none; }
+.tutorial-coach-steps li { width: 18px; height: 5px; border-radius: var(--radius-pill); background: var(--line); }
+.tutorial-coach-steps li.done { background: var(--accent); }
+.tutorial-coach-steps li.current { background: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.tutorial-coach-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.tutorial-restart { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 18px; margin-top: 16px; padding: 16px; border: 1px solid var(--line-soft); border-radius: 18px; background: var(--surface-soft); }
+.tutorial-restart > div { display: grid; flex: 1 1 260px; gap: 4px; min-width: 0; }
+.tutorial-restart .eyebrow { margin: 0; }
+.tutorial-restart strong { color: var(--text); }
+.tutorial-restart small { color: var(--soft); font-size: var(--text-footnote); line-height: 1.4; }
+@media (max-width: 780px) {
+  .tutorial-coach { margin-inline: 0; padding: 13px 14px; }
+  .tutorial-coach-actions { width: 100%; }
+  .tutorial-coach-actions button { flex: 1 1 140px; padding-inline: 12px; white-space: nowrap; }
+  .tutorial-restart button { width: 100%; }
+}
+
 /* The in-match lineup editor looks like the "Kader" tab: same heading, formation box, pitch and bench. */
 .gc-sub-panel.gc-squad-substitutions { border: 1px solid var(--line-soft); border-radius: 22px; padding: 18px; }
 .gc-sub-panel .starxi-lineup-heading { margin-top: 10px; gap: 16px; }

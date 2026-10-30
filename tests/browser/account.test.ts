@@ -85,6 +85,9 @@ async function closeWelcomePack(page: Page) {
   await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('.star-reveal .star-walkout-dismiss')?.disabled, undefined, { timeout: 20000 });
   await takeOver.click();
   await reveal.waitFor({ state: 'detached', timeout: 10000 });
+  // A new club then gets the tutorial window; these tests skip it.
+  const skip = page.getByRole('dialog').getByRole('button', { name: 'Überspringen' });
+  try { await skip.waitFor({ timeout: 3000 }); await skip.click(); } catch { /* no tutorial for this save */ }
 }
 
 async function login(page: Page, username: string, password: string) {
