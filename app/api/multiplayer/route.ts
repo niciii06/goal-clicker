@@ -1198,13 +1198,6 @@ async function handlePost(request: Request) {
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 
-    if (action === "reset") {
-      if (role !== "host") return jsonError("Nur der Host kann den gemeinsamen Spielstand zurücksetzen.", 403);
-      const sound = game.sound;
-      Object.assign(game, initialGame(), { sound });
-      return persistGameResponse(db, room, game, timestamp, playerId, role, { hostGoals: 0, guestGoals: 0, player3Goals: 0, player4Goals: 0, hostClicks: 0, guestClicks: 0, player3Clicks: 0, player4Clicks: 0 });
-    }
-
     if (action === "minigame-start") {
       const minigameId = MINI_GAME_IDS.find((id) => id === payload.minigameId);
       if (!minigameId) return jsonError("Dieses Minigame gibt es nicht.");

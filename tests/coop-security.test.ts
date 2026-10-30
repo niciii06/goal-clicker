@@ -43,10 +43,13 @@ test('joining with the name of an offline host reclaims the host seat',async()=>
  assert.equal(row.hostPlayerId,'new-device-player-1');
 });
 
-test('only the host may reset the shared game',async()=>{
- setup();
- const r=await action('reset',{},'guest-player-123');
- assert.equal(r.status,403);
+test('the shared game can no longer be reset, not even by the host',async()=>{
+ setup({sharedCoins:5000});
+ for(const playerId of ['host-player-123','guest-player-123']){
+  const r=await action('reset',{},playerId);
+  assert.ok(r.status>=400,`${playerId}: ${r.status}`);
+ }
+ assert.equal(row.sharedCoins,5000);
 });
 
 test('minigame rewards need a started run and are capped per minigame',async t=>{

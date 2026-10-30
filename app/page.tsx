@@ -32,7 +32,7 @@ import { MAX_CAREER_SEASON, SEASON_MILESTONES, getFormationUnlockLeague, sortFor
 import { MULTIPLAYER_PROTOCOL_VERSION } from "./multiplayer-protocol";
 import { PressConferencePanel } from "./press-conference-panel";
 import { TravelPanel, TravelStatsPanel, durationLabel } from "./travel-panel";
-import { advanceLocalGameWhileOpen, claimLocalSave, clearStoredGames, getMiniGameCooldownUntil, initialGame, isLocalSaveWriter, markLocalSaveLoaded, normalizeAchievements, normalizeLayoutOrder, normalizeNickname, normalizeRuntimeGame, pauseMiniGameCooldowns, persistLocalGame, readStoredGame, suspendLocalPersistence } from "./game/storage";
+import { advanceLocalGameWhileOpen, claimLocalSave, getMiniGameCooldownUntil, initialGame, isLocalSaveWriter, markLocalSaveLoaded, normalizeAchievements, normalizeLayoutOrder, normalizeNickname, normalizeRuntimeGame, pauseMiniGameCooldowns, persistLocalGame, readStoredGame, suspendLocalPersistence } from "./game/storage";
 import type { LocalSaveResult } from "./game/storage";
 import { answerPressConference, getPressReward } from "./press-conference";
 import { canVibrate, readVibrationSetting, setVibrationOn, vibrate, vibrationOn } from "./game/device";
@@ -2398,34 +2398,6 @@ function App() {
     showToast(game.sound ? "Sound aus" : "Sound an");
   }
 
-  function resetGame() {
-    if (isCoopLive) {
-      if (coopSession?.role !== "host") {
-        setCoopMessage("Nur der Host kann den gemeinsamen Spielstand zurücksetzen.");
-        showToast("Nur der Host kann zurücksetzen");
-        return;
-      }
-      if (!window.confirm("Soll der gemeinsame Koop Spielstand neu gestartet werden?")) return;
-      setCoopBusy(true);
-      void sendCoopAction("reset").then((data) => {
-        if (data) setCoopMessage("Gemeinsamer Spielstand zurückgesetzt.");
-        setCoopBusy(false);
-      });
-      return;
-    }
-    if (!window.confirm("Wirklich den kompletten Spielstand löschen?")) return;
-    const sound = game.sound;
-    const freshGame: GameState = { ...initialGame(), sound };
-    // Update the ref synchronously so the autosave interval or pagehide cannot persist the old state again.
-    gameRef.current = freshGame;
-    setGame(freshGame);
-    clearStoredGames();
-    setTutorial(newTutorial());
-    setOffline("");
-    setFeed([{ id: feedIdRef.current++, icon: "broadcast", text: "Neuer Spielstand. Die Fans sind wieder da." }]);
-    showToast("Spielstand zurückgesetzt");
-  }
-
   function closeWhatsNew() {
     setWhatsNewOpen(false);
     try {
@@ -2667,7 +2639,7 @@ function App() {
       <header className="topbar">
         <div className="brand-lockup"><div className="brand-ball"><FootballGraphic /></div><div className="brand-copy"><p className="eyebrow">FOOTBALL IDLE CLUB</p><h1>GOAL <span>CLICKER</span></h1></div></div>
         <div className={`header-goals${goalBoostActive ? " goal-boost-active" : ""}`} aria-live="polite" aria-label={`Aktueller Kontostand: ${hasInfiniteMoney ? "unbegrenzt" : formatNumber(displayGame.goals)} Tore${goalBoostActive ? `; ${goalBoostLabel}-facher Goalboost noch ${goalBoostCountdown}` : ""}`}><span>{hasInfiniteMoney ? "AZB TESTMODUS" : "AKTUELLER STAND"}</span><strong>{displayBalance}</strong><small>TORE</small>{goalBoostActive && <em className="header-goal-boost">⚡ {goalBoostLabel}× · {goalBoostCountdown}</em>}</div>
-        <div className="top-actions"><AccountButton /><button className="icon-button" aria-label="Benachrichtigungsverlauf" onClick={()=>openFeatureTab("history")}><Icon name="bell" size={18} /></button><button className="icon-button" onClick={toggleSound} aria-label={game.sound ? "Sound ausschalten" : "Sound einschalten"}><Icon name={game.sound ? "sound" : "mute"} size={17} /></button>{vibrationSupported && <button className={`icon-button vibration-toggle${vibrationEnabled ? "" : " off"}`} onClick={toggleVibration} aria-pressed={vibrationEnabled} aria-label={vibrationEnabled ? "Vibration ausschalten" : "Vibration einschalten"}><Icon name="vibrate" size={18} /></button>}<button className="reset-button" onClick={resetGame}>Reset</button></div>
+        <div className="top-actions"><AccountButton /><button className="icon-button" aria-label="Benachrichtigungsverlauf" onClick={()=>openFeatureTab("history")}><Icon name="bell" size={18} /></button><button className="icon-button" onClick={toggleSound} aria-label={game.sound ? "Sound ausschalten" : "Sound einschalten"}><Icon name={game.sound ? "sound" : "mute"} size={17} /></button>{vibrationSupported && <button className={`icon-button vibration-toggle${vibrationEnabled ? "" : " off"}`} onClick={toggleVibration} aria-pressed={vibrationEnabled} aria-label={vibrationEnabled ? "Vibration ausschalten" : "Vibration einschalten"}><Icon name="vibrate" size={18} /></button>}</div>
       </header>
 
       {whatsNewOpen && WHATS_NEW[0] && <WhatsNewDialog entry={WHATS_NEW[0]} onClose={closeWhatsNew} />}

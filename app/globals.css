@@ -831,10 +831,9 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .brand-copy h1 { margin: 0; color: var(--text); font-size: 20px; font-weight: 720; letter-spacing: -.035em; line-height: 1; }
 .brand-copy h1 span { color: var(--accent); }
 .top-actions { justify-content: flex-end; gap: 8px; }
-.icon-button, .reset-button { border: 1px solid var(--line); border-radius: 980px; color: var(--soft); cursor: pointer; background: color-mix(in srgb, var(--surface-raised) 72%, transparent); transition: border-color 180ms ease, color 180ms ease, background 180ms ease, transform 180ms ease; }
+.icon-button { border: 1px solid var(--line); border-radius: 980px; color: var(--soft); cursor: pointer; background: color-mix(in srgb, var(--surface-raised) 72%, transparent); transition: border-color 180ms ease, color 180ms ease, background 180ms ease, transform 180ms ease; }
 .icon-button { display: grid; width: 36px; height: 36px; place-items: center; }
-.reset-button { height: 36px; padding: 0 14px; font-size: var(--text-footnote); font-weight: 650; }
-.icon-button:hover, .reset-button:hover { border-color: color-mix(in srgb, var(--accent) 28%, transparent); color: var(--accent); background: var(--surface-raised); transform: translateY(-1px); }
+.icon-button:hover { border-color: color-mix(in srgb, var(--accent) 28%, transparent); color: var(--accent); background: var(--surface-raised); transform: translateY(-1px); }
 
 .clicker-layout { display: grid; grid-template-columns: minmax(390px, 1.15fr) minmax(335px, .9fr) minmax(255px, .62fr); align-items: start; gap: 18px; padding-top: 22px; }
 .click-zone-card, .shop-card, .side-card, .coach-note { border: 1px solid color-mix(in srgb, var(--text) 8%, transparent); background: var(--surface); box-shadow: 0 16px 45px rgba(29,29,31,.07); backdrop-filter: blur(18px); }
@@ -1117,7 +1116,7 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
   .starxi-filter-tools { grid-template-columns: 1fr; }
 }
 @media (max-width: 780px) { .coop-inline-room-bar { align-items: flex-start; flex-direction: column; }.coop-inline-room-actions { justify-content: flex-start; } }
-@media (max-width: 540px) { .app-shell { width: calc(100% - 16px); }.topbar { padding-bottom: 16px; }.brand-ball { width: 38px; height: 38px; }.brand-ball .hero-football { width: 22px; height: 22px; }.brand-copy h1 { font-size: 18px; }.top-actions { gap: 5px; }.reset-button { padding: 0 12px; }.click-zone-card { padding: 15px; }.panel-intro { display: block; }.panel-intro h2 { font-size: 32px; }.career-badges { display: flex; align-items: center; justify-content: flex-start; margin-top: 14px; }.rank-badge { display: inline-flex; margin-top: 0; }.score-display { padding-top: 22px; }.ball-stage { min-height: 320px; }.hero-football { width: 125px; height: 125px; }.field-label { top: 39px; font-size: var(--text-caption2); }.production-strip { gap: 7px; padding-top: 14px; }.production-item { gap: 5px; }.production-icon { width: 27px; height: 27px; font-size: var(--text-footnote); }.production-item small { font-size: var(--text-footnote); }.production-item strong { font-size: var(--text-footnote); }.shop-card { padding: 17px 10px 11px; }.shop-header { padding: 0 4px 14px; }.shop-header h2 { font-size: 24px; }.bulk-buy-bar { flex-wrap: wrap; margin-right: 4px; margin-left: 4px; }.bulk-options { margin-left: auto; }.shop-tabs { gap: 15px; }.upgrade-list { max-height: 680px; }.upgrade-item { grid-template-columns: 38px minmax(0,1fr) auto; gap: 8px; }.upgrade-icon { width: 36px; height: 36px; }.buy-button { min-width: 62px; }.side-column { grid-template-columns: 1fr; }.feed-card { grid-column: auto; }.mini-game-launch { margin-top: 15px; }.mini-game-hub { margin-top: 15px; padding: 12px; }.mini-game-grid { grid-template-columns: 1fr; }.mini-game-panel { margin-top: 15px; padding: 13px; }.footer-note { line-height: 1.4; }.mode-switch { width: 100%; gap: 2px; }.mode-switch button { flex: 1; padding: 8px 6px; font-size: var(--text-footnote); }.mode-card { padding: 15px; border-radius: 19px; }.mode-card-heading { gap: 12px; }.mode-card-icon { width: 42px; height: 42px; border-radius: 13px; }.mode-card-heading h2 { font-size: 31px; }.mode-card-heading p:not(.eyebrow) { font-size: var(--text-footnote); }.leaderboard-submit { grid-template-columns: 1fr; margin-top: 21px; }.leaderboard-submit .mode-primary { width: 100%; }.leaderboard-head { grid-template-columns: 37px minmax(0,1fr) auto; gap: 8px; padding-right: 7px; padding-left: 7px; }.leaderboard-row { grid-template-columns: 37px minmax(0,1fr) auto; gap: 8px; padding-right: 7px; padding-left: 7px; }.leaderboard-score { font-size: var(--text-footnote); }.leaderboard-player strong { font-size: var(--text-footnote); }.coop-lobby { margin-top: 21px; }.coop-lobby-panel { padding: 13px; }.coop-room { margin-top: 21px; }.coop-room-bar { display: block; padding: 14px; }.coop-code { font-size: 26px; }.coop-room-actions { justify-content: flex-start; margin-top: 14px; }.coop-score-hero { display: block; padding: 17px; }.coop-score-hero > div strong { font-size: 45px; }.coop-click-button { width: 100%; margin-top: 17px; }.coop-players { grid-template-columns: 1fr; }.coop-upgrades { padding: 13px; }.coop-section-heading { display: block; }.coop-section-heading > span { display: inline-block; margin-top: 8px; }.coop-upgrade-row button { min-width: 70px; } }
+@media (max-width: 540px) { .app-shell { width: calc(100% - 16px); }.topbar { padding-bottom: 16px; }.brand-ball { width: 38px; height: 38px; }.brand-ball .hero-football { width: 22px; height: 22px; }.brand-copy h1 { font-size: 18px; }.top-actions { gap: 5px; }.click-zone-card { padding: 15px; }.panel-intro { display: block; }.panel-intro h2 { font-size: 32px; }.career-badges { display: flex; align-items: center; justify-content: flex-start; margin-top: 14px; }.rank-badge { display: inline-flex; margin-top: 0; }.score-display { padding-top: 22px; }.ball-stage { min-height: 320px; }.hero-football { width: 125px; height: 125px; }.field-label { top: 39px; font-size: var(--text-caption2); }.production-strip { gap: 7px; padding-top: 14px; }.production-item { gap: 5px; }.production-icon { width: 27px; height: 27px; font-size: var(--text-footnote); }.production-item small { font-size: var(--text-footnote); }.production-item strong { font-size: var(--text-footnote); }.shop-card { padding: 17px 10px 11px; }.shop-header { padding: 0 4px 14px; }.shop-header h2 { font-size: 24px; }.bulk-buy-bar { flex-wrap: wrap; margin-right: 4px; margin-left: 4px; }.bulk-options { margin-left: auto; }.shop-tabs { gap: 15px; }.upgrade-list { max-height: 680px; }.upgrade-item { grid-template-columns: 38px minmax(0,1fr) auto; gap: 8px; }.upgrade-icon { width: 36px; height: 36px; }.buy-button { min-width: 62px; }.side-column { grid-template-columns: 1fr; }.feed-card { grid-column: auto; }.mini-game-launch { margin-top: 15px; }.mini-game-hub { margin-top: 15px; padding: 12px; }.mini-game-grid { grid-template-columns: 1fr; }.mini-game-panel { margin-top: 15px; padding: 13px; }.footer-note { line-height: 1.4; }.mode-switch { width: 100%; gap: 2px; }.mode-switch button { flex: 1; padding: 8px 6px; font-size: var(--text-footnote); }.mode-card { padding: 15px; border-radius: 19px; }.mode-card-heading { gap: 12px; }.mode-card-icon { width: 42px; height: 42px; border-radius: 13px; }.mode-card-heading h2 { font-size: 31px; }.mode-card-heading p:not(.eyebrow) { font-size: var(--text-footnote); }.leaderboard-submit { grid-template-columns: 1fr; margin-top: 21px; }.leaderboard-submit .mode-primary { width: 100%; }.leaderboard-head { grid-template-columns: 37px minmax(0,1fr) auto; gap: 8px; padding-right: 7px; padding-left: 7px; }.leaderboard-row { grid-template-columns: 37px minmax(0,1fr) auto; gap: 8px; padding-right: 7px; padding-left: 7px; }.leaderboard-score { font-size: var(--text-footnote); }.leaderboard-player strong { font-size: var(--text-footnote); }.coop-lobby { margin-top: 21px; }.coop-lobby-panel { padding: 13px; }.coop-room { margin-top: 21px; }.coop-room-bar { display: block; padding: 14px; }.coop-code { font-size: 26px; }.coop-room-actions { justify-content: flex-start; margin-top: 14px; }.coop-score-hero { display: block; padding: 17px; }.coop-score-hero > div strong { font-size: 45px; }.coop-click-button { width: 100%; margin-top: 17px; }.coop-players { grid-template-columns: 1fr; }.coop-upgrades { padding: 13px; }.coop-section-heading { display: block; }.coop-section-heading > span { display: inline-block; margin-top: 8px; }.coop-upgrade-row button { min-width: 70px; } }
 .header-goals { position: absolute; top: 50%; left: 50%; display: flex; align-items: baseline; gap: 7px; padding: 8px 14px; border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent); border-radius: 980px; background: color-mix(in srgb, var(--surface-raised) 76%, transparent); box-shadow: 0 6px 20px rgba(29,29,31,.05); transform: translate(-50%, -50%); white-space: nowrap; }
 .header-goals span { color: var(--muted); font-size: var(--text-footnote); font-weight: 800; letter-spacing: .12em; }
 .header-goals strong { color: var(--score); font-size: 18px; font-weight: 760; letter-spacing: -.05em; line-height: 1; }
@@ -1945,19 +1944,18 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 
 /* Touch targets: at least 40px everywhere, 44px on touch screens. */
 .icon-button { width: 40px; height: 40px; }
-.reset-button { height: 40px; }
 .mode-switch button, .tab-button, .feature-tabs button, .buy-button, .feature-buy-button { min-height: 40px; }
 .bulk-options button { min-height: 36px; min-width: 40px; }
 @media (pointer: coarse) {
   .icon-button { width: 44px; height: 44px; }
-  .reset-button, .mode-switch button, .tab-button, .feature-tabs button, .buy-button, .theme-picker button { min-height: 44px; }
+  .mode-switch button, .tab-button, .feature-tabs button, .buy-button, .theme-picker button { min-height: 44px; }
   .bulk-options button { min-height: 40px; min-width: 44px; }
 }
 
 /* Calm version for players who turned motion down on their device. */
 @media (prefers-reduced-motion: reduce) {
   .ball-button.hit .hero-football, .floating-number, .combo-burst, .combo-meter, [class*="goal-"], [class*="confetti"] { animation: none !important; }
-  .icon-button:hover, .reset-button:hover, .upgrade-item:hover, .buy-button:hover, .starxi-best-button:hover { transform: none !important; }
+  .icon-button:hover, .upgrade-item:hover, .buy-button:hover, .starxi-best-button:hover { transform: none !important; }
   .hero-football { transition: none; }
 }
 
@@ -1992,9 +1990,8 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .topbar { top: 0; margin: 0 calc(var(--space-2) * -1); padding: var(--space-3) var(--space-2); border-bottom: 0; border-radius: 0 0 var(--radius-lg) var(--radius-lg); background: var(--glass-bg); box-shadow: inset 0 -.5px 0 var(--glass-edge); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
 .brand-copy .eyebrow { font-size: var(--text-caption2); letter-spacing: .08em; }
 .brand-copy h1 { font-size: var(--text-title3); letter-spacing: -.02em; }
-.icon-button, .reset-button { border-color: transparent; color: var(--text); background: var(--fill); }
-.icon-button:hover, .reset-button:hover { border-color: transparent; color: var(--accent); background: var(--fill-strong); transform: none; }
-.reset-button { font-size: var(--text-subhead); font-weight: 600; }
+.icon-button { border-color: transparent; color: var(--text); background: var(--fill); }
+.icon-button:hover { border-color: transparent; color: var(--accent); background: var(--fill-strong); transform: none; }
 .vibration-toggle.off { color: var(--muted); }
 .header-goals { border-color: transparent; background: var(--fill); box-shadow: none; }
 .header-goals span, .header-goals small { font-size: var(--text-caption2); letter-spacing: .06em; }
@@ -2008,7 +2005,6 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
   .brand-ball .hero-football { width: 20px; height: 20px; }
   .top-actions { flex: none; gap: var(--space-1); }
   .top-actions .icon-button { width: 40px; height: 40px; }
-  .top-actions .reset-button { height: 40px; padding: 0 var(--space-3); font-size: var(--text-footnote); }
   .header-goals { order: 3; width: 100%; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); }
 }
 
