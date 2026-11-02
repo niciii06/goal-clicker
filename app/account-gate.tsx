@@ -6,7 +6,7 @@
 // in this browser; signing in later takes that save into a new account.
 import { createContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { authErrorMessage, recoverWithCode, refreshAuthSession, registerWithUsername, signInWithGoogle, signInWithUsername, signOutOfAuth } from "./auth/browser";
+import { authErrorMessage, refreshAuthSession, registerWithUsername, signInWithGoogle, signInWithUsername, signOutOfAuth } from "./auth/browser";
 import { browserAuthMode } from "./auth/config";
 import { adoptOwnUpload, applyCloudSave, clearLocalAccountData, CloudSync, FLUSH_SAVE_EVENT, fetchCloudSave, holdsOtherAccountSave, planInitialSync, readCloudMeta, readCloudMetaOwner, readLocalSaveKeys, writeCloudMeta } from "./cloud-sync";
 import type { CloudSaveState } from "./cloud-sync";
@@ -352,8 +352,7 @@ function FinishDeletion({ message }: { message: string }) {
 }
 
 function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSignedIn: () => void; onGuest: () => void }) {
-  const [mode, setMode] = useState<"login" | "register" | "recover">("login");
-  const [code, setCode] = useState("");
+  const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
@@ -362,7 +361,7 @@ function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSigne
   const [busy, setBusy] = useState(false);
   const check = useUsernameCheck(mode === "register" ? username : "");
 
-  function switchMode(next: "login" | "register" | "recover") {
+  function switchMode(next: "login" | "register") {
     setMode(next);
     setError("");
     setPassword("");
@@ -376,15 +375,10 @@ function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSigne
       const problem = usernameError(username) ?? displayNameError(displayName) ?? passwordError(password) ?? (password !== passwordRepeat ? "Die beiden Passwörter stimmen nicht überein." : null);
       if (problem) { setError(problem); return; }
     }
-    if (mode === "recover") {
-      const problem = (code.trim().length < 16 ? "Gib den ganzen Wiederherstellungscode ein." : null) ?? passwordError(password) ?? (password !== passwordRepeat ? "Die beiden Passwörter stimmen nicht überein." : null);
-      if (problem) { setError(problem); return; }
-    }
     setBusy(true);
     setError("");
     try {
       if (mode === "login") await signInWithUsername(username.trim(), password);
-      else if (mode === "recover") await recoverWithCode(username.trim(), code, password);
       else await registerWithUsername(username.trim(), displayName, password);
       onSignedIn();
     } catch (failure) {
@@ -394,7 +388,7 @@ function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSigne
   }
 
   return <>
-    <h2>{mode === "login" ? "Anmelden" : mode === "recover" ? "Konto wiederherstellen" : "Konto erstellen"}</h2>
+    <h2>{mode === "login" ? "Anmelden" : "Konto erstellen"}</h2>
     <p>Melde dich an, damit dein Spielstand auf allen deinen Geräten gleich ist.</p>
     {message && <p className="account-notice" role="status">{message}</p>}
     <button type="button" className="account-google" disabled={busy} onClick={() => void signInWithGoogle(window.location.pathname).catch((failure: unknown) => setError(authErrorMessage(failure)))}><span aria-hidden="true">G</span>Mit Google anmelden</button>
@@ -408,15 +402,11 @@ function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSigne
       {mode === "register" && <UsernameHint check={check} />}
       {mode === "register" && <><label className="account-field"><span>Anzeigename</span><input className="mode-input" autoComplete="nickname" maxLength={DISPLAY_NAME_MAX} required value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
         <small className="account-hint">So heisst du im Spiel und im Multiplayer. Jederzeit änderbar.</small></>}
-      <label className="account-field"><span>{mode === "register" ? `Passwort (mindestens ${PASSWORD_MIN} Zeichen)` : mode === "recover" ? `Neues Passwort (mindestens ${PASSWORD_MIN} Zeichen)` : "Passwort"}</span><input className="mode-input" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? undefined : PASSWORD_MIN} maxLength={PASSWORD_MAX} required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-      {mode === "recover" && <label className="account-field"><span>Wiederherstellungscode</span><input className="mode-input" autoComplete="one-time-code" autoCapitalize="characters" spellCheck={false} maxLength={64} required value={code} onChange={(event) => setCode(event.target.value)} /></label>}
+      <label className="account-field"><span>{mode === "register" ? `Passwort (mindestens ${PASSWORD_MIN} Zeichen)` : "Passwort"}</span><input className="mode-input" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? undefined : PASSWORD_MIN} maxLength={PASSWORD_MAX} required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
       {mode !== "login" && <label className="account-field"><span>Passwort wiederholen</span><input className="mode-input" type="password" autoComplete="new-password" maxLength={PASSWORD_MAX} required value={passwordRepeat} onChange={(event) => setPasswordRepeat(event.target.value)} /></label>}
       {mode === "register" && <small className="account-hint">Merk dir dein Passwort gut: Ohne E-Mail Adresse lässt es sich nicht zurücksetzen.</small>}
-      {mode === "recover" && <small className="account-hint">Den Code bekommst du vom Besitzer des Spiels. Er gilt einmal und nur für dein Konto.</small>}
-      <button type="submit" className="mode-primary" disabled={busy || (mode === "register" && check.blocked)}>{mode === "login" ? "Anmelden" : mode === "recover" ? "Wiederherstellen" : "Konto erstellen"}</button>
+      <button type="submit" className="mode-primary" disabled={busy || (mode === "register" && check.blocked)}>{mode === "login" ? "Anmelden" : "Konto erstellen"}</button>
     </form>
-    {mode !== "recover" ? <button type="button" className="mode-secondary quiet" disabled={busy} onClick={() => switchMode("recover")}>Ich habe einen Wiederherstellungscode</button>
-      : <button type="button" className="mode-secondary quiet" disabled={busy} onClick={() => switchMode("login")}>Zurück zur Anmeldung</button>}
     {error && <p className="account-error" role="alert">{error}</p>}
     <div className="account-guest">
       <button type="button" className="mode-secondary quiet" disabled={busy} onClick={onGuest}>Als Gast fortfahren</button>

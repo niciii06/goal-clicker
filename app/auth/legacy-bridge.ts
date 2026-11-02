@@ -1,52 +1,32 @@
-// TEMPORARY RECOVERY BRIDGE to the original Supabase project (iocdsjgmgkqdkojmciyx). Retire it as described in
-// docs/neon-netlify-migration.md ("Brücke abschalten") once all six username accounts are recovered or the owner
-// decides otherwise.
-//
-// Neon's Managed Better Auth cannot import Supabase password hashes, and the generated login addresses of the six
-// username accounts cannot receive mail. So the old password is checked once, on the server, against the still
-// running Supabase Auth (documented GoTrue endpoint POST /auth/v1/token?grant_type=password). The session it
-// returns is revoked again at once; nothing is stored, the password is never logged.
-//
-// Server only variables: LEGACY_SUPABASE_URL and LEGACY_SUPABASE_PUBLISHABLE_KEY (the public key of that project).
-
-export type LegacyCheck = { result: "valid"; userId: string } | { result: "invalid" } | { result: "unavailable" } | { result: "rate-limited" };
-
-export function legacyBridgeConfigured() {
-  return Boolean(legacyUrl() && process.env.LEGACY_SUPABASE_PUBLISHABLE_KEY);
+// Server-only offline password migration. This connection belongs to a dedicated
+// verifier role; the normal application role must never read password hashes.
+import postgres from 'postgres';
+import { compare } from 'bcryptjs';
+export type LegacyCheck = { result: 'valid'; userId: string } | { result: 'invalid' } | { result: 'unavailable' } | { result: 'rate-limited' };
+let verifier: postgres.Sql | undefined;
+function db() {
+  const url = process.env.LEGACY_PASSWORD_DATABASE_URL;
+  if (!url) throw new Error('Offline migration verifier is not configured');
+  return verifier ??= postgres(url, { prepare: false, fetch_types: false, max: 1, idle_timeout: 20 });
 }
-
-function legacyUrl() {
-  const value = (process.env.LEGACY_SUPABASE_URL ?? "").trim().replace(/\/+$/, "");
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" || url.hostname === "localhost" || url.hostname === "127.0.0.1" ? url.origin : "";
-  } catch {
-    return "";
-  }
+export function legacyBridgeConfigured() { return Boolean(process.env.LEGACY_PASSWORD_DATABASE_URL); }
+export async function checkLegacyCredential(row: { account_id: string; password_hash: string } | undefined, password: string): Promise<LegacyCheck> {
+  if (!row || !/^\$2[aby]\$\d{2}\$/.test(row.password_hash)) return { result: 'invalid' };
+  const hash = row.password_hash.replace(/^\$2y\$/, '$2b$');
+  return await compare(password, hash) ? { result: 'valid', userId: row.account_id } : { result: 'invalid' };
 }
-
-/** Checks the old login address and password at Supabase Auth; the caller compares userId with the account. */
 export async function verifyLegacyPassword(email: string, password: string): Promise<LegacyCheck> {
-  const base = legacyUrl();
-  const key = process.env.LEGACY_SUPABASE_PUBLISHABLE_KEY ?? "";
-  if (!base || !key) return { result: "unavailable" };
-  let response: Response;
+  if (!legacyBridgeConfigured()) return { result: 'unavailable' };
   try {
-    response = await fetch(`${base}/auth/v1/token?grant_type=password`, {
-      method: "POST",
-      headers: { apikey: key, "content-type": "application/json" },
-      body: JSON.stringify({ email, password }),
-      signal: AbortSignal.timeout(8000),
-      cache: "no-store",
-    });
-  } catch {
-    return { result: "unavailable" };
-  }
-  if (response.status === 429) return { result: "rate-limited" };
-  if (response.status >= 500) return { result: "unavailable" };
-  const body = await response.json().catch(() => null) as { access_token?: string; user?: { id?: string } } | null;
-  if (!response.ok || !body?.access_token || typeof body.user?.id !== "string") return { result: "invalid" };
-  // The proof is all that is needed: end that Supabase session right away.
-  await fetch(`${base}/auth/v1/logout?scope=local`, { method: "POST", headers: { apikey: key, authorization: `Bearer ${body.access_token}` }, signal: AbortSignal.timeout(5000) }).catch(() => undefined);
-  return { result: "valid", userId: body.user.id };
+    const rows = await db()<{ account_id: string; password_hash: string }[]>`
+      select account_id, password_hash from migration_private.legacy_passwords where login_email = ${email}`;
+    return await checkLegacyCredential(rows[0], password);
+  } catch { return { result: 'unavailable' }; }
+}
+// Called only after supported Neon APIs verified the credential and the canonical
+// identity was bound. Failure retains the recovery proof for a later safe retry.
+export async function retireLegacyPassword(accountId: string) {
+  if (!legacyBridgeConfigured()) return;
+  try { await db()`delete from migration_private.legacy_passwords where account_id = ${accountId}::uuid`; }
+  catch { /* A later successful login retries retirement; never log credentials. */ }
 }

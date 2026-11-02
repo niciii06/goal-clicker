@@ -12,7 +12,7 @@ import type { AccountRecovery, AuthIdentity, CloudSave, GoalClickerDatabase, Pro
 import { authConfigured, authIssuer } from "./auth/config";
 import { checkGoogleLinks, forgetIdentity, lookupAccount, resolveAccount } from "./auth/identity";
 import type { AccountResolution } from "./auth/identity";
-import { legacyBridgeConfigured, verifyLegacyPassword } from "./auth/legacy-bridge";
+import { legacyBridgeConfigured, verifyLegacyPassword, retireLegacyPassword } from "./auth/legacy-bridge";
 import { hashRecoveryCode } from "./auth/recovery-code";
 import type { LegacyCheck } from "./auth/legacy-bridge";
 import { deleteNeonUser, endAllSessions, signInEmail, signOutSession, signUpEmail } from "./auth/neon-accounts";
@@ -49,7 +49,7 @@ export type AccountApiDeps = {
     endAllSessions: (sessionCookie: string, origin: string) => Promise<void>;
   };
   /** TEMPORARY: checks an old password at the original Supabase project. */
-  legacy: { configured: () => boolean; verify: (email: string, password: string) => Promise<LegacyCheck> };
+  legacy: { configured: () => boolean; verify: (email: string, password: string) => Promise<LegacyCheck>; retire?: (accountId: string) => Promise<void> };
   rateLimit: (request: Request, name: RateLimitName, subject?: string) => Promise<Response | null>;
   issuer: () => string;
   configured: () => boolean;
@@ -62,7 +62,7 @@ const defaults: AccountApiDeps = {
   now: () => new Date(),
   newId: randomUUID,
   neon: { signUp: signUpEmail, signIn: signInEmail, signOut: signOutSession, deleteUser: deleteNeonUser, endAllSessions },
-  legacy: { configured: legacyBridgeConfigured, verify: verifyLegacyPassword },
+  legacy: { configured: legacyBridgeConfigured, verify: verifyLegacyPassword, retire: retireLegacyPassword },
   rateLimit: (request, name, subject) => sharedRateLimited(request, name, subject),
   issuer: authIssuer,
   configured: authConfigured,
@@ -327,7 +327,7 @@ async function loginTarget(store: Store, issuer: string, username: string): Prom
 
 /**
  * Signs in with username and password. A username account from the original project that has no Neon login yet
- * is recovered on the way (TEMPORARY bridge): the old password is checked at Supabase, then the new login is
+ * is migrated on the way: the old bcrypt password is checked locally in the restricted store, then the new login is
  * created with the same password and bound to the original account. The player just logs in as before.
  */
 export function loginResponse(request: Request, deps = defaults) {
@@ -348,7 +348,7 @@ export function loginResponse(request: Request, deps = defaults) {
     if (identity) {
       if (!identity.loginEmail) return json(INVALID_LOGIN, 401);
       const login = await deps.neon.signIn(identity.loginEmail, password, origin);
-      if (login.ok && login.subject === identity.subject) return json({ signedIn: true }, 200, browserSetCookies(login.setCookies));
+      if (login.ok && login.subject === identity.subject) { await deps.legacy.retire?.(profile.userId); return json({ signedIn: true }, 200, browserSetCookies(login.setCookies)); }
       if (login.ok) { await deps.neon.signOut(login.sessionCookie, origin); return json(INVALID_LOGIN, 401); }
       if (login.reason === "rate-limited") return json({ error: "Zu viele Versuche. Bitte warte ein paar Minuten.", errorCode: "RATE_LIMITED" }, 429);
       return json(INVALID_LOGIN, 401);
@@ -359,7 +359,7 @@ export function loginResponse(request: Request, deps = defaults) {
     if (!deps.legacy.configured()) return json({ error: "Dein Konto muss einmalig übernommen werden, das ist gerade nicht möglich. Bitte melde dich beim Besitzer des Spiels.", errorCode: "RECOVERY_UNAVAILABLE" }, 503);
     const check = await deps.legacy.verify(profile.loginEmail, password);
     if (check.result === "rate-limited") return json({ error: "Zu viele Versuche. Bitte warte ein paar Minuten.", errorCode: "RATE_LIMITED" }, 429);
-    if (check.result === "unavailable") return json({ error: "Dein Konto muss einmalig übernommen werden, der alte Login Dienst antwortet aber gerade nicht. Bitte versuche es später nochmal.", errorCode: "RECOVERY_UNAVAILABLE" }, 503);
+    if (check.result === "unavailable") return json({ error: "Dein Konto muss einmalig übernommen werden, die sichere Passwortübernahme ist gerade nicht erreichbar. Bitte versuche es später nochmal.", errorCode: "RECOVERY_UNAVAILABLE" }, 503);
     // The proof must be for exactly this account.
     if (check.result !== "valid" || check.userId !== profile.userId) return json(INVALID_LOGIN, 401);
     return migratePasswordLogin(deps, { accountId: profile.userId, password, name: profile.displayName, method: "legacy-password", origin });
@@ -387,7 +387,11 @@ async function migratePasswordLogin(deps: AccountApiDeps, values: { accountId: s
     const identity = await store.getIdentityForAccount(issuer, values.accountId);
     if (identity?.loginEmail && !identity.deletedAt) {
       const login = await deps.neon.signIn(identity.loginEmail, values.password, values.origin);
-      if (login.ok && login.subject === identity.subject) return json({ signedIn: true, recovered: true }, 200, browserSetCookies(login.setCookies));
+      if (login.ok && login.subject === identity.subject) {
+        await deps.legacy.retire?.(values.accountId);
+        return json({ signedIn: true, recovered: true }, 200, browserSetCookies(login.setCookies));
+      }
+      if (login.ok) await deps.neon.signOut(login.sessionCookie, values.origin);
     }
     return json(RECOVERY_FAILED, 409);
   }
@@ -414,6 +418,7 @@ async function migratePasswordLogin(deps: AccountApiDeps, values: { accountId: s
     const expired = completion.reason === "expired" || completion.reason === "code-used";
     return json(expired ? { error: "Die Übernahme ist abgelaufen. Bitte melde dich nochmal an.", errorCode: "RECOVERY_EXPIRED" } : RECOVERY_FAILED, 409);
   }
+  await deps.legacy.retire?.(values.accountId);
   return json({ signedIn: true, recovered: true }, 200, browserSetCookies(login.setCookies));
 }
 

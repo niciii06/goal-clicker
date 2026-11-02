@@ -1,3 +1,19 @@
+# Aktueller Stand: Offline-Passwortübernahme
+
+Die Passwortübernahme benötigt keinen laufenden Supabase-Auth-Dienst mehr. `app/auth/legacy-bridge.ts` prüft das alte bcrypt-Passwort lokal mit `bcryptjs` 3.0.3. Die anschliessende Erstellung und Bindung des Neon-Logins nutzt weiterhin die bestehenden unterstützten Auth-APIs und Transaktionen.
+
+Migration `0008_offline_legacy_passwords.sql` richtet den privaten Speicher und eine getrennte Rolle `goal_clicker_password_verifier` ein. `goal_clicker_app` hat keinen Zugriff auf die Prüfwerte. Der Verifier darf ausschliesslich aus dieser Tabelle lesen und erfolgreich übernommene Prüfwerte löschen. Sein gepoolter Zugang wird als geheime serverseitige Variable `LEGACY_PASSWORD_DATABASE_URL` ausschliesslich für die isolierte Staging-Umgebung gesetzt. Keine Verwendung in Produktion oder anderen Previews ohne gesonderte Prüfung.
+
+Der administrative Import erfolgt mit `scripts/migration/import-legacy-passwords.mts`, zunächst `--dry-run`. Er verwendet die nur administrativ verfügbaren Variablen `LEGACY_DATABASE_URL` und `TARGET_DATABASE_URL`, protokolliert keine Prüfwerte und importiert keine schon übernommenen Konten erneut. Der Import wurde auf Staging mit sechs ursprünglichen Konten durchgeführt; die echte Anmeldung der Kontoinhaber ist noch nicht geprüft.
+
+Lokale Prüfung: Produktionsbuild und vollständiger Testlauf mit 492 bestandenen Tests; danach Typecheck, ESLint und 16 gezielte Auth-/Migrationsprüfungen nach der letzten Anpassung erneut erfolgreich. Die Browser-Suite mit PostgreSQL und die echten Provider-Logins wurden in dieser Sitzung nicht ausgeführt.
+
+Die Code-Option wurde aus der Anmeldemaske entfernt; `/api/recovery` antwortet mit 410. Historische interne Hilfsfunktionen bleiben vorläufig für rückwärtsgerichtete Regressionstests bestehen und sind kein aktiver Wiederherstellungsweg.
+
+Der aktuelle Release bleibt **NO-GO**, solange Verifier-Zugang, Netlify-Umgebung, echte Google-Anmeldung, alte Passwortkonten und Multiplayer nicht auf Staging erfolgreich geprüft sind. Die nachfolgenden bisherigen Architektur- und Testnachweise beziehen sich auf die frühere PR-Version; Angaben zur Supabase-Auth-Brücke und Besitzercodes sind überholt.
+
+---
+
 # Umzug auf Neon Auth, Neon PostgreSQL und Netlify
 
 Stand: 2. November 2026. Status: **NO-GO für die Produktion.** Der Code ist ein Release Kandidat, die Umstellung der Produktion braucht die Punkte unter [Freigabe](#freigabe-für-die-produktion) und die ausdrückliche Zustimmung des Besitzers.

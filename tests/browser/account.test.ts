@@ -4,6 +4,7 @@
 // and two accounts playing one multiplayer world at the same time.
 // Needs TEST_DATABASE_URL (an empty scratch database) and Chromium; builds its own copy into .next-account.
 import assert from 'node:assert/strict';
+import { hash } from 'bcryptjs';
 import { spawn, spawnSync } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { after, before, test } from 'node:test';
@@ -25,8 +26,7 @@ const env = {
   NEXT_DIST_DIR: '.next-account',
   NEON_AUTH_BASE_URL: `http://127.0.0.1:${AUTH_PORT}/neondb/auth`,
   NEON_AUTH_COOKIE_SECRET: 'browser-test-cookie-secret-0123456789abcdef',
-  LEGACY_SUPABASE_URL: `http://127.0.0.1:${AUTH_PORT}`,
-  LEGACY_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test',
+  LEGACY_PASSWORD_DATABASE_URL: databaseUrl,
   AUTH_SESSION_CACHE_SECONDS: '0',
   DATABASE_URL: databaseUrl,
 };
@@ -43,6 +43,9 @@ before(async () => {
   admin = postgres(databaseUrl, { max: 1, onnotice: () => {} });
   await migrate(drizzle(admin), { migrationsFolder: 'drizzle' });
   await admin`truncate coop_rooms, solo_travel, player_accounts, profiles, cloud_saves, auth_identities, legacy_identities, account_recovery, recovery_codes, rate_limits`;
+  await admin`create schema if not exists migration_private`;
+  await admin`create table if not exists migration_private.legacy_passwords(account_id uuid primary key,login_email text unique not null,password_hash text not null)`;
+  await admin`truncate migration_private.legacy_passwords`;
   auth = startMockNeonAuth(AUTH_PORT);
   // ACCOUNT_TEST_REUSE_BUILD=1 skips the build while iterating on the test itself.
   if (process.env.ACCOUNT_TEST_REUSE_BUILD !== '1') {
@@ -362,7 +365,8 @@ const ORIGINAL_GOOGLE = { id: 'a55f881c-0000-4000-8000-00000000a002', username: 
 
 test('an original username account is taken over by simply logging in with the old password', { skip }, async () => {
   await plantOriginalAccount({ ...ORIGINAL_PASSWORD, legacy: { provider: 'email', subject: ORIGINAL_PASSWORD.id } });
-  auth.legacy.set(ORIGINAL_PASSWORD.loginEmail, { id: ORIGINAL_PASSWORD.id, password: 'altes-passwort-7' });
+  const legacyHash = await hash('altes-passwort-7', 4);
+  await admin`insert into migration_private.legacy_passwords(account_id,login_email,password_hash) values(${ORIGINAL_PASSWORD.id}::uuid,${ORIGINAL_PASSWORD.loginEmail},${legacyHash})`;
   const before = await admin`select p.*, s.version, s.save_json from profiles p join cloud_saves s using (user_id) where p.user_id = ${ORIGINAL_PASSWORD.id}::uuid`;
   // A new site address starts with an empty browser.
   const page = await device('original-password');

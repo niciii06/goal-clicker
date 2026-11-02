@@ -117,6 +117,13 @@ test('all six username accounts are recovered by logging in with the old passwor
   const { store, passwords, accounts } = legacyFixture();
   const neon = fakeNeon();
   const deps = accountDeps(store, neon, { legacy: passwords });
+  const retired: string[] = [];
+  deps.legacy.retire = async (accountId) => {
+    assert.ok(store.identities.some((identity) => identity.accountId === accountId), 'retire only after binding');
+    retired.push(accountId);
+    const account = accounts.find((entry) => entry.id === accountId)!;
+    delete passwords[account.loginEmail!];
+  };
   const before = snapshot(store);
   for (const account of accounts.filter((a) => a.kind === 'email')) {
     const response = await call(loginResponse, deps, 'POST', '/api/login', { username: account.username, password: account.password });
@@ -132,6 +139,8 @@ test('all six username accounts are recovered by logging in with the old passwor
     const second = await call(loginResponse, deps, 'POST', '/api/login', { username: account.username, password: account.password });
     assert.deepEqual(await second.json(), { signedIn: true });
   }
+  assert.equal(new Set(retired).size, 6);
+  assert.equal(Object.keys(passwords).length, 0);
   assert.equal(store.identities.length, 6);
   assert.ok(store.identities.every((identity) => identity.method === 'legacy-password' && identity.loginEmail?.endsWith('@players.goal-clicker.vercel.app')));
   assert.equal(snapshot(store), before);
