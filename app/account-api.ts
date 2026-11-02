@@ -15,7 +15,7 @@ import type { AccountResolution } from "./auth/identity";
 import { legacyBridgeConfigured, verifyLegacyPassword } from "./auth/legacy-bridge";
 import { hashRecoveryCode } from "./auth/recovery-code";
 import type { LegacyCheck } from "./auth/legacy-bridge";
-import { deleteNeonUser, signInEmail, signOutSession, signUpEmail } from "./auth/neon-accounts";
+import { deleteNeonUser, endAllSessions, signInEmail, signOutSession, signUpEmail } from "./auth/neon-accounts";
 import type { DeleteOutcome, NeonLogin } from "./auth/neon-accounts";
 import { forgetAccountLink } from "./auth/player";
 import { AuthUnavailableError, browserSetCookies, forgetSession, getAuthSession, publicOrigin, sameOrigin } from "./auth/server";
@@ -30,7 +30,7 @@ import type { PublicProfile } from "./profile-rules";
 type Store = Pick<GoalClickerDatabase,
   | "getProfile" | "getProfileByUsername" | "isUsernameTaken" | "createProfile" | "updateDisplayName" | "changeUsername"
   | "getCloudSave" | "getCloudSaveSince" | "putCloudSave"
-  | "getIdentity" | "getIdentityForAccount" | "bindIdentity" | "unbindIdentity" | "listLegacyIdentities"
+  | "getIdentity" | "getIdentityForAccount" | "bindIdentity" | "lockFailedLogin" | "listLegacyIdentities"
   | "openRecoveryClaim" | "rotateRecoveryDestination" | "completeRecovery" | "findRecoveryCode"
   | "deleteAccountData" | "finishAccountDeletion">;
 
@@ -45,6 +45,8 @@ export type AccountApiDeps = {
     signIn: (email: string, password: string, origin: string) => Promise<NeonLogin>;
     signOut: (sessionCookie: string, origin: string) => Promise<string[]>;
     deleteUser: (sessionCookie: string, origin: string, password?: string) => Promise<DeleteOutcome>;
+    /** Ends every session of the signed in login (Better Auth revoke-sessions) and this one. */
+    endAllSessions: (sessionCookie: string, origin: string) => Promise<void>;
   };
   /** TEMPORARY: checks an old password at the original Supabase project. */
   legacy: { configured: () => boolean; verify: (email: string, password: string) => Promise<LegacyCheck> };
@@ -59,7 +61,7 @@ const defaults: AccountApiDeps = {
   db: getDb,
   now: () => new Date(),
   newId: randomUUID,
-  neon: { signUp: signUpEmail, signIn: signInEmail, signOut: signOutSession, deleteUser: deleteNeonUser },
+  neon: { signUp: signUpEmail, signIn: signInEmail, signOut: signOutSession, deleteUser: deleteNeonUser, endAllSessions },
   legacy: { configured: legacyBridgeConfigured, verify: verifyLegacyPassword },
   rateLimit: (request, name, subject) => sharedRateLimited(request, name, subject),
   issuer: authIssuer,
@@ -185,19 +187,26 @@ export function updateProfileResponse(request: Request, deps = defaults) {
   });
 }
 
-const DELETE_MESSAGES: Record<Exclude<DeleteOutcome, "deleted">, { error: string; errorCode: string }> = {
-  "needs-reauth": { error: "Zum Löschen musst du dich zuerst neu anmelden. Melde dich ab, wieder an und lösche das Profil dann sofort.", errorCode: "REAUTH_REQUIRED" },
-  "not-deleted": { error: "Der Login konnte nicht gelöscht werden. Es wurde nichts gelöscht. Bitte versuche es später nochmal.", errorCode: "LOGIN_NOT_DELETED" },
+const REAUTH_FOR_DELETE = { error: "Zum Löschen musst du dich zuerst neu anmelden. Melde dich ab, wieder an und lösche das Profil dann sofort.", errorCode: "REAUTH_REQUIRED" };
+const DELETION_REQUESTED = {
+  deleted: false,
+  dataDeleted: true,
+  loginDeleted: false,
+  loginDeletionPending: true,
+  message: "Profil und Spielstand sind gelöscht. Dein Login ist gesperrt und wird vom Besitzer des Spiels endgültig entfernt.",
 };
 
 /**
- * Deletes the account: profile, cloud save, the link to the player ID and the login itself. The username must be
- * typed as confirmation. Order, so that success is only reported once the login is really gone:
- * 1. Neon Auth deletes the login (and its sessions); afterwards the session must no longer verify. If that
- *    fails, nothing at all was deleted and the player can simply try again.
- * 2. Then the game data is deleted in one transaction and the login is marked as deleted, then the mapping
- *    goes. If this step fails, the answer says so (the login is gone, the data is not yet) instead of "deleted".
- * Worlds stay, other players share them.
+ * Deletes the account. The username must be typed as confirmation. Worlds stay, other players share them.
+ *
+ * Neon's Managed Better Auth has no self service delete-user (404, checked on staging on 2 November 2026), so the
+ * normal path is a DELETION REQUEST, and the answer never claims that the login is gone:
+ * 1. Profile, cloud save, player link, imported old logins and recovery state are deleted in one transaction,
+ *    and the login is marked (auth_identities.deleted_at). A marked login can neither open the old account nor
+ *    create a new one.
+ * 2. Every session of that login is ended at Neon Auth and the cookies are cleared.
+ * 3. The owner removes the login itself (scripts/migration/finish-account-deletions.mts), which also removes the mark.
+ * Should Neon Auth ever delete the login itself, the deletion is completed at once instead.
  */
 export function deleteProfileResponse(request: Request, deps = defaults) {
   if (!deps.configured()) return Promise.resolve(notConfigured());
@@ -212,25 +221,26 @@ export function deleteProfileResponse(request: Request, deps = defaults) {
       if (!identity) return json({ error: "Dieser Login gehört zu keinem Spielerkonto.", errorCode: "ACCOUNT_SETUP_REQUIRED" }, 409);
       const accountId = identity.accountId;
       const now = deps.now().toISOString();
-      // A deletion that stopped half way is finished without asking again.
+      const origin = publicOrigin(request);
+      // A deletion that was already requested is answered (and finished where possible) without asking again.
       if (!identity.deletedAt) {
         const profile = await store.getProfile(accountId);
         const confirm = typeof body.confirm === "string" ? usernameKey(body.confirm) : "";
         if (profile && confirm !== profile.usernameKey) return json({ error: "Zur Bestätigung den Benutzernamen eintippen.", errorCode: "CONFIRM_REQUIRED" }, 400);
       }
       const password = typeof body.password === "string" && body.password ? body.password : undefined;
-      const outcome = await deps.neon.deleteUser(session.sessionCookie, publicOrigin(request), password);
-      if (outcome !== "deleted") return json(DELETE_MESSAGES[outcome], outcome === "needs-reauth" ? 401 : 503);
+      const outcome = await deps.neon.deleteUser(session.sessionCookie, origin, password);
+      if (outcome === "needs-reauth") return json(REAUTH_FOR_DELETE, 401);
       forgetSession(request);
       forgetIdentity(session);
       forgetAccountLink(accountId);
-      try {
-        await store.deleteAccountData(accountId, now);
+      await store.deleteAccountData(accountId, now);
+      if (outcome === "deleted") {
         await store.finishAccountDeletion(accountId);
-      } catch {
-        return json({ error: "Dein Login ist gelöscht, aber das Spielerkonto noch nicht vollständig. Der Besitzer des Spiels schliesst das ab.", errorCode: "DATA_NOT_DELETED", loginDeleted: true }, 503);
+        return json({ deleted: true, dataDeleted: true, loginDeleted: true }, 200, browserSetCookies(expiredSessionCookies()));
       }
-      return json({ deleted: true, loginDeleted: true }, 200, browserSetCookies(expiredSessionCookies()));
+      await deps.neon.endAllSessions(session.sessionCookie, origin);
+      return json(DELETION_REQUESTED, 202, browserSetCookies(expiredSessionCookies()));
     } catch (error) {
       return failure(error);
     }
@@ -279,9 +289,14 @@ export function registerResponse(request: Request, deps = defaults) {
     if (!login.ok) return login.reason === "rate-limited" ? json({ error: "Zu viele Versuche. Bitte warte ein paar Minuten.", errorCode: "RATE_LIMITED" }, 429) : json({ error: "Das Konto konnte nicht erstellt werden.", errorCode: "SIGNUP_FAILED" }, 503);
     const issuer = deps.issuer();
     const accountId = deps.newId();
+    // Neon Auth cannot delete the new login itself (no self service deletion): it is locked instead, its session
+    // ended, and the owner's deletion script removes it. A login without an account opens nothing in any case.
     const undo = async () => {
-      await store.unbindIdentity(issuer, login.subject).catch(() => undefined);
-      await deps.neon.deleteUser(login.sessionCookie, origin).catch(() => "not-deleted");
+      const deleted = await deps.neon.deleteUser(login.sessionCookie, origin).catch(() => "not-deleted" as const);
+      if (deleted !== "deleted") {
+        await store.lockFailedLogin({ issuer, subject: login.subject, accountId, loginEmail: email, now: deps.now().toISOString() }).catch(() => undefined);
+        await deps.neon.endAllSessions(login.sessionCookie, origin).catch(() => undefined);
+      }
     };
     try {
       const bound = await store.bindIdentity({ issuer, subject: login.subject, accountId, method: "password", loginEmail: email, createdAt: deps.now().toISOString() });

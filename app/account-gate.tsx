@@ -46,6 +46,8 @@ const LOGIN_MESSAGES: Record<string, string> = {
   fehler: "Die Anmeldung hat nicht geklappt. Bitte erneut versuchen.",
   "nicht-konfiguriert": "Der Login ist auf diesem Server noch nicht eingerichtet.",
   vergeben: "Dieses Google Konto gehört schon zu einem anderen Spielerkonto.",
+  geloescht: "Dein Profil, dein Spielstand und dein Login sind gelöscht.",
+  loeschauftrag: "Dein Profil und dein Spielstand sind gelöscht. Dein Login ist gesperrt und wird vom Besitzer des Spiels endgültig entfernt.",
 };
 
 type SessionUser = { id: string; email: string | null; passwordLogin: boolean; suggestedName: string };
@@ -244,8 +246,8 @@ function RequiredAccount({ children }: { children: ReactNode }) {
       sync?.start();
       throw error;
     }
-    const body = await readJson<{ deleted?: boolean }>(response);
-    if (!response.ok || !body.deleted) {
+    const body = await readJson<{ deleted?: boolean; dataDeleted?: boolean; loginDeleted?: boolean }>(response);
+    if (!response.ok || !body.dataDeleted) {
       sync?.start();
       throw new Error(body.error ?? "Das Profil konnte nicht gelöscht werden.");
     }
@@ -253,7 +255,8 @@ function RequiredAccount({ children }: { children: ReactNode }) {
     clearLocalAccountData();
     localStorage.removeItem(PROFILE_CACHE_KEY);
     await signOutOfAuth();
-    window.location.replace("/");
+    // The login screen says what happened: everything deleted, or the data deleted and the login still to be removed.
+    window.location.replace(body.loginDeleted ? "/?login=geloescht" : "/?login=loeschauftrag");
   }, []);
 
   // A guest's save stays in this browser. A save another account left behind is not the guest's, so it goes first.
@@ -337,34 +340,14 @@ function UsernameHint({ check }: { check: ReturnType<typeof useUsernameCheck> })
   return <small className={`account-hint${check.tone}`}>{check.message || "3 bis 20 Zeichen: Buchstaben, Zahlen und _. Änderbar alle 30 Tage."}</small>;
 }
 
-/** Finishes an account deletion that removed the data but not yet the login (or the other way round). */
+/** A login whose account was deleted: the data is gone, the login is locked until the owner removes it. */
 function FinishDeletion({ message }: { message: string }) {
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  async function finish() {
-    setBusy(true);
-    setError("");
-    try {
-      const response = await fetch("/api/profile", { method: "DELETE", headers: { "content-type": "application/json" }, body: "{}" });
-      const body = await readJson<{ deleted?: boolean }>(response);
-      if (!response.ok || !body.deleted) throw new Error(body.error ?? "Das Löschen hat nicht geklappt.");
-      clearLocalAccountData();
-      localStorage.removeItem(PROFILE_CACHE_KEY);
-      await signOutOfAuth();
-      window.location.replace("/");
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "Das Löschen hat nicht geklappt.");
-      setBusy(false);
-    }
-  }
   return <>
-    <h2>Konto wird gelöscht</h2>
+    <h2>Konto gelöscht</h2>
     <p>{message}</p>
     <div className="account-actions">
-      <button type="button" className="mode-primary" disabled={busy} onClick={() => void finish()}>Löschen abschliessen</button>
-      <button type="button" className="mode-secondary" disabled={busy} onClick={() => void signOutOfAuth().then(() => window.location.replace("/"))}>Abmelden</button>
+      <button type="button" className="mode-primary" onClick={() => { clearLocalAccountData(); localStorage.removeItem(PROFILE_CACHE_KEY); void signOutOfAuth().then(() => window.location.replace("/")); }}>Abmelden</button>
     </div>
-    {error && <p className="account-error" role="alert">{error}</p>}
   </>;
 }
 

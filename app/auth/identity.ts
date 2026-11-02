@@ -44,7 +44,7 @@ export const identityDefaults: IdentityDeps = { store: getDb, listAccounts: list
 
 const fail = (status: number, errorCode: string, error: string): AccountResolution => ({ ok: false, status, errorCode, error });
 export const ACCOUNT_SETUP_REQUIRED = fail(409, "ACCOUNT_SETUP_REQUIRED", "Dein Konto wird noch eingerichtet. Bitte lade die Seite neu.");
-export const DELETION_PENDING = fail(410, "ACCOUNT_DELETION_PENDING", "Dein Konto wird gerade gelöscht. Bitte lösche es im Kontofenster erneut, damit auch der Login entfernt wird.");
+export const DELETION_PENDING = fail(410, "ACCOUNT_DELETION_PENDING", "Dein Profil und dein Spielstand sind gelöscht. Dieser Login ist gesperrt und wird vom Besitzer des Spiels endgültig entfernt.");
 
 // Bound logins per server instance; a binding never changes, only a deletion removes it (see forgetIdentity).
 const identityCache = new Map<string, { accountId: string; method: string; until: number }>();

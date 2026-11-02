@@ -144,7 +144,7 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
 
   function deleteProfile(event: FormEvent) {
     event.preventDefault();
-    if (!window.confirm("Profil, Spielstand und Login werden endgültig gelöscht. Das lässt sich nicht rückgängig machen. Wirklich löschen?")) return;
+    if (!window.confirm("Profil und Spielstand werden endgültig gelöscht und dein Login gesperrt. Das lässt sich nicht rückgängig machen. Wirklich löschen?")) return;
     void run("delete", () => account!.deleteProfile(confirm));
   }
 
@@ -161,7 +161,7 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
     </div>}
     <details className="profile-danger"><summary>Profil löschen</summary>
       <form className="profile-row" onSubmit={deleteProfile}><label><span>Zur Bestätigung „{profile.username}“ eintippen</span><input className="mode-input" autoCapitalize="none" spellCheck={false} value={confirm} onChange={(event) => setConfirm(event.target.value)} /></label><button type="submit" className="mode-secondary danger" disabled={Boolean(busy) || confirm.trim().toLowerCase() !== profile.username.toLowerCase()}>Endgültig löschen</button>
-        <small>Löscht Profil, Spielstand und Login. Multiplayer Welten bleiben für die anderen Spieler bestehen.</small></form>
+        <small>Löscht Profil und Spielstand sofort und sperrt den Login; den Login entfernt danach der Besitzer des Spiels. Multiplayer Welten bleiben für die anderen Spieler bestehen.</small></form>
     </details>
   </section>;
 }

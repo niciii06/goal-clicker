@@ -67,6 +67,12 @@ export function memoryStore() {
       identities.push(identity);
       return { ok: true as const, identity };
     },
+    lockFailedLogin: async (values: { issuer: string; subject: string; accountId: string; loginEmail: string | null; now: string }) => {
+      await tick();
+      const existing = identities.find((i) => i.issuer === values.issuer && i.subject === values.subject);
+      if (existing) existing.deletedAt = values.now;
+      else identities.push({ issuer: values.issuer, subject: values.subject, accountId: values.accountId, method: 'failed-registration', loginEmail: values.loginEmail, deletedAt: values.now, createdAt: values.now });
+    },
     unbindIdentity: async (issuer: string, subject: string) => { await tick(); const index = identities.findIndex((i) => i.issuer === issuer && i.subject === subject); if (index >= 0) identities.splice(index, 1); },
     findLegacyIdentity: async (provider: string, providerSubject: string) => { await tick(); return legacy.find((l) => l.provider === provider && l.providerSubject === providerSubject) ?? null; },
     listLegacyIdentities: async (accountId: string) => { await tick(); return legacy.filter((l) => l.accountId === accountId); },
@@ -141,7 +147,8 @@ export function fakeNeon() {
     users, sessions, calls,
     /** Fails the next N sign ups (simulating a Neon Auth outage at that moment). */
     failSignUps: 0,
-    deleteWorks: true,
+    /** Like the real Managed Better Auth: no self service delete-user. */
+    deleteWorks: false,
     signUp: async (email: string, password: string, name: string): Promise<NeonLogin> => {
       calls.push(`sign-up:${email}`);
       await Promise.resolve();
@@ -159,6 +166,15 @@ export function fakeNeon() {
       return login(user.id);
     },
     signOut: async (sessionCookie: string) => { sessions.delete(sessionCookie.split('=')[1]); return []; },
+    endAllSessions: async (sessionCookie: string) => {
+      const userId = sessions.get(sessionCookie.split('=')[1]);
+      for (const [token, owner] of sessions) if (owner === userId) sessions.delete(token);
+    },
+    /** What the owner's deletion does (Neon CLI or API as admin). */
+    adminDelete: (userId: string) => {
+      users.delete(userId);
+      for (const [token, owner] of sessions) if (owner === userId) sessions.delete(token);
+    },
     deleteUser: async (sessionCookie: string) => {
       const userId = sessions.get(sessionCookie.split('=')[1]);
       if (!userId || !neon.deleteWorks) return 'not-deleted' as const;
@@ -212,7 +228,7 @@ export function accountDeps(store: MemoryStore, neon: FakeNeon, options: { now?:
     db: () => store,
     now: options.now ?? (() => new Date('2026-11-02T10:00:00.000Z')),
     newId: () => `00000000-0000-4000-8000-${String(++ids).padStart(12, '0')}`,
-    neon: { signUp: (e, p, n) => neon.signUp(e, p, n), signIn: (e, p) => neon.signIn(e, p), signOut: (c) => neon.signOut(c), deleteUser: (c) => neon.deleteUser(c) },
+    neon: { signUp: (e, p, n) => neon.signUp(e, p, n), signIn: (e, p) => neon.signIn(e, p), signOut: (c) => neon.signOut(c), deleteUser: (c) => neon.deleteUser(c), endAllSessions: (c) => neon.endAllSessions(c) },
     legacy: {
       configured: () => Boolean(options.legacy),
       verify: async (email, password) => {

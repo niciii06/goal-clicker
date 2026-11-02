@@ -36,11 +36,16 @@ Was **nie** als Nachweis gilt: E-Mail Adresse, Benutzername, Anzeigename, eine v
 
 Ein Benutzername Konto kann Google verknüpfen (`linkSocial`, Rückkehr über `/auth/callback?link=google`). Der Server prüft danach, ob dieser Google Login der alte Login eines **anderen** Originalkontos ist; dann wird er sofort wieder gelöst und das Spiel meldet *vergeben*. Neon Auth selbst verhindert, dass ein Google Konto an zwei Logins hängt.
 
-### Konto löschen
+### Konto löschen (Löschauftrag)
 
-1. Neon Auth löscht den Login (`delete-user`). Danach muss die Session ungültig sein, sonst gilt es als nicht gelöscht. Klappt das nicht (abgeschaltet, nur Bestätigungsmail, Session zu alt), wird **nichts** gelöscht und das Spiel sagt es.
-2. Erst dann werden Profil, Spielstand, Spieler Verknüpfung, alte Logins und Übernahmezustand in einer Transaktion gelöscht und die Zuordnung entfernt. Welten bleiben für die anderen Spieler.
-3. Scheitert Schritt 2, meldet die Antwort ehrlich *Login gelöscht, Spielerkonto noch nicht vollständig*, nicht *gelöscht*.
+Neons Managed Better Auth bietet **keine Selbstlöschung** an (`delete-user` antwortet 404, auf Staging geprüft). Entscheid des Besitzers vom 2. November 2026: Löschauftrag.
+
+1. Das Spiel löscht Profil, Spielstand, Spieler Verknüpfung, importierte alte Logins und Übernahmezustand in einer Transaktion und **sperrt** den Login (`auth_identities.deleted_at`). Welten bleiben für die anderen Spieler.
+2. Alle Sessions des Logins werden bei Neon Auth beendet (`revoke-sessions`), die Cookies gelöscht.
+3. Die Antwort sagt genau das (`dataDeleted: true`, `loginDeleted: false`, Status 202) und das Spiel zeigt: *Profil und Spielstand sind gelöscht. Dein Login ist gesperrt und wird vom Besitzer des Spiels endgültig entfernt.* Es behauptet nie, der Login sei weg.
+4. Ein gesperrter Login öffnet nichts mehr und legt kein neues Konto an (Google Anmeldung zeigt *Konto gelöscht*, der Benutzername existiert nicht mehr).
+5. Der Besitzer entfernt den Login: `DATABASE_URL=<direkt> NEON_AUTH_BASE_URL=<…> npx tsx scripts/migration/finish-account-deletions.mts` listet die gesperrten Logins mit dem Befehl `neon neon-auth user delete <id>`; danach entfernt `--finish` die Markierung jener Logins, die in `neon_auth."user"` nicht mehr vorkommen. Gleich werden halb angelegte Logins einer abgebrochenen Registrierung behandelt (`failed-registration`).
+6. Sollte Neon Auth später selbst löschen können, schliesst das Spiel die Löschung sofort ab (`loginDeleted: true`).
 
 ### Sessions
 
@@ -136,7 +141,7 @@ Von 300 Credits gehen bei vier Produktionsdeploys 60 ab, mit 25 Prozent Reserve 
 | :--- | :--- |
 | `npm run test:unit` | darunter `tests/neon-migration.test.ts` (alle neun Originalkonten, Konflikte, Gleichzeitigkeit, Replay, Wiederholung, Besitzercode, fehlende Konfiguration, Trennung der Konten), `tests/auth.test.ts`, `tests/account-profile.test.ts`, `tests/rate-limit.test.ts` |
 | `npm run test:db` | Bindung und Übernahme unter Gleichzeitigkeit, Löschung, SQL Versionsprüfung, geteilte Rate Limits, RLS auf allen neuen Tabellen, gegen echtes PostgreSQL |
-| `npm run test:account` | Chromium gegen einen Nachbau von Neon Auth (`tests/browser/mock-neon-auth.ts`): Registrieren, Anmelden, zwei Geräte, Profil, Passwort ändern, Löschen, Gast, **altes Passwort Konto, altes Google Konto über den echten SDK Verifier Austausch**, neues Google Konto, widerrufene Session, zwei Konten in einer Welt mit gleichzeitigen Klicks und Verweigerung fremder Spieler IDs |
+| `npm run test:account` | Chromium gegen einen Nachbau von Neon Auth (`tests/browser/mock-neon-auth.ts`, ohne Selbstlöschung wie das Original): Registrieren, Anmelden, zwei Geräte, Profil, Passwort ändern, Löschauftrag, gesperrter Google Login nach dem Löschen, Gast, **altes Passwort Konto, altes Google Konto über den echten SDK Verifier Austausch**, neues Google Konto, widerrufene Session, zwei Konten in einer Welt mit gleichzeitigen Klicks und Verweigerung fremder Spieler IDs |
 
 Echte Neon Auth, echte Google Anmeldung, der Pooler und Netlify sind damit **nicht** geprüft; das gehört auf das Staging Deployment.
 
@@ -149,10 +154,10 @@ Lokal im Cloud Container (Node.js 22.23, PostgreSQL 16.10 als Scratch Datenbank,
 | `npm run typecheck` | ohne Fehler |
 | `npm run lint` | ohne Fehler und Warnungen |
 | `npm audit --omit=dev --audit-level=high` | ohne Befund |
-| `npm test` (Build, Unit, `next start`) | 446 + 42 + 3 Tests bestanden |
-| `npm run test:db` | 31 von 31 |
+| `npm test` (Build, Unit, `next start`) | 446 + 42 + 3 Tests bestanden (auch nach dem Löschauftrag) |
+| `npm run test:db` | 31 von 31, nach dem Löschauftrag 32 von 32 |
 | `npm run test:browser` | 23 von 23 |
-| `npm run test:account` | 14 von 14 |
+| `npm run test:account` | 14 von 14, nach dem Löschauftrag 15 von 15 |
 | `scripts/migration/import-legacy-identities.mts` gegen simulierte Quelle | Abbruch bei fehlendem Spielstand, Probelauf, Import, Wiederholung ohne Änderung |
 | `scripts/migration/runtime-role.sql` zweimal, dann App als `goal_clicker_app` | App Operationen gehen, DDL und Schreiben in `legacy_identities` verweigert |
 
@@ -218,7 +223,7 @@ Erst umstellen, wenn alles erfüllt ist: neueste Datenkopie geprüft (`verify-ac
 
 ## Offene Risiken
 
-* **Profil löschen funktioniert auf Neon so nicht:** `delete-user` gibt es in Managed Better Auth nicht (404, auf Staging geprüft). Lösung offen (Entscheid des Besitzers): Löschauftrag mit Besitzer Skript, Löschung über die Neon API mit Schlüssel auf dem Server, oder Löschen vorerst nur auf Anfrage.
+* **Login Löschung braucht den Besitzer:** `delete-user` gibt es in Managed Better Auth nicht. Umgesetzt ist der Löschauftrag (siehe oben); bis der Besitzer `finish-account-deletions.mts` laufen lässt, bleibt der gesperrte Login bei Neon Auth bestehen.
 * Die übrigen Neon Auth Antworten sind auf Staging geprüft (siehe Nachweis); Google und der Verifier Austausch noch nicht.
 * Google `sub` ist über OAuth Clients hinweg gleich (Google verwendet keine paarweisen Kennungen); mit den geteilten Neon Zugangsdaten auf Staging zu bestätigen.
 * Neon Auth erlaubt die Registrierung mit E-Mail direkt an der Auth URL (`allow_sign_up`), unabhängig vom Proxy. Solche Logins bekommen kein Konto; im schlimmsten Fall blockiert jemand die Google Anmeldung einer Adresse, die er vorher selbst registriert hat (Verfügbarkeit, nicht Übernahme). Abschalten geht nicht, weil der Server selbst über diesen Endpunkt registriert.

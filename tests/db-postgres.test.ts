@@ -252,6 +252,18 @@ test('deleting an account removes profile, cloud save, link and login mapping bu
   assert.ok(await db.getRoom('KEEP'));
 });
 
+test('a half made registration login is locked and can never open an account', { skip }, async () => {
+  const issuer = 'https://auth.test/lock';
+  const account = '00000000-0000-4000-8000-000000000651';
+  await db.lockFailedLogin({ issuer, subject: 'neon-half', accountId: account, loginEmail: 'p-half@players.test', now: iso() });
+  assert.ok((await db.getIdentity(issuer, 'neon-half'))!.deletedAt);
+  // Binding the same login afterwards is refused; locking twice is fine.
+  assert.deepEqual(await db.bindIdentity({ issuer, subject: 'neon-half', accountId: account, method: 'password', createdAt: iso() }), { ok: false, reason: 'subject-bound' });
+  await db.lockFailedLogin({ issuer, subject: 'neon-half', accountId: account, loginEmail: 'p-half@players.test', now: iso() });
+  await db.finishAccountDeletion(account);
+  assert.equal(await db.getIdentity(issuer, 'neon-half'), null);
+});
+
 test('a login binds to one account once, also under concurrency', { skip }, async () => {
   const issuer = 'https://auth.test/bind';
   const account = '00000000-0000-4000-8000-000000000601';

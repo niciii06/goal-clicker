@@ -29,12 +29,19 @@ export async function signOutSession(sessionCookie: string, origin: string) {
   return result?.setCookies ?? [];
 }
 
+/** Ends every session of the login (revoke-sessions), then this one; best effort, failures are not fatal. */
+export async function endAllSessions(sessionCookie: string, origin: string) {
+  await neonAuthFetch("revoke-sessions", { origin, cookie: sessionCookie, body: {} }).catch(() => null);
+  await neonAuthFetch("sign-out", { origin, cookie: sessionCookie, body: {} }).catch(() => null);
+}
+
 export type DeleteOutcome = "deleted" | "needs-reauth" | "not-deleted";
 
 /**
  * Deletes the Neon Auth user of a session (Better Auth /delete-user) and then checks that it is really gone:
- * the session must no longer verify. A delete that only sent a confirmation mail, is switched off on the
- * branch or needs a fresh sign in does not count as deleted.
+ * the session must no longer verify. Neon's Managed Better Auth answers 404 (no self service deletion, checked
+ * on staging), which counts as not deleted; the caller then files a deletion request instead. A delete that
+ * only sent a confirmation mail, is switched off on the branch or needs a fresh sign in does not count either.
  */
 export async function deleteNeonUser(sessionCookie: string, origin: string, password?: string): Promise<DeleteOutcome> {
   const result = await neonAuthFetch<{ success?: boolean; message?: string }>("delete-user", { origin, cookie: sessionCookie, body: password ? { password } : {} });

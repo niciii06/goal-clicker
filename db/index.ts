@@ -390,6 +390,15 @@ export class GoalClickerDatabase {
     await this.client.delete(authIdentities).where(eq(authIdentities.accountId, accountId));
   }
 
+  /**
+   * Locks a login whose registration failed half way: it is kept as a marked (deleted_at) row, so it can never
+   * open an account and the owner's deletion script removes the login at Neon Auth together with this row.
+   */
+  async lockFailedLogin(values: { issuer: string; subject: string; accountId: string; loginEmail: string | null; now: string }) {
+    await this.client.insert(authIdentities).values({ issuer: values.issuer, subject: values.subject, accountId: values.accountId, method: "failed-registration", loginEmail: values.loginEmail, deletedAt: values.now, createdAt: values.now })
+      .onConflictDoUpdate({ target: [authIdentities.issuer, authIdentities.subject], set: { deletedAt: values.now } });
+  }
+
   /** Removes a login that was created for a registration or recovery that then failed, and never got data. */
   async unbindIdentity(issuer: string, subject: string) {
     await this.client.delete(authIdentities).where(and(eq(authIdentities.issuer, issuer), eq(authIdentities.subject, subject)));

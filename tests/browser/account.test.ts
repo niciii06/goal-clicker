@@ -284,10 +284,17 @@ test('the profile settings change display name and password and delete the profi
   await panel.getByLabel(/eintippen/).fill('keeper');
   await panel.getByRole('button', { name: 'Endgültig löschen' }).click();
   await page.getByRole('button', { name: 'Mit Google anmelden' }).waitFor();
+  // Neon Auth cannot delete a login itself: the data is gone, the login is locked, and the game says exactly that.
+  await page.getByText('Dein Login ist gesperrt und wird vom Besitzer des Spiels endgültig entfernt.').waitFor();
   assert.equal((await admin`select count(*)::int as n from profiles where user_id = ${userId}::uuid`)[0].n, 0);
-  // The login is gone at Neon Auth too, and so is its mapping.
-  assert.equal([...auth.users.values()].some((user) => user.name === 'Goalie'), false);
-  assert.equal((await admin`select count(*)::int as n from auth_identities where account_id = ${userId}::uuid`)[0].n, 0);
+  assert.equal((await admin`select count(*)::int as n from cloud_saves where user_id = ${userId}::uuid`)[0].n, 0);
+  const [mark] = await admin`select subject, deleted_at from auth_identities where account_id = ${userId}::uuid`;
+  assert.ok(mark.deleted_at, 'the login is marked for the owner');
+  // The username is gone with the profile: signing in again opens nothing and creates nothing.
+  await login(page, 'Keeper', 'neues-passwort-3');
+  await page.getByText('Benutzername oder Passwort stimmt nicht.').waitFor();
+  assert.equal((await admin`select count(*)::int as n from profiles where username_key = 'keeper'`)[0].n, 0);
+  assert.ok([...auth.users.keys()].includes(mark.subject), 'the login waits for the owner');
 });
 
 test('signing out right after clicking still saves those clicks, then forgets the save on this device', { skip }, async () => {
@@ -449,5 +456,25 @@ test('two accounts play one world at the same time: joining, concurrent clicks a
   // Signed out, the world is closed.
   const anonymous = await (await fetch(`${BASE}/api/multiplayer`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ protocol, action: 'click', code, playerId: hostId, amount: 1, clickCount: 1 }) })).status;
   assert.equal(anonymous, 401);
+  assert.deepEqual(problems, []);
+});
+
+test('a deleted Google account stays locked: signing in with Google again shows the deletion, not a new account', { skip }, async () => {
+  const page = devices['new-google'].page;
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Konto von Neu' }).click();
+  const panel = page.getByRole('dialog', { name: 'Konto' });
+  await panel.getByText('Profil löschen').click();
+  await panel.getByLabel(/eintippen/).fill('neugoogle');
+  await panel.getByRole('button', { name: 'Endgültig löschen' }).click();
+  await page.getByText('Dein Login ist gesperrt und wird vom Besitzer des Spiels endgültig entfernt.').waitFor();
+  const accounts = (await admin`select count(*)::int as n from profiles`)[0].n;
+  auth.google.nextSub = '200000000000000000042';
+  await page.getByRole('button', { name: 'Mit Google anmelden' }).click();
+  await page.getByRole('heading', { name: 'Konto gelöscht' }).waitFor({ timeout: 30000 });
+  assert.equal(await page.getByRole('heading', { name: 'Dein Profil' }).count(), 0);
+  assert.equal((await admin`select count(*)::int as n from profiles`)[0].n, accounts, 'no new account was created');
+  // The world the account played in stays for the other player.
+  assert.equal((await admin`select count(*)::int as n from coop_rooms where host_player_id = ${ORIGINAL_PASSWORD.playerId}`)[0].n, 1);
   assert.deepEqual(problems, []);
 });

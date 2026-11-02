@@ -130,14 +130,20 @@ export function startMockNeonAuth(port: number) {
         if (body.revokeOtherSessions) for (const [token, session] of sessions) if (session.userId === user.id && token !== current.token) sessions.delete(token);
         return send(200, { token: null });
       }
-      if (path === 'delete-user') {
-        users.delete(user.id);
+      // Like the real Managed Better Auth (checked on staging): no self service deletion.
+      if (path === 'delete-user') return fail(404, 'NOT_FOUND', '');
+      if (path === 'revoke-sessions') {
         for (const [token, session] of sessions) if (session.userId === user.id) sessions.delete(token);
-        return send(200, { success: true, message: 'User deleted' });
+        return send(200, { status: true });
       }
       return fail(404, 'NOT_FOUND', `No mock for ${request.method} ${path}`);
     });
   });
   server.listen(port, '127.0.0.1');
-  return { server, users, sessions, google, legacy, log, baseUrl: `${origin}${base}`, origin, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
+  /** What the owner does with the Neon CLI or Console: delete a login as an admin. */
+  const adminDelete = (userId: string) => {
+    users.delete(userId);
+    for (const [token, session] of sessions) if (session.userId === userId) sessions.delete(token);
+  };
+  return { server, users, sessions, google, legacy, log, adminDelete, baseUrl: `${origin}${base}`, origin, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
 }

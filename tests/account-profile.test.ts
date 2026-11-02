@@ -153,22 +153,35 @@ test('a cloud save only replaces the version it was loaded from', async () => {
   assert.equal((await call(putCloudSaveResponse, 'PUT', { baseVersion: 2, keys: { goalClickerLayoutV3: '[]' } }, '/api/save')).status, 400);
 });
 
-test('deleting the profile needs the username as confirmation and removes the login first', async () => {
-  const { call, store, neon } = setup();
+test('deleting the profile deletes the game data, locks the login and never claims the login is gone', async () => {
+  const { call, store, neon, deps } = setup();
   await call(createProfileResponse, 'POST', { username: 'Nico_06', displayName: 'Nico' });
+  await call(putCloudSaveResponse, 'PUT', { baseVersion: 0, keys: { goalClickerSiteSaveV3: game(5) } }, '/api/save');
   assert.equal((await call(deleteProfileResponse, 'DELETE', { confirm: 'someone' })).data.errorCode, 'CONFIRM_REQUIRED');
-  // Neon Auth refuses: nothing at all is deleted, and the answer does not claim success.
-  neon.deleteWorks = false;
-  const refused = await call(deleteProfileResponse, 'DELETE', { confirm: 'nico_06' });
-  assert.equal(refused.status, 503);
-  assert.equal(refused.data.deleted, undefined);
   assert.equal(store.profiles.size, 1);
-  assert.equal(store.identities.length, 1);
-  neon.deleteWorks = true;
-  assert.deepEqual((await call(deleteProfileResponse, 'DELETE', { confirm: 'nico_06' })).data, { deleted: true, loginDeleted: true });
-  assert.equal(store.profiles.size, 0);
-  assert.equal(store.identities.length, 0);
-  assert.equal(neon.users.size, 0);
+  const [subject] = [...neon.users.keys()];
+  const cookie = [...neon.sessions.keys()][0];
+  // Neon Auth has no self service deletion: a deletion request.
+  const requested = await call(deleteProfileResponse, 'DELETE', { confirm: 'nico_06' });
+  assert.equal(requested.status, 202);
+  assert.deepEqual({ deleted: requested.data.deleted, dataDeleted: requested.data.dataDeleted, loginDeleted: requested.data.loginDeleted }, { deleted: false, dataDeleted: true, loginDeleted: false });
+  assert.equal(store.profiles.size + store.saves.size, 0);
+  assert.ok(store.identities[0].deletedAt, 'the login is marked and locked');
+  assert.equal(neon.sessions.size, 0, 'every session of the login is ended');
+  assert.ok(neon.users.has(subject), 'the login itself still exists until the owner removes it');
+  // Signing in again: the marked login opens nothing and creates nothing.
+  const again = neon.googleLogin('google-sub-a');
+  assert.ok(again.ok);
+  const lookup = await deps.lookupAccount(neon.session(again.sessionCookie)!);
+  assert.equal(!lookup.ok && lookup.errorCode, 'ACCOUNT_DELETION_PENDING');
+  // When Neon Auth can delete the login itself, the deletion is complete.
+  void cookie;
+  store.identities.length = 0;
+  const second = setup();
+  second.neon.deleteWorks = true;
+  await second.call(createProfileResponse, 'POST', { username: 'Zweiter', displayName: 'Zwei' });
+  assert.deepEqual((await second.call(deleteProfileResponse, 'DELETE', { confirm: 'zweiter' })).data, { deleted: true, dataDeleted: true, loginDeleted: true });
+  assert.equal(second.store.identities.length + second.neon.users.size, 0);
 });
 
 test('a device keeps its save when it continues the cloud version, otherwise takes the cloud', () => {
@@ -212,14 +225,17 @@ test('only the game, layout and vibration keys travel to the cloud', () => {
   assert.deepEqual(summarizeSave({ goalClickerSiteSaveV3: game(7) }), { totalGoals: 7, seasons: 1, stars: 2, clicks: 7 });
 });
 
-test('a registration whose profile fails to save removes its new login again', async () => {
+test('a registration whose profile fails to save locks its new login and leaves no session', async () => {
   const { call, store, neon } = setup(false);
   store.createProfile = async () => { throw new Error('database gone for a moment'); };
   const response = await call(registerResponse, 'POST', { username: 'Keeper', displayName: 'Goalie', password: 'sicheres-passwort' }, '/api/register');
   assert.equal(response.status, 503);
-  assert.equal(neon.users.size, 0);
-  assert.equal(store.identities.length, 0);
   assert.equal(sessionCookieFrom(response.response), '');
+  // Neon Auth cannot delete it: the half made login is locked for the owner's deletion and has no session left.
+  assert.equal(store.identities.length, 1);
+  assert.ok(store.identities[0].deletedAt);
+  assert.equal(neon.sessions.size, 0);
+  assert.equal(store.profiles.size, 0);
 });
 
 test('a deleted login cannot create a profile or a first cloud save with its old cookie', async () => {

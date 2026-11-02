@@ -57,7 +57,7 @@ Ein Benutzername Konto kann im Konto Fenster Google verknüpfen. Danach öffnen 
 
 * **Benutzername**: 3 bis 20 Zeichen, Buchstaben ohne Umlaute, Zahlen und `_`, eindeutig ohne Rücksicht auf Gross und Kleinschreibung, änderbar alle 30 Tage.
 * **Anzeigename**: 2 bis 18 Zeichen, jederzeit änderbar, auch der Name in allen Welten.
-* **Profil löschen**: zuerst der Login bei Neon Auth, dann Profil, Spielstand und Verknüpfungen. Welten bleiben für die anderen.
+* **Profil löschen**: löscht Profil und Spielstand sofort und sperrt den Login; den Login selbst entfernt der Besitzer (Neon Auth kennt keine Selbstlöschung, siehe Umzugsdoku). Welten bleiben für die anderen.
 
 ### Spielstand in der Cloud
 
