@@ -140,6 +140,24 @@ Von 300 Credits gehen bei vier Produktionsdeploys 60 ab, mit 25 Prozent Reserve 
 
 Echte Neon Auth, echte Google Anmeldung, der Pooler und Netlify sind damit **nicht** geprüft; das gehört auf das Staging Deployment.
 
+### Nachweis vom 2. November 2026
+
+Lokal im Cloud Container (Node.js 22.23, PostgreSQL 16.10 als Scratch Datenbank, Chromium 1243). Typecheck, Lint, Audit, Datenbank und Browser Tests auf Commit `634727d`; `npm test` nach der Korrektur einer Testerwartung (`GET /api/account` meldet jetzt `mode`) erneut auf `8d98022`, der Anwendungscode ist zwischen beiden gleich.
+
+| Befehl | Ergebnis |
+| :--- | :--- |
+| `npm run typecheck` | ohne Fehler |
+| `npm run lint` | ohne Fehler und Warnungen |
+| `npm audit --omit=dev --audit-level=high` | ohne Befund |
+| `npm test` (Build, Unit, `next start`) | 446 + 42 + 3 Tests bestanden |
+| `npm run test:db` | 31 von 31 |
+| `npm run test:browser` | 23 von 23 |
+| `npm run test:account` | 14 von 14 |
+| `scripts/migration/import-legacy-identities.mts` gegen simulierte Quelle | Abbruch bei fehlendem Spielstand, Probelauf, Import, Wiederholung ohne Änderung |
+| `scripts/migration/runtime-role.sql` zweimal, dann App als `goal_clicker_app` | App Operationen gehen, DDL und Schreiben in `legacy_identities` verweigert |
+
+Auf `migration-staging` nur gelesen (Neon MCP): 9 Profile, 9 Spielstände, 9 Verknüpfungen, 3 Welten, 39 Reisebelege, kein Drizzle Journal, 0007 noch nicht eingespielt, Neon Auth ohne Trusted Origins, Google mit geteilten Zugangsdaten, E-Mail Registrierung erlaubt, Pooler Host vorhanden bei `pooler_enabled=false`.
+
 ## Anbieter Schritte (ChatGPT Work oder Besitzer)
 
 1. **Staging Deployment:** ein geschütztes Netlify Deployment (Branch Deploy des Branches dieser Arbeit), dessen Umgebungsvariablen **nur** auf `migration-staging` zeigen: `DATABASE_URL` (Pooler von `ep-long-shadow-b4ngl6x8`), `NEON_AUTH_BASE_URL` (Staging Auth), eigenes `NEON_AUTH_COOKIE_SECRET`, `LEGACY_SUPABASE_*`. Prüfen, dass der Kontext diese Werte wirklich bekommt (Branch Deploys erben nicht automatisch). Die tatsächlich von Netlify gemeldete Adresse verwenden.
