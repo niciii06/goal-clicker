@@ -16,14 +16,14 @@ test('every new cup fixture is away; only highest cup final uses neutral Wembley
  f.seasonMode.matchday=0;assert.equal(fixtureFor(f,'season').away,false);
 });
 test('Pfuschi is positionless, bench-only, excluded from ratings/automatic XI and cannot substitute',()=>{
- const f=ready(),p=getStarXIPlayer('star-pfuschi')!;assert.equal(p.position,null);assert.deepEqual(getStarXIPositions(p),[]);assert.equal(p.rating,67);
+ const f=ready(),p=getStarXIPlayer('star-pfuschi')!;assert.equal(p.position,null);assert.deepEqual(getStarXIPositions(p),[]);assert.equal(p.rating,80);
  assert.ok(Object.values(p.originalAttributes!.stats).every(s=>s.value===1));
  for(let i=0;i<11;i++)assert.equal(canStarXIPlayerFillSlot(p.id,i),false);
  f.starXI=setStarXIBenchPlayer(f.starXI,0,p.id);assert.equal(f.starXI.benchIds[0],p.id);
  assert.ok(!setBestStarXI(f.starXI).lineupIds.includes(p.id));
  f.cup=beginCupMatch(f.cup,1000,'stadium',getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds));
  assert.equal(getCupPlayerMatchRating(f.cup,p.id,90),null);assert.ok(!baseActors(f,f.cup,1,true).some(a=>a.id===p.id));
- const di=getStarXIPlayer('star-di-certo')!;assert.equal(di.rating,100);assert.deepEqual(getStarXIPositions(di),['LV','RV']);assert.equal(di.countryCode,'CH');
+ const di=getStarXIPlayer('star-di-certo')!;assert.equal(di.rating,80);assert.equal(di.potential,100);assert.deepEqual(getStarXIPositions(di),['LV','RV']);assert.equal(di.countryCode,'CH');
  const look=getWalkoutPresentation(di);assert.equal(look.countryCode,'CH');assert.equal(look.glasses,true);assert.equal(look.cap,'backwards');
  // Both remain reachable in the existing custom-card draw, with no automatic grant.
  for(const id of [p.id,di.id]){let found=false;for(const rarity of [.01,.5])for(let i=0;i<200;i++){const rolls=[rarity,(i+.5)/200];const result=drawRandomStarXICustomCard({...initialGameFeatures().starXI,fragments:STAR_XI_RANDOM_CUSTOM_CARD_COST},()=>rolls.shift() ?? 0);if(result.player?.id===id)found=true;}assert.ok(found);}

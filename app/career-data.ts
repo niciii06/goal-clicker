@@ -5,7 +5,8 @@ import { addHistory, getMatchScoreImpact, TRANSFER_UNHAPPY_PENALTY, transferUnha
 import { getBannedPlayerIds, nextCompetition, processMatchDiscipline, suspensionLabel } from './discipline';
 import type { CupState, GameFeatures, SeasonMatchHistoryEntry, StarPosition, StarXIPlayer } from './feature-data';
 
-export type PlayerCareerStats = { appearances: number; minutes: number; goals: number; assists: number; ratingTotal: number; ratedMatches: number; motm: number; subAppearances: number; subRatingTotal: number; subMinutes: number; recent: number[] };
+/** `points`: match points of the club while this card played, by the result after 90 minutes (win 3, draw 1, loss 0). */
+export type PlayerCareerStats = { appearances: number; minutes: number; goals: number; assists: number; ratingTotal: number; ratedMatches: number; motm: number; subAppearances: number; subRatingTotal: number; subMinutes: number; points: number; recent: number[] };
 export type RatingReason = { label: string; value: number };
 export type PlayerMatchReport = { playerId: string; rating: number; minutes: number; goals: number; assists: number; substitute: boolean; reasons: RatingReason[] };
 export type ArchivedMatchEvent = { id: string; minute: number; label: string };
@@ -27,7 +28,32 @@ export type CareerState = {
   claimedAlbumRewards: string[];
   milestoneCards: Record<string, string[]>;
   milestoneCategories: Record<string, MilestoneCategory>;
+  /** Special cards: their statistics when growth started (the update of 2 November 2026); only what comes after counts. */
+  growthBase: Record<string, GrowthStats>;
 };
+export type GrowthStats = { points: number };
+
+/** Growth of special cards from 80 to their potential: the match points of the club while the card played, by the
+ * result after 90 minutes (win 3, draw 1, loss 0; extra time and shoot-outs count as a draw for both sides), +1 rating
+ * every GROWTH_POINTS_PER_LEVEL points, so 100 points from 80 to 100 (owner's decision of 2 November 2026). */
+export const GROWTH_POINTS_PER_LEVEL = 5;
+export const MATCH_RESULT_POINTS = { win: 3, draw: 1, loss: 0 } as const;
+
+/** Cards with a potential grow through their own matches instead of milestones. */
+export function hasPotential(player: StarXIPlayer) {
+  return typeof player.potential === 'number' && player.potential > player.rating;
+}
+
+/** Points, levels gained and progress to the next level of a card with potential. */
+export function getSpecialGrowth(career: CareerState, player: StarXIPlayer) {
+  const stats = career.players[player.id] ?? emptyPlayerStats();
+  const base = career.growthBase[player.id];
+  const points = Math.max(0, stats.points - (base?.points ?? 0));
+  const maxLevels = Math.max(0, (player.potential ?? player.rating) - player.rating);
+  const levels = Math.min(maxLevels, Math.floor(points / GROWTH_POINTS_PER_LEVEL));
+  const done = levels >= maxLevels;
+  return { points, levels, maxLevels, potential: player.potential ?? player.rating, rating: player.rating + levels, nextLevelPoints: done ? null : (levels + 1) * GROWTH_POINTS_PER_LEVEL, pointsToNext: done ? 0 : (levels + 1) * GROWTH_POINTS_PER_LEVEL - points };
+}
 export const LEGACY_CAREER_MILESTONES = [
   { id: 'loyal', label: 'Vereinstreue', metric: 'appearances', target: 25, bonus: 1, accent: '#a3b9d6' },
   { id: 'scorer', label: 'Torjäger', metric: 'goals', target: 50, bonus: 2, accent: '#f2b44e' },
@@ -59,13 +85,15 @@ export function getPlayerMilestones(career: CareerState, player: StarXIPlayer): 
 }
 function unlockPlayerMilestones(career: CareerState, player: StarXIPlayer) {
   career.milestoneCategories[player.id] ??= getMilestoneCategory(player);
+  // Special cards grow through their potential only, they collect no milestones.
+  if (hasPotential(player)) { delete career.milestoneCards[player.id]; return; }
   const stats = career.players[player.id] ?? emptyPlayerStats();
   const ids = new Set(career.milestoneCards[player.id] ?? []);
   for (const milestone of getPlayerMilestones(career, player)) if (stats[milestone.metric] >= milestone.target) ids.add(milestone.id);
   if (ids.size) career.milestoneCards[player.id] = [...ids];
 }
-export function emptyPlayerStats(): PlayerCareerStats { return { appearances: 0, minutes: 0, goals: 0, assists: 0, ratingTotal: 0, ratedMatches: 0, motm: 0, subAppearances: 0, subRatingTotal: 0, subMinutes: 0, recent: [] }; }
-export function initialCareerState(): CareerState { return { version: 2, players: {}, seasonPlayers: {}, seasonNumber: 1, seasonMatches: 0, awards: [], reports: [], processedMatchIds: [], rivals: {}, collectedIds: [], claimedAlbumRewards: [], milestoneCards: {}, milestoneCategories: {} }; }
+export function emptyPlayerStats(): PlayerCareerStats { return { appearances: 0, minutes: 0, goals: 0, assists: 0, ratingTotal: 0, ratedMatches: 0, motm: 0, subAppearances: 0, subRatingTotal: 0, subMinutes: 0, points: 0, recent: [] }; }
+export function initialCareerState(): CareerState { return { version: 3, players: {}, seasonPlayers: {}, seasonNumber: 1, seasonMatches: 0, awards: [], reports: [], processedMatchIds: [], rivals: {}, collectedIds: [], claimedAlbumRewards: [], milestoneCards: {}, milestoneCategories: {}, growthBase: {} }; }
 function object(value: unknown): Record<string, unknown> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}; }
 function number(value: unknown, max = 1e9) { const n = Number(value); return Number.isFinite(n) ? Math.max(0, Math.min(max, n)) : 0; }
 function integer(value: unknown, max = 1e9) { return Math.floor(number(value, max)); }
@@ -110,6 +138,15 @@ export function normalizeCareerState(value: unknown, knownIds: readonly string[]
     }
     unlockPlayerMilestones(next, player);
   }
+  // Version 3 (2 November 2026): special cards start growing from 80. The points counter is new, so every card starts
+  // at 0; the starting point is still recorded, should points ever have been counted before.
+  const savedBase = object(source.growthBase);
+  for (const [id, stats] of Object.entries(next.players)) {
+    const player = getStarXIPlayer(id);
+    if (!player || !hasPotential(player)) continue;
+    const saved = object(savedBase[id]);
+    next.growthBase[id] = { points: integer(source.version) < 3 ? stats.points : integer(saved.points) };
+  }
   for (const raw of Object.values(object(source.rivals)).slice(0, 300)) {
     const r = object(raw), opponent = text(r.opponent, 80); if (!opponent) continue;
     const wins = integer(r.wins), draws = integer(r.draws), losses = integer(r.losses), played = wins + draws + losses, closeGames = Math.min(played, integer(r.closeGames));
@@ -135,6 +172,10 @@ export function getPlayerForm(career: CareerState, playerId: string) {
   return { average, bonus, matches: recent.length, label: bonus >= 0.5 ? 'In Form' : bonus <= -0.5 ? 'Formtief' : 'Stabil' };
 }
 export function getCareerCard(career: CareerState, player: StarXIPlayer) {
+  if (hasPotential(player)) {
+    const growth = getSpecialGrowth(career, player);
+    return { milestone: undefined, bonus: growth.levels, rating: growth.rating, growth };
+  }
   const unlocked = career.milestoneCards[player.id] ?? [];
   const milestone = [...CAREER_MILESTONES].filter(m => unlocked.includes(m.id)).sort((a,b) => b.bonus - a.bonus)[0];
   return { milestone, bonus: milestone ? Math.min(milestone.bonus, 100 - player.rating) : 0, rating: Math.min(100, player.rating + (milestone?.bonus ?? 0)) };
@@ -144,10 +185,18 @@ export function albumMilestonesFromStorage(raw: string | null, guest: boolean) {
   return !guest && raw !== 'off';
 }
 export function prepareCareerMatch(features: GameFeatures) {
-  const bonuses: Record<string, number> = {};
+  const bonuses: Record<string, number> = {}, growth: Record<string, number> = {};
   // A player kept against his wish after a sale offer plays weaker for a few matches.
-  for (const id of features.starXI.ownedIds) { const p = getStarXIPlayer(id); if (p) bonuses[id] = getPlayerForm(features.career, id).bonus + getCareerCard(features.career, p).bonus - (transferUnhappyMatches(features, id) ? TRANSFER_UNHAPPY_PENALTY : 0); }
+  // The growth of a special card is kept apart: it raises the rating once, it is not a form bonus.
+  for (const id of features.starXI.ownedIds) {
+    const p = getStarXIPlayer(id);
+    if (!p) continue;
+    const card = getCareerCard(features.career, p);
+    if (hasPotential(p)) growth[id] = card.bonus;
+    bonuses[id] = getPlayerForm(features.career, id).bonus + (hasPotential(p) ? 0 : card.bonus) - (transferUnhappyMatches(features, id) ? TRANSFER_UNHAPPY_PENALTY : 0);
+  }
   features.cup.careerBonuses = bonuses;
+  features.cup.careerGrowth = growth;
   features.cup.careerRatingSeed = features.cup.matchStartedAt;
   features.cup.careerMatchId = `career-${features.cup.matchStartedAt}-${features.cup.mode}-${features.cup.opponent}`;
   if (!features.cup.simulation && features.cup.lastTickAt === features.cup.matchStartedAt) features.cup.simulation = createInteractiveMatch(features.cup, features.starXI.lineupIds, features.starXI.formationId);
@@ -187,9 +236,9 @@ export function getMatchRatingBreakdown(cup: CupState, playerId: string, minute:
   if (cup.injuryEvents.some(e => e.playerId === playerId)) reasons.push({ label: 'Verletzungsbedingtes Einsatzende', value: 0 });
   return { playerId, rating, minutes: end - entered + 1, goals, assists, substitute: entered > 1, reasons };
 }
-function addStats(current: PlayerCareerStats | undefined, report: PlayerMatchReport, motm: boolean): PlayerCareerStats {
+function addStats(current: PlayerCareerStats | undefined, report: PlayerMatchReport, motm: boolean, resultPoints = 0): PlayerCareerStats {
   const s = current ?? emptyPlayerStats();
-  return { appearances: s.appearances+1, minutes: s.minutes+report.minutes, goals: s.goals+report.goals, assists: s.assists+report.assists, ratingTotal: s.ratingTotal+report.rating, ratedMatches: s.ratedMatches+1, motm: s.motm+Number(motm), subAppearances: s.subAppearances+Number(report.substitute), subRatingTotal: s.subRatingTotal+(report.substitute ? report.rating : 0), subMinutes: s.subMinutes+(report.substitute ? report.minutes : 0), recent: report.minutes >= 15 ? [...s.recent,report.rating].slice(-5) : s.recent };
+  return { appearances: s.appearances+1, minutes: s.minutes+report.minutes, goals: s.goals+report.goals, assists: s.assists+report.assists, ratingTotal: s.ratingTotal+report.rating, ratedMatches: s.ratedMatches+1, motm: s.motm+Number(motm), subAppearances: s.subAppearances+Number(report.substitute), subRatingTotal: s.subRatingTotal+(report.substitute ? report.rating : 0), subMinutes: s.subMinutes+(report.substitute ? report.minutes : 0), points: s.points+resultPoints, recent: report.minutes >= 15 ? [...s.recent,report.rating].slice(-5) : s.recent };
 }
 /**
  * Ratings of the opponent's players by the same rules as the club's (day form, goals, assists, the score while on
@@ -237,6 +286,10 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
   const old = career.rivals[key] ?? { opponent: c.opponent, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, closeGames: 0, active: false, lastResults: [], lastPlayedAt: 0 };
   const draw = c.homeScore === c.awayScore && !c.penaltyEvents.length;
   const won = c.homeScore > c.awayScore || (c.homeScore === c.awayScore && c.penaltyHomeScore > c.penaltyAwayScore);
+  // Points of every card that played, by the result after 90 minutes: win 3, draw 1, loss 0. Extra time and a
+  // shoot-out only happen after a draw at 90 minutes, so such a match is a draw (1) whoever goes through.
+  const decidedAfter90 = c.phase === 'extra-time' || c.phase === 'penalties' || c.penaltyEvents.length > 0;
+  const resultPoints = decidedAfter90 || c.homeScore === c.awayScore ? MATCH_RESULT_POINTS.draw : c.homeScore > c.awayScore ? MATCH_RESULT_POINTS.win : MATCH_RESULT_POINTS.loss;
   // Like Sofascore: the best rated player of the whole match, from either side and whatever the result.
   const ownBest = ranked[0], opponentBest = getOpponentMatchRatings(c, minute).sort((a,b) => b.rating-a.rating || b.goals-a.goals || b.assists-a.assists)[0];
   const opponentWins = Boolean(opponentBest && (!ownBest || opponentBest.rating > ownBest.rating || (opponentBest.rating === ownBest.rating && opponentBest.goals > ownBest.goals)));
@@ -251,10 +304,18 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
   if (old.active) addHistory(features, { title: won ? 'Derbysieg! Die Kurve eskaliert.' : draw ? 'Derbyremis. Die Revanche wartet.' : 'Derbyniederlage. Das vergessen die Fans nicht.', detail: `${resultLabel} gegen ${c.opponent}${derbyReward ? ` · +${derbyReward} Fragmente` : ''}`, tone: won ? 'positive' : draw ? 'neutral' : 'negative' });
   features.starXI.fragments += derbyReward;
   for (const p of players) {
-    career.players[p.playerId] = addStats(career.players[p.playerId],p,p.playerId===motmId);
-    if (c.mode === 'season') career.seasonPlayers[p.playerId] = addStats(career.seasonPlayers[p.playerId],p,p.playerId===motmId);
+    const card = getStarXIPlayer(p.playerId)!;
+    const grownBefore = hasPotential(card) ? getSpecialGrowth(career, card).levels : 0;
+    career.players[p.playerId] = addStats(career.players[p.playerId],p,p.playerId===motmId,resultPoints);
+    if (c.mode === 'season') career.seasonPlayers[p.playerId] = addStats(career.seasonPlayers[p.playerId],p,p.playerId===motmId,resultPoints);
     if (!career.collectedIds.includes(p.playerId)) career.collectedIds.push(p.playerId);
-    career.milestoneCategories[p.playerId] ??= getMilestoneCategory(getStarXIPlayer(p.playerId)!);
+    career.milestoneCategories[p.playerId] ??= getMilestoneCategory(card);
+    if (hasPotential(card)) {
+      // Special cards grow with their own matches instead of collecting milestones.
+      const grown = getSpecialGrowth(career, card);
+      if (grown.levels > grownBefore) addHistory(features, { title: `${card.name} wächst auf ${grown.rating}`, detail: grown.nextLevelPoints === null ? `Potenzial ${grown.potential} erreicht.` : `Potenzial ${grown.potential} · noch ${grown.pointsToNext} ${grown.pointsToNext === 1 ? 'Punkt' : 'Punkte'} bis ${grown.rating + 1}.`, tone: 'positive' });
+      continue;
+    }
     for (const m of getPlayerMilestones(career, getStarXIPlayer(p.playerId)!)) if (career.players[p.playerId][m.metric] >= m.target && !(career.milestoneCards[p.playerId] || []).includes(m.id)) {
       career.milestoneCards[p.playerId] = [...(career.milestoneCards[p.playerId] || []),m.id];
       addHistory(features, { title: `${m.label}-Karte freigeschaltet`, detail: `${getStarXIPlayer(p.playerId)?.name} · ${m.target} ${MILESTONE_METRIC_LABELS[m.metric]}. Die stärkste Version ist automatisch aktiv.`, tone: 'positive' });

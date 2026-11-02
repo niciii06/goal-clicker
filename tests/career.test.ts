@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { beginSeasonCupMatch, initialGameFeatures, normalizeGameFeatures, pauseGameFeatureTimers, setBestStarXI, STAR_XI_PLAYERS, getStarXISelection, advanceCupMatch, getStarXIEffectiveMatchRating, recordSeasonModeMatch, startSeasonPrestige, resumeCupMatch } from '../app/feature-data.ts';
+import { cardPackRating, beginSeasonCupMatch, initialGameFeatures, normalizeGameFeatures, pauseGameFeatureTimers, setBestStarXI, STAR_XI_PLAYERS, getStarXISelection, advanceCupMatch, getStarXIEffectiveMatchRating, recordSeasonModeMatch, startSeasonPrestige, resumeCupMatch } from '../app/feature-data.ts';
 import { getMatchScoreImpact } from '../app/feature-data.ts';
 import { getOpponentMatchRatings } from '../app/career-data.ts';
 import { createMatchBroadcast } from '../app/match-broadcast.ts';
@@ -11,7 +11,7 @@ import { AlbumPanel, CareerPanel, MatchRatingsPanel } from '../app/career-panels
 
 function fixture(now=1000000) {
   let f=initialGameFeatures(now);
-  f.starXI=setBestStarXI({...f.starXI,ownedIds:STAR_XI_PLAYERS.filter(p=>p.rating<95).slice(0,200).map(p=>p.id)});
+  f.starXI=setBestStarXI({...f.starXI,ownedIds:STAR_XI_PLAYERS.filter(p=>cardPackRating(p)<95).slice(0,200).map(p=>p.id)});
   f=normalizeGameFeatures(f);
   f.cup=beginSeasonCupMatch(f.cup,f.seasonMode,now,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions,f.starXI.lineupIds,f.starXI.benchIds);
   prepareCareerMatch(f);
@@ -235,4 +235,16 @@ test('the album switch shows milestone ratings or the original ratings; guests s
  assert.equal(albumMilestonesFromStorage(null,false),true);
  assert.equal(albumMilestonesFromStorage('off',false),false);
  assert.equal(albumMilestonesFromStorage('on',true),false,'a guest starts with the original ratings');
+});
+test('every card that played gets the match points after 90 minutes: win 3, draw 1, loss 0, extra time and shoot-outs 1',()=>{
+ const pointsAfter=(setup:(f:ReturnType<typeof fixture>)=>void)=>{const f=fixture();const {scorer}=finishFixture(f);setup(f);recordCareerMatch(f);return f.career.players[scorer].points;};
+ assert.equal(pointsAfter(()=>{}),3);
+ assert.equal(pointsAfter(f=>{f.cup.homeScore=1;f.cup.awayScore=1;}),1);
+ assert.equal(pointsAfter(f=>{f.cup.homeScore=1;f.cup.awayScore=2;}),0);
+ // Won or lost in extra time or on penalties: it was a draw after 90 minutes, so 1 for both.
+ assert.equal(pointsAfter(f=>{f.cup.phase='extra-time';f.cup.homeScore=2;f.cup.awayScore=1;}),1);
+ assert.equal(pointsAfter(f=>{f.cup.phase='extra-time';f.cup.homeScore=1;f.cup.awayScore=2;}),1);
+ const shootout=(won:boolean)=>pointsAfter(f=>{f.cup.phase='penalties';f.cup.homeScore=1;f.cup.awayScore=1;f.cup.penaltyHomeScore=won?5:3;f.cup.penaltyAwayScore=4;f.cup.penaltyEvents=[{id:'p1',side:'home',scored:true,takerId:'x',minute:120} as unknown as typeof f.cup.penaltyEvents[number]];});
+ assert.equal(shootout(true),1);
+ assert.equal(shootout(false),1);
 });

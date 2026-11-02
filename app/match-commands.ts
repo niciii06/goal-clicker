@@ -58,7 +58,7 @@ export function confirmMatchDraft(f:GameFeatures,d:MatchDraft,now:number):{featu
   // Edit a copy so the play that ended at this boundary keeps the state it ended with.
   const sim=c.simulation;sim.committed=structuredClone(sim.committed);const checkpoint=sim.committed;
   // Transfer the outgoing slot's position to the incoming player at this safe boundary.
-  outgoing.forEach((out,i)=>{const old=checkpoint.players.find(p=>p.id===out),source=getStarXIPlayer(incoming[i]);if(old&&source){old.active=false;checkpoint.players=checkpoint.players.filter(p=>p.id!==out);checkpoint.players.push(substituteSimPlayer(old,source,c.careerBonuses?.[source.id]));if(checkpoint.owner===out)checkpoint.owner=source.id;}});
+  outgoing.forEach((out,i)=>{const old=checkpoint.players.find(p=>p.id===out),source=getStarXIPlayer(incoming[i]);if(old&&source){old.active=false;checkpoint.players=checkpoint.players.filter(p=>p.id!==out);checkpoint.players.push(substituteSimPlayer(old,source,c.careerBonuses?.[source.id],c.careerGrowth?.[source.id]));if(checkpoint.owner===out)checkpoint.owner=source.id;}});
   d.lineup.forEach((id,i)=>{const p=checkpoint.players.find(p=>p.id===id);if(!p)return;const slot=form.slots[i],right=checkpoint.direction>0,x=p.role==='TW'?3:12+(100-slot.y)*.68,y=p.role==='TW'?34:5+slot.x*.58;p.role=slot.position;p.slot=i;p.anchor={x:right?x:105-x,y:right?y:68-y};});
   if(checkpoint.lastPass&&outgoing.includes(checkpoint.lastPass.id))checkpoint.lastPass=undefined;
   sim.clubFormation=form.id;invalidateInteractive(c);

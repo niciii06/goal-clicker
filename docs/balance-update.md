@@ -219,3 +219,18 @@ Neues Modell `scripts/balance/progression-model.ts`. Annahmen: 2 Minuten Büro, 
 | 1 | 140 / 350 | 5,3 / 21,5 | 4,8 / 13,0 |
 
 Werte: Median / P90 in Minuten. Die volle Startelf steht nach 50 Klicks, also nach unter einer Minute. Offene Punkte: In Liga 5 bis 3 wartet jeder zehnte passive Club über 20 bis 49 Minuten auf das nächste Pack, weil das VAR Pech dort mit den teuersten Packs zusammentrifft. In Liga 1 und 2 braucht ein Club oft zwei Saisons.
+
+## Nachtrag 2. November: Special Cards wachsen von 80 auf 100
+
+Alle zehn Special Cards (auch Pfuschi und Mikeboy Jr.) starten mit 80 OVR und haben Potenzial 100. Sie wachsen nur mit den Punkten ihrer Partien, Meilensteine gibt es für sie nicht mehr:
+
+* Punkte für jede Partie, in der die Karte gespielt hat (Startelf oder eingewechselt), nach dem Resultat nach 90 Minuten: Sieg 3, Unentschieden 1, Niederlage 0. Geht eine Partie in die Verlängerung oder ins Elfmeterschiessen, war es nach 90 Minuten unentschieden: 1 Punkt, egal wer weiterkommt. Alle 5 Punkte +1 OVR, also 100 Punkte bis 100 (etwa 34 Siege, mit gemischter Bilanz rund 50 bis 60 Partien).
+* Tore, Vorlagen und Spieler des Spiels zählen nicht.
+* Der Punktezähler (`points` in der Karrierestatistik) ist neu, deshalb beginnen alle Karten bei 0, auch in bestehenden Spielständen und Welten. Bestehende 100er fallen auf 80. `career.growthBase` hält den Startpunkt fest (Karriere Version 3).
+* Das Wachstum wirkt im Spiel: Es fliesst wie die Meilensteinboni über `careerBonuses` in die Spielstärke (für Karten mit Potenzial bis +20 statt +5) und in die Beste Elf.
+* Packs bleiben gleich: `packRating` hält die frühere Stufe (100 oder 67) für Packzeilen, Seltenheit, Liga 3 Sperre, Special Card Pack Chance und Duplikat Entschädigung. Preis und Pack Gewichte sind unverändert.
+* Pfuschi bleibt Spasskarte: nur Bank, absichtlich schlechte Werte.
+* Anzeige im Spielerprofil: „OVR 83 · Potenzial 100 · noch 2 Punkte bis 84“; im Verlauf erscheint jede neue Stufe.
+* Multiplayer Protokoll 14, damit alte Clients nach dem Update neu laden. Kein Eintrag in „Was ist neu“.
+
+Code: `app/feature-data.ts` (`SPECIAL_START_RATING`, `SPECIAL_POTENTIAL`, `cardPackRating`), `app/career-data.ts` (`getSpecialGrowth`, `MATCH_RESULT_POINTS`, `GROWTH_POINTS_PER_LEVEL`), Anzeige in `app/career-panels.tsx`. Tests: `tests/special-growth.test.ts`, `tests/career.test.ts`.

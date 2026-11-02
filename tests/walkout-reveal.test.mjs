@@ -113,14 +113,14 @@ test("walkout uses real SVG flags and shortens GOAT Nicu positions", async () =>
   assert.doesNotMatch(pageSource, /star-walkout-country"><span aria-hidden="true">/);
 });
 
-test("Flurin Fabrice is a 100-rated special card with a slim fixed walkout appearance independent of clothing", async () => {
+test("Flurin Fabrice is a special card (start 80, potential 100) with a slim fixed walkout appearance independent of clothing", async () => {
   const [featureSource, walkoutSource] = await Promise.all([
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/walkout-data.ts", import.meta.url), "utf8"),
   ]);
   const flurinProfile = walkoutSource.match(/"star-flurin-fabrice": \{([\s\S]*?)\n  \},/)?.[1] ?? "";
 
-  assert.match(featureSource, /id: "star-flurin-fabrice",[\s\S]*?name: "Flurin Fabrice",[\s\S]*?rating: 100,/);
+  assert.match(featureSource, /id: "star-flurin-fabrice",[\s\S]*?name: "Flurin Fabrice",[\s\S]*?rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 100,/);
   assert.match(flurinProfile, /hair: "medium"/);
   assert.match(flurinProfile, /hairColor: LIGHT_BROWN/);
   assert.match(flurinProfile, /face: "long"/);
@@ -156,38 +156,38 @@ test("Mätthu matches Nedu's strong walkout appearance except for being bald", a
   assert.doesNotMatch(maetthuProfile, /kitPrimary|kitSecondary|boots/);
 });
 
-test("Silvanzambi (formerly Silvuz) is a fixed Swiss 100-rated pack player", async () => {
+test("Silvanzambi (formerly Silvuz) is a fixed Swiss special card pack player (potential 100)", async () => {
   const [featureSource, walkoutSource] = await Promise.all([
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/walkout-data.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(featureSource, /id: "star-silvuz",[\s\S]*?countryCode: "CH",[\s\S]*?name: "Silvanzambi",[\s\S]*?position: "LF",[\s\S]*?positions: \["LF", "LM", "RF"\],[\s\S]*?rating: 100,[\s\S]*?packWeight: 0\.02/);
+  assert.match(featureSource, /id: "star-silvuz",[\s\S]*?countryCode: "CH",[\s\S]*?name: "Silvanzambi",[\s\S]*?position: "LF",[\s\S]*?positions: \["LF", "LM", "RF"\],[\s\S]*?rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 100,[\s\S]*?packWeight: 0\.02/);
   assert.match(walkoutSource, /"star-silvuz": \{ \.\.\.GOAT_PROFILE/);
 });
 
-test("Mikeboy Jr. is a Swiss 67-rated legendary centre-back with a fixed walkout", async () => {
+test("Mikeboy Jr. is a Swiss legendary centre-back (start 80, potential 100) with a fixed walkout", async () => {
   const [featureSource, walkoutSource, pageSource] = await Promise.all([
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/walkout-data.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
   ]);
 
-  assert.match(featureSource, /id: "star-benxli",[\s\S]*?countryCode: "CH",[\s\S]*?name: "Mikeboy Jr\.",[\s\S]*?position: "IV",[\s\S]*?positions: \["IV"\],[\s\S]*?rating: 67,[\s\S]*?cardType: "legendary",[\s\S]*?packWeight: 0\.04/);
+  assert.match(featureSource, /id: "star-benxli",[\s\S]*?countryCode: "CH",[\s\S]*?name: "Mikeboy Jr\.",[\s\S]*?position: "IV",[\s\S]*?positions: \["IV"\],[\s\S]*?rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 67,[\s\S]*?cardType: "legendary",[\s\S]*?packWeight: 0\.04/);
   assert.match(walkoutSource, /"star-benxli": \{ \.\.\.GOAT_PROFILE/);
   assert.match(pageSource, /function formatStableInteger\(value: number\)/);
   assert.match(pageSource, /formatStableInteger\(STAR_XI_TOTAL_CARD_COUNT\)/);
   assert.match(pageSource, /STAR_XI_SPECIAL_CARD_COUNT} einzigartige Spezialkarten/);
 });
 
-test("Nedu Mann Yesss is a Bosnian legendary 100-rated ZM and ZDM pack player", async () => {
+test("Nedu Mann Yesss is a Bosnian legendary ZM and ZDM pack player (potential 100)", async () => {
   const [featureSource, walkoutSource, pageSource] = await Promise.all([
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/walkout-data.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
   ]);
 
-  assert.match(featureSource, /id: "star-nedu-mann-yesss",[\s\S]*?countryCode: "BA",[\s\S]*?name: "Nedu Mann Yesss",[\s\S]*?position: "ZM",[\s\S]*?positions: \["ZM", "ZDM"\],[\s\S]*?rating: 100,[\s\S]*?cardType: "legendary",[\s\S]*?packWeight: 0\.02/);
+  assert.match(featureSource, /id: "star-nedu-mann-yesss",[\s\S]*?countryCode: "BA",[\s\S]*?name: "Nedu Mann Yesss",[\s\S]*?position: "ZM",[\s\S]*?positions: \["ZM", "ZDM"\],[\s\S]*?rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 100,[\s\S]*?cardType: "legendary",[\s\S]*?packWeight: 0\.02/);
   assert.match(walkoutSource, /BA: \{ name: "Bosnien und Herzegowina"/);
   const neduProfile = walkoutSource.match(/"star-nedu-mann-yesss": \{([\s\S]*?)\n  \},/)?.[1] ?? "";
   assert.match(neduProfile, /\.\.\.GOAT_PROFILE/);
@@ -201,14 +201,14 @@ test("Nedu Mann Yesss is a Bosnian legendary 100-rated ZM and ZDM pack player", 
   assert.match(pageSource, /import \{[^}]*\bBA\b[^}]*\} from "country-flag-icons\/react\/3x2"/);
 });
 
-test("Di Santo is a Dutch 100-rated ST whose walkout borrows only the body", async () => {
+test("Di Santo is a Dutch ST (potential 100) whose walkout borrows only the body", async () => {
   const [featureSource, walkoutSource] = await Promise.all([
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/walkout-data.ts", import.meta.url), "utf8"),
   ]);
   const diSantoProfile = walkoutSource.match(/"star-di-santo": \{([\s\S]*?)\n  \},/)?.[1] ?? "";
 
-  assert.match(featureSource, /id: "star-di-santo",[\s\S]*?countryCode: "NL",[\s\S]*?name: "Di Santo",[\s\S]*?position: "ST",[\s\S]*?positions: \["ST"\],[\s\S]*?rating: 100,[\s\S]*?cardType: "legendary",[\s\S]*?packWeight: 0\.02/);
+  assert.match(featureSource, /id: "star-di-santo",[\s\S]*?countryCode: "NL",[\s\S]*?name: "Di Santo",[\s\S]*?position: "ST",[\s\S]*?positions: \["ST"\],[\s\S]*?rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 100,[\s\S]*?cardType: "legendary",[\s\S]*?packWeight: 0\.02/);
   assert.match(diSantoProfile, /skin: S2/);
   assert.match(diSantoProfile, /hair: "slick"/);
   assert.match(diSantoProfile, /hairColor: BLACK/);

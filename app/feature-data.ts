@@ -211,13 +211,18 @@ export function shouldTriggerPackTroll(player: StarXIPlayer, random: () => numbe
 }
 
 
+/** Special cards start at 80 and grow to their potential of 100 through their own matches (career-data.ts,
+ * getSpecialGrowth). Their pack rarity stays where it was: packRating keeps the former 100 and 67 tiers. */
+export const SPECIAL_START_RATING = 80;
+export const SPECIAL_POTENTIAL = 100;
+
 const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
   { id: "star-pfuschi", name: "Pfuschi", isCustom: true, benchOnly: true,
-    position: null, positions: [], rating: 67, price: 1000, accent: "#64748b",
+    position: null, positions: [], rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 67, price: 1000, accent: "#64748b",
     cardType: "legendary", symbol: "☠️", packWeight: .04, originalAttributes: specialAttributes(1) },
   { id: "star-di-certo", name: "Di Certo", pitchName: "Di Certo", isCustom: true, countryCode: "CH", position: "LV",
-    positions: ["LV", "RV"], rating: 100, price: 5000000000, accent: "#c69214",
-    cardType: "legendary", packWeight: .02, originalAttributes: specialAttributes(100) },
+    positions: ["LV", "RV"], rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 100, price: 5000000000, accent: "#c69214",
+    cardType: "legendary", packWeight: .02, originalAttributes: specialAttributes(SPECIAL_START_RATING) },
   {
     id: "star-goat-nicu",
     pitchName: "GOAT Nicu",
@@ -225,7 +230,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
     name: "GOAT Nicu",
     position: "ST",
     positions: ["TW", "LV", "LAV", "IV", "RV", "RAV", "ZDM", "ZM", "ZOM", "LM", "RM", "LF", "RF", "MS", "ST"],
-    rating: 100,
+    rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 100,
     price: 5000000000,
     accent: "#c69214",
     cardType: "legendary",
@@ -238,7 +243,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
     name: "Flurin Fabrice",
     position: "ZM",
     positions: ["ZM", "ZOM"],
-    rating: 100,
+    rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 100,
     price: 5000000000,
     accent: "#c69214",
     cardType: "legendary",
@@ -252,7 +257,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
     name: "Mikeboy Jr.",
     position: "IV",
     positions: ["IV"],
-    rating: 67,
+    rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 67,
     price: 1000,
     accent: "#1f7a4f",
     cardType: "legendary",
@@ -264,7 +269,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
     name: "Mätthu",
     position: "TW",
     positions: ["TW"],
-    rating: 100,
+    rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 100,
     price: 5000000000,
     accent: "#c6cbd2",
     packWeight: 0.02,
@@ -277,7 +282,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
     name: "Champ Simu",
     position: "IV",
     positions: ["IV"],
-    rating: 100,
+    rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 100,
     price: 5000000000,
     accent: "#c6cbd2",
     packWeight: 0.02,
@@ -290,7 +295,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
     name: "Silvanzambi",
     position: "LF",
     positions: ["LF", "LM", "RF"],
-    rating: 100,
+    rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 100,
     price: 5000000000,
     accent: "#d71920",
     packWeight: 0.02,
@@ -304,7 +309,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
     name: "Nedu Mann Yesss",
     position: "ZM",
     positions: ["ZM", "ZDM"],
-    rating: 100,
+    rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 100,
     price: 5000000000,
     accent: "#0033a0",
     cardType: "legendary",
@@ -318,7 +323,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
     name: "Di Santo",
     position: "ST",
     positions: ["ST"],
-    rating: 100,
+    rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 100,
     price: 5000000000,
     accent: "#f36c21",
     cardType: "legendary",
@@ -575,8 +580,18 @@ export const SPECIAL_PACK_HUNDRED_CHANCE = 0.08;
 // A duplicate special card refunds at most a tenth of the pack, so duplicates never pay for the next draw.
 const CUSTOM_DUPLICATE_COMPENSATION_CAP = STAR_XI_RANDOM_CUSTOM_CARD_COST / 10;
 
+/** How far a card can still grow above its starting rating (special cards: 20). */
+function potentialGap(player: StarXIPlayer) {
+  return Math.max(0, (player.potential ?? player.rating) - player.rating);
+}
+
+/** The rating a card is sorted into pack rows and rarity tiers by: special cards keep their former tier. */
+export function cardPackRating(player: StarXIPlayer) {
+  return player.packRating ?? player.rating;
+}
+
 function isHundredSpecialCard(player: StarXIPlayer) {
-  return player.isCustom === true && player.rating >= 100;
+  return player.isCustom === true && cardPackRating(player) >= 100;
 }
 const SPECIAL_PACK_GROUPS = [
   { chance: SPECIAL_PACK_HUNDRED_CHANCE, players: STAR_XI_CUSTOM_PLAYERS.filter(isHundredSpecialCard) },
@@ -591,7 +606,8 @@ function pickByPackWeight<T extends { packWeight?: number }>(candidates: readonl
 }
 
 export function getStarXIFragmentCompensation(player: StarXIPlayer) {
-  const ratingStep = Math.max(1, Math.min(34, Math.floor(player.rating) - 66));
+  // Special cards keep the compensation of their pack tier, whatever they start at.
+  const ratingStep = Math.max(1, Math.min(34, Math.floor(cardPackRating(player)) - 66));
   if (player.isCustom) return Math.min(CUSTOM_DUPLICATE_COMPENSATION_CAP, ratingStep * 600);
   if (player.cardType === "icon") return ratingStep * 75;
   if (player.cardType === "legendary") return ratingStep * 150;
@@ -711,7 +727,7 @@ for (const pack of STAR_PACKS) {
   for (const odds of pack.odds) {
     const key = `${odds.minRating}-${odds.maxRating}`;
     // Of the special cards only the 100 rated ones can come from a normal pack, in its 100 row.
-    if (!STAR_RATING_POOLS.has(key)) STAR_RATING_POOLS.set(key, EXISTING_STAR_XI_PLAYERS.filter((player) => !player.retired && (!player.isCustom || isHundredSpecialCard(player)) && player.rating >= odds.minRating && player.rating <= odds.maxRating));
+    if (!STAR_RATING_POOLS.has(key)) STAR_RATING_POOLS.set(key, EXISTING_STAR_XI_PLAYERS.filter((player) => !player.retired && (!player.isCustom || isHundredSpecialCard(player)) && cardPackRating(player) >= odds.minRating && cardPackRating(player) <= odds.maxRating));
   }
 }
 
@@ -1320,7 +1336,7 @@ export function getStarXISelectionRating(player: StarXIPlayer, context: StarXIEv
   const cup = context.cup;
   const currentMatch = cup?.active && cup.matchStartedAt > 0;
   const prepared = currentMatch && cup.careerRatingSeed === cup.matchStartedAt
-    ? cup.careerBonuses?.[player.id] : undefined;
+    ? (cup.careerBonuses?.[player.id] ?? 0) + (cup.careerGrowth?.[player.id] ?? 0) : undefined;
   const base = Math.min(100, player.rating + (prepared ?? (form + card)));
   const live = currentMatch ? getCupPlayerMatchRating(cup, player.id, context.minute ?? 1) : null;
   const fitness=currentMatch?cup.broadcast?.fitness[player.id]??100:100;
@@ -1552,7 +1568,7 @@ export function applyCupSubstitution(cup: CupState, outgoingPlayerId: string | u
   const substitutionMinute = Math.max(1, Math.min(120, Math.floor(Number(minute) || 1)));
   const outgoingMatchRating = getCupPlayerMatchRating(cup, outgoing.id, substitutionMinute) ?? 6.5;
   // Same prepared match ratings (milestone card and form) the engine uses for every starter.
-  const matchRating = (player: StarXIPlayer) => Math.min(100, player.rating + (cup.careerBonuses?.[player.id] ?? 0));
+  const matchRating = (player: StarXIPlayer) => Math.min(100, player.rating + (cup.careerBonuses?.[player.id] ?? 0) + (cup.careerGrowth?.[player.id] ?? 0));
   const incomingRating = matchRating(incoming), outgoingRating = matchRating(outgoing);
   const ratingDelta = Math.round((incomingRating - outgoingRating) * 10) / 10;
   const ratingMomentum = clamp(ratingDelta * 0.18, -4, 4);
@@ -1582,7 +1598,7 @@ export function getStarXIEffectiveMatchRating(ownedIds: string[], lineupIds: str
   const missing = STAR_XI_SQUAD_SIZE - starters.length;
   const effectiveTotal = starters.reduce((total, player) => {
     const liveForm = getCupPlayerMatchRating(cup, player.id, minute) ?? 6.4;
-    return total + Math.min(100, player.rating + (cup.careerBonuses?.[player.id] ?? 0)) + (liveForm - 6.5) * 2.8;
+    return total + Math.min(100, player.rating + (cup.careerBonuses?.[player.id] ?? 0) + (cup.careerGrowth?.[player.id] ?? 0)) + (liveForm - 6.5) * 2.8;
   }, missing * 55);
   const squadRating = Math.round((effectiveTotal / STAR_XI_SQUAD_SIZE) * 10) / 10;
   const momentumRating = (Number(cup.matchMomentum) || 0) * CUP_MOMENTUM_RATING_WEIGHT;
@@ -1852,6 +1868,7 @@ function startTournamentRound(cup: CupState, tournament: TournamentDefinition, r
     careerRatingSeed: now,
     careerMatchId: `career-${now}-tournament-${opponent.name}`,
     careerBonuses: undefined,
+    careerGrowth: undefined,
     mode: "tournament",
     tournamentId: tournament.id,
     round,
@@ -1934,6 +1951,7 @@ export function beginSeasonCupMatch(cup: CupState, seasonValue: unknown, now = D
     careerRatingSeed: now,
     careerMatchId: `career-${now}-season-${opponent.name}`,
     careerBonuses: undefined,
+    careerGrowth: undefined,
     mode: "season",
     tournamentId: "stadium",
     round: 0,
@@ -2395,7 +2413,12 @@ function getPenaltyWinner(homeScore: number, awayScore: number, homeTaken: numbe
   return null;
 }
 
-export function resolveCupPenalty(cup: CupState, starRating: number, direction: PenaltyDirection, now = Date.now(), random = Math.random, homePlayers: readonly StarXIPlayer[] = [], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS) {
+export function resolveCupPenalty(cup: CupState, starRating: number, direction: PenaltyDirection, now = Date.now(), random = Math.random, rawHomePlayers: readonly StarXIPlayer[] = [], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS) {
+  // Grown special cards take their penalties (and keep goal) with the rating they reached, not their 80 start.
+  const homePlayers = rawHomePlayers.map((player) => {
+    const growth = cup.careerGrowth?.[player.id] ?? 0;
+    return growth > 0 ? { ...player, rating: Math.min(100, player.rating + growth) } : player;
+  });
   const baseResult = getCupBaseResult(cup, starRating);
   if (!cup.active || cup.phase !== "penalties" || !PENALTY_DIRECTIONS.includes(direction)) return { cup, ...baseResult };
   let penaltyHomeScore = cup.penaltyHomeScore;
@@ -2648,7 +2671,7 @@ function removeEarlyHundredSpecialCards(source: Record<string, unknown>) {
  * statistics they are earned from), whatever the league. A card in the squad stays in the squad. */
 function clearHundredCardsFromAlbum(source: Record<string, unknown>) {
   if (Number(source.schemaVersion) >= 8 || !source.career) return { source, cleared: false };
-  const hundredIds = new Set(STAR_XI_PLAYERS.filter((player) => player.rating >= 100).map((player) => player.id));
+  const hundredIds = new Set(STAR_XI_PLAYERS.filter((player) => cardPackRating(player) >= 100).map((player) => player.id));
   const career = asRecord(source.career);
   const withoutHundreds = (value: unknown) => Object.fromEntries(Object.entries(asRecord(value)).filter(([id]) => !hundredIds.has(id)));
   const collectedIds = Array.isArray(career.collectedIds) ? career.collectedIds : [];
@@ -2900,7 +2923,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     transferMarket: { offerIds: offerIds.length ? offerIds : defaults.transferMarket.offerIds, ownedIds: [...new Set(ownedIds)] },
     starXI: { ...normalizedStarXI, lockedPlayerIds: active ? savedLock?.playerIds : undefined },
     club: { name: clubName, badge: CLUB_BADGES.includes(String(club.badge)) ? String(club.badge) : defaults.club.badge, color: CLUB_COLORS.includes(String(club.color)) ? String(club.color) : defaults.club.color },
-    cup: { simulation: normalizeInteractive(cup.simulation), restartAt:Number.isFinite(cup.restartAt)?Number(cup.restartAt):undefined, restartSide:cup.restartSide==='opponent'?'opponent':'club', regularDurationMs: Number(cup.regularDurationMs)>=180000&&Number(cup.regularDurationMs)<=300000?Number(cup.regularDurationMs):undefined, halftimeTaken:cup.halftimeTaken===true, timedPause:normalizeTimedPause(cup.timedPause), subWindowsUsed: Math.min(3,Math.max(0,Math.floor(Number(cup.subWindowsUsed)||0))), pendingSubstitutions: normalizePendingSubstitutions(cup.pendingSubstitutions), broadcast: normalizeMatchBroadcast(cup.broadcast), fixture: cup.fixture && typeof cup.fixture==='object' ? cup.fixture as CupState['fixture'] : undefined, drawSeed: isDrawSeed(cup.drawSeed) ? cup.drawSeed : legacyTournamentDrawSeed(cup), careerRatingSeed: Number.isFinite(Number(cup.careerRatingSeed)) && Number(cup.careerRatingSeed) > 0 ? Number(cup.careerRatingSeed) : matchStartedAt, careerMatchId: typeof cup.careerMatchId === "string" ? cup.careerMatchId.slice(0, 200) : undefined, careerBonuses: Object.fromEntries(Object.entries(asRecord(cup.careerBonuses)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Number(value), -2 - TRANSFER_UNHAPPY_PENALTY, 5)])), active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && (Boolean(lastInjury) || Boolean(cup.simulation)), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
+    cup: { simulation: normalizeInteractive(cup.simulation), restartAt:Number.isFinite(cup.restartAt)?Number(cup.restartAt):undefined, restartSide:cup.restartSide==='opponent'?'opponent':'club', regularDurationMs: Number(cup.regularDurationMs)>=180000&&Number(cup.regularDurationMs)<=300000?Number(cup.regularDurationMs):undefined, halftimeTaken:cup.halftimeTaken===true, timedPause:normalizeTimedPause(cup.timedPause), subWindowsUsed: Math.min(3,Math.max(0,Math.floor(Number(cup.subWindowsUsed)||0))), pendingSubstitutions: normalizePendingSubstitutions(cup.pendingSubstitutions), broadcast: normalizeMatchBroadcast(cup.broadcast), fixture: cup.fixture && typeof cup.fixture==='object' ? cup.fixture as CupState['fixture'] : undefined, drawSeed: isDrawSeed(cup.drawSeed) ? cup.drawSeed : legacyTournamentDrawSeed(cup), careerRatingSeed: Number.isFinite(Number(cup.careerRatingSeed)) && Number(cup.careerRatingSeed) > 0 ? Number(cup.careerRatingSeed) : matchStartedAt, careerMatchId: typeof cup.careerMatchId === "string" ? cup.careerMatchId.slice(0, 200) : undefined, careerBonuses: Object.fromEntries(Object.entries(asRecord(cup.careerBonuses)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Number(value), -2 - TRANSFER_UNHAPPY_PENALTY, 5)])), careerGrowth: Object.fromEntries(Object.entries(asRecord(cup.careerGrowth)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Math.floor(Number(value)), 0, potentialGap(getStarXIPlayer(id)!))])), active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && (Boolean(lastInjury) || Boolean(cup.simulation)), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
     seasonMode: normalizedSeasonMode,
     goalBoost,
     missions,

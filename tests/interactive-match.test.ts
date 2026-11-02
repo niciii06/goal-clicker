@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { initialGameFeatures, STAR_XI_PLAYERS, STAR_FORMATIONS, setBestStarXI, beginSeasonCupMatch, getStarXISelection, advanceCupMatch, normalizeGameFeatures, resumeCupMatch, getStarXIPlayer, pauseGameFeatureTimers, getCupRegularDurationMs } from '../app/feature-data';
-import { prepareCareerMatch, recordCareerMatch } from '../app/career-data';
+import { emptyPlayerStats, prepareCareerMatch, recordCareerMatch } from '../app/career-data';
 import { createInteractiveMatch, advanceInteractive, interactiveFrame } from '../app/interactive-match';
 import { requestMatchEdit, confirmMatchDraft, draftMatch } from '../app/match-commands';
 import { getVisualFrame, LiveMatchViewer } from '../app/match-viewer';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
 function fixture(seed=1,formation='433'){
- const f=initialGameFeatures(1000000+seed);f.starXI=setBestStarXI({...f.starXI,formationId:formation as typeof f.starXI.formationId,ownedIds:STAR_XI_PLAYERS.map(p=>p.id)});
+ const f=initialGameFeatures(1000000+seed);
+ // Special cards start at 80 and grow to 100 (career-data.ts); fully grown they make the same XI as before.
+ for(const p of STAR_XI_PLAYERS.filter(p=>p.potential))f.career.players[p.id]={...emptyPlayerStats(),points:200};
+ f.starXI=setBestStarXI({...f.starXI,formationId:formation as typeof f.starXI.formationId,ownedIds:STAR_XI_PLAYERS.map(p=>p.id)},[],{career:f.career});
  f.cup=beginSeasonCupMatch(f.cup,f.seasonMode,1000000+seed,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions,f.starXI.lineupIds,f.starXI.benchIds);prepareCareerMatch(f);return f;
 }
 function complete(f:ReturnType<typeof fixture>,step=360000,render=false){

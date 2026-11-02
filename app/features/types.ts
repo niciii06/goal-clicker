@@ -50,6 +50,9 @@ export type CupState = {
   /** Random draw for the next tournament run; rerolled whenever a run starts. */
   drawSeed?: number;
   careerBonuses?: Record<string, number>;
+  /** Growth of special cards above their starting rating, fixed at kick off. Unlike careerBonuses (form and
+   * milestones, which the simulation amplifies) it counts exactly once everywhere, like a higher rating. */
+  careerGrowth?: Record<string, number>;
   active: boolean;
   mode: CupMatchMode;
   phase: CupMatchPhase;
@@ -175,6 +178,10 @@ export type StarXIPlayer = {
   isCustom?: boolean;
   cardType?: "base" | "icon" | "legendary";
   packWeight?: number;
+  /** Highest rating the card can grow to through its own matches (special cards: 100). */
+  potential?: number;
+  /** Rating used for pack rows and rarity tiers when it differs from the starting rating. */
+  packRating?: number;
   /** Caption under the player on the ball in the 2D match; defaults to the last word of the name. */
   pitchName?: string;
   // Not part of FC 27: kept so existing saves stay valid, never drawn again.

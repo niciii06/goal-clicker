@@ -3,7 +3,7 @@ import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { initialGameFeatures, normalizeGameFeatures, purchaseSpecialCardPack, getSpecialCardPackOdds, SPECIAL_CARD_PACK, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, setBestStarXI, beginSeasonCupMatch, getStarXISelection, advanceCupMatch, resumeCupMatch } from '../app/feature-data';
+import { cardPackRating, initialGameFeatures, normalizeGameFeatures, purchaseSpecialCardPack, getSpecialCardPackOdds, SPECIAL_CARD_PACK, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, setBestStarXI, beginSeasonCupMatch, getStarXISelection, advanceCupMatch, resumeCupMatch } from '../app/feature-data';
 import { getReachedLeague, hasReachedLeague, isLeagueContentUnlocked, leagueForTier, getPackUnlockLeague, getTournamentUnlockLeague, getFormationUnlockLeague, getUpgradeUnlockLeague } from '../app/season-progression';
 import { prepareCareerMatch, recordCareerMatch } from '../app/career-data';
 import { PlayerStatsSummary } from '../app/career-panels';
@@ -59,7 +59,7 @@ test('displayed requirements and purchase checks use the same league rules', asy
 
 test('fragments buy the special card pack exactly once per purchase', () => {
   // A roll of 0 lands in the rare 100 group and on its first card.
-  const firstHundred = STAR_XI_CUSTOM_PLAYERS.find(p => p.rating === 100)!;
+  const firstHundred = STAR_XI_CUSTOM_PLAYERS.find(p => cardPackRating(p) === 100)!;
   const f = initialGameFeatures(1000);
   f.starXI.fragments = 120000;
   const ownedBefore = f.starXI.ownedIds.length;
