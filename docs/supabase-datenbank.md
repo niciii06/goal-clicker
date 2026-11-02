@@ -1,5 +1,7 @@
 # Datenbank: Supabase (PostgreSQL)
 
+> Stand 2. November 2026: Die Daten ziehen auf Neon um, der Login auf Neon Auth ([neon-netlify-migration.md](neon-netlify-migration.md)). Die Regeln zu Tabellen und atomaren Updates unten gelten weiter. Was hier über Supabase Auth, `goal_clicker_private` und Vercel steht, beschreibt die alte Umgebung, die als Sicherung bestehen bleibt. Neue Tabellen seit Migration 0007: `auth_identities`, `legacy_identities`, `account_recovery`, `recovery_codes`, `rate_limits`.
+
 Die Multiplayer Welten (`coop_rooms`), die Reise und Prämienbelege der Einzelspieler (`solo_travel`), die Verknüpfung Konto ↔ Spieler ID (`player_accounts`), die Profile (`profiles`) und die Cloud Spielstände (`cloud_saves`) liegen in PostgreSQL bei Supabase. Die frühere Cloudflare D1 Datenbank (SQLite) wird vom Code nicht mehr verwendet.
 
 ## Was sich gegenüber D1 geändert hat

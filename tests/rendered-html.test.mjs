@@ -44,7 +44,8 @@ test("renders the production page with security headers and without preview meta
 test("the account API reports that login is not configured on a server without keys", async () => {
   const response = await fetch(`${BASE}/api/account`);
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { configured: false, signedIn: false });
+  // A developer machine without login settings plays anonymously; a host would say "misconfigured".
+  assert.deepEqual(await response.json(), { configured: false, mode: "anonymous", signedIn: false });
 });
 
 test("the app manifest, its icons, the service worker and the offline page are served", async () => {

@@ -1,28 +1,29 @@
-# Goal Clicker hosten: Vercel, Supabase und Login
+# Goal Clicker hosten: Netlify, Neon und Login
 
-Die App ist eine normale Next.js 16 Anwendung. Vercel baut sie direkt mit `next build`, ohne Anpassungen. Die Daten liegen in Supabase (PostgreSQL), angemeldet wird über Supabase Auth mit Google oder mit Benutzername und Passwort (ohne Mails). Ohne Login startet das Spiel nicht; jedes Konto hat ein Profil mit eindeutigem Benutzernamen, und der Einzelspieler Spielstand liegt im Profil (gleich auf allen Geräten).
+Die App ist eine normale Next.js 16 Anwendung auf Node.js 24. Netlify baut sie mit `next build` und dem Next.js Adapter (`@netlify/plugin-nextjs`). Die Daten liegen in PostgreSQL bei Neon, angemeldet wird über Neon Auth mit Google oder mit Benutzername und Passwort (ohne Mails). Ohne Login startet das Spiel nicht; jedes Konto hat ein Profil mit eindeutigem Benutzernamen, und der Einzelspieler Spielstand liegt im Profil (gleich auf allen Geräten).
+
+Der Umzug von Vercel und Supabase ist in [docs/neon-netlify-migration.md](docs/neon-netlify-migration.md) beschrieben, mit Übernahme der Originalkonten, Freigabe, Umstellung und Rückweg. Bis zur Freigabe durch den Besitzer gilt: **keine Umstellung der Produktion.**
 
 Weiterführend:
 
-* [Datenbank und Datenübernahme](docs/supabase-datenbank.md)
+* [Umzug auf Neon Auth, Neon und Netlify](docs/neon-netlify-migration.md)
 * [Login einrichten (Google oder Benutzername), Profil und Cloud Spielstand](docs/google-login.md)
-
-Die bisherige ChatGPT Sites Version ist davon unabhängig. Nichts in diesem Repository schaltet sie ab oder verändert sie. Ein Push auf GitHub aktualisiert die Site nicht.
+* [Datenbank und Datenübernahme](docs/supabase-datenbank.md) (Schema und Regeln, Abschnitte zu Supabase sind historisch)
 
 ## Lokal entwickeln
 
-Voraussetzungen: Node.js 24, npm, Git. Für Multiplayer lokal zusätzlich ein PostgreSQL (Supabase CLI mit Docker oder ein normales PostgreSQL).
+Voraussetzungen: Node.js 24, npm, Git. Für Multiplayer lokal zusätzlich ein PostgreSQL.
 
 ```sh
 git clone https://github.com/niciii06/goal-clicker.git
 cd goal-clicker
 npm ci
 cp .env.example .env.local   # Werte eintragen, Datei bleibt lokal
-npm run db:migrate           # Tabellen in DATABASE_URL anlegen
+npm run db:migrate           # Tabellen in einer LEEREN lokalen Datenbank anlegen (nicht auf Neon, siehe unten)
 npm run dev                  # http://localhost:3000
 ```
 
-Ohne Supabase Werte in `.env.local` läuft die App lokal ohne Login und ohne Profil, wie bisher mit der Spieler ID des Browsers. Der Einzelspieler braucht dann gar keine Datenbank.
+Ohne `NEON_AUTH_BASE_URL` und `NEON_AUTH_COOKIE_SECRET` läuft die App lokal ohne Login und ohne Profil, wie bisher mit der Spieler ID des Browsers. Auf Netlify oder Vercel geht das nie: dort verweigert der Server ohne vollständige Werte alles, was eine Identität braucht.
 
 | Befehl | Zweck |
 | :--- | :--- |
@@ -32,74 +33,32 @@ Ohne Supabase Werte in `.env.local` läuft die App lokal ohne Login und ohne Pro
 | `npm test` | Build, alle Unit Tests und ein Test gegen `next start` |
 | `npm run test:browser` | Browser Smoke Test gegen den Produktionsbuild (Chromium) |
 | `npm run test:db` | Datenbanktests, braucht `TEST_DATABASE_URL` auf eine leere Testdatenbank |
-| `npm run test:account` | Login, Profil und Cloud Spielstand im Browser, mit einem Ersatz für Supabase Auth (braucht `TEST_DATABASE_URL`) |
-| `npm run db:migrate` / `npm run db:generate` | Migrationen anwenden bzw. nach Schemaänderungen erzeugen |
-| `npm run db:import-d1` | Daten aus einem D1 Export übernehmen |
-| `npm run generate:client-data` | Schlanke Browser Kopie von `app/fc27-india-source.json` neu erzeugen |
+| `npm run test:account` | Login, Übernahme der Originalkonten, Profil, Cloud Spielstand und Multiplayer im Browser gegen einen Nachbau von Neon Auth (braucht `TEST_DATABASE_URL`) |
+| `npm run db:migrate` / `npm run db:generate` | Migrationen auf eine Datenbank mit Drizzle Journal anwenden bzw. erzeugen |
+| `npx tsx scripts/migration/verify-accounts.mts` | Anzahlen, Prüfsummen und Übernahmestand (nur lesen) |
 
 ## Umgebungsvariablen
 
-Nur Namen, keine Werte. Werte gehören in `.env.local` (lokal, von Git ignoriert) und in die Vercel Einstellungen.
+Nur Namen, keine Werte. Werte gehören in `.env.local` (lokal, von Git ignoriert) und in die Netlify Einstellungen, **pro Kontext** (Produktion und Staging zeigen auf verschiedene Neon Branches). Liste mit Zweck: [docs/neon-netlify-migration.md](docs/neon-netlify-migration.md#umgebungsvariablen-nur-namen). Keine Variable beginnt mit `NEXT_PUBLIC_`; das Google Client Secret gehört nur in Neon Auth.
 
-| Name | Pflicht | Wo | Beschreibung |
-| :--- | :--- | :--- | :--- |
-| `NEXT_PUBLIC_SUPABASE_URL` | ja | Vercel, lokal | Projekt URL `https://<projekt-ref>.supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | ja | Vercel, lokal | Publishable Key (`sb_publishable_...`), bei älteren Projekten ersatzweise `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
-| `DATABASE_URL` | ja | Vercel, lokal | PostgreSQL Verbindung. Auf Vercel der Transaction Pooler (Port 6543) mit `?sslmode=require` |
-| `DATABASE_POOL_MAX` | nein | Vercel | Verbindungen pro Server Instanz, Standard 5 |
-| `AUTH_REQUIRED` | nein | lokal | `1` verweigert Multiplayer ohne Supabase Werte auch ausserhalb von Vercel |
-| `TEST_DATABASE_URL` | nein | nur Tests | Leere Testdatenbank für `npm run test:db`, nie die echte |
+## Datenbank auf Neon
 
-Das Google Client Secret gehört **nur** in Supabase, nicht in Vercel. Der Supabase `service_role` bzw. `secret` Key wird nicht gebraucht.
+* App: der Pooler Host (`-pooler`) des Branches mit `?sslmode=require`, als Rolle `goal_clicker_app` (`scripts/migration/runtime-role.sql`).
+* Migrationen und Skripte: direkte Verbindung als `neondb_owner`.
+* Auf den Neon Branches fehlt das Drizzle Journal. Neue Migrationen dort direkt mit `psql -f` einspielen; sie sind dafür idempotent geschrieben (`IF NOT EXISTS`).
+* Alle Tabellen haben Row Level Security. Data API, Realtime und Object Storage bleiben aus.
 
-## Einrichtung durch den Besitzer
+## Netlify
 
-Diese Schritte erfordern Konten und Geheimnisse und können nur vom Besitzer erledigt werden.
-
-### 1. Supabase Projekt
-
-1. Auf [supabase.com](https://supabase.com) ein Projekt anlegen. Region möglichst nah an den Spielern, zum Beispiel Frankfurt (`eu-central-1`).
-2. Unter *Project Settings* → *JWT Keys* prüfen, dass die neuen asymmetrischen Signing Keys aktiv sind. Dann prüft der Server Logins lokal statt bei jeder Anfrage bei Supabase nachzufragen.
-3. Unter *Connect* die Verbindungs URLs kopieren: **Transaction Pooler** (für Vercel) und **Session Pooler** oder direkte Verbindung (für Migrationen und Import).
-4. Tabellen anlegen, lokal ausgeführt: `DATABASE_URL=<Session Pooler URL> npm run db:migrate`
-
-Alle Tabellen haben Row Level Security ohne Policies. Damit sind sie über die öffentliche Supabase REST API gesperrt. Die App greift serverseitig direkt per PostgreSQL zu.
-
-### 2. Login (Google oder Benutzername)
-
-Anleitung mit allen Weiterleitungs URLs: [docs/google-login.md](docs/google-login.md). Kurzfassung:
-
-* Google OAuth Client, Weiterleitungs URI: `https://<projekt-ref>.supabase.co/auth/v1/callback`
-* Supabase *URL Configuration*: Site URL `https://<domain>`, Redirect URLs `https://<domain>/auth/callback`, `https://*-<team>.vercel.app/auth/callback`, `http://localhost:3000/auth/callback`
-* Benutzername und Passwort: nichts einzustellen, die Datenbankfunktion `goal_clicker_private.create_password_user` legt die Logins an
-
-### 3. Vercel Projekt verbinden
-
-1. Auf [vercel.com](https://vercel.com) *Add New* → *Project* → das GitHub Repository `niciii06/goal-clicker` importieren.
-2. Framework Preset: **Next.js** (wird erkannt). Build Command `next build`, Output und Install Command auf Standard lassen. Node.js Version 22 oder neuer (aus `engines` in `package.json`).
-3. Die Umgebungsvariablen aus der Tabelle oben für *Production* und *Preview* setzen.
-4. Unter *Settings* → *Functions* die Region auf die Supabase Region setzen (zum Beispiel `fra1` für Frankfurt), damit Datenbankabfragen kurz bleiben.
-5. Deployen. Jeder Push auf einen Branch erzeugt ein Preview Deployment, ein Push auf `main` die Produktion.
-
-Hinweis: Der frühere Cloudflare Worker hatte eine optionale Anfragebegrenzung für `/api/`. Vercel hat dafür keine Bindung im Code. Bei Bedarf in Vercel unter *Firewall* eine Rate Limiting Regel für `/api/*` anlegen.
-
-### 4. Preview Deployment prüfen
-
-Auf der Preview Adresse nacheinander:
-
-1. **Login**: *Mit Google anmelden* → Google Konto wählen → beim ersten Mal Profil anlegen → im Spiel stehen Anzeigename und Benutzername oben. Ebenso mit *Konto erstellen* (Benutzername und Passwort) und danach *Anmelden*. *Abmelden* funktioniert.
-2. **Einzelspieler**: klicken, Upgrade kaufen, Seite neu laden, Stand bleibt. Auf einem zweiten Gerät anmelden: derselbe Stand. *Als Gast fortfahren* startet ohne Konto, nur Einzelspieler; *Anmelden* nimmt den Gast Spielstand in ein neues Konto mit.
-3. **Multiplayer**: angemeldet eine Welt erstellen, in einem zweiten Browser (anderes Google Konto) mit dem Code beitreten, beide klicken, beide sehen dieselben Tore. Abgemeldet erscheint der Hinweis, dass Multiplayer einen Login braucht.
-
-### 5. Daten übernehmen
-
-1. **Vor der Kündigung von ChatGPT** die Live Datenbank der Sites Version sichern. Das ist nicht aus diesem Repository heraus möglich, siehe [Abschnitt in docs/supabase-datenbank.md](docs/supabase-datenbank.md#wichtig-vor-der-kündigung-von-chatgpt-live-daten-der-sites-version-sichern).
-2. `DATABASE_URL=<Session Pooler URL> npm run db:import-d1 -- --dump d1-export.sql --dry-run`, danach ohne `--dry-run`. Der Import ist wiederholbar.
+* Framework Next.js, Build `next build`, Node.js 24, Funktionen in `us-east-2` (gleiche Region wie Neon).
+* Der Netlify Zugangsschutz schützt alle Deployments, bis der Besitzer ihn entfernt.
+* Ein Deploy Preview, das auf die Produktionsdatenbank zeigt, ist **kein** Staging. Für Staging einen Branch Deploy mit eigenen Variablen auf `migration-staging` verwenden und prüfen, dass der Kontext sie bekommt.
+* Jedes Produktionsdeploy kostet im Free Plan 15 Credits; nicht für Kleinigkeiten deployen.
 
 ## Spielstand sichern (für Spieler)
 
-Der Spielstand liegt im Profil, sobald man angemeldet ist, und ist auf allen Geräten gleich. Gäste spielen nur Einzelspieler mit einem Spielstand in diesem Browser; mit *Anmelden* kommt er in ein neues Konto. Einen Datei Export gibt es nicht mehr.
+Der Spielstand liegt im Profil, sobald man angemeldet ist, und ist auf allen Geräten gleich, auch nach dem Wechsel auf die neue Adresse. Gäste spielen nur Einzelspieler mit einem Spielstand in diesem Browser; mit *Anmelden* kommt er in ein neues Konto.
 
 ## Was entfernt wurde
 
-Die ChatGPT Sites und Cloudflare spezifischen Teile sind nicht mehr im Code: Vite und vinext Build, `build/sites-vite-plugin.ts`, `build/client-data-plugin.ts`, `scripts/sites-env.sh`, die Sites Install und Artefakt Skripte, `scripts/external-hosting.mjs`, `scripts/export-chatgpt-knowledge.mjs`, Wrangler Konfigurationen, der Worker Einstieg, `.openai/hosting.json`, das D1 Beispiel, `@cloudflare/vite-plugin` und alle `cloudflare:workers` Importe. Die Aufgaben der Vite Plugins übernehmen jetzt die `imports` in `package.json`: Der Browser bekommt die schlanke FC 27 Datei und lädt die Reiserouten erst nach dem Start.
+`@supabase/ssr` und `@supabase/supabase-js`, der Supabase Browser Client, die Datenbankfunktionen `goal_clicker_private.create_password_user` und `delete_user` als Abhängigkeit, und die Auslieferung der Login Adresse über `/api/login`. Früher entfernt: die ChatGPT Sites und Cloudflare Teile (Vite, vinext, Wrangler, D1, Worker).

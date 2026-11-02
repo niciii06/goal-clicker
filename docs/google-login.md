@@ -1,112 +1,70 @@
-# Login einrichten: Google oder Benutzername und Passwort (Supabase Auth)
+# Login einrichten: Google oder Benutzername und Passwort (Neon Auth)
 
-Ohne Login startet das Spiel nicht, sobald Supabase eingerichtet ist. Angemeldet wird über Supabase Auth, wahlweise mit Google oder mit Benutzername und Passwort. Es werden nie Mails verschickt. Jedes Konto hat ein Profil: einen Benutzernamen, den es nur einmal gibt, und einen Anzeigenamen. Google Konten legen es nach dem ersten Login an, Konten mit Passwort beim Registrieren. Der Code ist fertig. Die folgenden Schritte kann nur der Besitzer erledigen, weil sie Konten und Geheimnisse betreffen. Platzhalter:
+Ohne Login startet das Spiel nicht, sobald Neon Auth eingerichtet ist. Angemeldet wird über Neon Auth (Managed Better Auth), wahlweise mit Google oder mit Benutzername und Passwort. Es werden nie Mails verschickt. Jedes Konto hat ein Profil mit einem Benutzernamen, den es nur einmal gibt, und einem Anzeigenamen. Wie die neun Konten aus Supabase übernommen werden: [neon-netlify-migration.md](neon-netlify-migration.md).
 
-* `<projekt-ref>`: die Kennung des Supabase Projekts, zu sehen in der Projekt URL `https://<projekt-ref>.supabase.co`
-* `<domain>`: die endgültige Adresse der Seite, zum Beispiel `goal-clicker.vercel.app` oder eine eigene Domain
-* `<team>`: der Vercel Team oder Konto Name, der in Preview Adressen vorkommt (`goal-clicker-git-<branch>-<team>.vercel.app`)
+## 1. Neon Auth pro Branch
 
-## 1. Google OAuth Client anlegen
+In der Neon Console: Projekt `sparkling-sea-00072876` → Branch → *Auth* → *Configuration*.
 
-1. In der [Google Cloud Console](https://console.cloud.google.com/) ein Projekt wählen oder anlegen.
-2. *APIs und Dienste* → *OAuth Zustimmungsbildschirm*: App Name (Goal Clicker), Support E-Mail, Bereiche `openid`, `email`, `profile`. Für alle Google Konten freigeben: Veröffentlichungsstatus *In Produktion*.
-3. *Anmeldedaten* → *Anmeldedaten erstellen* → *OAuth Client ID* → Typ *Webanwendung*.
-4. **Autorisierte JavaScript Quellen**:
-   * `https://<domain>`
-   * `http://localhost:3000` (lokale Entwicklung)
-5. **Autorisierte Weiterleitungs URI** (genau diese eine, Google leitet immer zu Supabase zurück):
-   * `https://<projekt-ref>.supabase.co/auth/v1/callback`
-6. Client ID und Client Secret notieren. Das Secret gehört **nur** in Supabase, nicht in Vercel und nicht ins Repository.
+* **Auth URL** kopieren: das ist `NEON_AUTH_BASE_URL` für die Umgebung, die auf diesen Branch zeigt.
+* **Trusted origins:** genau die Adressen, von denen das Spiel geladen wird. Staging: die Adresse des Staging Deployments, wie Netlify sie meldet. Produktion: `https://goalglicker.netlify.app`. `localhost` nur für Entwicklung.
+* **Email and password:** eingeschaltet, ohne Bestätigungsmail (die Adressen sind erzeugt und empfangen nichts).
+* **Google:** für Staging genügen die geteilten Neon Zugangsdaten. Für die Produktion einen eigenen OAuth Client.
 
-## 2. Supabase
+## 2. Eigener Google OAuth Client (Produktion)
 
-1. *Authentication* → *Sign In / Providers* → *Google*: aktivieren, Client ID und Client Secret eintragen, speichern.
-2. *Authentication* → *URL Configuration*:
-   * **Site URL**: `https://<domain>`
-   * **Redirect URLs** (Zulassungsliste, auf diese Adressen darf Supabase nach dem Login zurückleiten):
-     * `https://<domain>/auth/callback`
-     * `https://*-<team>.vercel.app/auth/callback` (Vercel Preview Deployments)
-     * `http://localhost:3000/auth/callback` (lokal)
-3. *Project Settings* → *API Keys*: die **Publishable Key** (`sb_publishable_...`) kopieren. Ältere Projekte zeigen stattdessen den `anon` Key, der funktioniert ebenfalls. Den `service_role` bzw. `secret` Key braucht die App nicht.
+1. In der [Google Cloud Console](https://console.cloud.google.com/) *Anmeldedaten* → *OAuth Client ID* → *Webanwendung*.
+2. **Autorisierte Weiterleitungs URI:** `{NEON_AUTH_BASE_URL}/callback/google`, für jeden verwendeten Branch. Die alte Supabase Weiterleitung `https://iocdsjgmgkqdkojmciyx.supabase.co/auth/v1/callback` bleibt stehen, solange die alte Umgebung als Rückweg dient.
+3. Client ID und Secret nur in Neon Auth eintragen, nie in Netlify oder im Repository.
 
-## 3. Vercel Umgebungsvariablen
+Der Google `sub` eines Kontos ist bei allen OAuth Clients gleich; darüber werden die drei alten Google Konten erkannt.
 
-Unter *Project Settings* → *Environment Variables* für *Production* und *Preview* setzen:
+## 3. Netlify
 
-| Name | Wert |
-| :--- | :--- |
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://<projekt-ref>.supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | die Publishable Key aus Schritt 2.3 |
-| `DATABASE_URL` | Transaction Pooler URL aus Supabase (*Connect*), Port 6543, mit `?sslmode=require` |
+`NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET` (mindestens 32 zufällige Zeichen, `openssl rand -base64 32`) und `DATABASE_URL` pro Kontext setzen, danach neu deployen. Ohne diese Werte zeigt das Spiel den Login mit dem Hinweis, dass er nicht eingerichtet ist, und der Server verweigert Multiplayer und Konto Aufrufe.
 
-Nach dem Setzen neu deployen, weil `NEXT_PUBLIC_` Werte beim Build in den Browser Code übernommen werden. Ohne diese Werte verweigert ein Vercel Deployment den Multiplayer mit "Der Login ist auf diesem Server nicht eingerichtet", statt unangemeldete Welten zuzulassen.
+## Benutzername und Passwort
 
-## 4. Benutzername und Passwort
+Neon Auth braucht für ein Passwort Konto eine E-Mail Adresse. Der Server erzeugt deshalb `p-<zufall>@players.goal-clicker.vercel.app` und legt den Login selbst an; die Adresse verlässt den Server nie.
 
-Dafür ist in Supabase nichts einzustellen. Supabase Auth braucht für ein Passwort Konto eine E-Mail Adresse; das Spiel erzeugt deshalb beim Registrieren eine Adresse `p-<zufall>@players.goal-clicker.vercel.app`, an die nie eine Mail geht. Angelegt wird das Konto bereits bestätigt durch die Datenbankfunktion `goal_clicker_private.create_password_user` (siehe [docs/supabase-datenbank.md](supabase-datenbank.md)), deshalb bleibt *Confirm email* in Supabase eingeschaltet und es braucht keinen Mailversand.
+* **Registrieren** (`POST /api/register`): prüft Benutzername, Anzeigename und Passwort (8 bis 72 Zeichen), legt Login, Spielkonto und Profil an und meldet den Browser an.
+* **Anmelden** (`POST /api/login`): der Server meldet mit der Adresse hinter dem Benutzernamen bei Neon Auth an. Falsche Namen und falsche Passwörter sehen gleich aus. Ein altes Konto aus Supabase wird dabei einmalig übernommen.
+* **Passwort ändern:** im Konto Fenster (👤), mit dem aktuellen Passwort; andere Geräte werden abgemeldet.
+* **Passwort vergessen:** gibt es nicht per Mail. Der Besitzer kann mit `scripts/migration/issue-recovery-code.mts` einen einmaligen Code für ein noch nicht übernommenes Originalkonto ausstellen.
 
-* **Registrieren** (`POST /api/register`): prüft Benutzername, Anzeigename und Passwort (8 bis 72 Zeichen), legt Login und Profil an und gibt die erzeugte Adresse zurück. Der Browser meldet sich damit bei Supabase an.
-* **Anmelden** (`POST /api/login`): liefert zum Benutzernamen die erzeugte Adresse, der Browser meldet sich damit und dem Passwort bei Supabase an. Das Passwort sieht nur Supabase, und die Begrenzung der Anmeldeversuche gilt pro Gerät.
-* **Passwort ändern**: über den Konto Knopf (👤) oben neben der Glocke.
-* **Passwort vergessen** gibt es nicht, weil keine Mailadresse bekannt ist. Im Notfall kann der Besitzer im Supabase Dashboard unter *Authentication* → *Users* beim betroffenen Login ein neues Passwort setzen (die Adresse steht in `profiles.login_email`).
+### Google verknüpfen
 
-### Google mit einem Benutzernamen Konto verknüpfen
-
-Wer ein Konto mit Benutzername und Passwort hat, kann im Konto Fenster (👤) später Google verknüpfen. Danach öffnen Google und Benutzername dasselbe Konto mit demselben Spielstand. Der Code nutzt `supabase.auth.linkIdentity` (`app/auth/browser.ts`, `linkGoogleAccount`), die Rückkehr läuft über `/auth/callback?link=google`, und das Spiel meldet das Ergebnis im Konto Fenster (`?google=verknuepft`, `vergeben`, `abgebrochen` oder `fehler`).
-
-**Einmalig in Supabase einschalten:** *Authentication* → *Sign In / Providers* → **Allow manual linking** (Manuelles Verknüpfen erlauben). Ohne diese Einstellung meldet das Spiel "Die Verknüpfung mit Google ist auf dem Server noch nicht freigeschaltet."
-
-Ein Google Konto, mit dem schon einmal ein eigenes Spielerkonto angelegt wurde, lässt sich nicht zusätzlich verknüpfen ("Dieses Google Konto gehört schon zu einem anderen Spielerkonto.").
-
-Ein späterer Login per E-Mail bräuchte einen eigenen Mailversand (eigene Domain mit einem Dienst wie Resend) und Mailvorlagen mit `{{ .Token }}`.
+Ein Benutzername Konto kann im Konto Fenster Google verknüpfen. Danach öffnen beide denselben Spielstand. Rückkehr über `/auth/callback?link=google`, das Spiel meldet `?google=verknuepft`, `vergeben`, `abgebrochen` oder `fehler`. Ein Google Konto, das schon zu einem anderen Spielerkonto gehört (auch als alter Login eines Originalkontos), wird nicht verknüpft.
 
 ## Was der Code macht
 
 | Teil | Datei |
 | :--- | :--- |
-| Login Pflicht, Login Formulare, Profil anlegen, Auswahl zwischen zwei Spielständen | `app/account-gate.tsx` |
-| Konto Knopf in der Kopfzeile mit Profil Einstellungen, Speicherstand und Abmelden; Verknüpfung Konto ↔ Spieler ID | `app/account-panel.tsx` (`AccountButton`, `ProfilePanel`, `AccountLink`) |
-| Google Login (PKCE), Anmelden und Registrieren mit Benutzername, Passwort ändern | `app/auth/browser.ts` |
-| Regeln für Benutzername und Anzeigename | `app/profile-rules.ts` |
-| Registrieren, Anmelden, Profil und Cloud Spielstand API (`/api/register`, `/api/login`, `/api/profile`, `/api/profile/username`, `/api/save`) | `app/account-api.ts` |
-| Spielstand mit der Cloud abgleichen | `app/cloud-sync.ts`, `app/cloud-save-rules.ts` |
-| Rückkehr von Google, Code gegen Session Cookie tauschen | `app/auth/callback/route.ts` (`/auth/callback`) |
-| Session vor jeder Seite und API Anfrage auffrischen | `proxy.ts` |
-| Token prüfen (Signatur, `getClaims`) | `app/auth/server.ts` |
-| Spieler ID des Kontos bestimmen | `app/auth/player.ts`, `app/api/account/route.ts` |
-| Tabellen `player_accounts`, `profiles`, `cloud_saves` | `db/schema.ts`, `drizzle/` |
+| Login Pflicht, Formulare, Wiederherstellungscode, Profil anlegen | `app/account-gate.tsx` |
+| Konto Fenster, Passwort ändern, Google verknüpfen | `app/account-panel.tsx` |
+| Browser: Google über das SDK, Benutzername über den Server | `app/auth/browser.ts` |
+| Einstellungen, Fail Closed (`authMode`) | `app/auth/config.ts` |
+| Session prüfen, Neon Auth Aufrufe, Cookies | `app/auth/server.ts`, `app/auth/neon-accounts.ts`, `app/auth/neon-sdk.ts` |
+| Login → Spielkonto (Google Übernahme, neue Konten) | `app/auth/identity.ts` |
+| Spieler ID des Kontos | `app/auth/player.ts`, `app/api/account/route.ts` |
+| Vorübergehende Brücke und Besitzercodes | `app/auth/legacy-bridge.ts`, `app/auth/recovery-code.ts`, `app/api/recovery/route.ts` |
+| Registrieren, Anmelden, Profil, Löschen, Cloud Spielstand | `app/account-api.ts` |
+| Auth Proxy für das SDK (nur erlaubte Aufrufe) | `app/api/auth/[...path]/route.ts` |
+| Rückkehr von Google, Verifier Austausch | `app/auth/callback/route.ts`, `proxy.ts` |
+| Tabellen | `db/schema.ts`, `drizzle/0007_neon_auth_identities.sql` |
 
 ### Profil
 
-* **Benutzername**: 3 bis 20 Zeichen, Buchstaben ohne Umlaute, Zahlen und `_`. Eindeutig ohne Rücksicht auf Gross und Kleinschreibung (`username_key`). Änderbar alle 30 Tage, nur die Gross und Kleinschreibung des eigenen Namens jederzeit. Ein alter Name wird nach der Änderung sofort wieder frei.
-* **Anzeigename**: 2 bis 18 Zeichen, jederzeit änderbar. Er ist auch der Name in allen Multiplayer Welten.
-* **Profil löschen** (Konto Knopf): löscht Profil, Cloud Spielstand, die Verknüpfung zur Spieler ID und den Login selbst. Multiplayer Welten bleiben für die anderen Spieler bestehen.
-* Wer sich mit Benutzername und Passwort anmeldet, meldet sich nach einer Namensänderung mit dem neuen Namen an.
+* **Benutzername**: 3 bis 20 Zeichen, Buchstaben ohne Umlaute, Zahlen und `_`, eindeutig ohne Rücksicht auf Gross und Kleinschreibung, änderbar alle 30 Tage.
+* **Anzeigename**: 2 bis 18 Zeichen, jederzeit änderbar, auch der Name in allen Welten.
+* **Profil löschen**: zuerst der Login bei Neon Auth, dann Profil, Spielstand und Verknüpfungen. Welten bleiben für die anderen.
 
 ### Spielstand in der Cloud
 
-Der Einzelspieler Spielstand (Spiel, Layout, Vibration) liegt pro Konto in `cloud_saves`. Vor dem Spielstart lädt das Spiel ihn in den Browser, danach wird jede Änderung alle 15 Sekunden, beim Wechsel in den Hintergrund und beim Schliessen hochgeladen. Jede Speicherung erhöht `version`; ein Gerät kann nur die Version überschreiben, die es geladen hat.
-
-Sind zwei Geräte gleichzeitig offen, entscheidet, wo wirklich gespielt wird (Klick oder Tastendruck seit der letzten Speicherung):
-
-* Ein Gerät, auf dem seither niemand etwas gemacht hat, übernimmt einen neueren Stand still, spätestens wenn sein Tab wieder in den Vordergrund kommt.
-* Hat das andere Gerät nur passive Tore gesammelt (`active = false`), überschreibt das gespielte Gerät dessen Stand.
-* Nur wenn auf beiden Geräten gespielt wurde, fragt das Spiel, welcher Stand bleiben soll.
-
-Beim ersten Login auf einem Gerät mit eigenem Fortschritt fragt das Spiel ebenfalls, falls im Profil schon ein anderer Stand liegt. Beim Abmelden wird zuerst gespeichert und danach der Spielstand auf diesem Gerät entfernt.
-
-### Spieler ID und bestehende Welten
-
-Die bisherige Identität war **nicht** die E-Mail Adresse. Die Sites Version hat den ChatGPT Login nie verwendet (`app/chatgpt-auth.ts` war nirgends eingebunden). Jeder Browser hatte eine zufällige Spieler ID im `localStorage` (`goalClickerPlayerIdV3`), und Multiplayer Welten gehören dieser ID. In der Datenbank steht keine E-Mail Adresse. Eine automatische Zuordnung über die E-Mail ist deshalb nicht möglich.
-
-Stattdessen gilt:
-
-1. Beim **ersten Login** wird die Spieler ID dieses Browsers mit dem Konto verknüpft. Danach nutzt jedes Gerät mit demselben Konto diese Spieler ID und sieht dieselben Welten.
-2. Wer den alten Spielstand als Datei mitbringt (Export auf der alten Seite, Import auf der neuen), bringt seine alte Spieler ID mit. Nach dem Import übernimmt das Konto diese ID, solange das Konto mit seiner bisherigen ID noch keine Welt hat. So hängen alte Welten am Konto.
-3. Eine Spieler ID gehört höchstens einem Konto. Eine fremde, bereits verknüpfte ID kann nicht übernommen werden.
+Unverändert: `cloud_saves` pro Spielkonto mit `version` und `active_version`, Upload jede Minute und beim Verlassen, ein Gerät überschreibt nur die Version, die es geladen hat, ein nur passiv gespieltes Gerät überschreibt nie echten Fortschritt. Ein leerer Browser (zum Beispiel auf der neuen Adresse) übernimmt immer den Stand aus der Cloud.
 
 ## Tests
 
-* `npm run test:unit` enthält `tests/account-profile.test.ts` (Regeln, API, Synchronisationsentscheide).
-* `npm run test:db` prüft Profile und Cloud Spielstände gegen PostgreSQL, auch gleichzeitige Zugriffe.
-* `npm run test:account` baut eine eigene Kopie nach `.next-account` und spielt Registrieren, Anmelden mit falschem und richtigem Passwort, doppelte Benutzernamen, Profil Einstellungen, zwei Geräte und Abmelden im Browser durch. Statt Supabase Auth läuft dabei `tests/browser/mock-auth-server.ts`; weil die Testdatenbank die Funktion zum Anlegen von Logins nicht hat, registriert die App dort über die Auth API. Braucht `TEST_DATABASE_URL` und Chromium. `ACCOUNT_TEST_REUSE_BUILD=1` überspringt den Build.
+* `npm run test:unit`: `tests/neon-migration.test.ts`, `tests/auth.test.ts`, `tests/account-profile.test.ts`.
+* `npm run test:db`: Bindung, Übernahme, Löschung und Spielstände gegen PostgreSQL, auch gleichzeitig.
+* `npm run test:account`: Chromium gegen `tests/browser/mock-neon-auth.ts`, inklusive Übernahme beider Arten von Originalkonten. Braucht `TEST_DATABASE_URL`; `ACCOUNT_TEST_REUSE_BUILD=1` überspringt den Build.
