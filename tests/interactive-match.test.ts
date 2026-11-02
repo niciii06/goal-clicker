@@ -10,7 +10,7 @@ import { createElement } from 'react';
 function fixture(seed=1,formation='433'){
  const f=initialGameFeatures(1000000+seed);
  // Special cards start at 80 and grow to 100 (career-data.ts); fully grown they make the same XI as before.
- for(const p of STAR_XI_PLAYERS.filter(p=>p.potential))f.career.players[p.id]={...emptyPlayerStats(),appearances:200};
+ for(const p of STAR_XI_PLAYERS.filter(p=>p.potential))f.career.players[p.id]={...emptyPlayerStats(),points:200};
  f.starXI=setBestStarXI({...f.starXI,formationId:formation as typeof f.starXI.formationId,ownedIds:STAR_XI_PLAYERS.map(p=>p.id)},[],{career:f.career});
  f.cup=beginSeasonCupMatch(f.cup,f.seasonMode,1000000+seed,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions,f.starXI.lineupIds,f.starXI.benchIds);prepareCareerMatch(f);return f;
 }

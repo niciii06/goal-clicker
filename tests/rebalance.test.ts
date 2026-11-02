@@ -181,7 +181,7 @@ test("every 100 rated card leaves the album once, whatever the league", () => {
   const inSquad = hundredIds[0], archived = hundredIds[1];
   // A normal card keeps its milestones; special cards grow through their potential instead.
   const normal = STAR_XI_PLAYERS.find((player) => !player.isCustom && !player.retired && player.cardType !== "icon" && player.rating < 90)!;
-  const stats = { appearances: 30, minutes: 2700, goals: 60, assists: 30, ratingTotal: 240, ratedMatches: 30, motm: 12, subAppearances: 0, subRatingTotal: 0, subMinutes: 0, recent: [] };
+  const stats = { appearances: 30, minutes: 2700, goals: 60, assists: 30, ratingTotal: 240, ratedMatches: 30, motm: 12, subAppearances: 0, subRatingTotal: 0, subMinutes: 0, points: 30, recent: [] };
   save.schemaVersion = 7;
   save.seasonMode.division = 14;
   save.seasonMode.highestDivision = 14;
@@ -206,7 +206,7 @@ test("every 100 rated card leaves the album once, whatever the league", () => {
   // Runs once: later progress of a 100 rated card stays, as growth towards its potential.
   cleaned.career.players[inSquad] = stats;
   const again = normalizeGameFeatures(JSON.parse(JSON.stringify(cleaned)));
-  assert.equal(getCareerCard(again.career, getStarXIPlayer(inSquad)!).rating, 100);
+  assert.equal(getCareerCard(again.career, getStarXIPlayer(inSquad)!).rating, 86, "30 points after the update: +6");
 });
 
 test("a new club opens a free welcome pack with a guaranteed base walkout", () => {

@@ -236,3 +236,12 @@ test('the album switch shows milestone ratings or the original ratings; guests s
  assert.equal(albumMilestonesFromStorage('off',false),false);
  assert.equal(albumMilestonesFromStorage('on',true),false,'a guest starts with the original ratings');
 });
+test('every card that played gets the match points: win 3, draw 1, loss 0, a shoot-out counts for its winner',()=>{
+ const pointsAfter=(setup:(f:ReturnType<typeof fixture>)=>void)=>{const f=fixture();const {scorer}=finishFixture(f);setup(f);recordCareerMatch(f);return f.career.players[scorer].points;};
+ assert.equal(pointsAfter(()=>{}),3);
+ assert.equal(pointsAfter(f=>{f.cup.homeScore=1;f.cup.awayScore=1;}),1);
+ assert.equal(pointsAfter(f=>{f.cup.homeScore=1;f.cup.awayScore=2;}),0);
+ const shootout=(won:boolean)=>pointsAfter(f=>{f.cup.homeScore=1;f.cup.awayScore=1;f.cup.penaltyHomeScore=won?5:3;f.cup.penaltyAwayScore=won?4:4;f.cup.penaltyEvents=[{id:'p1',side:'home',scored:true,takerId:'x',minute:120} as unknown as typeof f.cup.penaltyEvents[number]];});
+ assert.equal(shootout(true),3);
+ assert.equal(shootout(false),0);
+});

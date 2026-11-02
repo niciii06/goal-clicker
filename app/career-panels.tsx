@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { getStarXIPlayer, getStarXIPositions, getUnavailableStarXIPlayerIds, STAR_POSITIONS, STAR_XI_PLAYERS, TRANSFER_UNHAPPY_PENALTY, transferUnhappyMatches } from './feature-data';
 import type { GameFeatures, StarXIPlayer } from './feature-data';
-import { CAREER_MILESTONES, getPlayerMilestones, MILESTONE_METRIC_LABELS, emptyPlayerStats, getAlbumGroups, getCareerCard, getPlayerForm } from './career-data';
+import { CAREER_MILESTONES, GROWTH_POINTS_PER_LEVEL, getPlayerMilestones, MILESTONE_METRIC_LABELS, emptyPlayerStats, getAlbumGroups, getCareerCard, getPlayerForm } from './career-data';
 import type { AwardWinner, PlayerMatchReport } from './career-data';
 import { formatNumber } from './game/format';
 import { leagueForTier } from './season-progression';
@@ -21,7 +21,7 @@ export function CareerPlayerBadge({ features, player, compact = false }: { featu
   if (compact) return <>{form.matches || card.milestone || unhappy ? <span className={`career-pitch-badge ${card.milestone ? 'special' : ''}${unhappy ? ' unhappy' : ''}`} title={`${card.milestone?.label ?? 'Basiskarte'} · ${form.label} · Form ${signed(form.bonus)} OVR${unhappy ? ` · ${unhappyLabel}` : ''}`} style={{ '--career-accent': card.milestone?.accent ?? '#edf3fa' } as CSSProperties}>{unhappy ? '😠 ' : ''}{card.milestone ? '★ ' : ''}{form.matches ? signed(form.bonus) : ''}</span> : null}<DisciplineTags features={features} playerId={player.id} compact /></>;
   return <span className="career-player-badges">
     {card.milestone && <span className="career-special-tag" style={{ '--career-accent': card.milestone.accent } as CSSProperties}>★ {card.milestone.label} · OVR {card.rating}</span>}
-    {card.growth && <span className="career-special-tag" title="Special Cards wachsen mit ihren eigenen Partien: Einsatz 1 Punkt, Tor 2, Vorlage 1, Spieler des Spiels 3. Alle 10 Punkte +1 OVR bis zum Potenzial." style={{ '--career-accent': player.accent } as CSSProperties}>{card.growth.nextLevelPoints === null ? `★ Potenzial ${card.growth.potential} erreicht · OVR ${card.rating}` : `OVR ${card.rating} · Potenzial ${card.growth.potential} · noch ${card.growth.pointsToNext} Punkte bis ${card.rating + 1}`}</span>}
+    {card.growth && <span className="career-form-tag up" title={`Special Cards wachsen mit den Punkten ihrer Partien: Sieg 3, Unentschieden 1, Niederlage 0. Alle ${GROWTH_POINTS_PER_LEVEL} Punkte +1 OVR bis zum Potenzial.`}>{card.growth.nextLevelPoints === null ? `★ Potenzial ${card.growth.potential} erreicht · OVR ${card.rating}` : `OVR ${card.rating} · Potenzial ${card.growth.potential} · noch ${card.growth.pointsToNext} ${card.growth.pointsToNext === 1 ? 'Punkt' : 'Punkte'} bis ${card.rating + 1}`}</span>}
     {form.matches > 0 && <span className={`career-form-tag ${form.bonus >= .5 ? 'up' : form.bonus <= -.5 ? 'down' : ''}`}>{form.label} · {signed(form.bonus)}</span>}
     {unhappy > 0 && <span className="career-form-tag down">😠 {unhappyLabel}</span>}
     <DisciplineTags features={features} playerId={player.id} />

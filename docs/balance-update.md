@@ -222,13 +222,15 @@ Werte: Median / P90 in Minuten. Die volle Startelf steht nach 50 Klicks, also na
 
 ## Nachtrag 2. November: Special Cards wachsen von 80 auf 100
 
-Alle zehn Special Cards (auch Pfuschi und Mikeboy Jr.) starten mit 80 OVR und haben Potenzial 100. Sie wachsen nur durch ihre eigenen Partien, Meilensteine gibt es für sie nicht mehr:
+Alle zehn Special Cards (auch Pfuschi und Mikeboy Jr.) starten mit 80 OVR und haben Potenzial 100. Sie wachsen nur mit den Punkten ihrer Partien, Meilensteine gibt es für sie nicht mehr:
 
-* Punkte pro Partie dieser Karte: Einsatz 1, Tor 2, Vorlage 1, Spieler des Spiels 3. Alle 10 Punkte +1 OVR, also 200 Punkte bis 100 (Stammspieler mit Toren etwa 60 bis 80 Partien).
-* Der Zähler beginnt für alle bei 0, auch für Karten, die schon vorher gespielt haben (Spielstände und Welten merken sich den Stand vom Update, `career.growthBase`, Karriere Version 3). Bestehende 100er fallen damit auf 80.
+* Punkte für jede Partie, in der die Karte gespielt hat (Startelf oder eingewechselt): Sieg 3, Unentschieden 1, Niederlage 0. Im Elfmeterschiessen zählt der Sieger 3 und der Verlierer 0. Alle 5 Punkte +1 OVR, also 100 Punkte bis 100 (etwa 34 Siege, mit gemischter Bilanz rund 50 bis 60 Partien).
+* Tore, Vorlagen und Spieler des Spiels zählen nicht.
+* Der Punktezähler (`points` in der Karrierestatistik) ist neu, deshalb beginnen alle Karten bei 0, auch in bestehenden Spielständen und Welten. Bestehende 100er fallen auf 80. `career.growthBase` hält den Startpunkt fest (Karriere Version 3).
 * Das Wachstum wirkt im Spiel: Es fliesst wie die Meilensteinboni über `careerBonuses` in die Spielstärke (für Karten mit Potenzial bis +20 statt +5) und in die Beste Elf.
 * Packs bleiben gleich: `packRating` hält die frühere Stufe (100 oder 67) für Packzeilen, Seltenheit, Liga 3 Sperre, Special Card Pack Chance und Duplikat Entschädigung. Preis und Pack Gewichte sind unverändert.
 * Pfuschi bleibt Spasskarte: nur Bank, absichtlich schlechte Werte.
-* Multiplayer Protokoll 14, damit alte Clients nach dem Update neu laden.
+* Anzeige im Spielerprofil: „OVR 83 · Potenzial 100 · noch 2 Punkte bis 84“; im Verlauf erscheint jede neue Stufe.
+* Multiplayer Protokoll 14, damit alte Clients nach dem Update neu laden. Kein Eintrag in „Was ist neu“.
 
-Code: `app/feature-data.ts` (`SPECIAL_START_RATING`, `SPECIAL_POTENTIAL`, `cardPackRating`), `app/career-data.ts` (`getSpecialGrowth`), Anzeige im Spielerprofil (`app/career-panels.tsx`). Tests: `tests/special-growth.test.ts`.
+Code: `app/feature-data.ts` (`SPECIAL_START_RATING`, `SPECIAL_POTENTIAL`, `cardPackRating`), `app/career-data.ts` (`getSpecialGrowth`, `MATCH_RESULT_POINTS`, `GROWTH_POINTS_PER_LEVEL`), Anzeige in `app/career-panels.tsx`. Tests: `tests/special-growth.test.ts`, `tests/career.test.ts`.
