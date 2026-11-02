@@ -4,7 +4,7 @@ import { FC27_OFFICIAL_POSITION_COUNT, FC27_POSITION_BY_SOURCE_ID } from "../app
 import { FC27_OFFICIAL_RATING_COUNT, FC27_RATING_BY_SOURCE_ID, FC27_UNAVAILABLE_SOURCE_IDS } from "../app/fc27-ratings.ts";
 import { FC27_WITHDRAWN_SEEDS } from "../app/fc27-added-players.ts";
 import { transferClubsForRating } from "../app/features/news-data.ts";
-import { acceptTransferOffer, declineTransferOffer, expireTransferOffer, lockMatchSquad, releaseMatchSquad, transferUnhappyMatches, TRANSFER_OFFER_DURATION_MS, TRANSFER_UNHAPPY_MATCHES, TRANSFER_UNHAPPY_PENALTY, activatePendingTransferLoans, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, canStarXIPlayerPlayPosition, completeTournamentRun, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupMatchStrength, getCupPlayerMatchRating, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarXIEffectiveMatchRating, getStarXIPlayerMatchRating, getStarXISelection, getStarXIFragmentCompensation, getTournamentGoalBoostMultiplier, getTournamentOpponentSchedule, getTransferDeadlineEventDelay, getTransferEventDelay, getUnavailableStarXIPlayerIds, initialGameFeatures, initialSeasonMode, isTransferDeadlineDay, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, playSeasonModeMatch, recordSeasonModeMatch, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, startTournamentGoalBoost, REWARD_PACKS, getRewardPackOdds, getStarXIPlayer, STAR_PACKS, STAR_XI_ACTIVE_PLAYERS, STAR_XI_BENCH_SIZE, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE, TOURNAMENTS, TOURNAMENT_COOLDOWN_MS, TOURNAMENT_OPPONENT_MULTIPLIER, TOURNAMENT_GOAL_BOOST_DURATION_MS, TRANSFER_DEADLINE_LOAN_CHANCE, TRANSFER_LOAN_CHANCE, TRANSFER_PAID_SALE_CHANCE, TRANSFER_SALE_CHANCE, YB_FC26_SOURCE_IDS } from "../app/feature-data.ts";
+import { cardPackRating, acceptTransferOffer, declineTransferOffer, expireTransferOffer, lockMatchSquad, releaseMatchSquad, transferUnhappyMatches, TRANSFER_OFFER_DURATION_MS, TRANSFER_UNHAPPY_MATCHES, TRANSFER_UNHAPPY_PENALTY, activatePendingTransferLoans, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, canStarXIPlayerPlayPosition, completeTournamentRun, drawRandomStarXICustomCard, finishActiveTransferLoans, getCupMatchStrength, getCupPlayerMatchRating, getGoalBoostedPassiveReward, getGoalBoostMultiplier, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarXIEffectiveMatchRating, getStarXIPlayerMatchRating, getStarXISelection, getStarXIFragmentCompensation, getTournamentGoalBoostMultiplier, getTournamentOpponentSchedule, getTransferDeadlineEventDelay, getTransferEventDelay, getUnavailableStarXIPlayerIds, initialGameFeatures, initialSeasonMode, isTransferDeadlineDay, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, playSeasonModeMatch, recordSeasonModeMatch, resolveRandomEvent, resolveTransferInsiderEvent, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, startTournamentGoalBoost, REWARD_PACKS, getRewardPackOdds, getStarXIPlayer, STAR_PACKS, STAR_XI_ACTIVE_PLAYERS, STAR_XI_BENCH_SIZE, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STAR_XI_RANDOM_CUSTOM_CARD_COST, STAR_XI_SQUAD_SIZE, TOURNAMENTS, TOURNAMENT_COOLDOWN_MS, TOURNAMENT_OPPONENT_MULTIPLIER, TOURNAMENT_GOAL_BOOST_DURATION_MS, TRANSFER_DEADLINE_LOAN_CHANCE, TRANSFER_LOAN_CHANCE, TRANSFER_PAID_SALE_CHANCE, TRANSFER_SALE_CHANCE, YB_FC26_SOURCE_IDS } from "../app/feature-data.ts";
 import { getPackUnlockLeague } from "../app/season-progression.ts";
 import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../app/upgrade-purchase.ts";
 import { prepareCareerMatch, recordCareerMatch } from "../app/career-data.ts";
@@ -50,7 +50,7 @@ test("pack rows follow the card tiers and a dearer pack is never worse in any ti
   assert.deepEqual(hundred, { scrap: 0, regional: 0, scout: 0, profi: 0, elite: 0, weltklasse: 0.00001, legend: 0.0001 });
   for (const id of ["weltklasse", "legend"] as const) {
     const pulls = Array.from({ length: 40 }, (_, index) => openStarPack(id, [], sequenceRandom([0.999999, 0.5, (index % 4 + 0.5) / 4, (index + 0.5) / 40]))).map((opening) => opening.player);
-    assert.ok(pulls.every((player) => player.rating === 100 && player.isCustom && player.cardType === "legendary"), `${id} 100 row draws only 100 rated special cards`);
+    assert.ok(pulls.every((player) => cardPackRating(player) === 100 && player.isCustom && player.cardType === "legendary"), `${id} 100 row draws only 100 rated special cards`);
   }
   const atLeast = (pack: (typeof STAR_PACKS)[number], rating: number) => pack.odds.filter((band) => band.minRating >= rating).reduce((sum, band) => sum + band.chance, 0);
   const byPrice = [...STAR_PACKS].sort((first, second) => first.price - second.price);
@@ -110,7 +110,7 @@ test("fragment compensation rises with rating and card rarity", () => {
   const normal69 = STAR_XI_PLAYERS.find((player) => !player.isCustom && !player.cardType && player.rating === 69)!;
   const highestNormal = Math.max(...STAR_XI_PLAYERS.filter((player) => !player.isCustom && !player.cardType).map((player) => getStarXIFragmentCompensation(player)));
   const icon = STAR_XI_PLAYERS.find((player) => player.cardType === "icon")!;
-  const special = STAR_XI_CUSTOM_PLAYERS.find((player) => player.rating === 67)!;
+  const special = STAR_XI_CUSTOM_PLAYERS.find((player) => cardPackRating(player) === 67)!;
 
   assert.ok(getStarXIFragmentCompensation(normal69) > getStarXIFragmentCompensation(normal68));
   assert.ok(getStarXIFragmentCompensation(icon) > getStarXIFragmentCompensation(normal69));
@@ -334,8 +334,9 @@ test("best XI chooses a full valid high-rated lineup without duplicate players",
   assert.equal(best.benchIds.length, STAR_XI_BENCH_SIZE);
   assert.equal(best.benchIds.filter(Boolean).length, STAR_XI_BENCH_SIZE);
   selected.forEach((playerId, index) => assert.equal(canStarXIPlayerFillSlot(playerId, index, best.formationPositions), true));
-  assert.equal(best.lineupIds[0], "star-maetthu");
-  assert.ok(best.lineupIds.includes("star-goat-nicu"));
+  // Special cards start at 80 (potential 100), so with every card owned the strongest icons play.
+  assert.equal(best.lineupIds[0], "icon-gianluigi-buffon");
+  assert.ok(!best.lineupIds.some((id) => getStarXIPlayer(id)?.isCustom));
 });
 
 test("best XI bench only contains players who fit the active formation", () => {

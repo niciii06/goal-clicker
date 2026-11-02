@@ -250,3 +250,11 @@ Erst umstellen, wenn alles erfüllt ist: neueste Datenkopie geprüft (`verify-ac
 * Supabase Free pausiert; dann bleibt nur der Besitzercode.
 * Die Kostenschätzung oben ist eine Rechnung, keine Messung auf Netlify.
 * `@neon/auth` 0.8.2 ist vom 30. Oktober 2026, also sehr neu.
+
+## Nachtrag 2. November, nach dem Livegang: vergessene Tabs
+
+Erste echte Werte von Neon (seit 07:19 UTC): 10 MB von 5 GB Transfer, 3,2 Stunden wache Rechenzeit über beide Branches. Die Live Seite nutzt den Branch `migration-staging` (fest 0,25 CU). Gefahr waren Tabs, die offen bleiben: sichtbar sendeten sie alle 1,5 s einen Tick (im Pokalspiel zusätzlich jede Sekunde), versteckt jede Minute den Spielstand und alle 5 s den Reise Abgleich. Damit wäre die Neon Compute nie pausiert (rund 6 CU Stunden pro Tag, die 100 freien also nach etwa 16 Tagen weg) und Netlify hätte pro vergessenem Tab 10 bis 25 Credits am Tag verbraucht.
+
+Seither (`app/activity.ts`): Ein Tab, der versteckt ist oder seit 10 Minuten keine Eingabe hatte, sendet keine Hintergrund Anfragen mehr. Der Cloud Spielstand wird nur noch im sichtbaren, benutzten Tab jede Minute hochgeladen, rein passive Tore höchstens alle 10 Minuten; Verstecken und Schliessen speichern weiter sofort. So pausiert die Neon Compute 5 Minuten nach dem letzten aktiven Spieler.
+
+Jedes Produktionsdeploy kostet auf Netlify 15 Credits: Änderungen bündeln.

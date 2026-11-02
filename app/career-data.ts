@@ -27,7 +27,31 @@ export type CareerState = {
   claimedAlbumRewards: string[];
   milestoneCards: Record<string, string[]>;
   milestoneCategories: Record<string, MilestoneCategory>;
+  /** Special cards: their statistics when growth started (the update of 2 November 2026); only what comes after counts. */
+  growthBase: Record<string, GrowthStats>;
 };
+export type GrowthStats = { appearances: number; goals: number; assists: number; motm: number };
+
+/** Growth of special cards from 80 to their potential: points per match of that card, +1 rating per GROWTH_POINTS_PER_LEVEL. */
+export const GROWTH_POINT_VALUES: GrowthStats = { appearances: 1, goals: 2, assists: 1, motm: 3 };
+export const GROWTH_POINTS_PER_LEVEL = 10;
+const GROWTH_KEYS = Object.keys(GROWTH_POINT_VALUES) as (keyof GrowthStats)[];
+
+/** Cards with a potential grow through their own matches instead of milestones. */
+export function hasPotential(player: StarXIPlayer) {
+  return typeof player.potential === 'number' && player.potential > player.rating;
+}
+
+/** Points, levels gained and progress to the next level of a card with potential. */
+export function getSpecialGrowth(career: CareerState, player: StarXIPlayer) {
+  const stats = career.players[player.id] ?? emptyPlayerStats();
+  const base = career.growthBase[player.id];
+  const points = GROWTH_KEYS.reduce((sum, key) => sum + Math.max(0, stats[key] - (base?.[key] ?? 0)) * GROWTH_POINT_VALUES[key], 0);
+  const maxLevels = Math.max(0, (player.potential ?? player.rating) - player.rating);
+  const levels = Math.min(maxLevels, Math.floor(points / GROWTH_POINTS_PER_LEVEL));
+  const done = levels >= maxLevels;
+  return { points, levels, maxLevels, potential: player.potential ?? player.rating, rating: player.rating + levels, nextLevelPoints: done ? null : (levels + 1) * GROWTH_POINTS_PER_LEVEL, pointsToNext: done ? 0 : (levels + 1) * GROWTH_POINTS_PER_LEVEL - points };
+}
 export const LEGACY_CAREER_MILESTONES = [
   { id: 'loyal', label: 'Vereinstreue', metric: 'appearances', target: 25, bonus: 1, accent: '#a3b9d6' },
   { id: 'scorer', label: 'Torjäger', metric: 'goals', target: 50, bonus: 2, accent: '#f2b44e' },
@@ -59,13 +83,15 @@ export function getPlayerMilestones(career: CareerState, player: StarXIPlayer): 
 }
 function unlockPlayerMilestones(career: CareerState, player: StarXIPlayer) {
   career.milestoneCategories[player.id] ??= getMilestoneCategory(player);
+  // Special cards grow through their potential only, they collect no milestones.
+  if (hasPotential(player)) { delete career.milestoneCards[player.id]; return; }
   const stats = career.players[player.id] ?? emptyPlayerStats();
   const ids = new Set(career.milestoneCards[player.id] ?? []);
   for (const milestone of getPlayerMilestones(career, player)) if (stats[milestone.metric] >= milestone.target) ids.add(milestone.id);
   if (ids.size) career.milestoneCards[player.id] = [...ids];
 }
 export function emptyPlayerStats(): PlayerCareerStats { return { appearances: 0, minutes: 0, goals: 0, assists: 0, ratingTotal: 0, ratedMatches: 0, motm: 0, subAppearances: 0, subRatingTotal: 0, subMinutes: 0, recent: [] }; }
-export function initialCareerState(): CareerState { return { version: 2, players: {}, seasonPlayers: {}, seasonNumber: 1, seasonMatches: 0, awards: [], reports: [], processedMatchIds: [], rivals: {}, collectedIds: [], claimedAlbumRewards: [], milestoneCards: {}, milestoneCategories: {} }; }
+export function initialCareerState(): CareerState { return { version: 3, players: {}, seasonPlayers: {}, seasonNumber: 1, seasonMatches: 0, awards: [], reports: [], processedMatchIds: [], rivals: {}, collectedIds: [], claimedAlbumRewards: [], milestoneCards: {}, milestoneCategories: {}, growthBase: {} }; }
 function object(value: unknown): Record<string, unknown> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}; }
 function number(value: unknown, max = 1e9) { const n = Number(value); return Number.isFinite(n) ? Math.max(0, Math.min(max, n)) : 0; }
 function integer(value: unknown, max = 1e9) { return Math.floor(number(value, max)); }
@@ -110,6 +136,17 @@ export function normalizeCareerState(value: unknown, knownIds: readonly string[]
     }
     unlockPlayerMilestones(next, player);
   }
+  // Version 3 (2 November 2026): special cards start growing from 80. Whatever they played before counts as the
+  // starting point, so every special card begins at 0 growth points, also in saves and worlds from before.
+  const savedBase = object(source.growthBase);
+  for (const [id, stats] of Object.entries(next.players)) {
+    const player = getStarXIPlayer(id);
+    if (!player || !hasPotential(player)) continue;
+    const saved = object(savedBase[id]);
+    next.growthBase[id] = integer(source.version) < 3
+      ? { appearances: stats.appearances, goals: stats.goals, assists: stats.assists, motm: stats.motm }
+      : { appearances: integer(saved.appearances), goals: integer(saved.goals), assists: integer(saved.assists), motm: integer(saved.motm) };
+  }
   for (const raw of Object.values(object(source.rivals)).slice(0, 300)) {
     const r = object(raw), opponent = text(r.opponent, 80); if (!opponent) continue;
     const wins = integer(r.wins), draws = integer(r.draws), losses = integer(r.losses), played = wins + draws + losses, closeGames = Math.min(played, integer(r.closeGames));
@@ -135,6 +172,10 @@ export function getPlayerForm(career: CareerState, playerId: string) {
   return { average, bonus, matches: recent.length, label: bonus >= 0.5 ? 'In Form' : bonus <= -0.5 ? 'Formtief' : 'Stabil' };
 }
 export function getCareerCard(career: CareerState, player: StarXIPlayer) {
+  if (hasPotential(player)) {
+    const growth = getSpecialGrowth(career, player);
+    return { milestone: undefined, bonus: growth.levels, rating: growth.rating, growth };
+  }
   const unlocked = career.milestoneCards[player.id] ?? [];
   const milestone = [...CAREER_MILESTONES].filter(m => unlocked.includes(m.id)).sort((a,b) => b.bonus - a.bonus)[0];
   return { milestone, bonus: milestone ? Math.min(milestone.bonus, 100 - player.rating) : 0, rating: Math.min(100, player.rating + (milestone?.bonus ?? 0)) };
@@ -251,10 +292,18 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
   if (old.active) addHistory(features, { title: won ? 'Derbysieg! Die Kurve eskaliert.' : draw ? 'Derbyremis. Die Revanche wartet.' : 'Derbyniederlage. Das vergessen die Fans nicht.', detail: `${resultLabel} gegen ${c.opponent}${derbyReward ? ` · +${derbyReward} Fragmente` : ''}`, tone: won ? 'positive' : draw ? 'neutral' : 'negative' });
   features.starXI.fragments += derbyReward;
   for (const p of players) {
+    const card = getStarXIPlayer(p.playerId)!;
+    const grownBefore = hasPotential(card) ? getSpecialGrowth(career, card).levels : 0;
     career.players[p.playerId] = addStats(career.players[p.playerId],p,p.playerId===motmId);
     if (c.mode === 'season') career.seasonPlayers[p.playerId] = addStats(career.seasonPlayers[p.playerId],p,p.playerId===motmId);
     if (!career.collectedIds.includes(p.playerId)) career.collectedIds.push(p.playerId);
-    career.milestoneCategories[p.playerId] ??= getMilestoneCategory(getStarXIPlayer(p.playerId)!);
+    career.milestoneCategories[p.playerId] ??= getMilestoneCategory(card);
+    if (hasPotential(card)) {
+      // Special cards grow with their own matches instead of collecting milestones.
+      const grown = getSpecialGrowth(career, card);
+      if (grown.levels > grownBefore) addHistory(features, { title: `${card.name} wächst auf ${grown.rating}`, detail: grown.nextLevelPoints === null ? `Potenzial ${grown.potential} erreicht.` : `Potenzial ${grown.potential} · noch ${grown.pointsToNext} Punkte bis ${grown.rating + 1}.`, tone: 'positive' });
+      continue;
+    }
     for (const m of getPlayerMilestones(career, getStarXIPlayer(p.playerId)!)) if (career.players[p.playerId][m.metric] >= m.target && !(career.milestoneCards[p.playerId] || []).includes(m.id)) {
       career.milestoneCards[p.playerId] = [...(career.milestoneCards[p.playerId] || []),m.id];
       addHistory(features, { title: `${m.label}-Karte freigeschaltet`, detail: `${getStarXIPlayer(p.playerId)?.name} · ${m.target} ${MILESTONE_METRIC_LABELS[m.metric]}. Die stärkste Version ist automatisch aktiv.`, tone: 'positive' });

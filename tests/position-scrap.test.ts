@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { STAR_XI_PLAYERS, initialGameFeatures, normalizeGameFeatures } from '../app/feature-data.ts';
 import { emptyPlayerStats, getCareerCard, getMilestoneCategory, getPlayerMilestones, normalizeCareerState, claimAllAlbumRewards, getAlbumGroups } from '../app/career-data.ts';
-const player = (position:string) => STAR_XI_PLAYERS.find(p=>p.position===position) ?? {...STAR_XI_PLAYERS[0],position:position as NonNullable<(typeof STAR_XI_PLAYERS)[number]['position']>,positions:[position as NonNullable<(typeof STAR_XI_PLAYERS)[number]['position']>]};
+const player = (position:string) => STAR_XI_PLAYERS.find(p=>p.position===position&&!p.potential) ?? {...STAR_XI_PLAYERS.find(p=>!p.potential)!,position:position as NonNullable<(typeof STAR_XI_PLAYERS)[number]['position']>,positions:[position as NonNullable<(typeof STAR_XI_PLAYERS)[number]['position']>]};
 test('every primary position receives increasing realistic goals with unchanged nonstacking rewards',()=>{
  for(const [pos,category] of [['TW','goalkeeper'],['IV','defender'],['LV','defender'],['RV','defender'],['ZDM','midfielder'],['ZM','midfielder'],['ZOM','midfielder'],['LM','winger'],['RM','winger'],['LF','winger'],['RF','winger'],['ST','striker'],['MS','striker']]) {
   const p=player(pos);assert.equal(getMilestoneCategory(p),category);

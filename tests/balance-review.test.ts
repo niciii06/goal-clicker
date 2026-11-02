@@ -5,7 +5,7 @@ import { CLICK_PASSIVE_SHARE_CAP } from "../app/game/constants.ts";
 import { getBaseClickPower, getBasePassivePower, getClickPassiveShare } from "../app/game/economy.ts";
 import { ALBUM_MILESTONES, claimAlbumReward, getAlbumGroups } from "../app/career-data.ts";
 import { DAILY_REWARD_DAYS, WORLD_DAILY_KEY, claimDailyReward, getDailyRewardStatus, getPreviousRewardDay, getRewardDay, mergeDailyRewardsForWorld } from "../app/daily-reward.ts";
-import { MATCH_PACK_STAMP_TARGET, SCRAP_PACK_PLAYERS, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STARTER_SQUAD_UNLOCK_CLICKS, awardMatchStamp, canStarXIPlayerFillSlot, getSeasonOpponentRating, getStarXIPlayer, grantWelcomePack, initialGameFeatures, maybeGrantStarterSquad, normalizeGameFeatures, openEarnedPack, openEarnedPackDraw, openStarPack } from "../app/feature-data.ts";
+import { MATCH_PACK_STAMP_TARGET, cardPackRating, SCRAP_PACK_PLAYERS, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STARTER_SQUAD_UNLOCK_CLICKS, awardMatchStamp, canStarXIPlayerFillSlot, getSeasonOpponentRating, getStarXIPlayer, grantWelcomePack, initialGameFeatures, maybeGrantStarterSquad, normalizeGameFeatures, openEarnedPack, openEarnedPackDraw, openStarPack } from "../app/feature-data.ts";
 import { FULL_COMBO_FACTOR, activeClicks, clickUpgradeReport, simulateEconomy } from "../scripts/balance/economy-model.ts";
 
 function seededRandom(seed = 4242) {
@@ -148,19 +148,19 @@ test("day seven brings a special card pack: no 100 below Liga 3, the normal chan
   for (let index = 0; index < 2000; index++) {
     const opening = openEarnedPackDraw("special", [], 12, random);
     assert.ok(opening.player.isCustom);
-    assert.ok(opening.player.rating < 100, "no 100 below Liga 3");
+    assert.ok(cardPackRating(opening.player) < 100, "no 100 below Liga 3");
   }
   // A low roll is the 100 group, and from Liga 3 on it is open.
-  assert.equal(openEarnedPackDraw("special", [], 13, () => 0.01).player.rating, 100);
-  assert.ok(openEarnedPackDraw("special", [], 12, () => 0.01).player.rating < 100);
+  assert.equal(cardPackRating(openEarnedPackDraw("special", [], 13, () => 0.01).player), 100);
+  assert.ok(cardPackRating(openEarnedPackDraw("special", [], 12, () => 0.01).player) < 100);
   // The free pack is opened once, costs no fragments and refuses a 100 handed in below Liga 3.
   const features = initialGameFeatures();
   features.seasonMode.highestDivision = 5;
   features.earnedPacks = [{ id: "daily-solo-2026-10-30", packId: "special", earnedAt: 1 }];
-  const hundred = STAR_XI_CUSTOM_PLAYERS.find((player) => player.rating === 100)!;
+  const hundred = STAR_XI_CUSTOM_PLAYERS.find((player) => cardPackRating(player) === 100)!;
   assert.equal(openEarnedPack(features, "daily-solo-2026-10-30", 2, Math.random, { packId: "legend", packName: "x", player: hundred, duplicate: false, fragmentCompensation: 0, source: "custom-draw" }), null);
   const reveal = openEarnedPack(features, "daily-solo-2026-10-30", 2, seededRandom(5))!;
-  assert.ok(reveal.player.isCustom && reveal.player.rating < 100);
+  assert.ok(reveal.player.isCustom && cardPackRating(reveal.player) < 100);
   assert.equal(features.starXI.fragments, 0);
   assert.equal(openEarnedPack(features, "daily-solo-2026-10-30", 3), null);
   // The earned special pack and its opening survive a reload.

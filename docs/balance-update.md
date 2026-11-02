@@ -219,3 +219,16 @@ Neues Modell `scripts/balance/progression-model.ts`. Annahmen: 2 Minuten Büro, 
 | 1 | 140 / 350 | 5,3 / 21,5 | 4,8 / 13,0 |
 
 Werte: Median / P90 in Minuten. Die volle Startelf steht nach 50 Klicks, also nach unter einer Minute. Offene Punkte: In Liga 5 bis 3 wartet jeder zehnte passive Club über 20 bis 49 Minuten auf das nächste Pack, weil das VAR Pech dort mit den teuersten Packs zusammentrifft. In Liga 1 und 2 braucht ein Club oft zwei Saisons.
+
+## Nachtrag 2. November: Special Cards wachsen von 80 auf 100
+
+Alle zehn Special Cards (auch Pfuschi und Mikeboy Jr.) starten mit 80 OVR und haben Potenzial 100. Sie wachsen nur durch ihre eigenen Partien, Meilensteine gibt es für sie nicht mehr:
+
+* Punkte pro Partie dieser Karte: Einsatz 1, Tor 2, Vorlage 1, Spieler des Spiels 3. Alle 10 Punkte +1 OVR, also 200 Punkte bis 100 (Stammspieler mit Toren etwa 60 bis 80 Partien).
+* Der Zähler beginnt für alle bei 0, auch für Karten, die schon vorher gespielt haben (Spielstände und Welten merken sich den Stand vom Update, `career.growthBase`, Karriere Version 3). Bestehende 100er fallen damit auf 80.
+* Das Wachstum wirkt im Spiel: Es fliesst wie die Meilensteinboni über `careerBonuses` in die Spielstärke (für Karten mit Potenzial bis +20 statt +5) und in die Beste Elf.
+* Packs bleiben gleich: `packRating` hält die frühere Stufe (100 oder 67) für Packzeilen, Seltenheit, Liga 3 Sperre, Special Card Pack Chance und Duplikat Entschädigung. Preis und Pack Gewichte sind unverändert.
+* Pfuschi bleibt Spasskarte: nur Bank, absichtlich schlechte Werte.
+* Multiplayer Protokoll 14, damit alte Clients nach dem Update neu laden.
+
+Code: `app/feature-data.ts` (`SPECIAL_START_RATING`, `SPECIAL_POTENTIAL`, `cardPackRating`), `app/career-data.ts` (`getSpecialGrowth`), Anzeige im Spielerprofil (`app/career-panels.tsx`). Tests: `tests/special-growth.test.ts`.

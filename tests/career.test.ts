@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { beginSeasonCupMatch, initialGameFeatures, normalizeGameFeatures, pauseGameFeatureTimers, setBestStarXI, STAR_XI_PLAYERS, getStarXISelection, advanceCupMatch, getStarXIEffectiveMatchRating, recordSeasonModeMatch, startSeasonPrestige, resumeCupMatch } from '../app/feature-data.ts';
+import { cardPackRating, beginSeasonCupMatch, initialGameFeatures, normalizeGameFeatures, pauseGameFeatureTimers, setBestStarXI, STAR_XI_PLAYERS, getStarXISelection, advanceCupMatch, getStarXIEffectiveMatchRating, recordSeasonModeMatch, startSeasonPrestige, resumeCupMatch } from '../app/feature-data.ts';
 import { getMatchScoreImpact } from '../app/feature-data.ts';
 import { getOpponentMatchRatings } from '../app/career-data.ts';
 import { createMatchBroadcast } from '../app/match-broadcast.ts';
@@ -11,7 +11,7 @@ import { AlbumPanel, CareerPanel, MatchRatingsPanel } from '../app/career-panels
 
 function fixture(now=1000000) {
   let f=initialGameFeatures(now);
-  f.starXI=setBestStarXI({...f.starXI,ownedIds:STAR_XI_PLAYERS.filter(p=>p.rating<95).slice(0,200).map(p=>p.id)});
+  f.starXI=setBestStarXI({...f.starXI,ownedIds:STAR_XI_PLAYERS.filter(p=>cardPackRating(p)<95).slice(0,200).map(p=>p.id)});
   f=normalizeGameFeatures(f);
   f.cup=beginSeasonCupMatch(f.cup,f.seasonMode,now,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions,f.starXI.lineupIds,f.starXI.benchIds);
   prepareCareerMatch(f);

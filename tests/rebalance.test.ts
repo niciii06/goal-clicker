@@ -5,8 +5,9 @@ import { capGoalsAfterRebalance, getBasePassivePower, REBALANCED_FEATURES_SCHEMA
 import { STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from "../app/game/constants.ts";
 import { cleanCloudSaveKeys } from "../app/cloud-save-rules.ts";
 import { WHATS_NEW } from "../app/whats-new.ts";
-import { GAME_FEATURES_SCHEMA_VERSION, grantWelcomePack, WELCOME_PACK_LABEL, drawRandomStarXICustomCard, getSpecialCardChances, getStarXIPlayer, getTournamentRewardPack, initialGameFeatures, normalizeGameFeatures, SPECIAL_PACK_HUNDRED_CHANCE, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_RANDOM_CUSTOM_CARD_COST } from "../app/feature-data.ts";
+import { STAR_XI_PLAYERS, cardPackRating, GAME_FEATURES_SCHEMA_VERSION, grantWelcomePack, WELCOME_PACK_LABEL, drawRandomStarXICustomCard, getSpecialCardChances, getStarXIPlayer, getTournamentRewardPack, initialGameFeatures, normalizeGameFeatures, SPECIAL_PACK_HUNDRED_CHANCE, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_RANDOM_CUSTOM_CARD_COST } from "../app/feature-data.ts";
 import { getPackUnlockLeague, getUpgradeUnlockLeague } from "../app/season-progression.ts";
+import { getCareerCard } from "../app/career-data.ts";
 import { getFirstLevelPayback, medianSavingMinutes, simulateEconomy } from "../scripts/balance/economy-model.ts";
 
 function seededRandom(seed = 97531) {
@@ -17,11 +18,14 @@ function seededRandom(seed = 97531) {
   };
 }
 
-const hundredIds = STAR_XI_CUSTOM_PLAYERS.filter((player) => player.rating === 100).map((player) => player.id);
+const hundredIds = STAR_XI_CUSTOM_PLAYERS.filter((player) => cardPackRating(player) === 100).map((player) => player.id);
 
 test("Flurin Fabrice is one of the 100 rated special cards", () => {
   const flurin = getStarXIPlayer("star-flurin-fabrice")!;
-  assert.equal(flurin.rating, 100);
+  assert.equal(cardPackRating(flurin), 100);
+  // Like every special card he starts at 80 and can grow to 100.
+  assert.equal(flurin.rating, 80);
+  assert.equal(flurin.potential, 100);
   assert.equal(flurin.isCustom, true);
   assert.deepEqual(flurin.positions, ["ZM", "ZOM"]);
   assert.ok(hundredIds.includes(flurin.id));
@@ -51,7 +55,7 @@ test("the special card pack awards a 100 rated card in 8% of draws, weighted by 
 
 test("100 rated special cards drawn before Liga 3 leave an old save once", () => {
   const old = initialGameFeatures();
-  const keep = STAR_XI_CUSTOM_PLAYERS.find((player) => player.rating < 100 && !player.benchOnly)!;
+  const keep = STAR_XI_CUSTOM_PLAYERS.find((player) => cardPackRating(player) < 100 && !player.benchOnly)!;
   old.schemaVersion = 5;
   old.seasonMode.division = 11;
   old.seasonMode.highestDivision = 11;
@@ -175,7 +179,8 @@ test("special cards with several words show a fixed name under the player on the
 test("every 100 rated card leaves the album once, whatever the league", () => {
   const save = initialGameFeatures();
   const inSquad = hundredIds[0], archived = hundredIds[1];
-  const normal = STAR_XI_CUSTOM_PLAYERS.find((player) => player.rating < 100 && !player.benchOnly)!;
+  // A normal card keeps its milestones; special cards grow through their potential instead.
+  const normal = STAR_XI_PLAYERS.find((player) => !player.isCustom && !player.retired && player.cardType !== "icon" && player.rating < 90)!;
   const stats = { appearances: 30, minutes: 2700, goals: 60, assists: 30, ratingTotal: 240, ratedMatches: 30, motm: 12, subAppearances: 0, subRatingTotal: 0, subMinutes: 0, recent: [] };
   save.schemaVersion = 7;
   save.seasonMode.division = 14;
@@ -198,10 +203,10 @@ test("every 100 rated card leaves the album once, whatever the league", () => {
   assert.ok(cleaned.career.collectedIds.includes(normal.id));
   assert.ok(cleaned.career.milestoneCards[normal.id]?.length);
   assert.equal(cleaned.history.at(-1)?.title, "Sammelalbum bereinigt");
-  // Runs once: later progress of a 100 rated card stays.
+  // Runs once: later progress of a 100 rated card stays, as growth towards its potential.
   cleaned.career.players[inSquad] = stats;
   const again = normalizeGameFeatures(JSON.parse(JSON.stringify(cleaned)));
-  assert.ok(again.career.milestoneCards[inSquad]?.length);
+  assert.equal(getCareerCard(again.career, getStarXIPlayer(inSquad)!).rating, 100);
 });
 
 test("a new club opens a free welcome pack with a guaranteed base walkout", () => {

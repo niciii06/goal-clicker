@@ -24,11 +24,12 @@ function complete(f: ReturnType<typeof fixture>) {
   return f;
 }
 
-test('Pfuschi has exactly 67 OVR and nothing else changed', () => {
+test('Pfuschi starts at 80 OVR like every special card and stays a bench only joke card', () => {
   const pfuschi = STAR_XI_PLAYERS.filter(p => p.name === 'Pfuschi');
   assert.equal(pfuschi.length, 1, 'no second Pfuschi card');
   const p = getStarXIPlayer('star-pfuschi')!;
-  assert.equal(p.rating, 67);
+  assert.equal(p.rating, 80);
+  assert.equal(p.potential, 100);
   assert.equal(p.name, 'Pfuschi');
   assert.equal(p.position, null);
   assert.deepEqual(getStarXIPositions(p), []);
