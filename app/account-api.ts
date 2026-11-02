@@ -6,13 +6,14 @@
 // * the game account ID (profiles.user_id, cloud_saves.user_id, player_accounts.user_id): whose data it is,
 //   for the nine original accounts their old Supabase user ID,
 // * the player ID (player_accounts.player_id): the seat in multiplayer worlds.
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { getDb } from "../db";
 import type { AccountRecovery, AuthIdentity, CloudSave, GoalClickerDatabase, Profile, RecoveryCompletion } from "../db";
 import { authConfigured, authIssuer } from "./auth/config";
 import { checkGoogleLinks, forgetIdentity, lookupAccount, resolveAccount } from "./auth/identity";
 import type { AccountResolution } from "./auth/identity";
 import { legacyBridgeConfigured, verifyLegacyPassword } from "./auth/legacy-bridge";
+import { hashRecoveryCode } from "./auth/recovery-code";
 import type { LegacyCheck } from "./auth/legacy-bridge";
 import { deleteNeonUser, signInEmail, signOutSession, signUpEmail } from "./auth/neon-accounts";
 import type { DeleteOutcome, NeonLogin } from "./auth/neon-accounts";
@@ -399,10 +400,6 @@ async function migratePasswordLogin(deps: AccountApiDeps, values: { accountId: s
     return json(expired ? { error: "Die Übernahme ist abgelaufen. Bitte melde dich nochmal an.", errorCode: "RECOVERY_EXPIRED" } : RECOVERY_FAILED, 409);
   }
   return json({ signedIn: true, recovered: true }, 200, browserSetCookies(login.setCookies));
-}
-
-export function hashRecoveryCode(code: string) {
-  return createHash("sha256").update(code.replace(/[\s-]/g, "").toUpperCase()).digest("hex");
 }
 
 /**

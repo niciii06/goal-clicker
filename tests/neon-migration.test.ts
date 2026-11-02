@@ -4,7 +4,8 @@
 // binding and recovery rules against PostgreSQL.
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
-import { getCloudSaveResponse, getProfileResponse, hashRecoveryCode, loginResponse, recoveryCodeResponse } from '../app/account-api.ts';
+import { getCloudSaveResponse, getProfileResponse, loginResponse, recoveryCodeResponse } from '../app/account-api.ts';
+import { hashRecoveryCode, newRecoveryCode } from '../app/auth/recovery-code.ts';
 import { authConfigProblem, authIssuer, authMode } from '../app/auth/config.ts';
 import { checkGoogleLinks, clearIdentityCacheForTests, resolveAccount } from '../app/auth/identity.ts';
 import type { IdentityDeps } from '../app/auth/identity.ts';
@@ -312,4 +313,11 @@ test('missing or invalid auth configuration fails closed on a host and is never 
   assert.equal(authMode(), 'neon');
   process.env.NETLIFY = 'true';
   assert.equal(authMode(), 'misconfigured');
+});
+
+test('owner codes are long, unambiguous and hashed the same however they are typed', () => {
+  const code = newRecoveryCode();
+  assert.match(code, /^[A-HJ-NP-Z2-79]{4}(-[A-HJ-NP-Z2-79]{4}){4}$/);
+  assert.equal(hashRecoveryCode(code), hashRecoveryCode(` ${code.toLowerCase().replaceAll('-', ' ')} `));
+  assert.notEqual(newRecoveryCode(), code);
 });

@@ -1,5 +1,7 @@
-// The required login end to end: registering and signing in with username and password against a stand-in
-// for Supabase Auth, the unique username, and the cloud save across two devices: the profile's save always wins.
+// The required login end to end against a stand-in for Neon Auth (tests/browser/mock-neon-auth.ts): registering and
+// signing in with username and password, Google, the unique username, the cloud save across two devices (the
+// profile's save always wins), recovering the original accounts (old password, old Google login), revoked sessions,
+// and two accounts playing one multiplayer world at the same time.
 // Needs TEST_DATABASE_URL (an empty scratch database) and Chromium; builds its own copy into .next-account.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -10,7 +12,7 @@ import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
 import { chromium } from 'playwright-core';
 import type { Browser, BrowserContext, Page } from 'playwright-core';
-import { startMockAuth } from './mock-auth-server.ts';
+import { startMockNeonAuth } from './mock-neon-auth.ts';
 
 const databaseUrl = process.env.TEST_DATABASE_URL ?? '';
 const skip = databaseUrl ? false : 'TEST_DATABASE_URL is not set';
@@ -18,10 +20,19 @@ const AUTH_PORT = 54399;
 const PORT = Number(process.env.ACCOUNT_TEST_PORT ?? 8798);
 const BASE = `http://127.0.0.1:${PORT}`;
 const SAVE_KEY = 'goalClickerSiteSaveV3';
-const env = { ...process.env, NEXT_DIST_DIR: '.next-account', NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${AUTH_PORT}`, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test', DATABASE_URL: databaseUrl };
+const env = {
+  ...process.env,
+  NEXT_DIST_DIR: '.next-account',
+  NEON_AUTH_BASE_URL: `http://127.0.0.1:${AUTH_PORT}/neondb/auth`,
+  NEON_AUTH_COOKIE_SECRET: 'browser-test-cookie-secret-0123456789abcdef',
+  LEGACY_SUPABASE_URL: `http://127.0.0.1:${AUTH_PORT}`,
+  LEGACY_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test',
+  AUTH_SESSION_CACHE_SECONDS: '0',
+  DATABASE_URL: databaseUrl,
+};
 
 let admin: postgres.Sql;
-let auth: ReturnType<typeof startMockAuth>;
+let auth: ReturnType<typeof startMockNeonAuth>;
 let server: ChildProcess | undefined;
 let browser: Browser;
 const problems: string[] = [];
@@ -31,8 +42,8 @@ before(async () => {
   if (!databaseUrl) return;
   admin = postgres(databaseUrl, { max: 1, onnotice: () => {} });
   await migrate(drizzle(admin), { migrationsFolder: 'drizzle' });
-  await admin`truncate coop_rooms, solo_travel, player_accounts, profiles, cloud_saves`;
-  auth = startMockAuth(AUTH_PORT);
+  await admin`truncate coop_rooms, solo_travel, player_accounts, profiles, cloud_saves, auth_identities, legacy_identities, account_recovery, recovery_codes, rate_limits`;
+  auth = startMockNeonAuth(AUTH_PORT);
   // ACCOUNT_TEST_REUSE_BUILD=1 skips the build while iterating on the test itself.
   if (process.env.ACCOUNT_TEST_REUSE_BUILD !== '1') {
     const build = spawnSync('node_modules/.bin/next', ['build'], { env, stdio: 'inherit' });
@@ -262,6 +273,7 @@ test('the profile settings change display name and password and delete the profi
   await panel.getByRole('button', { name: 'Speichern' }).click();
   // Feedback shows inside the dialog, above its dimmed background.
   await panel.getByRole('status').filter({ hasText: 'Anzeigename gespeichert.' }).waitFor();
+  await panel.getByLabel('Aktuelles Passwort').fill('anderes-passwort-2');
   await panel.getByLabel('Neues Passwort').fill('neues-passwort-3');
   await panel.getByLabel('Wiederholen').fill('neues-passwort-3');
   await panel.getByRole('button', { name: 'Passwort ändern' }).click();
@@ -273,6 +285,9 @@ test('the profile settings change display name and password and delete the profi
   await panel.getByRole('button', { name: 'Endgültig löschen' }).click();
   await page.getByRole('button', { name: 'Mit Google anmelden' }).waitFor();
   assert.equal((await admin`select count(*)::int as n from profiles where user_id = ${userId}::uuid`)[0].n, 0);
+  // The login is gone at Neon Auth too, and so is its mapping.
+  assert.equal([...auth.users.values()].some((user) => user.name === 'Goalie'), false);
+  assert.equal((await admin`select count(*)::int as n from auth_identities where account_id = ${userId}::uuid`)[0].n, 0);
 });
 
 test('signing out right after clicking still saves those clicks, then forgets the save on this device', { skip }, async () => {
@@ -318,5 +333,121 @@ test('a guest plays single player only, and signing up takes the guest save into
   await page.getByRole('button', { name: 'Konto von Gast' }).waitFor();
   await hideTab(page);
   await waitFor(() => cloudSave('GuestFan'), (save) => Boolean(save && save.totalGoals >= guestGoals), 'guest save in the new account');
+  assert.deepEqual(problems, []);
+});
+
+// ---- The original accounts from Supabase, Google, sessions and multiplayer -------------------------------------
+
+/** Plants an original account the way the copied database holds it: profile, cloud save, player link, old login. */
+async function plantOriginalAccount(values: { id: string; username: string; displayName: string; playerId: string; totalGoals: number; legacy: { provider: 'google' | 'email'; subject: string }; loginEmail?: string }) {
+  const [template] = await admin`select save_json from cloud_saves s join profiles p on p.user_id = s.user_id where p.username_key = 'striker'`;
+  const keys = JSON.parse(template.save_json) as Record<string, string>;
+  const game = JSON.parse(keys[SAVE_KEY]) as Record<string, unknown>;
+  keys[SAVE_KEY] = JSON.stringify({ ...game, totalGoals: values.totalGoals, goals: values.totalGoals });
+  await admin`insert into profiles (user_id, username, username_key, display_name, login_email) values (${values.id}::uuid, ${values.username}, ${values.username.toLowerCase()}, ${values.displayName}, ${values.loginEmail ?? null})`;
+  await admin`insert into cloud_saves (user_id, save_json, version, active, active_version) values (${values.id}::uuid, ${JSON.stringify(keys)}, 17, true, 17)`;
+  await admin`insert into player_accounts (user_id, player_id) values (${values.id}::uuid, ${values.playerId})`;
+  await admin`insert into legacy_identities (provider, provider_subject, account_id) values (${values.legacy.provider}, ${values.legacy.subject}, ${values.id}::uuid)`;
+}
+
+const ORIGINAL_PASSWORD = { id: '63cc2e63-0000-4000-8000-00000000a001', username: 'AltSpieler', displayName: 'Alter Hase', playerId: 'player-original-password', totalGoals: 424242, loginEmail: 'p-original@players.goal-clicker.vercel.app' };
+const ORIGINAL_GOOGLE = { id: 'a55f881c-0000-4000-8000-00000000a002', username: 'AltGoogle', displayName: 'Google Alt', playerId: 'player-original-google', totalGoals: 515151, sub: '113983284348230000001' };
+
+test('an original username account is taken over by simply logging in with the old password', { skip }, async () => {
+  await plantOriginalAccount({ ...ORIGINAL_PASSWORD, legacy: { provider: 'email', subject: ORIGINAL_PASSWORD.id } });
+  auth.legacy.set(ORIGINAL_PASSWORD.loginEmail, { id: ORIGINAL_PASSWORD.id, password: 'altes-passwort-7' });
+  const before = await admin`select p.*, s.version, s.save_json from profiles p join cloud_saves s using (user_id) where p.user_id = ${ORIGINAL_PASSWORD.id}::uuid`;
+  // A new site address starts with an empty browser.
+  const page = await device('original-password');
+  await login(page, ORIGINAL_PASSWORD.username, 'falsches-passwort');
+  await page.getByText('Benutzername oder Passwort stimmt nicht.').waitFor();
+  assert.equal((await admin`select count(*)::int as n from auth_identities where account_id = ${ORIGINAL_PASSWORD.id}::uuid`)[0].n, 0);
+  await page.getByLabel('Passwort').fill('altes-passwort-7');
+  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
+  await page.getByRole('button', { name: `Konto von ${ORIGINAL_PASSWORD.displayName}` }).waitFor();
+  // The original save is in the browser, nothing of the account changed, and the player ID is the original one.
+  assert.equal(await localGoals(page), ORIGINAL_PASSWORD.totalGoals);
+  await page.waitForFunction((id) => localStorage.getItem('goalClickerPlayerIdV3') === id, ORIGINAL_PASSWORD.playerId, { timeout: 15000 });
+  const after = await admin`select p.*, s.version, s.save_json from profiles p join cloud_saves s using (user_id) where p.user_id = ${ORIGINAL_PASSWORD.id}::uuid`;
+  assert.deepEqual(after, before);
+  const [identity] = await admin`select method, login_email from auth_identities where account_id = ${ORIGINAL_PASSWORD.id}::uuid`;
+  assert.equal(identity.method, 'legacy-password');
+  assert.notEqual(identity.login_email, ORIGINAL_PASSWORD.loginEmail);
+  // From now on it is a normal Neon login: a second device signs in with the same password, the bridge is not asked.
+  auth.legacy.clear();
+  const second = await device('original-password-2');
+  await login(second, ORIGINAL_PASSWORD.username, 'altes-passwort-7');
+  await second.getByRole('button', { name: `Konto von ${ORIGINAL_PASSWORD.displayName}` }).waitFor();
+  assert.equal(await localGoals(second), ORIGINAL_PASSWORD.totalGoals);
+  assert.deepEqual(problems, []);
+});
+
+test('an original Google account is taken over by its Google login, a new Google login gets a new account', { skip }, async () => {
+  await plantOriginalAccount({ ...ORIGINAL_GOOGLE, legacy: { provider: 'google', subject: ORIGINAL_GOOGLE.sub } });
+  const page = await device('original-google');
+  auth.google.nextSub = ORIGINAL_GOOGLE.sub;
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Mit Google anmelden' }).click();
+  await page.getByRole('button', { name: `Konto von ${ORIGINAL_GOOGLE.displayName}` }).waitFor({ timeout: 30000 });
+  assert.equal(await localGoals(page), ORIGINAL_GOOGLE.totalGoals);
+  assert.equal(new URL(page.url()).searchParams.has('neon_auth_session_verifier'), false);
+  const [identity] = await admin`select method, subject from auth_identities where account_id = ${ORIGINAL_GOOGLE.id}::uuid`;
+  assert.equal(identity.method, 'legacy-google');
+  assert.notEqual(identity.subject, ORIGINAL_GOOGLE.id);
+  // Someone else with a new Google login: a new, empty account that first asks for a profile.
+  const stranger = await device('new-google');
+  auth.google.nextSub = '200000000000000000042';
+  await stranger.goto(BASE, { waitUntil: 'networkidle' });
+  await stranger.getByRole('button', { name: 'Mit Google anmelden' }).click();
+  await stranger.getByRole('heading', { name: 'Dein Profil' }).waitFor({ timeout: 30000 });
+  await stranger.getByLabel('Benutzername').fill('NeuGoogle');
+  await stranger.getByText('Dieser Benutzername ist frei.').waitFor();
+  await stranger.getByLabel('Anzeigename').fill('Neu');
+  await stranger.getByRole('button', { name: 'Profil erstellen' }).click();
+  await closeWelcomePack(stranger);
+  await stranger.getByRole('button', { name: 'Konto von Neu' }).waitFor();
+  assert.equal((await admin`select count(*)::int as n from auth_identities`)[0].n >= 4, true);
+  assert.deepEqual(problems, []);
+});
+
+test('a revoked session ends the game on the next check, and the reload shows the login', { skip }, async () => {
+  const page = devices['original-google'].page;
+  // Neon Auth revokes every session of that login (another device signed out everywhere, or an admin).
+  const [identity] = await admin`select subject from auth_identities where account_id = ${ORIGINAL_GOOGLE.id}::uuid`;
+  for (const [token, session] of auth.sessions) if (session.userId === identity.subject) auth.sessions.delete(token);
+  const response = await page.evaluate(async () => (await fetch('/api/save')).status);
+  assert.equal(response, 401);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Mit Google anmelden' }).waitFor();
+});
+
+test('two accounts play one world at the same time: joining, concurrent clicks and cross account refusal', { skip }, async () => {
+  const host = devices['original-password'].page;
+  const guest = devices['new-google'].page;
+  const { MULTIPLAYER_PROTOCOL_VERSION: protocol } = await import('../../app/multiplayer-protocol.ts');
+  const api = (page: Page, body: Record<string, unknown>) => page.evaluate(async ({ body, protocol }) => {
+    const response = await fetch('/api/multiplayer', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ protocol, ...body }) });
+    return { status: response.status, data: await response.json() as { room?: { code: string; sharedCoins: number; playerCount: number }; error?: string; errorCode?: string } };
+  }, { body, protocol });
+  const playerOf = (page: Page) => page.evaluate(() => localStorage.getItem('goalClickerPlayerIdV3') ?? '');
+  const hostId = await playerOf(host);
+  const guestId = await playerOf(guest);
+  assert.equal(hostId, ORIGINAL_PASSWORD.playerId);
+  const created = await api(host, { action: 'create', playerId: hostId, nickname: ORIGINAL_PASSWORD.displayName });
+  assert.equal(created.status, 201, created.data.error);
+  const code = created.data.room!.code;
+  // The guest cannot act as the host by naming the host's player ID.
+  const impersonation = await api(guest, { action: 'click', code, playerId: hostId, amount: 1, clickCount: 1 });
+  assert.equal(impersonation.status, 409);
+  const joined = await api(guest, { action: 'join', code, playerId: guestId, nickname: 'Neu' });
+  assert.equal(joined.status, 200, joined.data.error);
+  assert.equal(joined.data.room!.playerCount, 2);
+  const clicks = await Promise.all([...Array.from({ length: 6 }, () => api(host, { action: 'click', code, playerId: hostId, amount: 1, clickCount: 1 })), ...Array.from({ length: 6 }, () => api(guest, { action: 'click', code, playerId: guestId, amount: 1, clickCount: 1 }))]);
+  assert.ok(clicks.every((click) => click.status === 200 || click.status === 409), JSON.stringify(clicks.map((click) => [click.status, click.data.errorCode])));
+  const [row] = await admin`select host_clicks, guest_clicks, shared_state_version from coop_rooms where code = ${code}`;
+  assert.ok(Number(row.host_clicks) >= 1 && Number(row.guest_clicks) >= 1, JSON.stringify(row));
+  // Signed out, the world is closed.
+  const anonymous = await (await fetch(`${BASE}/api/multiplayer`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ protocol, action: 'click', code, playerId: hostId, amount: 1, clickCount: 1 }) })).status;
+  assert.equal(anonymous, 401);
   assert.deepEqual(problems, []);
 });
