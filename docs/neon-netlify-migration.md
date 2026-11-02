@@ -156,7 +156,33 @@ Lokal im Cloud Container (Node.js 22.23, PostgreSQL 16.10 als Scratch Datenbank,
 | `scripts/migration/import-legacy-identities.mts` gegen simulierte Quelle | Abbruch bei fehlendem Spielstand, Probelauf, Import, Wiederholung ohne Änderung |
 | `scripts/migration/runtime-role.sql` zweimal, dann App als `goal_clicker_app` | App Operationen gehen, DDL und Schreiben in `legacy_identities` verweigert |
 
-Auf `migration-staging` nur gelesen (Neon MCP): 9 Profile, 9 Spielstände, 9 Verknüpfungen, 3 Welten, 39 Reisebelege, kein Drizzle Journal, 0007 noch nicht eingespielt, Neon Auth ohne Trusted Origins, Google mit geteilten Zugangsdaten, E-Mail Registrierung erlaubt, Pooler Host vorhanden bei `pooler_enabled=false`.
+### Staging vorbereitet (2. November 2026, mit Freigabe des Besitzers)
+
+Auf `migration-staging` über die Neon Verbindung:
+
+* Vorher festgehalten: 10:00:52 UTC, WAL Position `0/1DA8100` (Neon erlaubt keinen Snapshot eines Nicht Root Branches; Rückweg über Wiederherstellung auf diesen Zeitpunkt oder Entfernen der fünf neuen Tabellen).
+* Migration 0007 eingespielt (eine Transaktion).
+* Alte Logins importiert: 9 (Google 3, Benutzername 6), jedes Konto hat Profil und Spielstand; in einer Transaktion mit Prüfung, sonst Abbruch.
+* Rolle `goal_clicker_app` angelegt, **noch ohne Passwort** (setzt der Besitzer), 10 Policies, RLS auf 10 Tabellen, kein BYPASSRLS.
+* Prüfsummen (`to_jsonb`, md5) von `coop_rooms`, `player_accounts`, `profiles`, `cloud_saves` und `solo_travel` sind auf Supabase, Neon Staging (vor und nach den Änderungen) und Neon Produktion identisch. Letzter Schreibvorgang in Supabase: 30. Oktober 2026.
+
+Gegen die **echte** Neon Auth von Staging mit den Server Funktionen dieses Codes (Wegwerf Login mit erzeugter Adresse, ohne Spielkonto):
+
+| Aufruf | Ergebnis |
+| :--- | :--- |
+| `sign-up/email` | ok, Cookie `__Secure-neon-auth.session_token`, weitergegeben als `HttpOnly; Secure; SameSite=Lax` |
+| zweites `sign-up/email` mit derselben Adresse | 422 `USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL`, im Code als „exists“ erkannt |
+| `get-session` | Session gültig, Benutzer ID und Adresse stimmen |
+| `list-accounts` | `providerId: credential`, `accountId` = Benutzer ID |
+| `sign-in/email` falsch / richtig | 401 `INVALID_EMAIL_OR_PASSWORD` / ok, gleicher Benutzer |
+| `change-password` mit falschem aktuellem Passwort | 400 `INVALID_PASSWORD` |
+| gefälschtes Session Cookie | abgelehnt |
+| `sign-out` | danach ist die Session ungültig |
+| **`delete-user`** | **404, mit und ohne Passwort: Selbstlöschung gibt es in Managed Better Auth nicht.** Der Code meldet korrekt „nicht gelöscht“ und löscht nichts. Löschen geht nur als Admin (Neon API `/auth/users`, Neon CLI `neon neon-auth user delete`). |
+
+Zwei Wegwerf Logins dieser Probe liegen noch in Staging Auth (ohne Spielkonto, ohne Zuordnung).
+
+Vorher auf `migration-staging` nur gelesen (Neon MCP): 9 Profile, 9 Spielstände, 9 Verknüpfungen, 3 Welten, 39 Reisebelege, kein Drizzle Journal, 0007 noch nicht eingespielt, Neon Auth ohne Trusted Origins, Google mit geteilten Zugangsdaten, E-Mail Registrierung erlaubt, Pooler Host vorhanden bei `pooler_enabled=false`.
 
 ## Anbieter Schritte (ChatGPT Work oder Besitzer)
 
@@ -192,7 +218,8 @@ Erst umstellen, wenn alles erfüllt ist: neueste Datenkopie geprüft (`verify-ac
 
 ## Offene Risiken
 
-* Echte Neon Auth Antworten (Fehlercodes, `delete-user` aktiv oder nicht, Cookie Namen) sind nur gegen den Nachbau geprüft. `delete-user` muss auf dem Branch erlaubt sein, sonst meldet *Profil löschen* ehrlich einen Fehler.
+* **Profil löschen funktioniert auf Neon so nicht:** `delete-user` gibt es in Managed Better Auth nicht (404, auf Staging geprüft). Lösung offen (Entscheid des Besitzers): Löschauftrag mit Besitzer Skript, Löschung über die Neon API mit Schlüssel auf dem Server, oder Löschen vorerst nur auf Anfrage.
+* Die übrigen Neon Auth Antworten sind auf Staging geprüft (siehe Nachweis); Google und der Verifier Austausch noch nicht.
 * Google `sub` ist über OAuth Clients hinweg gleich (Google verwendet keine paarweisen Kennungen); mit den geteilten Neon Zugangsdaten auf Staging zu bestätigen.
 * Neon Auth erlaubt die Registrierung mit E-Mail direkt an der Auth URL (`allow_sign_up`), unabhängig vom Proxy. Solche Logins bekommen kein Konto; im schlimmsten Fall blockiert jemand die Google Anmeldung einer Adresse, die er vorher selbst registriert hat (Verfügbarkeit, nicht Übernahme). Abschalten geht nicht, weil der Server selbst über diesen Endpunkt registriert.
 * Neon Auth sieht alle Anfragen von den Netlify Servern aus; seine eigenen Rate Limits pro Adresse greifen deshalb für alle Spieler gemeinsam (Eigenschaft des SDK Proxys). Die eigenen Limits in PostgreSQL sind pro Spieler.
