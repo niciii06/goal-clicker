@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { GROWTH_POINTS_PER_LEVEL, MATCH_RESULT_POINTS, emptyPlayerStats, getCareerCard, getSpecialGrowth, normalizeCareerState } from '../app/career-data.ts';
-import { STAR_XI_CUSTOM_PLAYERS, cardPackRating, getSpecialCardPackOdds, getStarXIFragmentCompensation, getStarXIPlayer, initialGameFeatures, normalizeGameFeatures, SPECIAL_PACK_HUNDRED_CHANCE } from '../app/feature-data.ts';
+import { STAR_XI_CUSTOM_PLAYERS, cardPackRating, resolveCupPenalty, getSpecialCardPackOdds, getStarXIFragmentCompensation, getStarXIPlayer, initialGameFeatures, normalizeGameFeatures, SPECIAL_PACK_HUNDRED_CHANCE } from '../app/feature-data.ts';
 
 const stats = (points: number, appearances = 0, goals = 0) => ({ ...emptyPlayerStats(), points, appearances, goals });
 
@@ -77,4 +77,17 @@ test('growth raises the rating once, also in the match simulation; form stays th
   const old = { id: 'x', name: 'x', rating: 70 } as Parameters<typeof substituteSimPlayer>[0];
   assert.equal(substituteSimPlayer(old, card, 0, 7).rating, 87, 'seven levels are seven rating points');
   assert.equal(substituteSimPlayer(old, card, 1, 7).rating, 90, 'a form point is still worth three');
+});
+
+test('penalty shoot-outs use the grown rating of a special card', () => {
+  const card = getStarXIPlayer('star-goat-nicu')!;
+  const shoot = (growth: number) => {
+    const cup = { ...initialGameFeatures().cup, active: true, phase: 'penalties' as const, penaltyTurn: 'home' as const, careerGrowth: { [card.id]: growth } };
+    // The keeper dives right, the shot goes left; 0.9 scores at 100 (96 %) but not at 80 (86 %).
+    const rolls = [0.99, 0.9, 0.5];
+    const result = resolveCupPenalty(cup, 80, 'left', 1_000, () => rolls.shift() ?? 0.5, [card]);
+    return result.cup.penaltyHomeScore;
+  };
+  assert.equal(shoot(0), 0);
+  assert.equal(shoot(20), 1);
 });

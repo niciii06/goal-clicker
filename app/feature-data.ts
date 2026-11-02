@@ -2413,7 +2413,12 @@ function getPenaltyWinner(homeScore: number, awayScore: number, homeTaken: numbe
   return null;
 }
 
-export function resolveCupPenalty(cup: CupState, starRating: number, direction: PenaltyDirection, now = Date.now(), random = Math.random, homePlayers: readonly StarXIPlayer[] = [], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS) {
+export function resolveCupPenalty(cup: CupState, starRating: number, direction: PenaltyDirection, now = Date.now(), random = Math.random, rawHomePlayers: readonly StarXIPlayer[] = [], formationPositions: readonly StarPosition[] = STAR_XI_FORMATION_POSITIONS) {
+  // Grown special cards take their penalties (and keep goal) with the rating they reached, not their 80 start.
+  const homePlayers = rawHomePlayers.map((player) => {
+    const growth = cup.careerGrowth?.[player.id] ?? 0;
+    return growth > 0 ? { ...player, rating: Math.min(100, player.rating + growth) } : player;
+  });
   const baseResult = getCupBaseResult(cup, starRating);
   if (!cup.active || cup.phase !== "penalties" || !PENALTY_DIRECTIONS.includes(direction)) return { cup, ...baseResult };
   let penaltyHomeScore = cup.penaltyHomeScore;
