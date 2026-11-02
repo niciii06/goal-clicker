@@ -185,10 +185,18 @@ export function albumMilestonesFromStorage(raw: string | null, guest: boolean) {
   return !guest && raw !== 'off';
 }
 export function prepareCareerMatch(features: GameFeatures) {
-  const bonuses: Record<string, number> = {};
+  const bonuses: Record<string, number> = {}, growth: Record<string, number> = {};
   // A player kept against his wish after a sale offer plays weaker for a few matches.
-  for (const id of features.starXI.ownedIds) { const p = getStarXIPlayer(id); if (p) bonuses[id] = getPlayerForm(features.career, id).bonus + getCareerCard(features.career, p).bonus - (transferUnhappyMatches(features, id) ? TRANSFER_UNHAPPY_PENALTY : 0); }
+  // The growth of a special card is kept apart: it raises the rating once, it is not a form bonus.
+  for (const id of features.starXI.ownedIds) {
+    const p = getStarXIPlayer(id);
+    if (!p) continue;
+    const card = getCareerCard(features.career, p);
+    if (hasPotential(p)) growth[id] = card.bonus;
+    bonuses[id] = getPlayerForm(features.career, id).bonus + (hasPotential(p) ? 0 : card.bonus) - (transferUnhappyMatches(features, id) ? TRANSFER_UNHAPPY_PENALTY : 0);
+  }
   features.cup.careerBonuses = bonuses;
+  features.cup.careerGrowth = growth;
   features.cup.careerRatingSeed = features.cup.matchStartedAt;
   features.cup.careerMatchId = `career-${features.cup.matchStartedAt}-${features.cup.mode}-${features.cup.opponent}`;
   if (!features.cup.simulation && features.cup.lastTickAt === features.cup.matchStartedAt) features.cup.simulation = createInteractiveMatch(features.cup, features.starXI.lineupIds, features.starXI.formationId);

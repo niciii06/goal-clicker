@@ -50,6 +50,9 @@ export type CupState = {
   /** Random draw for the next tournament run; rerolled whenever a run starts. */
   drawSeed?: number;
   careerBonuses?: Record<string, number>;
+  /** Growth of special cards above their starting rating, fixed at kick off. Unlike careerBonuses (form and
+   * milestones, which the simulation amplifies) it counts exactly once everywhere, like a higher rating. */
+  careerGrowth?: Record<string, number>;
   active: boolean;
   mode: CupMatchMode;
   phase: CupMatchPhase;

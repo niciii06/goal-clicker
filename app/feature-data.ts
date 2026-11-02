@@ -1336,7 +1336,7 @@ export function getStarXISelectionRating(player: StarXIPlayer, context: StarXIEv
   const cup = context.cup;
   const currentMatch = cup?.active && cup.matchStartedAt > 0;
   const prepared = currentMatch && cup.careerRatingSeed === cup.matchStartedAt
-    ? cup.careerBonuses?.[player.id] : undefined;
+    ? (cup.careerBonuses?.[player.id] ?? 0) + (cup.careerGrowth?.[player.id] ?? 0) : undefined;
   const base = Math.min(100, player.rating + (prepared ?? (form + card)));
   const live = currentMatch ? getCupPlayerMatchRating(cup, player.id, context.minute ?? 1) : null;
   const fitness=currentMatch?cup.broadcast?.fitness[player.id]??100:100;
@@ -1568,7 +1568,7 @@ export function applyCupSubstitution(cup: CupState, outgoingPlayerId: string | u
   const substitutionMinute = Math.max(1, Math.min(120, Math.floor(Number(minute) || 1)));
   const outgoingMatchRating = getCupPlayerMatchRating(cup, outgoing.id, substitutionMinute) ?? 6.5;
   // Same prepared match ratings (milestone card and form) the engine uses for every starter.
-  const matchRating = (player: StarXIPlayer) => Math.min(100, player.rating + (cup.careerBonuses?.[player.id] ?? 0));
+  const matchRating = (player: StarXIPlayer) => Math.min(100, player.rating + (cup.careerBonuses?.[player.id] ?? 0) + (cup.careerGrowth?.[player.id] ?? 0));
   const incomingRating = matchRating(incoming), outgoingRating = matchRating(outgoing);
   const ratingDelta = Math.round((incomingRating - outgoingRating) * 10) / 10;
   const ratingMomentum = clamp(ratingDelta * 0.18, -4, 4);
@@ -1598,7 +1598,7 @@ export function getStarXIEffectiveMatchRating(ownedIds: string[], lineupIds: str
   const missing = STAR_XI_SQUAD_SIZE - starters.length;
   const effectiveTotal = starters.reduce((total, player) => {
     const liveForm = getCupPlayerMatchRating(cup, player.id, minute) ?? 6.4;
-    return total + Math.min(100, player.rating + (cup.careerBonuses?.[player.id] ?? 0)) + (liveForm - 6.5) * 2.8;
+    return total + Math.min(100, player.rating + (cup.careerBonuses?.[player.id] ?? 0) + (cup.careerGrowth?.[player.id] ?? 0)) + (liveForm - 6.5) * 2.8;
   }, missing * 55);
   const squadRating = Math.round((effectiveTotal / STAR_XI_SQUAD_SIZE) * 10) / 10;
   const momentumRating = (Number(cup.matchMomentum) || 0) * CUP_MOMENTUM_RATING_WEIGHT;
@@ -1868,6 +1868,7 @@ function startTournamentRound(cup: CupState, tournament: TournamentDefinition, r
     careerRatingSeed: now,
     careerMatchId: `career-${now}-tournament-${opponent.name}`,
     careerBonuses: undefined,
+    careerGrowth: undefined,
     mode: "tournament",
     tournamentId: tournament.id,
     round,
@@ -1950,6 +1951,7 @@ export function beginSeasonCupMatch(cup: CupState, seasonValue: unknown, now = D
     careerRatingSeed: now,
     careerMatchId: `career-${now}-season-${opponent.name}`,
     careerBonuses: undefined,
+    careerGrowth: undefined,
     mode: "season",
     tournamentId: "stadium",
     round: 0,
@@ -2916,7 +2918,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     transferMarket: { offerIds: offerIds.length ? offerIds : defaults.transferMarket.offerIds, ownedIds: [...new Set(ownedIds)] },
     starXI: { ...normalizedStarXI, lockedPlayerIds: active ? savedLock?.playerIds : undefined },
     club: { name: clubName, badge: CLUB_BADGES.includes(String(club.badge)) ? String(club.badge) : defaults.club.badge, color: CLUB_COLORS.includes(String(club.color)) ? String(club.color) : defaults.club.color },
-    cup: { simulation: normalizeInteractive(cup.simulation), restartAt:Number.isFinite(cup.restartAt)?Number(cup.restartAt):undefined, restartSide:cup.restartSide==='opponent'?'opponent':'club', regularDurationMs: Number(cup.regularDurationMs)>=180000&&Number(cup.regularDurationMs)<=300000?Number(cup.regularDurationMs):undefined, halftimeTaken:cup.halftimeTaken===true, timedPause:normalizeTimedPause(cup.timedPause), subWindowsUsed: Math.min(3,Math.max(0,Math.floor(Number(cup.subWindowsUsed)||0))), pendingSubstitutions: normalizePendingSubstitutions(cup.pendingSubstitutions), broadcast: normalizeMatchBroadcast(cup.broadcast), fixture: cup.fixture && typeof cup.fixture==='object' ? cup.fixture as CupState['fixture'] : undefined, drawSeed: isDrawSeed(cup.drawSeed) ? cup.drawSeed : legacyTournamentDrawSeed(cup), careerRatingSeed: Number.isFinite(Number(cup.careerRatingSeed)) && Number(cup.careerRatingSeed) > 0 ? Number(cup.careerRatingSeed) : matchStartedAt, careerMatchId: typeof cup.careerMatchId === "string" ? cup.careerMatchId.slice(0, 200) : undefined, careerBonuses: Object.fromEntries(Object.entries(asRecord(cup.careerBonuses)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Number(value), -2 - TRANSFER_UNHAPPY_PENALTY, 5 + potentialGap(getStarXIPlayer(id)!))])), active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && (Boolean(lastInjury) || Boolean(cup.simulation)), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
+    cup: { simulation: normalizeInteractive(cup.simulation), restartAt:Number.isFinite(cup.restartAt)?Number(cup.restartAt):undefined, restartSide:cup.restartSide==='opponent'?'opponent':'club', regularDurationMs: Number(cup.regularDurationMs)>=180000&&Number(cup.regularDurationMs)<=300000?Number(cup.regularDurationMs):undefined, halftimeTaken:cup.halftimeTaken===true, timedPause:normalizeTimedPause(cup.timedPause), subWindowsUsed: Math.min(3,Math.max(0,Math.floor(Number(cup.subWindowsUsed)||0))), pendingSubstitutions: normalizePendingSubstitutions(cup.pendingSubstitutions), broadcast: normalizeMatchBroadcast(cup.broadcast), fixture: cup.fixture && typeof cup.fixture==='object' ? cup.fixture as CupState['fixture'] : undefined, drawSeed: isDrawSeed(cup.drawSeed) ? cup.drawSeed : legacyTournamentDrawSeed(cup), careerRatingSeed: Number.isFinite(Number(cup.careerRatingSeed)) && Number(cup.careerRatingSeed) > 0 ? Number(cup.careerRatingSeed) : matchStartedAt, careerMatchId: typeof cup.careerMatchId === "string" ? cup.careerMatchId.slice(0, 200) : undefined, careerBonuses: Object.fromEntries(Object.entries(asRecord(cup.careerBonuses)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Number(value), -2 - TRANSFER_UNHAPPY_PENALTY, 5)])), careerGrowth: Object.fromEntries(Object.entries(asRecord(cup.careerGrowth)).filter(([id, value]) => getStarXIPlayer(id) && Number.isFinite(Number(value))).map(([id, value]) => [id, clamp(Math.floor(Number(value)), 0, potentialGap(getStarXIPlayer(id)!))])), active, mode, phase, tournamentId, round, wins: Math.max(0, Math.floor(Number(cup.wins) || 0)), best: Math.max(0, Math.min(TOURNAMENTS[TOURNAMENTS.length - 1].rounds, Math.floor(Number(cup.best) || 0))), trophies, lastResult: safeString(cup.lastResult, defaults.cup.lastResult), matchStartedAt, matchEndsAt, lastTickAt, homeScore: Math.max(0, Math.floor(Number(cup.homeScore) || 0)), awayScore: Math.max(0, Math.floor(Number(cup.awayScore) || 0)), opponent: normalizedOpponentName, opponentRating: normalizedOpponentRating, opponentStrategyId, opponentIds, strategyId, substitutionsUsed: Math.max(0, Math.min(STAR_XI_MAX_SUBSTITUTIONS, Math.floor(Number(cup.substitutionsUsed) || 0))), matchMomentum, originalLineupIds, originalBenchIds, playerEnteredAt, playerExitedAt, playerMatchPositions, lastGoal, lastInjury, matchEvents, cardEvents, injuryEvents, sentOffPlayerIds, suspendedPlayerIds, injuredPlayerIds, matchPaused: active && cup.matchPaused === true && (Boolean(lastInjury) || Boolean(cup.simulation)), pendingNextRound, nextTournamentAt, penaltyHomeScore: Math.max(0, Math.floor(Number(cup.penaltyHomeScore) || 0)), penaltyAwayScore: Math.max(0, Math.floor(Number(cup.penaltyAwayScore) || 0)), penaltyHomeTaken: Math.max(0, Math.floor(Number(cup.penaltyHomeTaken) || 0)), penaltyAwayTaken: Math.max(0, Math.floor(Number(cup.penaltyAwayTaken) || 0)), penaltyTurn: cup.penaltyTurn === "away" ? "away" : "home", penaltyEvents, penaltyMessage: typeof cup.penaltyMessage === "string" ? cup.penaltyMessage.slice(0, 180) : "", allTimeScorers, allTimeAppearances },
     seasonMode: normalizedSeasonMode,
     goalBoost,
     missions,

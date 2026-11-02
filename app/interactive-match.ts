@@ -30,15 +30,16 @@ function random(c:SimCheckpoint){let n=c.rng;n^=n<<13;n^=n>>>17;n^=n<<5;c.rng=n>
 // A card's attribute profile relative to its rating, applied to the effective match rating:
 // form, milestone bonuses and the opponent's strength move every attribute, the profile stays.
 function attribute(p:StarXIPlayer|undefined,key:string,base:number){const stats=p?.originalAttributes?.stats as Record<string,{value:number}>|undefined;const n=stats?.[key]?.value;return clamp(typeof n==='number'&&Number.isFinite(n)&&p?base+(n-p.rating)*.8:base,1,99);}
-function player(id:string,name:string,role:StarPosition,slot:number,side:SimPlayer['side'],number:number,rating:number,source:StarXIPlayer|undefined,formation:string,direction:number,bonus=0):SimPlayer {
+function player(id:string,name:string,role:StarPosition,slot:number,side:SimPlayer['side'],number:number,rating:number,source:StarXIPlayer|undefined,formation:string,direction:number,bonus=0,growth=0):SimPlayer {
  const s=getStarFormation(formation).slots[slot];const x=role==='TW'?3:12+(100-s.y)*.68,y=role==='TW'?34:5+s.x*.58;
  const right=(side==='club'?direction:-direction)>0,anchor={x:right?x:105-x,y:right?y:68-y};
- const base=clamp(rating+bonus*3,1,99);
+ // Form and milestone bonuses are amplified; the growth of a special card is a plain higher rating.
+ const base=clamp(rating+growth+bonus*3,1,99);
  return {id,name,role,slot,side,number,rating:base,passing:attribute(source,'shortPassing',base),shooting:attribute(source,'finishing',base),pace:attribute(source,'sprintSpeed',base),defending:attribute(source,'standingTackle',base),keeping:attribute(source,'gkReflexes',base),control:attribute(source,'dribbling',base),stamina:attribute(source,'stamina',base),fitness:100,active:true,anchor,...anchor};
 }
 /** A substitute takes over the outgoing slot with the same milestone and form bonus the starters got at kick off. */
-export function substituteSimPlayer(old:SimPlayer,source:StarXIPlayer,bonus=0):SimPlayer {
- const base=clamp(source.rating+bonus*3,1,99);
+export function substituteSimPlayer(old:SimPlayer,source:StarXIPlayer,bonus=0,growth=0):SimPlayer {
+ const base=clamp(source.rating+growth+bonus*3,1,99);
  return {...old,id:source.id,name:source.name,rating:base,passing:attribute(source,'shortPassing',base),shooting:attribute(source,'finishing',base),pace:attribute(source,'sprintSpeed',base),defending:attribute(source,'standingTackle',base),keeping:attribute(source,'gkReflexes',base),control:attribute(source,'dribbling',base),stamina:attribute(source,'stamina',base),fitness:100,active:true};
 }
 function kickoff(c:SimCheckpoint,side:SimPlayer['side']) {
@@ -56,7 +57,7 @@ export function homeAdvantage(cup:Pick<CupState,'fixture'>,side:SimPlayer['side'
 export function createInteractiveMatch(cup:CupState,ids:readonly string[],formation:string):InteractiveMatch {
  const b=cup.broadcast??createMatchBroadcast(cup),id=cup.careerMatchId??`${cup.matchStartedAt}:${cup.opponent}`,seed=seedHash(id),direction=cup.fixture?.away?-1:1;
  const clubHome=homeAdvantage(cup,'club'),opponentHome=homeAdvantage(cup,'opponent');
- const players=[...ids.flatMap((id,i)=>{const p=getStarXIPlayer(id);return p?[player(id,p.name,getStarFormation(formation).slots[i].position,i,'club',i+1,p.rating+clubHome,p,formation,direction,cup.careerBonuses?.[id])]:[];}),...b.opponentXI.map(p=>player(p.id,p.name,p.position,p.slot,'opponent',p.number,cup.opponentRating+opponentHome,getStarXIPlayer(p.sourceId),b.opponentFormation,direction))];
+ const players=[...ids.flatMap((id,i)=>{const p=getStarXIPlayer(id);return p?[player(id,p.name,getStarFormation(formation).slots[i].position,i,'club',i+1,p.rating+clubHome,p,formation,direction,cup.careerBonuses?.[id],cup.careerGrowth?.[id])]:[];}),...b.opponentXI.map(p=>player(p.id,p.name,p.position,p.slot,'opponent',p.number,cup.opponentRating+opponentHome,getStarXIPlayer(p.sourceId),b.opponentFormation,direction))];
  const c:SimCheckpoint={time:0,rng:seed,sequence:0,players,ball:{x:52.5,y:34},owner:'',possession:'club',chain:0,restart:true,direction};kickoff(c,'club');
  const sim:InteractiveMatch={version:2,id,seed,time:0,committed:c,buffer:[],recent:[],generation:0,status:'running',halftimeDone:false,pauseRequested:false,clubFormation:formation,opponentFormation:b.opponentFormation,strategy:cup.strategyId,opponentStrategy:cup.opponentStrategyId};refill(sim);return sim;
 }

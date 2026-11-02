@@ -63,10 +63,18 @@ test('saves and worlds from before start every special card at 0 points; later r
   assert.equal(getCareerCard(reloaded, card).rating, 82);
 });
 
-test('a match may carry the full growth of a special card, a normal card stays capped', () => {
+test('growth raises the rating once, also in the match simulation; form stays the amplified bonus', async () => {
   const features = initialGameFeatures();
   features.cup.careerBonuses = { 'star-di-certo': 20, 'icon-gianluigi-buffon': 20 };
+  features.cup.careerGrowth = { 'star-di-certo': 25, 'icon-gianluigi-buffon': 3 };
   const restored = normalizeGameFeatures(JSON.parse(JSON.stringify(features)));
-  assert.equal(restored.cup.careerBonuses?.['star-di-certo'], 20);
-  assert.equal(restored.cup.careerBonuses?.['icon-gianluigi-buffon'], 5);
+  // Form and milestones stay capped at +5, growth at the card's potential and only for cards that have one.
+  assert.equal(restored.cup.careerBonuses?.['star-di-certo'], 5);
+  assert.equal(restored.cup.careerGrowth?.['star-di-certo'], 20);
+  assert.equal(restored.cup.careerGrowth?.['icon-gianluigi-buffon'], 0);
+  const { substituteSimPlayer } = await import('../app/interactive-match.ts');
+  const card = getStarXIPlayer('star-di-certo')!;
+  const old = { id: 'x', name: 'x', rating: 70 } as Parameters<typeof substituteSimPlayer>[0];
+  assert.equal(substituteSimPlayer(old, card, 0, 7).rating, 87, 'seven levels are seven rating points');
+  assert.equal(substituteSimPlayer(old, card, 1, 7).rating, 90, 'a form point is still worth three');
 });
