@@ -84,6 +84,9 @@ function WalkoutCountryFlag({ code, country, compact = false }: { code: string; 
 
 
 const SAVE_FAILED_MESSAGE = "Speichern fehlgeschlagen: Der Browser Speicher ist voll. Lade deinen Spielstand als Datei herunter, bevor du die Seite schliesst.";
+/** A waiting co-op world without input for this long is polled every COOP_IDLE_POLL_MS instead of every 1.5 s. */
+const COOP_IDLE_AFTER_MS = 30_000;
+const COOP_IDLE_POLL_MS = 4000;
 const STAR_WALKOUT_ANIMATION_MS = 9500;
 const STAR_TOP_WALKOUT_ANIMATION_MS = 11500;
 const STAR_WALKOUT_READY_MS = 7500;
@@ -762,12 +765,28 @@ function App() {
 
   useEffect(() => {
     if (!hydrated || appMode !== "coop" || !activeCoopCode || !activeCoopPlayerId || coopSession?.room.status === "live") return;
-    // A tab in the background does not poll; it catches up as soon as it is visible again.
+    // A tab in the background does not poll; it catches up as soon as it is visible again. While nobody touches
+    // the page for a while, the waiting world is checked every 4 s instead of every 1.5 s; any tap or key press
+    // brings back the fast rhythm at once (the live match keeps its own 1.5 s tick below).
+    let lastInput = Date.now();
+    let timer = 0;
+    let stopped = false;
     const syncWhileOpen = () => { if (document.visibilityState === "visible") void syncCoopRoom(); };
+    const schedule = () => {
+      if (stopped) return;
+      timer = window.setTimeout(() => { syncWhileOpen(); schedule(); }, Date.now() - lastInput < COOP_IDLE_AFTER_MS ? 1500 : COOP_IDLE_POLL_MS);
+    };
+    const onInput = () => {
+      const wasIdle = Date.now() - lastInput >= COOP_IDLE_AFTER_MS;
+      lastInput = Date.now();
+      if (wasIdle) { window.clearTimeout(timer); syncWhileOpen(); schedule(); }
+    };
     const initialSync = window.setTimeout(syncWhileOpen, 0);
-    const timer = window.setInterval(syncWhileOpen, 1500);
+    schedule();
     document.addEventListener("visibilitychange", syncWhileOpen);
-    return () => { window.clearTimeout(initialSync); window.clearInterval(timer); document.removeEventListener("visibilitychange", syncWhileOpen); };
+    window.addEventListener("pointerdown", onInput, { passive: true });
+    window.addEventListener("keydown", onInput);
+    return () => { stopped = true; window.clearTimeout(initialSync); window.clearTimeout(timer); document.removeEventListener("visibilitychange", syncWhileOpen); window.removeEventListener("pointerdown", onInput); window.removeEventListener("keydown", onInput); };
   }, [activeCoopCode, activeCoopPlayerId, appMode, coopSession?.room.status, hydrated, syncCoopRoom]);
 
   useEffect(() => {
