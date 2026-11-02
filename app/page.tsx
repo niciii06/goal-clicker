@@ -55,6 +55,7 @@ import { getCurrentTime, getTravelTime, syncTravelClock } from "./game/clock";
 import { getStarCardTier, getWalkoutPresentation } from "./walkout-data";
 import { WalkoutAvatar } from "./walkout-avatar";
 import { loadRouteCache } from "./travel-route-cache-lazy";
+import { isAway, onReturn } from "./activity";
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 
@@ -436,7 +437,7 @@ function App() {
         return {...current,features:{...current.features,travel,squadLock:serverJourney.squadLock}};
       });
     }catch{ /* Last authoritative clock continues; kickoff always revalidates. */ }};
-    void sync();const timer=window.setInterval(()=>{const j=gameRef.current.features.travel.journey;if(j&&!journeyView(j,getTravelTime()).arrived)void sync();},5000);
+    void sync();const timer=window.setInterval(()=>{const j=gameRef.current.features.travel.journey;if(j&&!isAway()&&!journeyView(j,getTravelTime()).arrived)void sync();},5000);
     const visible=()=>{if(document.visibilityState==='visible')void sync();};
     document.addEventListener('visibilitychange',visible);
     return ()=>{stopped=true;clearInterval(timer);document.removeEventListener('visibilitychange',visible);};
@@ -759,19 +760,19 @@ function App() {
   useEffect(() => {
     if (!hydrated || appMode !== "coop" || !playerId || coopSession) return;
     const initialLoad = window.setTimeout(() => void loadSavedRooms(), 0);
-    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void loadSavedRooms(); }, 15000);
+    const timer = window.setInterval(() => { if (!isAway()) void loadSavedRooms(); }, 15000);
     return () => { window.clearTimeout(initialLoad); window.clearInterval(timer); };
   }, [appMode, coopSession, hydrated, loadSavedRooms, playerId]);
 
   useEffect(() => {
     if (!hydrated || appMode !== "coop" || !activeCoopCode || !activeCoopPlayerId || coopSession?.room.status === "live") return;
     // A tab in the background does not poll; it catches up as soon as it is visible again. While nobody touches
-    // the page for a while, the waiting world is checked every 4 s instead of every 1.5 s; any tap or key press
-    // brings back the fast rhythm at once (the live match keeps its own 1.5 s tick below).
+    // the page for a while, the waiting world is checked every 4 s instead of every 1.5 s, and not at all once the
+    // player counts as away (app/activity.ts); any tap or key press brings back the fast rhythm at once.
     let lastInput = Date.now();
     let timer = 0;
     let stopped = false;
-    const syncWhileOpen = () => { if (document.visibilityState === "visible") void syncCoopRoom(); };
+    const syncWhileOpen = () => { if (!isAway()) void syncCoopRoom(); };
     const schedule = () => {
       if (stopped) return;
       timer = window.setTimeout(() => { syncWhileOpen(); schedule(); }, Date.now() - lastInput < COOP_IDLE_AFTER_MS ? 1500 : COOP_IDLE_POLL_MS);
@@ -791,10 +792,13 @@ function App() {
 
   useEffect(() => {
     if (!hydrated || appMode !== "coop" || !activeCoopCode || !activeCoopPlayerId || coopSession?.room.status !== "live") return;
-    const tick = () => { if (document.visibilityState === "visible") void sendCoopAction("tick", { featuresKey: coopFeaturesKeyRef.current }); };
+    // Hidden or untouched for 10 minutes (app/activity.ts): no ticks, so a forgotten tab neither polls nor keeps the
+    // database awake. The other players' ticks keep the world running; coming back ticks at once.
+    const tick = () => { if (!isAway()) void sendCoopAction("tick", { featuresKey: coopFeaturesKeyRef.current }); };
     const timer = window.setInterval(tick, 1500);
     document.addEventListener("visibilitychange", tick);
-    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", tick); };
+    const stopReturn = onReturn(tick);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", tick); stopReturn(); };
     // Background synchronisation is coalesced by sendCoopAction and must not restart on every room update.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCoopCode, activeCoopPlayerId, appMode, coopSession?.room.status, hydrated]);
@@ -1379,6 +1383,7 @@ function App() {
     const timer = window.setInterval(() => {
       const coopOffer = displayGame.features.transferSaga.pendingOffer, localOffer = gameRef.current.features.transferSaga.pendingOffer;
       if (appMode === "coop" && isCoopLive) {
+        if (isAway()) return;
         if (!displayGame.features.squadLock && coopOffer && coopOffer.expiresAt <= getCurrentTime()) void sendCoopAction("transfer-insider-event");
         else if (!displayGame.features.squadLock && !coopOffer && !displayGame.features.cup.active && displayGame.features.transferSaga.nextAt <= getCurrentTime()) void sendCoopAction("transfer-insider-event");
         else if (!displayGame.features.squadLock && displayGame.features.nextVarAt <= getCurrentTime()) void sendCoopAction("var-event");
@@ -2059,7 +2064,7 @@ function App() {
   useEffect(() => {
     if (!hydrated || (appMode !== "single" && !isCoopLive)) return;
     const timer = window.setInterval(() => {
-      if (appMode === "coop" && isCoopLive && displayGame.features.cup.active && displayGame.features.cup.phase !== "penalties") void sendCoopAction("cup-tick");
+      if (appMode === "coop" && isCoopLive && displayGame.features.cup.active && displayGame.features.cup.phase !== "penalties") { if (!isAway()) void sendCoopAction("cup-tick"); }
       else if (appMode === "single" && gameRef.current.features.cup.active) advanceLocalCup();
     }, 1000);
     return () => window.clearInterval(timer);

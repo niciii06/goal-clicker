@@ -9,6 +9,7 @@ import { BACKUP_STORAGE_KEY, COOP_ROOM_KEY, LEGACY_STORAGE_KEYS, PLAYER_NAME_KEY
 import { cleanCloudSaveKeys, hashText, hasProgress, serializeCloudSaveKeys, summarizeSave, SYNCED_SAVE_KEYS } from "./cloud-save-rules";
 import type { CloudSaveKeys } from "./cloud-save-rules";
 import { bumpSaveRevision, localSaveFailed } from "./game/save-revision";
+import { isAway } from "./activity";
 
 /** Which account and save version this browser's localStorage belongs to, and whether it was played since. */
 export const CLOUD_META_KEY = "goalClickerCloudMetaV1";
@@ -32,9 +33,12 @@ export function cloudPlayedSince(cloud: CloudSaveState, baseVersion: number) {
 }
 export type SyncStatus = "saved" | "saving" | "offline" | "failed";
 
-// Passive income changes the save all the time; uploading it once a minute (and when the page is left or
-// hidden) keeps the cloud close while sending a quarter of the data a 15 s rhythm would.
+// Played progress is uploaded once a minute while the tab is visible and someone is at it (and always when the
+// page is left or hidden). Passive income alone changes the save all the time; it is uploaded at most every
+// 10 minutes, and not at all from a hidden or untouched tab (app/activity.ts), so a forgotten tab neither sends
+// requests nor keeps the database awake. Hiding or closing the tab still uploads at once.
 const UPLOAD_INTERVAL_MS = 60_000;
+const PASSIVE_UPLOAD_INTERVAL_MS = 10 * 60_000;
 // Browsers drop keepalive requests above 64 KB, the limit for the last upload while a page closes.
 const KEEPALIVE_LIMIT = 60 * 1024;
 
@@ -200,7 +204,7 @@ export class CloudSync {
     if (!this.stopped) return;
     this.stopped = false;
     this.inputsAtLastSave = this.inputs - (readCloudMeta(this.userId)?.played ? 1 : 0);
-    this.timer = window.setInterval(() => void this.upload(), UPLOAD_INTERVAL_MS);
+    this.timer = window.setInterval(() => this.periodicUpload(), UPLOAD_INTERVAL_MS);
     document.addEventListener("visibilitychange", this.handleVisibility);
     window.addEventListener("pagehide", this.handlePageHide);
     window.addEventListener("pointerdown", this.handleInput, { capture: true, passive: true });
@@ -221,6 +225,15 @@ export class CloudSync {
 
   private get played() {
     return this.inputs !== this.inputsAtLastSave;
+  }
+
+  private lastUploadAt = Date.now();
+
+  /** The once a minute upload: skipped while away, and for passive goals only every PASSIVE_UPLOAD_INTERVAL_MS. */
+  private periodicUpload() {
+    if (isAway()) return;
+    if (!this.played && Date.now() - this.lastUploadAt < PASSIVE_UPLOAD_INTERVAL_MS) return;
+    void this.upload();
   }
 
   private handleInput = () => {
@@ -315,6 +328,7 @@ export class CloudSync {
         this.inputsAtLastSave = inputs;
         this.playedMarked = this.played;
         writeCloudMeta({ userId: this.userId, version: data.version, hash, played: this.played });
+        this.lastUploadAt = Date.now();
         setStatus("saved");
         return true;
       }
