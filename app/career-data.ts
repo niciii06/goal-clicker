@@ -5,7 +5,7 @@ import { addHistory, getMatchScoreImpact, TRANSFER_UNHAPPY_PENALTY, transferUnha
 import { getBannedPlayerIds, nextCompetition, processMatchDiscipline, suspensionLabel } from './discipline';
 import type { CupState, GameFeatures, SeasonMatchHistoryEntry, StarPosition, StarXIPlayer } from './feature-data';
 
-/** `points`: match points of the club while this card played (win 3, draw 1, loss 0; a penalty shoot-out counts for its winner). */
+/** `points`: match points of the club while this card played, by the result after 90 minutes (win 3, draw 1, loss 0). */
 export type PlayerCareerStats = { appearances: number; minutes: number; goals: number; assists: number; ratingTotal: number; ratedMatches: number; motm: number; subAppearances: number; subRatingTotal: number; subMinutes: number; points: number; recent: number[] };
 export type RatingReason = { label: string; value: number };
 export type PlayerMatchReport = { playerId: string; rating: number; minutes: number; goals: number; assists: number; substitute: boolean; reasons: RatingReason[] };
@@ -33,9 +33,9 @@ export type CareerState = {
 };
 export type GrowthStats = { points: number };
 
-/** Growth of special cards from 80 to their potential: the match points of the club while the card played (win 3,
- * draw 1, loss 0; a penalty shoot-out counts as a win for its winner and a loss for the other side), +1 rating every
- * GROWTH_POINTS_PER_LEVEL points, so 100 points from 80 to 100 (owner's decision of 2 November 2026). */
+/** Growth of special cards from 80 to their potential: the match points of the club while the card played, by the
+ * result after 90 minutes (win 3, draw 1, loss 0; extra time and shoot-outs count as a draw for both sides), +1 rating
+ * every GROWTH_POINTS_PER_LEVEL points, so 100 points from 80 to 100 (owner's decision of 2 November 2026). */
 export const GROWTH_POINTS_PER_LEVEL = 5;
 export const MATCH_RESULT_POINTS = { win: 3, draw: 1, loss: 0 } as const;
 
@@ -278,8 +278,10 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
   const old = career.rivals[key] ?? { opponent: c.opponent, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, closeGames: 0, active: false, lastResults: [], lastPlayedAt: 0 };
   const draw = c.homeScore === c.awayScore && !c.penaltyEvents.length;
   const won = c.homeScore > c.awayScore || (c.homeScore === c.awayScore && c.penaltyHomeScore > c.penaltyAwayScore);
-  // Points of every card that played: win 3, draw 1, loss 0; a shoot-out is a win for its winner, a loss otherwise.
-  const resultPoints = won ? MATCH_RESULT_POINTS.win : draw ? MATCH_RESULT_POINTS.draw : MATCH_RESULT_POINTS.loss;
+  // Points of every card that played, by the result after 90 minutes: win 3, draw 1, loss 0. Extra time and a
+  // shoot-out only happen after a draw at 90 minutes, so such a match is a draw (1) whoever goes through.
+  const decidedAfter90 = c.phase === 'extra-time' || c.phase === 'penalties' || c.penaltyEvents.length > 0;
+  const resultPoints = decidedAfter90 || c.homeScore === c.awayScore ? MATCH_RESULT_POINTS.draw : c.homeScore > c.awayScore ? MATCH_RESULT_POINTS.win : MATCH_RESULT_POINTS.loss;
   // Like Sofascore: the best rated player of the whole match, from either side and whatever the result.
   const ownBest = ranked[0], opponentBest = getOpponentMatchRatings(c, minute).sort((a,b) => b.rating-a.rating || b.goals-a.goals || b.assists-a.assists)[0];
   const opponentWins = Boolean(opponentBest && (!ownBest || opponentBest.rating > ownBest.rating || (opponentBest.rating === ownBest.rating && opponentBest.goals > ownBest.goals)));

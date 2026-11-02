@@ -224,7 +224,7 @@ Werte: Median / P90 in Minuten. Die volle Startelf steht nach 50 Klicks, also na
 
 Alle zehn Special Cards (auch Pfuschi und Mikeboy Jr.) starten mit 80 OVR und haben Potenzial 100. Sie wachsen nur mit den Punkten ihrer Partien, Meilensteine gibt es für sie nicht mehr:
 
-* Punkte für jede Partie, in der die Karte gespielt hat (Startelf oder eingewechselt): Sieg 3, Unentschieden 1, Niederlage 0. Im Elfmeterschiessen zählt der Sieger 3 und der Verlierer 0. Alle 5 Punkte +1 OVR, also 100 Punkte bis 100 (etwa 34 Siege, mit gemischter Bilanz rund 50 bis 60 Partien).
+* Punkte für jede Partie, in der die Karte gespielt hat (Startelf oder eingewechselt), nach dem Resultat nach 90 Minuten: Sieg 3, Unentschieden 1, Niederlage 0. Geht eine Partie in die Verlängerung oder ins Elfmeterschiessen, war es nach 90 Minuten unentschieden: 1 Punkt, egal wer weiterkommt. Alle 5 Punkte +1 OVR, also 100 Punkte bis 100 (etwa 34 Siege, mit gemischter Bilanz rund 50 bis 60 Partien).
 * Tore, Vorlagen und Spieler des Spiels zählen nicht.
 * Der Punktezähler (`points` in der Karrierestatistik) ist neu, deshalb beginnen alle Karten bei 0, auch in bestehenden Spielständen und Welten. Bestehende 100er fallen auf 80. `career.growthBase` hält den Startpunkt fest (Karriere Version 3).
 * Das Wachstum wirkt im Spiel: Es fliesst wie die Meilensteinboni über `careerBonuses` in die Spielstärke (für Karten mit Potenzial bis +20 statt +5) und in die Beste Elf.
