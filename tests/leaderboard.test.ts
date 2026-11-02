@@ -11,7 +11,7 @@ function row(overrides: Partial<LeaderboardRow>): LeaderboardRow {
 function setup(rows: LeaderboardRow[], allowed = true) {
   const calls: { sort: LeaderboardSort; limit: number }[] = [];
   const deps: LeaderboardApiDeps = {
-    resolve: async (_request, playerId) => allowed ? { ok: true, playerId, userId: 'user-1' } : { ok: false, response: Response.json({ error: 'Bitte melde dich an.' }, { status: 401 }) },
+    resolve: async (_request, playerId) => allowed ? { ok: true, playerId, accountId: 'user-1' } : { ok: false, response: Response.json({ error: 'Bitte melde dich an.' }, { status: 401 }) },
     db: () => ({ getLeaderboard: async (sort, limit) => { calls.push({ sort, limit }); return rows; } }),
   };
   const get = (query: string) => leaderboardResponse(new Request(`http://localhost/api/leaderboard?${query}`), deps);
@@ -46,7 +46,7 @@ test('an unknown sort falls back to goals, and a missing player or login is refu
 
 test('a database failure answers 503 without caching', async () => {
   const response = await leaderboardResponse(new Request('http://localhost/api/leaderboard?playerId=reader-player-1'), {
-    resolve: async (_request, playerId) => ({ ok: true, playerId, userId: null }),
+    resolve: async (_request, playerId) => ({ ok: true, playerId, accountId: null }),
     db: () => ({ getLeaderboard: async () => { throw new Error('down'); } }),
   });
   assert.equal(response.status, 503);

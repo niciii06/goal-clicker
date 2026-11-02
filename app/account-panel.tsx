@@ -78,6 +78,7 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
   const status = useSyncStatus();
   const [displayName, setDisplayName] = useState(account?.profile.displayName ?? "");
   const [username, setUsername] = useState(account?.profile.username ?? "");
+  const [currentPassword, setCurrentPassword] = useState("");
   const [password, setPassword] = useState("");
   const [passwordRepeat, setPasswordRepeat] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -132,9 +133,9 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
 
   function savePassword(event: FormEvent) {
     event.preventDefault();
-    const problem = passwordError(password) ?? (password !== passwordRepeat ? "Die beiden Passwörter stimmen nicht überein." : null);
+    const problem = (currentPassword ? null : "Gib dein aktuelles Passwort ein.") ?? passwordError(password) ?? (password !== passwordRepeat ? "Die beiden Passwörter stimmen nicht überein." : null);
     if (problem) { onMessage(problem); return; }
-    void run("password", async () => { await setAccountPassword(password); setPassword(""); setPasswordRepeat(""); onMessage("Neues Passwort gespeichert."); });
+    void run("password", async () => { await setAccountPassword(currentPassword, password); setCurrentPassword(""); setPassword(""); setPasswordRepeat(""); onMessage("Neues Passwort gespeichert. Andere Geräte sind abgemeldet."); });
   }
 
   function linkGoogle() {
@@ -152,7 +153,7 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
     <form className="profile-row" onSubmit={saveDisplayName}><label><span>Anzeigename</span><input className="mode-input" maxLength={DISPLAY_NAME_MAX} value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || displayName.trim() === profile.displayName}>Speichern</button></form>
     <form className="profile-row" onSubmit={saveUsername}><label><span>Benutzername</span><input className="mode-input" maxLength={USERNAME_MAX} autoCapitalize="none" spellCheck={false} value={username} onChange={(event) => setUsername(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || usernameLocked || username.trim() === profile.username}>Ändern</button>
       <small>{nextChange.getTime() > now ? `Nächste Änderung ab ${nextChange.toLocaleDateString("de-CH")} möglich (nur Gross und Kleinschreibung jederzeit).` : "Du kannst den Benutzernamen jetzt ändern. Danach erst wieder in 30 Tagen."}{account.passwordLogin ? " Du meldest dich danach mit dem neuen Namen an." : ""}</small></form>
-    {account.passwordLogin && <form className="profile-row" onSubmit={savePassword}><label><span>Neues Passwort</span><input className="mode-input" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} maxLength={PASSWORD_MAX} value={password} onChange={(event) => setPassword(event.target.value)} /></label><label><span>Wiederholen</span><input className="mode-input" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} maxLength={PASSWORD_MAX} value={passwordRepeat} onChange={(event) => setPasswordRepeat(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || !password}>Passwort ändern</button>
+    {account.passwordLogin && <form className="profile-row" onSubmit={savePassword}><label><span>Aktuelles Passwort</span><input className="mode-input" type="password" autoComplete="current-password" maxLength={PASSWORD_MAX} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} /></label><label><span>Neues Passwort</span><input className="mode-input" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} maxLength={PASSWORD_MAX} value={password} onChange={(event) => setPassword(event.target.value)} /></label><label><span>Wiederholen</span><input className="mode-input" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} maxLength={PASSWORD_MAX} value={passwordRepeat} onChange={(event) => setPasswordRepeat(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || !password || !currentPassword}>Passwort ändern</button>
       <small>Du meldest dich mit deinem Benutzernamen und diesem Passwort an.</small></form>}
     {account.passwordLogin && <div className="profile-row profile-google">
       {typeof googleEmail === "string" ? <p><strong>Mit Google verknüpft</strong><small>{googleEmail ? `${googleEmail} · ` : ""}Du kannst dich mit Google oder mit Benutzername und Passwort anmelden, es ist dasselbe Konto.</small></p>

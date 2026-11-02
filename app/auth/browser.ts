@@ -1,38 +1,52 @@
 "use client";
-// Browser side Supabase client. It keeps the session in cookies, so the API routes see the same login.
-import { createBrowserClient } from "@supabase/ssr";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { authConfigured, supabasePublishableKey, supabaseUrl, AUTH_CALLBACK_PATH } from "./config";
+// Browser side login. Google goes through the Neon Auth SDK (@neon/auth/next) and this site's /api/auth proxy, so
+// the session cookie belongs to this site and the API routes see it. Username and password go to this server
+// (/api/login, /api/register), which knows the generated login address behind a username and signs in at Neon Auth.
+import { createAuthClient } from "@neon/auth/next";
+import { AUTH_CALLBACK_PATH, AUTH_SIGNOUT_PATH, browserAuthMode } from "./config";
 
-let client: SupabaseClient | null = null;
+type AuthClient = ReturnType<typeof createAuthClient>;
+let client: AuthClient | null = null;
 
-export function browserSupabase() {
-  if (!authConfigured()) return null;
-  client ??= createBrowserClient(supabaseUrl(), supabasePublishableKey());
+export function authEnabled() {
+  return browserAuthMode() === "neon";
+}
+
+function authClient() {
+  if (!authEnabled()) throw new LoginError("Der Login ist auf diesem Server nicht eingerichtet.");
+  client ??= createAuthClient();
   return client;
-}
-
-export async function signInWithGoogle(returnTo = "/") {
-  const supabase = browserSupabase();
-  if (!supabase) throw new Error("Der Login ist nicht eingerichtet.");
-  const redirectTo = `${window.location.origin}${AUTH_CALLBACK_PATH}?next=${encodeURIComponent(returnTo)}`;
-  const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo } });
-  if (error) throw error;
-}
-
-function requireClient() {
-  const supabase = browserSupabase();
-  if (!supabase) throw new Error("Der Login ist nicht eingerichtet.");
-  return supabase;
 }
 
 /** An error whose message is already meant for the player. */
 class LoginError extends Error {}
 
+type Result<T> = { data?: T | null; error?: { code?: string; message?: string; status?: number } | null };
+
+/** The SDK reports failures in `error` instead of throwing. */
+function unwrap<T>(result: Result<T>): T | null {
+  if (result.error) throw Object.assign(new Error(result.error.message ?? "auth"), { code: result.error.code, status: result.error.status });
+  return result.data ?? null;
+}
+
+function callbackUrl(params: Record<string, string>) {
+  return `${window.location.origin}${AUTH_CALLBACK_PATH}?${new URLSearchParams(params).toString()}`;
+}
+
+function follow(data: { url?: string } | null) {
+  // The SDK usually navigates itself; where it does not, the answer names the Google address.
+  if (data?.url && /^https:\/\//.test(data.url)) window.location.assign(data.url);
+}
+
+export async function signInWithGoogle(returnTo = "/") {
+  const data = unwrap(await authClient().signIn.social({ provider: "google", callbackURL: callbackUrl({ next: returnTo }), errorCallbackURL: callbackUrl({ failed: "1" }) }) as Result<{ url?: string }>);
+  follow(data);
+}
+
 async function postJson<T>(path: string, body: unknown) {
   let response: Response;
   try {
-    response = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    response = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), credentials: "same-origin" });
   } catch {
     throw new LoginError("Keine Verbindung. Prüfe dein Internet.");
   }
@@ -41,56 +55,63 @@ async function postJson<T>(path: string, body: unknown) {
   return data;
 }
 
-async function signInWithLoginEmail(email: string, password: string) {
-  const { error } = await requireClient().auth.signInWithPassword({ email, password });
-  if (error) throw error;
-}
-
-/** Username and password: the server knows the login address behind the username, Supabase checks the password. */
+/** Username and password: the server signs in (and recovers an original account once, on the way). */
 export async function signInWithUsername(username: string, password: string) {
-  const { email } = await postJson<{ email: string }>("/api/login", { username });
-  await signInWithLoginEmail(email, password);
+  return postJson<{ signedIn: boolean; recovered?: boolean }>("/api/login", { username, password });
 }
 
-/** Creates the account with its profile on the server, then signs in like a normal login. */
+/** Creates the account with its profile on the server, which also signs the browser in. */
 export async function registerWithUsername(username: string, displayName: string, password: string) {
-  const { email } = await postJson<{ email: string }>("/api/register", { username, displayName, password });
-  await signInWithLoginEmail(email, password);
+  await postJson<{ profile: unknown }>("/api/register", { username, displayName, password });
+}
+
+/** TEMPORARY: takes over an original username account with a one time code from the owner and a new password. */
+export async function recoverWithCode(username: string, code: string, password: string) {
+  await postJson<{ signedIn: boolean }>("/api/recovery", { username, code, password });
 }
 
 /**
  * Links Google to the signed in account: afterwards Google and the username open the same account and save.
- * Supabase needs "manual linking" switched on; it returns through /auth/callback with ?link=google.
+ * Returns through /auth/callback?link=google, where the server checks the link (app/auth/callback/route.ts).
  */
 export async function linkGoogleAccount(returnTo = "/") {
-  const redirectTo = `${window.location.origin}${AUTH_CALLBACK_PATH}?link=google&next=${encodeURIComponent(returnTo)}`;
-  const { error } = await requireClient().auth.linkIdentity({ provider: "google", options: { redirectTo } });
-  if (error) throw error;
+  const data = unwrap(await authClient().linkSocial({ provider: "google", callbackURL: callbackUrl({ link: "google", next: returnTo }), errorCallbackURL: callbackUrl({ link: "google", next: returnTo, failed: "1" }) }) as Result<{ url?: string }>);
+  follow(data);
 }
 
-/** The Google address linked to the signed in account: "" when Google sends none, null without Google. */
+/** "" when Google is linked to the signed in account (Neon Auth does not list its address), null without Google. */
 export async function linkedGoogleEmail() {
-  const { data, error } = await requireClient().auth.getUserIdentities();
-  if (error) throw error;
-  const google = data.identities.find((identity) => identity.provider === "google");
-  if (!google) return null;
-  return typeof google.identity_data?.email === "string" ? google.identity_data.email : "";
+  const accounts = unwrap(await authClient().listAccounts() as Result<{ providerId?: string }[]>) ?? [];
+  return accounts.some((account) => account.providerId === "google") ? "" : null;
 }
 
-/** Changes the password of the signed in account. */
-export async function setAccountPassword(password: string) {
-  const { error } = await requireClient().auth.updateUser({ password });
-  if (error) throw error;
+/** Changes the password of the signed in username account; other devices are signed out. */
+export async function setAccountPassword(currentPassword: string, newPassword: string) {
+  unwrap(await authClient().changePassword({ currentPassword, newPassword, revokeOtherSessions: true }) as Result<unknown>);
+}
+
+/** Ends the session at Neon Auth and removes the cookies (server route, works even if the SDK is not loaded). */
+export async function signOutOfAuth() {
+  await fetch(AUTH_SIGNOUT_PATH, { method: "POST", credentials: "same-origin", redirect: "manual" }).catch(() => undefined);
+  client = null;
+}
+
+/** Asks the SDK for the session through the proxy, which also renews the session cookie when Neon Auth does. */
+export async function refreshAuthSession() {
+  if (!authEnabled()) return;
+  await authClient().getSession().catch(() => undefined);
 }
 
 const AUTH_ERRORS: Record<string, string> = {
-  invalid_credentials: "Benutzername oder Passwort stimmt nicht.",
-  over_request_rate_limit: "Zu viele Versuche. Bitte warte ein paar Minuten und versuche es dann nochmal.",
-  weak_password: "Das Passwort ist zu schwach. Nimm mindestens 8 Zeichen mit Buchstaben und Zahlen.",
-  same_password: "Das neue Passwort muss sich vom alten unterscheiden.",
-  reauthentication_needed: "Melde dich zuerst neu an, um das Passwort zu ändern.",
-  manual_linking_disabled: "Die Verknüpfung mit Google ist auf dem Server noch nicht freigeschaltet.",
-  identity_already_exists: "Dieses Google Konto gehört schon zu einem anderen Spielerkonto.",
+  INVALID_EMAIL_OR_PASSWORD: "Benutzername oder Passwort stimmt nicht.",
+  INVALID_PASSWORD: "Das aktuelle Passwort stimmt nicht.",
+  PASSWORD_TOO_SHORT: "Das Passwort ist zu kurz. Nimm mindestens 8 Zeichen.",
+  PASSWORD_TOO_LONG: "Das Passwort ist zu lang.",
+  SESSION_EXPIRED: "Melde dich zuerst neu an, um das zu ändern.",
+  SOCIAL_ACCOUNT_ALREADY_LINKED: "Dieses Google Konto gehört schon zu einem anderen Spielerkonto.",
+  ACCOUNT_ALREADY_LINKED_TO_DIFFERENT_USER: "Dieses Google Konto gehört schon zu einem anderen Spielerkonto.",
+  FAILED_TO_UNLINK_LAST_ACCOUNT: "Der letzte Login eines Kontos lässt sich nicht entfernen.",
+  TOO_MANY_REQUESTS: "Zu viele Versuche. Bitte warte ein paar Minuten und versuche es dann nochmal.",
 };
 
 /** A German message for a failed login or password change. */
@@ -98,7 +119,7 @@ export function authErrorMessage(error: unknown) {
   if (error instanceof LoginError) return error.message;
   const failure = error as { code?: string; status?: number };
   if (failure?.code && AUTH_ERRORS[failure.code]) return AUTH_ERRORS[failure.code];
-  if (failure?.status === 429) return AUTH_ERRORS.over_request_rate_limit;
+  if (failure?.status === 429) return AUTH_ERRORS.TOO_MANY_REQUESTS;
   if (error instanceof TypeError) return "Keine Verbindung. Prüfe dein Internet.";
   return "Das hat nicht geklappt. Bitte versuche es nochmal.";
 }

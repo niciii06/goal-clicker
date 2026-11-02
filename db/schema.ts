@@ -1,8 +1,13 @@
 import { sql } from "drizzle-orm";
-import { bigint, boolean, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
-// Supabase exposes the public schema through its REST API. Row level security without any policy keeps
-// these tables closed to the browser keys; the server connects as the database owner, which bypasses it.
+// Row level security without any policy keeps every table closed to roles that are not explicitly allowed
+// (the Supabase REST API, a Neon Data API if one is ever switched on). The server connects as the owner or as
+// the runtime role goal_clicker_app with its own policy (docs/neon-netlify-migration.md).
+//
+// Naming: the column user_id of player_accounts, profiles and cloud_saves holds the canonical game account ID.
+// For the nine accounts from Supabase it is their old Supabase Auth user ID; it is NOT the ID of a Neon Auth
+// user. auth_identities maps a verified login (issuer + subject) to that account ID.
 
 /** ISO 8601 in UTC, the same text format the API writes into every timestamp column. */
 const isoNow = sql`to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
@@ -109,4 +114,70 @@ export const cloudSaves = pgTable("cloud_saves", {
    * without asking when nothing was played since the version it loaded. */
   activeVersion: bigint("active_version", { mode: "number" }).notNull().default(0),
   updatedAt: text("updated_at").notNull().default(isoNow),
+}).enableRLS();
+
+// A verified login of an auth system (issuer: the Neon Auth base URL, subject: the Neon Auth user ID) and the game
+// account it opens. Neither the issuer nor the subject is ever the account ID itself. One login per account and
+// issuer. login_email: the generated address behind a username login (never shown, never mailed).
+// deleted_at: the account was deleted but its login could not be removed yet; nothing may be created for it.
+export const authIdentities = pgTable("auth_identities", {
+  issuer: text("issuer").notNull(),
+  subject: text("subject").notNull(),
+  accountId: uuid("account_id").notNull(),
+  method: text("method").notNull(),
+  loginEmail: text("login_email"),
+  deletedAt: text("deleted_at"),
+  createdAt: text("created_at").notNull().default(isoNow),
+}, (t) => [
+  primaryKey({ columns: [t.issuer, t.subject] }),
+  uniqueIndex("auth_identities_account_issuer_key").on(t.accountId, t.issuer),
+  uniqueIndex("auth_identities_login_email_key").on(t.loginEmail),
+]).enableRLS();
+
+// Logins of the original Supabase project, imported once (scripts/migration/import-legacy-identities.mts).
+// provider "google": provider_subject is the Google sub; provider "email": the old Supabase user ID.
+export const legacyIdentities = pgTable("legacy_identities", {
+  provider: text("provider").notNull(),
+  providerSubject: text("provider_subject").notNull(),
+  accountId: uuid("account_id").notNull(),
+  importedAt: text("imported_at").notNull().default(isoNow),
+}, (t) => [
+  primaryKey({ columns: [t.provider, t.providerSubject] }),
+  index("legacy_identities_account_idx").on(t.accountId),
+]).enableRLS();
+
+// TEMPORARY recovery bridge (retire per docs/neon-netlify-migration.md). One row per account and target auth
+// system: the generated login address the recovered username login gets, and the claim window a verified proof
+// of ownership (old password at Supabase, or an owner issued code) opens. Binding consumes it exactly once.
+export const accountRecovery = pgTable("account_recovery", {
+  accountId: uuid("account_id").notNull(),
+  issuer: text("issuer").notNull(),
+  destinationEmail: text("destination_email").notNull(),
+  method: text("method"),
+  claimExpiresAt: text("claim_expires_at"),
+  consumedAt: text("consumed_at"),
+  subject: text("subject"),
+  createdAt: text("created_at").notNull().default(isoNow),
+  updatedAt: text("updated_at").notNull().default(isoNow),
+}, (t) => [
+  primaryKey({ columns: [t.accountId, t.issuer] }),
+  uniqueIndex("account_recovery_destination_key").on(t.destinationEmail),
+]).enableRLS();
+
+// Owner issued one time recovery codes (scripts/migration/issue-recovery-code.mts). Only a SHA-256 hash is
+// stored; the code itself is shown once to the owner, who hands it to the player in person.
+export const recoveryCodes = pgTable("recovery_codes", {
+  codeHash: text("code_hash").primaryKey(),
+  accountId: uuid("account_id").notNull(),
+  issuer: text("issuer").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  usedAt: text("used_at"),
+  createdAt: text("created_at").notNull().default(isoNow),
+}).enableRLS();
+
+// Fixed window counters shared by all server instances, for the endpoints that guess passwords or create logins.
+export const rateLimits = pgTable("rate_limits", {
+  key: text("key").primaryKey(),
+  windowStart: bigint("window_start", { mode: "number" }).notNull(),
+  hits: integer("hits").notNull().default(0),
 }).enableRLS();

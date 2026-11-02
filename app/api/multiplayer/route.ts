@@ -645,7 +645,7 @@ async function handlePost(request: Request) {
       // player can never be displaced by someone who only knows the code and the name.
       // With accounts a seat belongs to the account's player ID, which follows the player to every device,
       // so a seat is never handed over by name: a nickname and an expired presence prove no ownership.
-      const isReclaimable = (player: ReturnType<typeof getRoomPlayer>) => nameRecoveryAllowed(auth.userId) && Boolean(player.playerId) && !isOnline(player.lastSeenAt);
+      const isReclaimable = (player: ReturnType<typeof getRoomPlayer>) => nameRecoveryAllowed(auth.accountId) && Boolean(player.playerId) && !isOnline(player.lastSeenAt);
       const sameNamePlayers = getOccupiedRoomPlayers(room).filter(hasSameName);
       const matchingNameRoles = sameNamePlayers.filter(isReclaimable).map((player) => player.role);
       const requestedPlayer = requestedRole ? getRoomPlayer(room, requestedRole) : null;

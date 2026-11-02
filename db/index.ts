@@ -3,7 +3,7 @@ import type { AnyColumn } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
-import { cloudSaves, coopRooms, playerAccounts, profiles, soloTravel } from "./schema";
+import { accountRecovery, authIdentities, cloudSaves, coopRooms, legacyIdentities, playerAccounts, profiles, rateLimits, recoveryCodes, soloTravel } from "./schema";
 
 /** Longest player name on a world seat (the same limit the multiplayer API applies when joining). */
 const ROOM_SEAT_NAME_MAX = 18;
@@ -13,6 +13,11 @@ export type RoomUpdate = Partial<Omit<RoomRow, "code">>;
 export type PlayerAccount = typeof playerAccounts.$inferSelect;
 export type Profile = typeof profiles.$inferSelect;
 export type CloudSave = typeof cloudSaves.$inferSelect;
+export type AuthIdentity = typeof authIdentities.$inferSelect;
+export type LegacyIdentity = typeof legacyIdentities.$inferSelect;
+export type AccountRecovery = typeof accountRecovery.$inferSelect;
+export type BindResult = { ok: true; identity: AuthIdentity } | { ok: false; reason: "account-bound" | "subject-bound" };
+export type RecoveryCompletion = { ok: true; identity: AuthIdentity; already: boolean } | { ok: false; reason: "no-claim" | "expired" | "code-used" | "account-bound" | "subject-bound" | "consumed-by-other" };
 
 export type RoomSeatRole = "host" | "guest" | "player3" | "player4";
 
@@ -67,6 +72,12 @@ function seatPlayerColumn(role: RoomSeatRole) {
 
 let connection: postgres.Sql | null = null;
 
+/** Connections per server instance: DATABASE_POOL_MAX, default 3, never more than 10 (serverless instances multiply it). */
+export function poolMax(value = process.env.DATABASE_POOL_MAX) {
+  const parsed = Math.floor(Number(value));
+  return Number.isFinite(parsed) && parsed >= 1 ? Math.min(10, parsed) : 3;
+}
+
 function createDatabase() {
   const url = process.env.DATABASE_URL;
   if (!url) {
@@ -74,9 +85,10 @@ function createDatabase() {
       "DATABASE_URL ist nicht gesetzt. Die bestehenden Welten werden dadurch nicht verändert.",
     );
   }
-  // Supabase's transaction pooler (port 6543) does not keep prepared statements between queries.
-  // No array columns, so the type lookup every new connection would run is skipped.
-  connection = postgres(url, { prepare: false, fetch_types: false, max: Number(process.env.DATABASE_POOL_MAX) || 5, idle_timeout: 20 });
+  // Transaction poolers (Neon's -pooler host, PgBouncer in transaction mode) do not keep prepared statements
+  // between queries. No array columns, so the type lookup every new connection would run is skipped.
+  // idle_timeout closes idle connections soon, so Neon's compute can suspend between players.
+  connection = postgres(url, { prepare: false, fetch_types: false, max: poolMax(), idle_timeout: 20, connect_timeout: 15 });
   return drizzle(connection, { schema });
 }
 
@@ -92,12 +104,6 @@ function increment(column: AnyColumn, amount: number) {
 function isUniqueViolation(error: unknown) {
   const failure = error as { code?: string; cause?: { code?: string } };
   return (failure.code ?? failure.cause?.code) === "23505";
-}
-
-/** A database without the Supabase auth schema (local tests) has no such schema or function. */
-function isMissingObject(error: unknown) {
-  const failure = error as { code?: string; cause?: { code?: string } };
-  return ["3F000", "42883", "42P01"].includes(failure.code ?? failure.cause?.code ?? "");
 }
 
 function roleClickUpdate(role: string, amount: number, clickCount: number) {
@@ -218,6 +224,15 @@ export class GoalClickerDatabase {
   }
 
   /**
+   * The save only when it is newer than `since`: the version check runs inside PostgreSQL, so a device that is
+   * up to date receives the few metadata columns instead of the whole save (egress). saveJson is null then.
+   */
+  async getCloudSaveSince(userId: string, since: number): Promise<(Omit<CloudSave, "saveJson"> & { saveJson: string | null }) | null> {
+    const [save] = await this.client.select({ ...SAVE_META_FIELDS, saveJson: sql<string | null>`case when ${cloudSaves.version} > ${since} then ${cloudSaves.saveJson} else null end` }).from(cloudSaves).where(eq(cloudSaves.userId, userId)).limit(1);
+    return save ?? null;
+  }
+
+  /**
    * Stores a save only on top of the version the device loaded (0: no save yet). Two devices that loaded the
    * same version cannot both write; the second gets the current save back as a conflict. A successful write
    * does not send the save back, the caller already has it.
@@ -234,52 +249,156 @@ export class GoalClickerDatabase {
     return { conflict: await this.getCloudSave(userId) };
   }
 
-  /**
-   * Creates a confirmed Supabase Auth login with e-mail and password, without any mail, through a function only
-   * the production database has (see docs/supabase-datenbank.md). Returns null where it does not exist.
-   */
-  async createPasswordLogin(email: string, password: string): Promise<string | null> {
-    try {
-      const rows = await this.client.execute(sql`select goal_clicker_private.create_password_user(${email}, ${password}) as id`);
-      return String((rows as unknown as { id: string }[])[0].id);
-    } catch (error) {
-      if (isMissingObject(error)) return null;
-      throw error;
-    }
+  // ---- Logins (Neon Auth) and game accounts -------------------------------------------------------------
+
+  async getIdentity(issuer: string, subject: string): Promise<AuthIdentity | null> {
+    const [identity] = await this.client.select().from(authIdentities).where(and(eq(authIdentities.issuer, issuer), eq(authIdentities.subject, subject))).limit(1);
+    return identity ?? null;
   }
 
-  /** Deletes only the login, for a registration that lost its username to a parallel one. */
-  async deleteLogin(userId: string) {
-    try {
-      await this.client.execute(sql`select goal_clicker_private.delete_user(${userId}::uuid)`);
-      return true;
-    } catch (error) {
-      if (isMissingObject(error)) return false;
-      throw error;
-    }
+  async getIdentityForAccount(issuer: string, accountId: string): Promise<AuthIdentity | null> {
+    const [identity] = await this.client.select().from(authIdentities).where(and(eq(authIdentities.issuer, issuer), eq(authIdentities.accountId, accountId))).limit(1);
+    return identity ?? null;
   }
 
   /**
-   * Removes everything stored for an account. Worlds stay, because other players share them. The login itself
-   * is deleted by a function only the production database has (see docs/supabase-datenbank.md).
+   * Binds a verified login to a game account, once. Both directions are unique (one account per login and one
+   * login per account and issuer), so concurrent attempts cannot bind twice; the loser learns why. Binding the
+   * same pair again is a success (retries).
    */
-  async deleteAccount(userId: string) {
-    let loginDeleted = false;
-    // One transaction for the game data and the login: if deleting the login fails, the data stays as well and a
-    // retry can finish both, instead of leaving a login whose game is already gone.
-    await this.client.transaction(async (tx) => {
-      await tx.delete(cloudSaves).where(eq(cloudSaves.userId, userId));
-      await tx.delete(profiles).where(eq(profiles.userId, userId));
-      await tx.delete(playerAccounts).where(eq(playerAccounts.userId, userId));
-      try {
-        // A savepoint: where the function does not exist (local databases), only that statement is undone.
-        await tx.transaction(async (inner) => { await inner.execute(sql`select goal_clicker_private.delete_user(${userId}::uuid)`); });
-        loginDeleted = true;
-      } catch (error) {
-        if (!isMissingObject(error)) throw error;
+  async bindIdentity(values: { issuer: string; subject: string; accountId: string; method: string; loginEmail?: string | null; createdAt: string }): Promise<BindResult> {
+    try {
+      const [created] = await this.client.insert(authIdentities).values({ ...values, loginEmail: values.loginEmail ?? null }).onConflictDoNothing().returning();
+      if (created) return { ok: true, identity: created };
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+    }
+    const bySubject = await this.getIdentity(values.issuer, values.subject);
+    if (bySubject) return bySubject.accountId === values.accountId && !bySubject.deletedAt ? { ok: true, identity: bySubject } : { ok: false, reason: "subject-bound" };
+    return { ok: false, reason: "account-bound" };
+  }
+
+  async findLegacyIdentity(provider: string, providerSubject: string): Promise<LegacyIdentity | null> {
+    const [identity] = await this.client.select().from(legacyIdentities).where(and(eq(legacyIdentities.provider, provider), eq(legacyIdentities.providerSubject, providerSubject))).limit(1);
+    return identity ?? null;
+  }
+
+  async listLegacyIdentities(accountId: string): Promise<LegacyIdentity[]> {
+    return this.client.select().from(legacyIdentities).where(eq(legacyIdentities.accountId, accountId));
+  }
+
+  /** Whether an account ID belongs to any game data at all (a recovery must never invent an account). */
+  async accountExists(accountId: string) {
+    const [profile] = await this.client.select({ userId: profiles.userId }).from(profiles).where(eq(profiles.userId, accountId)).limit(1);
+    return Boolean(profile);
+  }
+
+  /**
+   * TEMPORARY recovery bridge: opens (or reopens) the claim window of an account after a verified proof of
+   * ownership. The generated destination login address is created once per account and issuer and then kept,
+   * so a retry after a partial failure signs into the same new login instead of creating another one.
+   */
+  async openRecoveryClaim(values: { accountId: string; issuer: string; method: string; destinationEmail: string; claimExpiresAt: string; now: string }): Promise<AccountRecovery> {
+    const [row] = await this.client.insert(accountRecovery).values({ accountId: values.accountId, issuer: values.issuer, destinationEmail: values.destinationEmail, method: values.method, claimExpiresAt: values.claimExpiresAt, createdAt: values.now, updatedAt: values.now })
+      .onConflictDoUpdate({ target: [accountRecovery.accountId, accountRecovery.issuer], set: { method: values.method, claimExpiresAt: values.claimExpiresAt, updatedAt: values.now }, setWhere: isNull(accountRecovery.consumedAt) })
+      .returning();
+    if (row) return row;
+    const [existing] = await this.client.select().from(accountRecovery).where(and(eq(accountRecovery.accountId, values.accountId), eq(accountRecovery.issuer, values.issuer))).limit(1);
+    if (!existing) throw new Error("Die Wiederherstellung konnte nicht vorbereitet werden.");
+    return existing;
+  }
+
+  /** A new destination address, when the old one is held by a login whose password is not known (never consumed rows only). */
+  async rotateRecoveryDestination(accountId: string, issuer: string, destinationEmail: string, now: string): Promise<AccountRecovery | null> {
+    const [row] = await this.client.update(accountRecovery).set({ destinationEmail, updatedAt: now }).where(and(eq(accountRecovery.accountId, accountId), eq(accountRecovery.issuer, issuer), isNull(accountRecovery.consumedAt))).returning();
+    return row ?? null;
+  }
+
+  /**
+   * Binds the new login to the original account inside one transaction: the claim row is locked, must still be
+   * open, a code (if any) is used up, the login is bound and the claim consumed. A retry by the same login after
+   * success answers `already`. Nothing in profiles, cloud_saves, player_accounts or coop_rooms changes.
+   */
+  async completeRecovery(values: { accountId: string; issuer: string; subject: string; loginEmail: string; method: string; now: string; codeHash?: string }): Promise<RecoveryCompletion> {
+    return this.client.transaction(async (tx) => {
+      const [claim] = await tx.select().from(accountRecovery).where(and(eq(accountRecovery.accountId, values.accountId), eq(accountRecovery.issuer, values.issuer))).for("update").limit(1);
+      if (!claim) return { ok: false, reason: "no-claim" } as const;
+      if (claim.consumedAt) {
+        const [bound] = await tx.select().from(authIdentities).where(and(eq(authIdentities.issuer, values.issuer), eq(authIdentities.subject, values.subject))).limit(1);
+        return bound && bound.accountId === values.accountId && !bound.deletedAt ? { ok: true, identity: bound, already: true } as const : { ok: false, reason: "consumed-by-other" } as const;
       }
+      if (!claim.claimExpiresAt || claim.claimExpiresAt <= values.now) return { ok: false, reason: "expired" } as const;
+      if (claim.destinationEmail !== values.loginEmail) return { ok: false, reason: "no-claim" } as const;
+      if (values.codeHash) {
+        const [used] = await tx.update(recoveryCodes).set({ usedAt: values.now }).where(and(eq(recoveryCodes.codeHash, values.codeHash), eq(recoveryCodes.accountId, values.accountId), eq(recoveryCodes.issuer, values.issuer), isNull(recoveryCodes.usedAt), gt(recoveryCodes.expiresAt, values.now))).returning({ codeHash: recoveryCodes.codeHash });
+        if (!used) return { ok: false, reason: "code-used" } as const;
+      }
+      const [byAccount] = await tx.select().from(authIdentities).where(and(eq(authIdentities.issuer, values.issuer), eq(authIdentities.accountId, values.accountId))).limit(1);
+      if (byAccount) return { ok: false, reason: "account-bound" } as const;
+      const [bySubject] = await tx.select().from(authIdentities).where(and(eq(authIdentities.issuer, values.issuer), eq(authIdentities.subject, values.subject))).limit(1);
+      if (bySubject) return { ok: false, reason: "subject-bound" } as const;
+      const [identity] = await tx.insert(authIdentities).values({ issuer: values.issuer, subject: values.subject, accountId: values.accountId, method: values.method, loginEmail: values.loginEmail, createdAt: values.now }).returning();
+      await tx.update(accountRecovery).set({ consumedAt: values.now, subject: values.subject, claimExpiresAt: null, updatedAt: values.now }).where(and(eq(accountRecovery.accountId, values.accountId), eq(accountRecovery.issuer, values.issuer)));
+      return { ok: true, identity, already: false } as const;
     });
-    return { loginDeleted };
+  }
+
+  /** Stores the hash of an owner issued recovery code. */
+  async insertRecoveryCode(values: { codeHash: string; accountId: string; issuer: string; expiresAt: string; createdAt: string }) {
+    await this.client.insert(recoveryCodes).values(values);
+  }
+
+  /** The account of an unused, unexpired recovery code (looked up by its hash, so no timing on the code itself). */
+  async findRecoveryCode(codeHash: string, issuer: string, now: string): Promise<typeof recoveryCodes.$inferSelect | null> {
+    const [code] = await this.client.select().from(recoveryCodes).where(and(eq(recoveryCodes.codeHash, codeHash), eq(recoveryCodes.issuer, issuer), isNull(recoveryCodes.usedAt), gt(recoveryCodes.expiresAt, now))).limit(1);
+    return code ?? null;
+  }
+
+  /** Counts a hit in a fixed window shared by all server instances; returns the hits of this window. */
+  async hitRateLimit(key: string, windowStart: number) {
+    const [row] = await this.client.insert(rateLimits).values({ key, windowStart, hits: 1 }).onConflictDoUpdate({
+      target: rateLimits.key,
+      set: { hits: sql`case when ${rateLimits.windowStart} = ${windowStart} then ${rateLimits.hits} + 1 else 1 end`, windowStart },
+    }).returning({ hits: rateLimits.hits });
+    return row?.hits ?? 1;
+  }
+
+  async pruneRateLimits(before: number) {
+    await this.client.delete(rateLimits).where(lte(rateLimits.windowStart, before));
+  }
+
+  /**
+   * First step of deleting an account: removes the game data of the account (profile, cloud save, player link,
+   * imported old logins and recovery state) and marks its logins as being deleted. Worlds stay, because other
+   * players share them. Until the login itself is gone (finishAccountDeletion), the marked login can neither
+   * create a new account nor reach the deleted one, and a retry can finish the deletion.
+   */
+  async deleteAccountData(accountId: string, now: string) {
+    await this.client.transaction(async (tx) => {
+      await tx.delete(cloudSaves).where(eq(cloudSaves.userId, accountId));
+      await tx.delete(profiles).where(eq(profiles.userId, accountId));
+      await tx.delete(playerAccounts).where(eq(playerAccounts.userId, accountId));
+      await tx.delete(legacyIdentities).where(eq(legacyIdentities.accountId, accountId));
+      await tx.delete(accountRecovery).where(eq(accountRecovery.accountId, accountId));
+      await tx.delete(recoveryCodes).where(eq(recoveryCodes.accountId, accountId));
+      await tx.update(authIdentities).set({ deletedAt: now }).where(and(eq(authIdentities.accountId, accountId), isNull(authIdentities.deletedAt)));
+    });
+  }
+
+  /** Last step, once Neon Auth confirmed that the login is gone. */
+  async finishAccountDeletion(accountId: string) {
+    await this.client.delete(authIdentities).where(eq(authIdentities.accountId, accountId));
+  }
+
+  /** Removes a login that was created for a registration or recovery that then failed, and never got data. */
+  async unbindIdentity(issuer: string, subject: string) {
+    await this.client.delete(authIdentities).where(and(eq(authIdentities.issuer, issuer), eq(authIdentities.subject, subject)));
+  }
+
+  /** The generated login address of a username login: the bound Neon login if there is one. */
+  async getLoginEmail(issuer: string, accountId: string) {
+    const identity = await this.getIdentityForAccount(issuer, accountId);
+    return identity && !identity.deletedAt ? identity.loginEmail : null;
   }
 
   async getRoom(code: string): Promise<RoomRow | null> {

@@ -50,6 +50,13 @@
       "when": 1793198373212,
       "tag": "0006_coop_click_state",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793610389043,
+      "tag": "0007_neon_auth_identities",
+      "breakpoints": true
     }
   ]
 }

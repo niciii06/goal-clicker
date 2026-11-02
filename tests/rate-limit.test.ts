@@ -28,3 +28,35 @@ test('requests from this machine are not limited either', () => {
   for (let i = 0; i < 50; i++) assert.equal(rateLimited(from('127.0.0.1'), 'register'), null);
   for (let i = 0; i < 50; i++) assert.equal(rateLimited(from('::1'), 'register'), null);
 });
+
+test('on Netlify only the address the edge reports counts, a forged x-forwarded-for start does not', async () => {
+  const { clientAddress } = await import('../app/api/rate-limit.ts');
+  const saved = process.env.NETLIFY;
+  try {
+    const forged = new Request('http://localhost/api/login', { headers: { 'x-forwarded-for': '1.2.3.4, 203.0.113.9', 'x-nf-client-connection-ip': '203.0.113.9' } });
+    assert.equal(clientAddress(forged), '1.2.3.4');
+    process.env.NETLIFY = 'true';
+    assert.equal(clientAddress(forged), '203.0.113.9');
+    assert.equal(clientAddress(new Request('http://localhost/api/login', { headers: { 'x-forwarded-for': '9.9.9.9, 203.0.113.10' } })), '203.0.113.10');
+  } finally {
+    if (saved === undefined) delete process.env.NETLIFY; else process.env.NETLIFY = saved;
+  }
+});
+
+test('the shared limit counts across server instances and per username', async () => {
+  const { sharedRateLimited } = await import('../app/api/rate-limit.ts');
+  clearRateLimitsForTests();
+  const counts = new Map<string, number>();
+  const store = () => ({
+    hitRateLimit: async (key: string, windowStart: number) => { const k = `${key}@${windowStart}`; counts.set(k, (counts.get(k) ?? 0) + 1); return counts.get(k)!; },
+    pruneRateLimits: async () => undefined,
+  });
+  const { limit } = RATE_LIMITS.login;
+  // Many addresses guessing one username are stopped by the per username budget.
+  let refused = 0;
+  for (let i = 0; i < limit * 3; i++) if (await sharedRateLimited(from(`198.51.100.${i}`), 'login', 'victim', store, 5000)) refused += 1;
+  assert.equal(refused, limit);
+  // A database that cannot count does not block logins (the per instance limit still applies).
+  const broken = () => ({ hitRateLimit: async () => { throw new Error('down'); }, pruneRateLimits: async () => undefined });
+  assert.equal(await sharedRateLimited(from('192.0.2.1'), 'login', 'someone', broken, 5000), null);
+});

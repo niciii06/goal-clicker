@@ -1,80 +1,34 @@
 import assert from 'node:assert/strict';
-import { afterEach, beforeEach, test } from 'node:test';
-import { createProfileResponse, deleteProfileResponse, getCloudSaveResponse, getProfileResponse, loginEmailResponse, putCloudSaveResponse, registerResponse, updateProfileResponse, usernameAvailabilityResponse } from '../app/account-api.ts';
+import { test } from 'node:test';
+import { createProfileResponse, deleteProfileResponse, getCloudSaveResponse, getProfileResponse, loginResponse, putCloudSaveResponse, registerResponse, updateProfileResponse, usernameAvailabilityResponse } from '../app/account-api.ts';
 import type { AccountApiDeps } from '../app/account-api.ts';
 import { cleanCloudSaveKeys, hashText, serializeCloudSaveKeys, summarizeSave } from '../app/cloud-save-rules.ts';
 import { adoptOwnUpload, planInitialSync } from '../app/cloud-sync.ts';
 import { cleanDisplayName, displayNameError, isPasswordLoginEmail, nextUsernameChangeAt, passwordError, usernameError } from '../app/profile-rules.ts';
-import type { CloudSave, Profile } from '../db/index.ts';
-
-const ENV_KEYS = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'];
-let savedEnv: Record<string, string | undefined> = {};
-beforeEach(() => {
-  savedEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
-  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example-project.supabase.co';
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
-});
-afterEach(() => {
-  for (const key of ENV_KEYS) if (savedEnv[key] === undefined) delete process.env[key]; else process.env[key] = savedEnv[key];
-});
+import { accountDeps, fakeNeon, ISSUER, memoryStore, sessionCookieFrom } from './helpers/memory-account-store.ts';
 
 const game = (totalGoals: number) => JSON.stringify({ goals: totalGoals, totalGoals, clicks: totalGoals, seasons: 1, stars: 2 });
 
-/** An in-memory store with the same rules as the PostgreSQL methods. */
-function memoryStore() {
-  const profiles = new Map<string, Profile>();
-  const saves = new Map<string, CloudSave>();
-  const logins = new Map<string, { email: string; password: string }>();
-  let nextLogin = 0;
-  return {
-    profiles, saves, logins,
-    getProfile: async (userId: string) => profiles.get(userId) ?? null,
-    getProfileByUsername: async (key: string) => [...profiles.values()].find((p) => p.usernameKey === key) ?? null,
-    createPasswordLogin: async (email: string, password: string) => {
-      const id = `00000000-0000-4000-8000-${String(++nextLogin).padStart(12, '0')}`;
-      logins.set(id, { email, password });
-      return id;
-    },
-    deleteLogin: async (userId: string) => logins.delete(userId),
-    isUsernameTaken: async (key: string, except?: string) => [...profiles.values()].some((p) => p.usernameKey === key && p.userId !== except),
-    createProfile: async (userId: string, username: string, displayName: string, now: string, loginEmail: string | null = null) => {
-      if ([...profiles.values()].some((p) => p.usernameKey === username.toLowerCase())) return { reason: 'taken' as const };
-      if (profiles.has(userId)) return { reason: 'exists' as const };
-      const profile = { userId, username, usernameKey: username.toLowerCase(), displayName, loginEmail, usernameChangedAt: now, createdAt: now, updatedAt: now };
-      profiles.set(userId, profile);
-      return { profile };
-    },
-    updateDisplayName: async (userId: string, displayName: string) => { const p = profiles.get(userId); if (p) p.displayName = displayName; return p ?? null; },
-    changeUsername: async (userId: string, username: string, now: string, cutoff: string) => {
-      const p = profiles.get(userId);
-      if (!p) return { reason: 'missing' as const };
-      if (p.usernameKey === username.toLowerCase()) { p.username = username; return { profile: p }; }
-      if ([...profiles.values()].some((o) => o.usernameKey === username.toLowerCase())) return { reason: 'taken' as const };
-      if (p.usernameChangedAt > cutoff) return { reason: 'too-soon' as const };
-      Object.assign(p, { username, usernameKey: username.toLowerCase(), usernameChangedAt: now });
-      return { profile: p };
-    },
-    getCloudSave: async (userId: string) => saves.get(userId) ?? null,
-    putCloudSave: async (userId: string, saveJson: string, baseVersion: number, now: string, active = true) => {
-      const current = saves.get(userId);
-      if ((current?.version ?? 0) !== baseVersion) return { conflict: current ?? null };
-      const save = { userId, saveJson, version: baseVersion + 1, active, activeVersion: active ? baseVersion + 1 : current?.activeVersion ?? 0, updatedAt: now };
-      saves.set(userId, save);
-      return { save };
-    },
-    deleteAccount: async (userId: string) => { profiles.delete(userId); saves.delete(userId); return { loginDeleted: true }; },
-  };
-}
-
-function setup(user: { id: string; email: string | null } | null = { id: 'user-a', email: 'a@example.com' }) {
+/** A Google login that is already bound to the game account user-a, and helpers to call the API as it. */
+function setup(signedIn = true) {
   const store = memoryStore();
+  const neon = fakeNeon();
   let now = new Date('2026-10-01T10:00:00.000Z');
-  const deps: AccountApiDeps = { getUser: async () => user, db: () => store, now: () => now, signUp: async () => { throw new Error('the database creates the logins in these tests'); } };
-  const call = async (handler: (request: Request, deps: AccountApiDeps) => Promise<Response>, method = 'GET', body?: unknown, path = '/api/profile') => {
-    const response = await handler(new Request(`http://localhost${path}`, { method, headers: { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) }), deps);
-    return { status: response.status, data: await response.json() as Record<string, unknown> & { profile?: { username: string; displayName: string; nextUsernameChangeAt: string }; errorCode?: string } };
+  const deps: AccountApiDeps = { ...accountDeps(store, neon), now: () => now };
+  let cookie = '';
+  if (signedIn) {
+    const login = neon.googleLogin('google-sub-a', 'a@example.com');
+    if (!login.ok) throw new Error('login');
+    store.identities.push({ issuer: ISSUER, subject: login.subject, accountId: 'user-a', method: 'google', loginEmail: null, deletedAt: null, createdAt: '' });
+    cookie = login.sessionCookie;
+  }
+  const call = async (handler: (request: Request, deps: AccountApiDeps) => Promise<Response>, method = 'GET', body?: unknown, path = '/api/profile', withCookie = cookie) => {
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (withCookie) headers.cookie = withCookie;
+    const response = await handler(new Request(`http://localhost${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) }), deps);
+    return { status: response.status, response, data: await response.json() as Record<string, unknown> & { profile?: { username: string; displayName: string; nextUsernameChangeAt: string }; errorCode?: string } };
   };
-  return { store, call, setNow: (value: string) => { now = new Date(value); } };
+  return { store, neon, deps, call, setNow: (value: string) => { now = new Date(value); } };
 }
 
 test('usernames are 3 to 20 plain characters, unique without regard to case, display names are cleaned', () => {
@@ -97,33 +51,45 @@ test('passwords need 8 to 72 bytes and generated login addresses are recognised'
   assert.equal(isPasswordLoginEmail('nico@gmail.com'), false);
 });
 
-test('registering with username and password creates login and profile, the username leads to the login', async () => {
-  const { call, store } = setup(null);
+test('registering with username and password creates a Neon login, a new account and its profile', async () => {
+  const { call, store, neon } = setup(false);
   assert.deepEqual((await call(usernameAvailabilityResponse, 'GET', undefined, '/api/profile/username?name=Keeper')).data, { available: true });
   assert.equal((await call(registerResponse, 'POST', { username: 'Keeper', displayName: 'Goalie', password: 'short' }, '/api/register')).status, 400);
   const created = await call(registerResponse, 'POST', { username: 'Keeper', displayName: ' Goalie ', password: 'sicheres-passwort' }, '/api/register');
   assert.equal(created.status, 201);
   assert.equal(created.data.profile!.displayName, 'Goalie');
-  const email = created.data.email as string;
-  assert.equal(isPasswordLoginEmail(email), true);
-  assert.deepEqual([...store.logins.values()], [{ email, password: 'sicheres-passwort' }]);
-  // The generated address is only handed out for the username, and never with the profile.
-  assert.deepEqual((await call(loginEmailResponse, 'POST', { username: 'KEEPER' }, '/api/login')).data, { email });
-  assert.equal((await call(loginEmailResponse, 'POST', { username: 'nobody' }, '/api/login')).status, 404);
-  assert.equal(JSON.stringify(created.data.profile).includes(email), false);
+  // The browser is signed in by the answer; the generated address never reaches it.
+  assert.ok(sessionCookieFrom(created.response));
+  assert.equal(JSON.stringify(created.data).includes('@players.'), false);
+  const [user] = [...neon.users.values()];
+  assert.equal(isPasswordLoginEmail(user.email), true);
+  const [identity] = store.identities;
+  assert.equal(identity.subject, user.id);
+  assert.equal(identity.loginEmail, user.email);
+  // The game account ID is a new ID of its own, not the Neon user ID.
+  assert.notEqual(identity.accountId, user.id);
+  assert.equal(store.profiles.get(identity.accountId)!.username, 'Keeper');
   const again = await call(registerResponse, 'POST', { username: 'keeper', displayName: 'Zwei', password: 'sicheres-passwort' }, '/api/register');
   assert.equal(again.data.errorCode, 'USERNAME_TAKEN');
-  assert.equal(store.logins.size, 1);
+  assert.equal(neon.users.size, 1);
+  // Signing in with the username works, a wrong password and an unknown name look the same.
+  const login = await call(loginResponse, 'POST', { username: 'KEEPER', password: 'sicheres-passwort' }, '/api/login', '');
+  assert.equal(login.status, 200);
+  assert.ok(sessionCookieFrom(login.response));
+  const wrong = await call(loginResponse, 'POST', { username: 'Keeper', password: 'falsches-passwort' }, '/api/login', '');
+  const unknown = await call(loginResponse, 'POST', { username: 'nobody', password: 'falsches-passwort' }, '/api/login', '');
+  assert.deepEqual([wrong.status, wrong.data], [unknown.status, unknown.data]);
+  assert.equal(wrong.status, 401);
 });
 
-test('a Google account has no login address behind its username', async () => {
+test('a Google account cannot be signed into with a username and password', async () => {
   const { call } = setup();
   await call(createProfileResponse, 'POST', { username: 'Googler', displayName: 'G' + 'oo' });
-  assert.equal((await call(loginEmailResponse, 'POST', { username: 'Googler' }, '/api/login')).status, 404);
+  assert.equal((await call(loginResponse, 'POST', { username: 'Googler', password: 'irgendwas-langes' }, '/api/login', '')).status, 401);
 });
 
 test('without a login the profile and save API answer 401', async () => {
-  const { call } = setup(null);
+  const { call } = setup(false);
   assert.equal((await call(getProfileResponse)).data.errorCode, 'LOGIN_REQUIRED');
   assert.equal((await call(getCloudSaveResponse, 'GET', undefined, '/api/save')).status, 401);
 });
@@ -131,6 +97,7 @@ test('without a login the profile and save API answer 401', async () => {
 test('the first login has no profile, then creates one with a unique username', async () => {
   const { call, store } = setup();
   assert.deepEqual((await call(getProfileResponse)).data, { email: 'a@example.com', profile: null });
+  // An original account keeps its profile: creating one does nothing.
   assert.equal((await call(createProfileResponse, 'POST', { username: 'ab', displayName: 'Nico' })).status, 400);
   const created = await call(createProfileResponse, 'POST', { username: 'Nico_06', displayName: '  Nico   K ' });
   assert.equal(created.status, 201);
@@ -186,12 +153,22 @@ test('a cloud save only replaces the version it was loaded from', async () => {
   assert.equal((await call(putCloudSaveResponse, 'PUT', { baseVersion: 2, keys: { goalClickerLayoutV3: '[]' } }, '/api/save')).status, 400);
 });
 
-test('deleting the profile needs the username as confirmation', async () => {
-  const { call, store } = setup();
+test('deleting the profile needs the username as confirmation and removes the login first', async () => {
+  const { call, store, neon } = setup();
   await call(createProfileResponse, 'POST', { username: 'Nico_06', displayName: 'Nico' });
   assert.equal((await call(deleteProfileResponse, 'DELETE', { confirm: 'someone' })).data.errorCode, 'CONFIRM_REQUIRED');
+  // Neon Auth refuses: nothing at all is deleted, and the answer does not claim success.
+  neon.deleteWorks = false;
+  const refused = await call(deleteProfileResponse, 'DELETE', { confirm: 'nico_06' });
+  assert.equal(refused.status, 503);
+  assert.equal(refused.data.deleted, undefined);
+  assert.equal(store.profiles.size, 1);
+  assert.equal(store.identities.length, 1);
+  neon.deleteWorks = true;
   assert.deepEqual((await call(deleteProfileResponse, 'DELETE', { confirm: 'nico_06' })).data, { deleted: true, loginDeleted: true });
   assert.equal(store.profiles.size, 0);
+  assert.equal(store.identities.length, 0);
+  assert.equal(neon.users.size, 0);
 });
 
 test('a device keeps its save when it continues the cloud version, otherwise takes the cloud', () => {
@@ -236,22 +213,27 @@ test('only the game, layout and vibration keys travel to the cloud', () => {
 });
 
 test('a registration whose profile fails to save removes its new login again', async () => {
-  const { call, store } = setup(null);
+  const { call, store, neon } = setup(false);
   store.createProfile = async () => { throw new Error('database gone for a moment'); };
   const response = await call(registerResponse, 'POST', { username: 'Keeper', displayName: 'Goalie', password: 'sicheres-passwort' }, '/api/register');
   assert.equal(response.status, 503);
-  assert.equal(store.logins.size, 0);
+  assert.equal(neon.users.size, 0);
+  assert.equal(store.identities.length, 0);
+  assert.equal(sessionCookieFrom(response.response), '');
 });
 
-test('a deleted account cannot create a profile or a first cloud save with its old token', async () => {
-  const store = memoryStore();
-  let exists = true;
-  const deps: AccountApiDeps = { getUser: async () => ({ id: 'user-a', email: 'a@example.com' }), db: () => store, now: () => new Date('2026-10-01T10:00:00.000Z'), signUp: async () => null, loginExists: async () => exists };
-  const send = async (handler: (request: Request, deps: AccountApiDeps) => Promise<Response>, method: string, body: unknown, path = '/api/profile') => (await handler(new Request(`http://localhost${path}`, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }), deps)).status;
-  exists = false;
-  assert.equal(await send(createProfileResponse, 'POST', { username: 'Nico_06', displayName: 'Nico' }), 401);
-  assert.equal(await send(putCloudSaveResponse, 'PUT', { baseVersion: 0, keys: { goalClickerSiteSaveV3: game(5) } }, '/api/save'), 401);
+test('a deleted login cannot create a profile or a first cloud save with its old cookie', async () => {
+  const { call, store, neon } = setup();
+  // Neon Auth no longer knows the session (deleted or revoked user).
+  neon.sessions.clear();
+  assert.equal((await call(createProfileResponse, 'POST', { username: 'Nico_06', displayName: 'Nico' })).status, 401);
+  assert.equal((await call(putCloudSaveResponse, 'PUT', { baseVersion: 0, keys: { goalClickerSiteSaveV3: game(5) } }, '/api/save')).status, 401);
   assert.equal(store.profiles.size + store.saves.size, 0);
-  exists = true;
-  assert.equal(await send(createProfileResponse, 'POST', { username: 'Nico_06', displayName: 'Nico' }), 201);
+});
+
+test('state changing account calls from another site are refused', async () => {
+  const { deps, store } = setup();
+  const response = await createProfileResponse(new Request('http://localhost/api/profile', { method: 'POST', headers: { origin: 'https://evil.example', 'content-type': 'application/json' }, body: JSON.stringify({ username: 'Evil_1', displayName: 'Evil' }) }), deps);
+  assert.equal(response.status, 403);
+  assert.equal(store.profiles.size, 0);
 });

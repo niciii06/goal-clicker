@@ -1,21 +1,22 @@
 "use client";
-// Once Supabase is configured the game starts with a login: Google, or username and password (no e-mail involved).
+// Once Neon Auth is configured the game starts with a login: Google, or username and password (no e-mail involved).
 // Every account has a profile with a unique username and a display name; Google accounts create it after their
 // first login, username accounts when they register. Before the game starts, the account's cloud save is written
 // to localStorage; while it runs, CloudSync uploads every change. A guest plays single player only, with a save
 // in this browser; signing in later takes that save into a new account.
 import { createContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { authErrorMessage, browserSupabase, registerWithUsername, signInWithGoogle, signInWithUsername } from "./auth/browser";
-import { authConfigured } from "./auth/config";
+import { authErrorMessage, recoverWithCode, refreshAuthSession, registerWithUsername, signInWithGoogle, signInWithUsername, signOutOfAuth } from "./auth/browser";
+import { browserAuthMode } from "./auth/config";
 import { adoptOwnUpload, applyCloudSave, clearLocalAccountData, CloudSync, FLUSH_SAVE_EVENT, fetchCloudSave, holdsOtherAccountSave, planInitialSync, readCloudMeta, readCloudMetaOwner, readLocalSaveKeys, writeCloudMeta } from "./cloud-sync";
 import type { CloudSaveState } from "./cloud-sync";
 import { PLAYER_NAME_KEY } from "./game/constants";
 import { suspendLocalPersistence } from "./game/storage";
-import { cleanDisplayName, DISPLAY_NAME_MAX, displayNameError, isPasswordLoginEmail, PASSWORD_MAX, PASSWORD_MIN, passwordError, USERNAME_MAX, usernameError } from "./profile-rules";
+import { cleanDisplayName, DISPLAY_NAME_MAX, displayNameError, PASSWORD_MAX, PASSWORD_MIN, passwordError, USERNAME_MAX, usernameError } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
 
 export type AccountContextValue = {
+  /** The game account ID (not the ID of the login). */
   userId: string;
   /** The Google address; null for accounts with username and password. */
   email: string | null;
@@ -29,7 +30,7 @@ export type AccountContextValue = {
   deleteProfile: (confirm: string) => Promise<void>;
 };
 
-/** null in local development without Supabase, where the game runs without an account as before, and for guests. */
+/** null in local development without login, where the game runs without an account as before, and for guests. */
 export const AccountContext = createContext<AccountContextValue | null>(null);
 
 /** Set while a guest plays: single player only, and a way to the login. */
@@ -44,6 +45,7 @@ const LOGIN_MESSAGES: Record<string, string> = {
   abgebrochen: "Die Anmeldung wurde abgebrochen.",
   fehler: "Die Anmeldung hat nicht geklappt. Bitte erneut versuchen.",
   "nicht-konfiguriert": "Der Login ist auf diesem Server noch nicht eingerichtet.",
+  vergeben: "Dieses Google Konto gehört schon zu einem anderen Spielerkonto.",
 };
 
 type SessionUser = { id: string; email: string | null; passwordLogin: boolean; suggestedName: string };
@@ -53,40 +55,46 @@ type Phase =
   | { name: "guest" }
   | { name: "profile"; user: SessionUser }
   | { name: "unreachable"; message: string; user: SessionUser | null; offlineProfile: PublicProfile | null }
+  | { name: "deletion"; message: string }
   | { name: "ready"; user: SessionUser; profile: PublicProfile };
 
-function readProfileCache(userId: string): PublicProfile | null {
+/** The account and profile this device last started with: lets a signed in player continue offline. */
+function readProfileCache(): { user: SessionUser; profile: PublicProfile } | null {
   try {
-    const cached = JSON.parse(localStorage.getItem(PROFILE_CACHE_KEY) ?? "null") as { userId?: string; profile?: PublicProfile } | null;
-    return cached?.userId === userId && cached.profile ? cached.profile : null;
+    const cached = JSON.parse(localStorage.getItem(PROFILE_CACHE_KEY) ?? "null") as { userId?: string; profile?: PublicProfile; email?: string | null; passwordLogin?: boolean } | null;
+    if (typeof cached?.userId !== "string" || !cached.profile) return null;
+    return { user: { id: cached.userId, email: cached.email ?? null, passwordLogin: cached.passwordLogin === true, suggestedName: "" }, profile: cached.profile };
   } catch {
     return null;
   }
 }
 
-function writeProfileCache(userId: string, profile: PublicProfile) {
+function writeProfileCache(user: SessionUser, profile: PublicProfile) {
   try {
-    localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ userId, profile }));
+    localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ userId: user.id, email: user.email, passwordLogin: user.passwordLogin, profile }));
   } catch {
     // Only needed to start offline.
   }
 }
 
-function sessionUser(user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> }): SessionUser {
-  const metadata = user.user_metadata ?? {};
-  const name = [metadata.full_name, metadata.name, metadata.given_name].find((value): value is string => typeof value === "string" && value.trim().length > 0);
-  const passwordLogin = isPasswordLoginEmail(user.email);
-  const fromEmail = user.email && !passwordLogin ? user.email.split("@")[0] : "";
-  return { id: user.id, email: passwordLogin ? null : user.email ?? null, passwordLogin, suggestedName: cleanDisplayName(name ?? fromEmail).slice(0, DISPLAY_NAME_MAX) };
+type AccountSession = { signedIn?: boolean; accountId?: string; email?: string | null; passwordLogin?: boolean; suggestedName?: string };
+
+function sessionUser(body: AccountSession): SessionUser {
+  const fromEmail = body.email && !body.passwordLogin ? body.email.split("@")[0] : "";
+  return { id: body.accountId!, email: body.passwordLogin ? null : body.email ?? null, passwordLogin: body.passwordLogin === true, suggestedName: cleanDisplayName(body.suggestedName || fromEmail).slice(0, DISPLAY_NAME_MAX) };
 }
+
+/** Answers of POST /api/account that mean this login cannot open a game account; it is signed out again. */
+const REFUSED_LOGINS = new Set(["ACCOUNT_ALREADY_CLAIMED", "IDENTITY_UNBOUND", "LEGACY_ACCOUNT_MISSING", "AUTH_NOT_CONFIGURED"]);
 
 async function readJson<T>(response: Response) {
   return await response.json().catch(() => ({})) as T & { error?: string; errorCode?: string };
 }
 
 export function AccountGate({ children }: { children: ReactNode }) {
-  // Without Supabase (local development, tests) the game starts right away without an account.
-  if (!authConfigured()) return <>{children}</>;
+  // Without login (local development, tests) the game starts right away without an account. A hosted build without
+  // a complete login configuration shows the login screen with a notice instead (fail closed).
+  if (!browserAuthMode()) return <>{children}</>;
   return <RequiredAccount>{children}</RequiredAccount>;
 }
 
@@ -116,6 +124,7 @@ function RequiredAccount({ children }: { children: ReactNode }) {
       cloud = await fetchCloudSave();
     } catch {
       setPhase({ name: "unreachable", message: "Dein Spielstand konnte nicht geladen werden.", user, offlineProfile: readCloudMeta(user.id) ? profile : null });
+
       return;
     }
     // Only a save that never belonged to an account may move into this one; another account's save is removed.
@@ -133,34 +142,57 @@ function RequiredAccount({ children }: { children: ReactNode }) {
 
   const enter = useCallback(async () => {
     setPhase({ name: "checking" });
-    const supabase = browserSupabase()!;
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) {
-      setPhase(localStorage.getItem(GUEST_MODE_KEY) === "1" ? { name: "guest" } : { name: "signed-out" });
+    if (browserAuthMode() !== "neon") {
+      setPhase(localStorage.getItem(GUEST_MODE_KEY) === "1" ? { name: "guest" } : { name: "signed-out", message: LOGIN_MESSAGES["nicht-konfiguriert"] });
+      return;
+    }
+    let body: AccountSession & { error?: string; errorCode?: string };
+    try {
+      // Verifies the login with Neon Auth and opens its game account (recovering an original account on first use).
+      const response = await fetch("/api/account", { method: "POST", headers: { "content-type": "application/json" }, body: "{}", cache: "no-store" });
+      body = await readJson<AccountSession>(response);
+      if (response.status === 401) {
+        setPhase(localStorage.getItem(GUEST_MODE_KEY) === "1" ? { name: "guest" } : { name: "signed-out" });
+        return;
+      }
+      if (response.status === 410) { setPhase({ name: "deletion", message: body.error ?? "Dein Konto wird gerade gelöscht." }); return; }
+      if (body.errorCode && REFUSED_LOGINS.has(body.errorCode)) {
+        await signOutOfAuth();
+        setPhase({ name: "signed-out", message: body.error });
+        return;
+      }
+      if (!response.ok || !body.accountId) throw new Error(body.error);
+    } catch {
+      const cached = readProfileCache();
+      const offline = cached && readCloudMeta(cached.user.id) ? cached : null;
+      setPhase({ name: "unreachable", message: "Keine Verbindung zum Server.", user: offline?.user ?? null, offlineProfile: offline?.profile ?? null });
       return;
     }
     localStorage.removeItem(GUEST_MODE_KEY);
-    const user = sessionUser(data.session.user);
+    // Lets the SDK renew the session cookie when Neon Auth renews the session.
+    void refreshAuthSession();
+    const user = sessionUser(body);
     let profile: PublicProfile | null;
     try {
       const response = await fetch("/api/profile", { cache: "no-store" });
       if (response.status === 401) {
-        await supabase.auth.signOut({ scope: "local" });
+        await signOutOfAuth();
         setPhase({ name: "signed-out", message: "Deine Anmeldung ist abgelaufen. Bitte melde dich erneut an." });
         return;
       }
-      const body = await readJson<{ profile: PublicProfile | null }>(response);
-      if (!response.ok) throw new Error(body.error);
-      profile = body.profile;
+      const profileBody = await readJson<{ profile: PublicProfile | null }>(response);
+      if (!response.ok) throw new Error(profileBody.error);
+      profile = profileBody.profile;
     } catch {
-      setPhase({ name: "unreachable", message: "Keine Verbindung zum Server.", user, offlineProfile: readCloudMeta(user.id) ? readProfileCache(user.id) : null });
+      const cached = readProfileCache();
+      setPhase({ name: "unreachable", message: "Keine Verbindung zum Server.", user, offlineProfile: cached?.user.id === user.id && readCloudMeta(user.id) ? cached.profile : null });
       return;
     }
     if (!profile) {
       setPhase({ name: "profile", user });
       return;
     }
-    writeProfileCache(user.id, profile);
+    writeProfileCache(user, profile);
     await syncAndStart(user, profile);
   }, [syncAndStart]);
 
@@ -172,15 +204,19 @@ function RequiredAccount({ children }: { children: ReactNode }) {
       });
     }, 0);
     if (login) window.history.replaceState(null, "", window.location.pathname + window.location.hash);
-    // Signing out in another tab ends the session here too.
-    const { data } = browserSupabase()!.auth.onAuthStateChange((event) => {
-      if (event !== "SIGNED_OUT") return;
-      syncRef.current?.stop();
-      setPhase((current) => current.name === "signed-out" || current.name === "guest" ? current : { name: "signed-out", message: "Du wurdest abgemeldet." });
-    });
+    // Signing out in another tab (or a revoked session) ends the game here too, checked when the tab comes back.
+    const checkSignedIn = () => {
+      if (document.visibilityState !== "visible" || !syncRef.current) return;
+      void fetch("/api/account", { cache: "no-store" }).then((response) => response.json()).then((state: { signedIn?: boolean | null }) => {
+        if (state.signedIn !== false) return;
+        syncRef.current?.stop();
+        setPhase((current) => current.name === "ready" ? { name: "signed-out", message: "Du wurdest abgemeldet." } : current);
+      }).catch(() => undefined);
+    };
+    document.addEventListener("visibilitychange", checkSignedIn);
     return () => {
       window.clearTimeout(timer);
-      data.subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", checkSignedIn);
       syncRef.current?.stop();
     };
   }, [enter]);
@@ -192,7 +228,7 @@ function RequiredAccount({ children }: { children: ReactNode }) {
     sync?.stop();
     suspendLocalPersistence();
     clearLocalAccountData();
-    await browserSupabase()!.auth.signOut().catch(() => undefined);
+    await signOutOfAuth();
     window.location.replace("/");
   }, []);
 
@@ -216,7 +252,7 @@ function RequiredAccount({ children }: { children: ReactNode }) {
     suspendLocalPersistence();
     clearLocalAccountData();
     localStorage.removeItem(PROFILE_CACHE_KEY);
-    await browserSupabase()!.auth.signOut({ scope: "local" }).catch(() => undefined);
+    await signOutOfAuth();
     window.location.replace("/");
   }, []);
 
@@ -238,7 +274,7 @@ function RequiredAccount({ children }: { children: ReactNode }) {
   const ready = phase.name === "ready" ? phase : null;
   const setProfile = useCallback((profile: PublicProfile) => {
     setPhase((current) => current.name === "ready" ? { ...current, profile } : current);
-    if (ready) writeProfileCache(ready.user.id, profile);
+    if (ready) writeProfileCache(ready.user, profile);
     localStorage.setItem(PLAYER_NAME_KEY, profile.displayName);
   }, [ready]);
   const context = useMemo<AccountContextValue | null>(() => ready ? { userId: ready.user.id, email: ready.user.email, passwordLogin: ready.user.passwordLogin, profile: ready.profile, setProfile, signOut, deleteProfile } : null, [ready, setProfile, signOut, deleteProfile]);
@@ -259,7 +295,8 @@ function RequiredAccount({ children }: { children: ReactNode }) {
       <div className="account-brand"><span className="account-brand-ball" aria-hidden="true">⚽</span><div><p className="eyebrow">FOOTBALL IDLE CLUB</p><strong>Goal Clicker</strong></div></div>
       {phase.name === "checking" && <p className="account-status" role="status">Anmeldung wird geprüft …</p>}
       {phase.name === "signed-out" && <LoginForm message={phase.message} onSignedIn={() => void enter()} onGuest={playAsGuest} />}
-      {phase.name === "profile" && <ProfileSetup user={phase.user} onCreated={(profile) => { writeProfileCache(phase.user.id, profile); void syncAndStart(phase.user, profile); }} onSignOut={() => void signOut()} />}
+      {phase.name === "profile" && <ProfileSetup user={phase.user} onCreated={(profile) => { writeProfileCache(phase.user, profile); void syncAndStart(phase.user, profile); }} onSignOut={() => void signOut()} />}
+      {phase.name === "deletion" && <FinishDeletion message={phase.message} />}
       {phase.name === "unreachable" && <>
         <h2>Keine Verbindung</h2>
         <p>{phase.message} Prüfe dein Internet und versuche es nochmal.{phase.offlineProfile ? " Du kannst auch offline weiterspielen; dein Fortschritt wird gespeichert, sobald die Verbindung zurück ist." : ""}</p>
@@ -300,8 +337,40 @@ function UsernameHint({ check }: { check: ReturnType<typeof useUsernameCheck> })
   return <small className={`account-hint${check.tone}`}>{check.message || "3 bis 20 Zeichen: Buchstaben, Zahlen und _. Änderbar alle 30 Tage."}</small>;
 }
 
+/** Finishes an account deletion that removed the data but not yet the login (or the other way round). */
+function FinishDeletion({ message }: { message: string }) {
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function finish() {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/profile", { method: "DELETE", headers: { "content-type": "application/json" }, body: "{}" });
+      const body = await readJson<{ deleted?: boolean }>(response);
+      if (!response.ok || !body.deleted) throw new Error(body.error ?? "Das Löschen hat nicht geklappt.");
+      clearLocalAccountData();
+      localStorage.removeItem(PROFILE_CACHE_KEY);
+      await signOutOfAuth();
+      window.location.replace("/");
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Das Löschen hat nicht geklappt.");
+      setBusy(false);
+    }
+  }
+  return <>
+    <h2>Konto wird gelöscht</h2>
+    <p>{message}</p>
+    <div className="account-actions">
+      <button type="button" className="mode-primary" disabled={busy} onClick={() => void finish()}>Löschen abschliessen</button>
+      <button type="button" className="mode-secondary" disabled={busy} onClick={() => void signOutOfAuth().then(() => window.location.replace("/"))}>Abmelden</button>
+    </div>
+    {error && <p className="account-error" role="alert">{error}</p>}
+  </>;
+}
+
 function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSignedIn: () => void; onGuest: () => void }) {
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register" | "recover">("login");
+  const [code, setCode] = useState("");
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
@@ -310,7 +379,7 @@ function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSigne
   const [busy, setBusy] = useState(false);
   const check = useUsernameCheck(mode === "register" ? username : "");
 
-  function switchMode(next: "login" | "register") {
+  function switchMode(next: "login" | "register" | "recover") {
     setMode(next);
     setError("");
     setPassword("");
@@ -324,10 +393,15 @@ function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSigne
       const problem = usernameError(username) ?? displayNameError(displayName) ?? passwordError(password) ?? (password !== passwordRepeat ? "Die beiden Passwörter stimmen nicht überein." : null);
       if (problem) { setError(problem); return; }
     }
+    if (mode === "recover") {
+      const problem = (code.trim().length < 16 ? "Gib den ganzen Wiederherstellungscode ein." : null) ?? passwordError(password) ?? (password !== passwordRepeat ? "Die beiden Passwörter stimmen nicht überein." : null);
+      if (problem) { setError(problem); return; }
+    }
     setBusy(true);
     setError("");
     try {
       if (mode === "login") await signInWithUsername(username.trim(), password);
+      else if (mode === "recover") await recoverWithCode(username.trim(), code, password);
       else await registerWithUsername(username.trim(), displayName, password);
       onSignedIn();
     } catch (failure) {
@@ -337,7 +411,7 @@ function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSigne
   }
 
   return <>
-    <h2>{mode === "login" ? "Anmelden" : "Konto erstellen"}</h2>
+    <h2>{mode === "login" ? "Anmelden" : mode === "recover" ? "Konto wiederherstellen" : "Konto erstellen"}</h2>
     <p>Melde dich an, damit dein Spielstand auf allen deinen Geräten gleich ist.</p>
     {message && <p className="account-notice" role="status">{message}</p>}
     <button type="button" className="account-google" disabled={busy} onClick={() => void signInWithGoogle(window.location.pathname).catch((failure: unknown) => setError(authErrorMessage(failure)))}><span aria-hidden="true">G</span>Mit Google anmelden</button>
@@ -351,11 +425,15 @@ function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSigne
       {mode === "register" && <UsernameHint check={check} />}
       {mode === "register" && <><label className="account-field"><span>Anzeigename</span><input className="mode-input" autoComplete="nickname" maxLength={DISPLAY_NAME_MAX} required value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
         <small className="account-hint">So heisst du im Spiel und im Multiplayer. Jederzeit änderbar.</small></>}
-      <label className="account-field"><span>{mode === "register" ? `Passwort (mindestens ${PASSWORD_MIN} Zeichen)` : "Passwort"}</span><input className="mode-input" type="password" autoComplete={mode === "register" ? "new-password" : "current-password"} minLength={mode === "register" ? PASSWORD_MIN : undefined} maxLength={PASSWORD_MAX} required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-      {mode === "register" && <label className="account-field"><span>Passwort wiederholen</span><input className="mode-input" type="password" autoComplete="new-password" maxLength={PASSWORD_MAX} required value={passwordRepeat} onChange={(event) => setPasswordRepeat(event.target.value)} /></label>}
+      <label className="account-field"><span>{mode === "register" ? `Passwort (mindestens ${PASSWORD_MIN} Zeichen)` : mode === "recover" ? `Neues Passwort (mindestens ${PASSWORD_MIN} Zeichen)` : "Passwort"}</span><input className="mode-input" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? undefined : PASSWORD_MIN} maxLength={PASSWORD_MAX} required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+      {mode === "recover" && <label className="account-field"><span>Wiederherstellungscode</span><input className="mode-input" autoComplete="one-time-code" autoCapitalize="characters" spellCheck={false} maxLength={64} required value={code} onChange={(event) => setCode(event.target.value)} /></label>}
+      {mode !== "login" && <label className="account-field"><span>Passwort wiederholen</span><input className="mode-input" type="password" autoComplete="new-password" maxLength={PASSWORD_MAX} required value={passwordRepeat} onChange={(event) => setPasswordRepeat(event.target.value)} /></label>}
       {mode === "register" && <small className="account-hint">Merk dir dein Passwort gut: Ohne E-Mail Adresse lässt es sich nicht zurücksetzen.</small>}
-      <button type="submit" className="mode-primary" disabled={busy || (mode === "register" && check.blocked)}>{mode === "login" ? "Anmelden" : "Konto erstellen"}</button>
+      {mode === "recover" && <small className="account-hint">Den Code bekommst du vom Besitzer des Spiels. Er gilt einmal und nur für dein Konto.</small>}
+      <button type="submit" className="mode-primary" disabled={busy || (mode === "register" && check.blocked)}>{mode === "login" ? "Anmelden" : mode === "recover" ? "Wiederherstellen" : "Konto erstellen"}</button>
     </form>
+    {mode !== "recover" ? <button type="button" className="mode-secondary quiet" disabled={busy} onClick={() => switchMode("recover")}>Ich habe einen Wiederherstellungscode</button>
+      : <button type="button" className="mode-secondary quiet" disabled={busy} onClick={() => switchMode("login")}>Zurück zur Anmeldung</button>}
     {error && <p className="account-error" role="alert">{error}</p>}
     <div className="account-guest">
       <button type="button" className="mode-secondary quiet" disabled={busy} onClick={onGuest}>Als Gast fortfahren</button>

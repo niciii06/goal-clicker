@@ -16,7 +16,7 @@ before(async () => {
   if (!url) return;
   admin = postgres(url, { max: 1, onnotice: () => {} });
   await migrate(drizzle(admin), { migrationsFolder: 'drizzle' });
-  await admin`truncate coop_rooms, solo_travel, player_accounts, profiles, cloud_saves`;
+  await admin`truncate coop_rooms, solo_travel, player_accounts, profiles, cloud_saves, auth_identities, legacy_identities, account_recovery, recovery_codes, rate_limits`;
   process.env.DATABASE_URL = url;
   process.env.DATABASE_POOL_MAX = '10';
   const dbModule = await import('../db/index.ts');
@@ -135,6 +135,9 @@ test('row level security keeps the tables closed to the Supabase browser roles',
   assert.deepEqual(accountTables.map((r) => [r.relname, r.relrowsecurity]), [['cloud_saves', true], ['player_accounts', true], ['profiles', true]]);
   const policies = await admin`select count(*)::int as n from pg_policies where tablename in ('coop_rooms', 'solo_travel')`;
   assert.equal(policies[0].n, 0);
+  // The login mapping, the imported old logins and the recovery state are never reachable without the server.
+  const authTables = await admin`select relname, relrowsecurity from pg_class where relname in ('auth_identities', 'legacy_identities', 'account_recovery', 'recovery_codes', 'rate_limits') and relkind = 'r' order by relname`;
+  assert.deepEqual(authTables.map((r) => [r.relname, r.relrowsecurity]), [['account_recovery', true], ['auth_identities', true], ['legacy_identities', true], ['rate_limits', true], ['recovery_codes', true]]);
 });
 
 test('the multiplayer API creates, joins and plays a world on PostgreSQL', { skip }, async () => {
@@ -229,28 +232,95 @@ test('a cloud save that went through is not sent back from the database', { skip
   }
 });
 
-test('deleting an account removes profile, cloud save and link but keeps shared worlds', { skip }, async () => {
+test('deleting an account removes profile, cloud save, link and login mapping but keeps shared worlds', { skip }, async () => {
   const user = '00000000-0000-4000-8000-000000000401';
   await db.linkAccount(user, 'deleted-player-id', 'gone@example.com');
   await db.createProfile(user, 'Leaving', 'Weg', iso());
   await db.putCloudSave(user, '{}', 0, iso());
+  await db.bindIdentity({ issuer: 'https://auth.test', subject: 'neon-leaving', accountId: user, method: 'google', createdAt: iso() });
+  await admin`insert into legacy_identities (provider, provider_subject, account_id) values ('google', 'sub-leaving', ${user})`;
   await db.insertRoom({ ...room('KEEP'), hostPlayerId: 'deleted-player-id' });
-  // The scratch database has no Supabase auth schema, so the login itself is not deleted here.
-  assert.deepEqual(await db.deleteAccount(user), { loginDeleted: false });
+  await db.deleteAccountData(user, iso());
+  // Until the login is gone the mapping stays, marked: nothing can use or recreate the account.
+  assert.ok((await db.getIdentity('https://auth.test', 'neon-leaving'))!.deletedAt);
+  await db.finishAccountDeletion(user);
+  assert.equal(await db.getIdentity('https://auth.test', 'neon-leaving'), null);
+  assert.equal(await db.findLegacyIdentity('google', 'sub-leaving'), null);
   assert.equal(await db.getProfile(user), null);
   assert.equal(await db.getCloudSave(user), null);
   assert.equal(await db.getAccount(user), null);
   assert.ok(await db.getRoom('KEEP'));
 });
 
-test('a username account keeps its login address on the server and is found by its username', { skip }, async () => {
-  const user = '00000000-0000-4000-8000-000000000501';
-  // The scratch database has no Supabase auth schema; there the app registers through the Auth API instead.
-  assert.equal(await db.createPasswordLogin('p-x@players.goal-clicker.vercel.app', 'sicheres-passwort'), null);
-  assert.equal(await db.deleteLogin(user), false);
-  await db.createProfile(user, 'Libero', 'Libero', iso(), 'p-libero@players.goal-clicker.vercel.app');
-  assert.equal((await db.getProfileByUsername('libero'))!.loginEmail, 'p-libero@players.goal-clicker.vercel.app');
-  assert.equal(await db.getProfileByUsername('nobody'), null);
+test('a login binds to one account once, also under concurrency', { skip }, async () => {
+  const issuer = 'https://auth.test/bind';
+  const account = '00000000-0000-4000-8000-000000000601';
+  // 20 different logins race for one account: exactly one wins.
+  const results = await Promise.all(Array.from({ length: 20 }, (_, i) => db.bindIdentity({ issuer, subject: `neon-${i}`, accountId: account, method: 'legacy-google', createdAt: iso() })));
+  assert.equal(results.filter((r) => r.ok).length, 1);
+  assert.ok(results.filter((r) => !r.ok).every((r) => !r.ok && r.reason === 'account-bound'));
+  const winner = results.find((r) => r.ok)!;
+  // The same pair again is a success (retry), the winner cannot move to another account.
+  assert.equal((await db.bindIdentity({ issuer, subject: winner.ok ? winner.identity.subject : '', accountId: account, method: 'legacy-google', createdAt: iso() })).ok, true);
+  assert.deepEqual(await db.bindIdentity({ issuer, subject: winner.ok ? winner.identity.subject : '', accountId: '00000000-0000-4000-8000-000000000602', method: 'google', createdAt: iso() }), { ok: false, reason: 'subject-bound' });
+  // Another issuer (staging) is a different login.
+  assert.equal((await db.bindIdentity({ issuer: 'https://staging.test', subject: 'neon-0', accountId: account, method: 'legacy-google', createdAt: iso() })).ok, true);
+});
+
+test('concurrent recoveries of one account consume its claim exactly once', { skip }, async () => {
+  const issuer = 'https://auth.test/recovery';
+  const account = '00000000-0000-4000-8000-000000000701';
+  const now = '2026-11-02T10:00:00.000Z';
+  const claims = await Promise.all(Array.from({ length: 10 }, (_, i) => db.openRecoveryClaim({ accountId: account, issuer, method: 'legacy-password', destinationEmail: `p-${i}@players.test`, claimExpiresAt: '2026-11-02T10:10:00.000Z', now })));
+  // Every attempt gets the same destination address.
+  assert.equal(new Set(claims.map((c) => c.destinationEmail)).size, 1);
+  const destination = claims[0].destinationEmail;
+  const results = await Promise.all(Array.from({ length: 10 }, (_, i) => db.completeRecovery({ accountId: account, issuer, subject: i < 5 ? 'neon-same' : `neon-other-${i}`, loginEmail: destination, method: 'legacy-password', now })));
+  const bound = await db.getIdentityForAccount(issuer, account);
+  assert.ok(bound);
+  assert.equal(results.filter((r) => r.ok && !r.already).length, 1);
+  // Only the winning login (and its retries) succeeds; other logins are refused.
+  for (const [i, result] of results.entries()) {
+    const subject = i < 5 ? 'neon-same' : `neon-other-${i}`;
+    assert.equal(result.ok, subject === bound.subject, `${subject}: ${JSON.stringify(result)}`);
+  }
+  // The claim stays consumed: reopening does not reset it.
+  const reopened = await db.openRecoveryClaim({ accountId: account, issuer, method: 'owner-code', destinationEmail: 'p-new@players.test', claimExpiresAt: '2026-11-02T11:00:00.000Z', now });
+  assert.ok(reopened.consumedAt);
+  assert.equal(reopened.destinationEmail, destination);
+});
+
+test('an expired claim and a used or foreign recovery code bind nothing', { skip }, async () => {
+  const issuer = 'https://auth.test/codes';
+  const account = '00000000-0000-4000-8000-000000000801';
+  const other = '00000000-0000-4000-8000-000000000802';
+  await db.openRecoveryClaim({ accountId: account, issuer, method: 'owner-code', destinationEmail: 'p-code@players.test', claimExpiresAt: '2026-11-02T10:10:00.000Z', now: '2026-11-02T10:00:00.000Z' });
+  assert.deepEqual(await db.completeRecovery({ accountId: account, issuer, subject: 'neon-late', loginEmail: 'p-code@players.test', method: 'owner-code', now: '2026-11-02T10:11:00.000Z' }), { ok: false, reason: 'expired' });
+  await db.openRecoveryClaim({ accountId: account, issuer, method: 'owner-code', destinationEmail: 'unused', claimExpiresAt: '2026-11-02T12:00:00.000Z', now: '2026-11-02T11:00:00.000Z' });
+  await db.insertRecoveryCode({ codeHash: 'hash-of-other', accountId: other, issuer, expiresAt: '2026-11-03T00:00:00.000Z', createdAt: iso() });
+  assert.deepEqual(await db.completeRecovery({ accountId: account, issuer, subject: 'neon-x', loginEmail: 'p-code@players.test', method: 'owner-code', now: '2026-11-02T11:00:00.000Z', codeHash: 'hash-of-other' }), { ok: false, reason: 'code-used' });
+  await db.insertRecoveryCode({ codeHash: 'hash-good', accountId: account, issuer, expiresAt: '2026-11-03T00:00:00.000Z', createdAt: iso() });
+  assert.ok(await db.findRecoveryCode('hash-good', issuer, '2026-11-02T11:00:00.000Z'));
+  const done = await db.completeRecovery({ accountId: account, issuer, subject: 'neon-x', loginEmail: 'p-code@players.test', method: 'owner-code', now: '2026-11-02T11:00:00.000Z', codeHash: 'hash-good' });
+  assert.equal(done.ok, true);
+  assert.equal(await db.findRecoveryCode('hash-good', issuer, '2026-11-02T11:00:00.000Z'), null);
+  assert.equal(await db.findRecoveryCode('hash-of-other', issuer, '2026-11-04T00:00:00.000Z'), null, 'expired');
+});
+
+test('an unchanged cloud save is answered from its version without reading the save', { skip }, async () => {
+  const user = '00000000-0000-4000-8000-000000000901';
+  await db.putCloudSave(user, JSON.stringify({ big: 'x'.repeat(50_000) }), 0, iso());
+  assert.equal((await db.getCloudSaveSince(user, 1))!.saveJson, null);
+  assert.equal((await db.getCloudSaveSince(user, 0))!.saveJson!.length > 50_000, true);
+  assert.equal(await db.getCloudSaveSince('00000000-0000-4000-8000-000000000999', 0), null);
+});
+
+test('the shared rate limit counts in one window for every instance', { skip }, async () => {
+  const hits = await Promise.all(Array.from({ length: 30 }, () => db.hitRateLimit('login:ip:203.0.113.1', 1000)));
+  assert.deepEqual([...hits].sort((a, b) => a - b), Array.from({ length: 30 }, (_, i) => i + 1));
+  assert.equal(await db.hitRateLimit('login:ip:203.0.113.1', 2000), 1, 'a new window starts at one');
+  await db.pruneRateLimits(5000);
+  assert.equal(await db.hitRateLimit('login:ip:203.0.113.1', 6000), 1);
 });
 
 test('a new display name renames the account\'s seats in every world', { skip }, async () => {
@@ -311,25 +381,6 @@ test('a passive cloud save keeps the version of the last played one', { skip }, 
   assert.equal((await db.putCloudSave(user, '{"a":2}', 1, iso(), false)).save!.activeVersion, 1);
   assert.equal((await db.putCloudSave(user, '{"a":3}', 2, iso(), true)).save!.activeVersion, 3);
   assert.equal((await db.getCloudSave(user))!.activeVersion, 3);
-});
-
-test('deleting an account is one transaction with deleting its login', { skip }, async () => {
-  const user = '00000000-0000-4000-8000-000000000402';
-  await db.createProfile(user, 'Retry', 'Retry', iso());
-  await db.putCloudSave(user, '{}', 0, iso());
-  await admin.unsafe(`create schema if not exists goal_clicker_private;
-    create or replace function goal_clicker_private.delete_user(id uuid) returns void language plpgsql as $$ begin raise exception 'auth is down'; end $$;`);
-  try {
-    await assert.rejects(db.deleteAccount(user));
-    assert.ok(await db.getProfile(user), 'the game data stays when the login could not be deleted');
-    assert.ok(await db.getCloudSave(user));
-    await admin.unsafe(`create or replace function goal_clicker_private.delete_user(id uuid) returns void language plpgsql as $$ begin end $$;`);
-    assert.deepEqual(await db.deleteAccount(user), { loginDeleted: true });
-    assert.equal(await db.getProfile(user), null);
-    assert.equal(await db.getCloudSave(user), null);
-  } finally {
-    await admin.unsafe('drop schema goal_clicker_private cascade');
-  }
 });
 
 test('worlds with the AZB test code stay out of the leaderboard', { skip }, async () => {
