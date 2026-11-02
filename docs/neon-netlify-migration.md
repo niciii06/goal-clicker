@@ -187,6 +187,8 @@ Gegen die **echte** Neon Auth von Staging mit den Server Funktionen dieses Codes
 
 Zwei Wegwerf Logins dieser Probe liegen noch in Staging Auth (ohne Spielkonto, ohne Zuordnung).
 
+Danach (ebenfalls 2. November): Rolle `goal_clicker_app` hat ein Passwort (über Neons HTTPS Schnittstelle geprüft: liest 9 Profile und 9 alte Logins, schreibt `rate_limits`; DDL, `neon_auth` und Schreiben in `legacy_identities` verweigert). Port 5432 ist aus dem Cloud Container gesperrt, der Pooler selbst wird deshalb erst auf Netlify geprüft. Trusted Origin von Staging Auth: `https://deploy-preview-10--goalglicker.netlify.app`. Staging läuft über den Netlify Kontext **Deploy Previews** (Entscheid des Besitzers): dessen Variablen zeigen nur auf `migration-staging`. Die Netlify Verbindung dieser Sitzung gehört zu einem anderen Team als die Site, die Variablen setzt deshalb der Besitzer.
+
 Vorher auf `migration-staging` nur gelesen (Neon MCP): 9 Profile, 9 Spielstände, 9 Verknüpfungen, 3 Welten, 39 Reisebelege, kein Drizzle Journal, 0007 noch nicht eingespielt, Neon Auth ohne Trusted Origins, Google mit geteilten Zugangsdaten, E-Mail Registrierung erlaubt, Pooler Host vorhanden bei `pooler_enabled=false`.
 
 ## Anbieter Schritte (ChatGPT Work oder Besitzer)
