@@ -13,7 +13,7 @@ Harte Regeln:
 
 1. **Netlify Staging Deployment** für Site `goalglicker` (`a598db88-81d8-4d9d-b244-7f98b1f12fd6`): Branch Deploy des Branches `claude/affectionate-lovelace-vgli3d`. Die Site ist mit GitHub verbunden (für PR 10 entstand automatisch das Deploy Preview `deploy-preview-10--goalglicker.netlify.app`, das ist **kein** Staging). Branch Deploys für diesen Branch einschalten. Die von Netlify gemeldete Branch Deploy Adresse notieren (nicht erfinden).
 2. **Umgebungsvariablen nur für diesen Branch Kontext** (Werte nie ausgeben, nur Namen und Scope bestätigen):
-   * `NEON_AUTH_BASE_URL` = Auth URL von `migration-staging` (`https://ep-long-shadow-b4ngl6x8.neonauth.c-6.us-east-2.aws.neon.tech/neondb/auth`)
+   * `NEON_AUTH_BASE_URL` = Auth URL von `migration-staging` (Wert aus der Neon-Konfiguration übernehmen; keine konkrete URL im Repository speichern)
    * `NEON_AUTH_COOKIE_SECRET` = neu erzeugt, mindestens 32 Zeichen, nur für Staging
    * `DATABASE_URL` = Pooler Host `ep-long-shadow-b4ngl6x8-pooler.c-6.us-east-2.aws.neon.tech`, Datenbank `neondb`, `?sslmode=require`, Rolle `goal_clicker_app` (Schritt 4)
    * `LEGACY_SUPABASE_URL` und `LEGACY_SUPABASE_PUBLISHABLE_KEY` des Supabase Projekts (öffentlicher Schlüssel)
