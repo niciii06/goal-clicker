@@ -10,12 +10,13 @@ import type { MatchDraft } from "./match-commands";
 import { ACHIEVEMENTS, BALANCE_VERSION, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, COMBO_MAX_COUNT, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, ALBUM_MILESTONES_STORAGE_KEY, STAR_RATING_FILTERS, TUTORIAL_STORAGE_KEY, VIBRATION_STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from "./game/constants";
 import { AL, AR, AT, AU, AZ, BA, BE, BF, BG, BR, CA, CD, CH, CI, CL, CM, CN, CO, CR, CZ, DE, DK, DZ, EC, EG, ES, FI, FR, GB_ENG, GB_NIR, GB_SCT, GB_WLS, GE, GH, GM, GN, GR, GT, HR, HT, HU, IE, IL, IS, IT, JM, JP, KN, KR, MA, ME, ML, MW, MX, NG, NL, NO, NZ, PA, PH, PL, PT, PY, RO, RS, RU, SE, SI, SK, SN, SR, TR, UA, US, UY, VE, XK, ZA, ZM } from "country-flag-icons/react/3x2";
 import { AlbumPanel, CareerPanel, CareerPlayerBadge, MatchRatingsPanel, PostMatchSummary } from "./career-panels";
-import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, SPECIAL_CARD_PACK, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_SQUAD_SIZE, STAR_XI_TOTAL_CARD_COUNT, TOURNAMENTS, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, applyPendingMatchChanges, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, getSpecialCardPackOdds, purchaseSpecialCardPack, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getRewardPackOdds, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXIRating, getStarXISelection, getTournament, getTournamentRewardPack, getBestXIUnavailablePlayerIds, grantWelcomePack, awardMatchStamp, canDrawHundredSpecialCards, maybeGrantStarterSquad, STARTER_SQUAD_UNLOCK_CLICKS, getUnavailableStarXIPlayerIds, initialGameFeatures, isRewardPack, isTransferDeadlineDay, normalizeGameFeatures, openEarnedPack, openStarPack, pauseGameFeatureTimers, queueMatchChanges, recordSeasonModeMatch, releaseMatchSquad, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, TRANSFER_UNHAPPY_MATCHES, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige } from "./feature-data";
+import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, SPECIAL_CARD_PACK, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_SQUAD_SIZE, STAR_XI_TOTAL_CARD_COUNT, TOURNAMENTS, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, applyPendingMatchChanges, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, getSpecialCardPackOdds, purchaseSpecialCardPack, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getRewardPackOdds, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXIRating, getStarXISelection, getTournament, getTournamentRewardPack, getBestXIUnavailablePlayerIds, grantWelcomePack, awardMatchStamp, canDrawHundredSpecialCards, maybeGrantStarterSquad, STARTER_SQUAD_UNLOCK_CLICKS, getUnavailableStarXIPlayerIds, initialGameFeatures, isRewardPack, isTransferDeadlineDay, normalizeGameFeatures, openEarnedPack, openStarPack, pauseGameFeatureTimers, queueMatchChanges, recordSeasonModeMatch, releaseMatchSquad, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, TRANSFER_UNHAPPY_MATCHES, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, applySeasonPrestige, getPrestigeBlockReason } from "./feature-data";
 import { DailyRewardCard } from "./daily-reward-panel";
 import { FootballGraphic, GameErrorBoundary, Icon, StarXIPositionBadges } from "./game/ui";
 import { LiveMatchViewer } from "./match-viewer";
 import { AccountButton, AccountLink } from "./account-panel";
 import { ConfirmDialog } from "./confirm-dialog";
+import { PrestigeDialog, prestigeBonusLabel, prestigeBonusPercent } from "./prestige-dialog";
 import { WHATS_NEW } from "./whats-new";
 import { WhatsNewDialog } from "./whats-new-dialog";
 import { TutorialCoach, TutorialIntroDialog } from "./tutorial-panel";
@@ -206,6 +207,8 @@ function App() {
   const [coopRoomName, setCoopRoomName] = useState("Meine Welt");
   const [coopSession, setCoopSession] = useState<CoopSession | null>(null);
   const [confirmSingle, setConfirmSingle] = useState(false);
+  // Open Prestige dialog with its own request id: a double click or a retry starts one Prestige only.
+  const [prestigeDialog, setPrestigeDialog] = useState<{ requestId: string; error: string } | null>(null);
   // The md5 of the shared features this client holds; polls send it so the server can leave them out.
   const coopFeaturesKeyRef = useRef("");
   const [savedRooms, setSavedRooms] = useState<CoopRoom[]>([]);
@@ -582,6 +585,8 @@ function App() {
   const isFormationAvailable = (formation: { id: string }) => isLeagueContentUnlocked(getFormationUnlockLeague(formation.id), reachedLeague, hasFullTestAccess) || activeFormation.id === formation.id;
   const pickerFormations = sortFormationsForPicker(STAR_FORMATIONS, isFormationAvailable);
   const seasonCareerComplete = seasonMode.hallOfFame;
+  // Prestige has its own rules: lineup, open slots and suspensions never block it, running operations do.
+  const prestigeBlockReason = seasonCareerComplete ? getPrestigeBlockReason(displayGame.features) : "";
   const seasonTable = [...seasonMode.table].sort((first, second) => second.points - first.points || (second.goalsFor - second.goalsAgainst) - (first.goalsFor - first.goalsAgainst) || second.goalsFor - first.goalsFor || first.name.localeCompare(second.name));
   const seasonInProgress = seasonMode.matchday > 0 || seasonMode.table.some((team) => team.played > 0);
   const seasonStandingsEntry = seasonStandingsAnnouncement?.entry ?? null;
@@ -2407,23 +2412,34 @@ function App() {
     playTone(523, 0.08, "triangle", 0.03);
   }
 
-  async function beginSeasonPrestige() {
-    if (!seasonCareerComplete) return;
+  function openPrestigeDialog() {
+    const reason = getPrestigeBlockReason(displayGame.features);
+    if (reason) { showToast(reason); return; }
+    setPrestigeDialog({ requestId: crypto.randomUUID(), error: "" });
+  }
+
+  async function confirmSeasonPrestige(keepNormalId: string | null) {
+    if (!prestigeDialog) return;
+    const { requestId } = prestigeDialog;
     if (isCoopLive) {
       setCoopBusy(true);
-      const data = await sendCoopAction("season-prestige");
-      if (data) setCoopMessage("Prestige gestartet. Die Aufstiegsjagd beginnt wieder in Saison 1.");
+      const data = await sendCoopAction("season-prestige", { requestId, keepNormalId, expectedPrestigeCount: displayGame.features.seasonMode.prestigeCount });
       setCoopBusy(false);
-      return;
+      if (!data) { setPrestigeDialog((current) => current && { ...current, error: "Prestige wurde nicht gestartet. Dein Stand ist unverändert." }); return; }
+      setPrestigeDialog(null);
+      setCoopMessage("Prestige gestartet. Die Aufstiegsjagd beginnt wieder in Saison 1.");
+    } else {
+      const now = getCurrentTime();
+      // Checked once more against the current state; season, squad, album, goals and count change in one update.
+      const check = applySeasonPrestige(gameRef.current.features, keepNormalId, now, requestId);
+      if (check.error) { setPrestigeDialog((current) => current && { ...current, error: check.error }); return; }
+      setGame((current) => {
+        const result = applySeasonPrestige(current.features, keepNormalId, now, requestId);
+        if (result.error || result.duplicate) return current;
+        return { ...current, features: result.features, goals: 0, seasons: Math.max(current.seasons, MAX_CAREER_SEASON - 1) };
+      });
+      setPrestigeDialog(null);
     }
-    const now = getCurrentTime();
-    setGame((current) => {
-      const features = normalizeGameFeatures(current.features);
-      if (!features.seasonMode.hallOfFame) return current;
-      features.seasonMode = startSeasonPrestige(features.seasonMode, features.club.name, now);
-      addHistory(features, { title: `Prestige ${features.seasonMode.prestigeCount} gestartet`, detail: "Die Hall-of-Fame-Jagd beginnt erneut in Saison 1.", tone: "positive" });
-      return { ...current, features, seasons: Math.max(current.seasons, MAX_CAREER_SEASON - 1), stars: Math.min(MAX_SEASON_STARS, current.stars + 2) };
-    });
     addFeed("Prestige gestartet: zurück auf Saison 1, alle Freischaltungen bleiben.", "star");
     showToast("Prestige gestartet");
     playTone(523, 0.12, "triangle", 0.04);
@@ -2695,7 +2711,7 @@ function App() {
     <div className={`app-shell section-${featureTab}${displayGame.features.cup.active && featureTab === "cup" ? " match-in-progress" : ""}`}>
       <header className="topbar">
         <div className="brand-lockup"><div className="brand-ball"><FootballGraphic /></div><div className="brand-copy"><p className="eyebrow">FOOTBALL IDLE CLUB</p><h1>GOAL <span>CLICKER</span></h1></div></div>
-        <div className={`header-goals${goalBoostActive ? " goal-boost-active" : ""}`} aria-live="polite" aria-label={`Aktueller Kontostand: ${hasInfiniteMoney ? "unbegrenzt" : formatNumber(displayGame.goals)} Tore${goalBoostActive ? `; ${goalBoostLabel}-facher Goalboost noch ${goalBoostCountdown}` : ""}`}><span>{hasInfiniteMoney ? "AZB TESTMODUS" : "AKTUELLER STAND"}</span><strong>{displayBalance}</strong><small>TORE</small>{goalBoostActive && <em className="header-goal-boost">⚡ {goalBoostLabel}× · {goalBoostCountdown}</em>}</div>
+        <div className={`header-goals${goalBoostActive ? " goal-boost-active" : ""}`} aria-live="polite" aria-label={`Aktueller Kontostand: ${hasInfiniteMoney ? "unbegrenzt" : formatNumber(displayGame.goals)} Tore${goalBoostActive ? `; ${goalBoostLabel}-facher Goalboost noch ${goalBoostCountdown}` : ""}`}><span>{hasInfiniteMoney ? "AZB TESTMODUS" : "AKTUELLER STAND"}</span><strong>{displayBalance}</strong><small>TORE</small>{goalBoostActive && <em className="header-goal-boost">⚡ {goalBoostLabel}× · {goalBoostCountdown}</em>}{seasonMode.prestigeCount > 0 && <em className="header-prestige" title={prestigeBonusLabel(seasonMode.prestigeCount)}><span className="header-prestige-long">Prestige {seasonMode.prestigeCount} · </span>+{prestigeBonusPercent(seasonMode.prestigeCount)} % Tore</em>}</div>
         <div className="top-actions"><AccountButton /><button className="icon-button" aria-label="Benachrichtigungsverlauf" onClick={()=>openFeatureTab("history")}><Icon name="bell" size={18} /></button><button className="icon-button" onClick={toggleSound} aria-label={game.sound ? "Sound ausschalten" : "Sound einschalten"}><Icon name={game.sound ? "sound" : "mute"} size={17} /></button>{vibrationSupported && <button className={`icon-button vibration-toggle${vibrationEnabled ? "" : " off"}`} onClick={toggleVibration} aria-pressed={vibrationEnabled} aria-label={vibrationEnabled ? "Vibration ausschalten" : "Vibration einschalten"}><Icon name="vibrate" size={18} /></button>}</div>
       </header>
 
@@ -2705,6 +2721,7 @@ function App() {
       {guestCoopPrompt && guest && <ConfirmDialog title="Koop braucht ein Konto" confirmLabel="Anmelden" onCancel={() => setGuestCoopPrompt(false)} onConfirm={() => { setGuestCoopPrompt(false); guest.signIn(); }}>
         <p>Als Gast spielst du nur Einzelspieler. Melde dich an oder erstelle ein Konto, um mit anderen in einer Koop Welt zu spielen. Hat dein Konto noch keinen Spielstand, nimmt es deinen Gast Spielstand mit.</p>
       </ConfirmDialog>}
+      {prestigeDialog && <PrestigeDialog features={displayGame.features} goals={displayGame.goals} busy={coopBusy} error={prestigeDialog.error} onCancel={() => setPrestigeDialog(null)} onConfirm={(keepNormalId) => void confirmSeasonPrestige(keepNormalId)} />}
       {confirmSingle && <ConfirmDialog title="Zum Singleplayer wechseln?" confirmLabel="Wechseln" onCancel={() => setConfirmSingle(false)} onConfirm={() => { setConfirmSingle(false); setAppMode("single"); }}>
         <p>{coopSession ? `Du verlässt „${coopSession.room.roomName}“. Die Welt bleibt gespeichert und du kannst jederzeit zurück.` : "Du verlässt den Koop Multiplayer und spielst mit deinem eigenen Spielstand weiter."}</p>
       </ConfirmDialog>}
@@ -2808,9 +2825,9 @@ function App() {
                 <article className="competition-card season-competition-card">
                   <div className="competition-card-top"><strong>Saisonspiel</strong><b>{seasonCareerComplete ? "HALL OF FAME" : getSeasonModeDivisionLabel(seasonMode.division)}</b></div>
                   <p>10 Spieltage · 5 Heimspiele und 5 Auswärtsspiele · {getSeasonModeDivisionLabel(seasonMode.division)}</p>
-                  <div className="competition-card-route"><span>{seasonCareerComplete ? "PRESTIGE BEREIT" : `SPIELTAG ${seasonMode.matchday + 1} / ${SEASON_MODE_MATCHES_PER_SEASON}`}</span><strong>{seasonCareerComplete ? "★" : `★ ${displayGame.stars}`}</strong></div>
-                  <div className="competition-card-opponent"><strong>{seasonCareerComplete ? "Hall of Fame erreicht" : seasonNextOpponent.name}</strong><small>{seasonCareerComplete ? "Alle Freischaltungen bleiben erhalten." : `${seasonNextOpponent.rating} OVR · Tabellenwertung nach dem Abpfiff`}</small></div>
-                  <span className="travel-home-label">{!fixtureFor(displayGame.features,"season").away ? `Heimspiel · Bümplizstrasse 45, Bern · etwa ${expectedHomeCrowd(displayGame.features).toLocaleString("de-CH")} Fans erwartet` : `Auswärtsspiel · ${fixtureFor(displayGame.features,"season").venue.stadium}, ${fixtureFor(displayGame.features,"season").venue.city} · ${Math.round(travelTiming(fixtureFor(displayGame.features,"season")).km)} km · ca. ${durationLabel(travelTiming(fixtureFor(displayGame.features,"season")).baseMs/1000)} im Spiel`}</span><button className="mode-primary competition-card-action" onClick={() => void (seasonCareerComplete ? beginSeasonPrestige() : startSeasonCupMatch())} disabled={travelBusy || displayGame.features.cup.pendingNextRound || hasTransferSquadVacancy || suspendedPlayerOnSquad || (!seasonCareerComplete && !starXIComplete) || coopBusy}>{seasonCareerComplete ? "Prestige starten" : travelLabel(fixtureFor(displayGame.features,"season"))}</button>
+                  <div className="competition-card-route"><span>{seasonCareerComplete ? (prestigeBlockReason ? "PRESTIGE WARTET" : "PRESTIGE BEREIT") : `SPIELTAG ${seasonMode.matchday + 1} / ${SEASON_MODE_MATCHES_PER_SEASON}`}</span><strong>{seasonCareerComplete ? "★" : `★ ${displayGame.stars}`}</strong></div>
+                  <div className="competition-card-opponent"><strong>{seasonCareerComplete ? "Hall of Fame erreicht" : seasonNextOpponent.name}</strong><small>{seasonCareerComplete ? `Freischaltungen bleiben, Spezialkarten und eine Karte deiner Wahl auch. Danach +${prestigeBonusPercent(seasonMode.prestigeCount + 1)} % Tore.` : `${seasonNextOpponent.rating} OVR · Tabellenwertung nach dem Abpfiff`}</small></div>
+                  <span className="travel-home-label">{!fixtureFor(displayGame.features,"season").away ? `Heimspiel · Bümplizstrasse 45, Bern · etwa ${expectedHomeCrowd(displayGame.features).toLocaleString("de-CH")} Fans erwartet` : `Auswärtsspiel · ${fixtureFor(displayGame.features,"season").venue.stadium}, ${fixtureFor(displayGame.features,"season").venue.city} · ${Math.round(travelTiming(fixtureFor(displayGame.features,"season")).km)} km · ca. ${durationLabel(travelTiming(fixtureFor(displayGame.features,"season")).baseMs/1000)} im Spiel`}</span><button className="mode-primary competition-card-action" onClick={() => seasonCareerComplete ? openPrestigeDialog() : void startSeasonCupMatch()} disabled={coopBusy || (seasonCareerComplete ? Boolean(prestigeBlockReason) : travelBusy || displayGame.features.cup.pendingNextRound || hasTransferSquadVacancy || suspendedPlayerOnSquad || !starXIComplete)}>{seasonCareerComplete ? "Prestige starten" : travelLabel(fixtureFor(displayGame.features,"season"))}</button>{seasonCareerComplete && prestigeBlockReason && <small className="prestige-block-reason" role="status">{prestigeBlockReason}</small>}
                 </article>
                 {TOURNAMENTS.map((tournament) => {
                   const unlockLeague = getTournamentUnlockLeague(tournament.id);

@@ -3,7 +3,7 @@ import type { GameFeatures } from "../feature-data";
 import type { PurchaseMode, UpgradeDefinition } from "./types";
 import { CLICK_PASSIVE_SHARE_CAP, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, RANKS } from "./constants";
 import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../upgrade-purchase";
-import { addHistory, getGoalBoostMultiplier, getTransferBonuses } from "../feature-data";
+import { addHistory, getGoalBoostMultiplier, getPrestigeGoalMultiplier, getTransferBonuses } from "../feature-data";
 import { UPGRADES, getUpgrade } from "./upgrades";
 
 export function getLevel(upgrades: Record<string, number>, id: string) {
@@ -57,8 +57,10 @@ export function getBaseClickPower(upgrades: Record<string, number>, stars = 0, f
   return share > 0 ? fixed + share * getBasePassivePower(upgrades, stars, features) : fixed;
 }
 
+// Prestige raises clicks and passive goals once, on top of everything else. The Base* values (also used for
+// tickets, daily rewards and press rewards) stay without it.
 export function getClickPower(upgrades: Record<string, number>, stars = 0, features?: GameFeatures, now = Date.now()) {
-  return getBaseClickPower(upgrades, stars, features) * getGoalBoostMultiplier(features, now);
+  return getBaseClickPower(upgrades, stars, features) * getGoalBoostMultiplier(features, now) * getPrestigeGoalMultiplier(features);
 }
 
 export function getBasePassivePower(upgrades: Record<string, number>, stars = 0, features?: GameFeatures) {
@@ -68,7 +70,12 @@ export function getBasePassivePower(upgrades: Record<string, number>, stars = 0,
 }
 
 export function getPassivePower(upgrades: Record<string, number>, stars = 0, features?: GameFeatures, now = Date.now()) {
-  return getBasePassivePower(upgrades, stars, features) * getGoalBoostMultiplier(features, now);
+  return getBasePassivePower(upgrades, stars, features) * getGoalBoostMultiplier(features, now) * getPrestigeGoalMultiplier(features);
+}
+
+/** Passive goals per second before temporary boosts, with Prestige: what passive income over a period pays. */
+export function getPassiveIncomePower(upgrades: Record<string, number>, stars = 0, features?: GameFeatures) {
+  return getBasePassivePower(upgrades, stars, features) * getPrestigeGoalMultiplier(features);
 }
 
 /** Feature schema of the league economy rebalance: older saves had their goals capped once on load. */
