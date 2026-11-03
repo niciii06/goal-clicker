@@ -206,3 +206,23 @@ test('an injury picked up in a match keeps its full absence; older injuries coun
  assert.equal(f.cup.injuredPlayerIds[hurt],1,'still misses the next match');
  assert.equal(f.cup.injuredPlayerIds['older-injury'],1,'an older injury served this match');
 });
+test('a five minute match with extra time reaches the final whistle at 120 minutes, also with a requested change',()=>{
+ let found=0;
+ for(let seed=900;seed<1100&&found<3;seed++){
+  for(const requestChange of [false,true]){
+   let f=fixture(seed);f.cup.mode='tournament' as typeof f.cup.mode;f.cup.regularDurationMs=300000;f.cup.matchEndsAt=f.cup.matchStartedAt+300000;f.cup.opponentRating=99;f.cup.simulation=createInteractiveMatch(f.cup,f.starXI.lineupIds,f.starXI.formationId);
+   const run=(now:number)=>{f.cup=advanceCupMatch(f.cup,85,now,Math.random,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions).cup;};
+   let now=f.cup.matchStartedAt;
+   for(let i=0;i<3000&&f.cup.active&&f.cup.phase==="regular";i++){if(f.cup.matchPaused)f.cup=resumeCupMatch(f.cup,f.cup.lastTickAt);now=Math.max(now,f.cup.lastTickAt)+1000;run(now);}
+   if(f.cup.phase!=='extra-time')break;
+   if(f.cup.matchPaused)f.cup=resumeCupMatch(f.cup,f.cup.lastTickAt);
+   // 400000 ms × 5400/300000 is 7199.999999999999 in floating point.
+   now=f.cup.matchEndsAt-1000;run(now);
+   if(requestChange&&!f.cup.matchPaused)f=requestMatchEdit(f,now);
+   for(let i=0;i<30&&f.cup.active&&f.cup.phase==='extra-time';i++){if(f.cup.matchPaused)f.cup=resumeCupMatch(f.cup,f.cup.lastTickAt);now+=1000;run(now);}
+   assert.ok(!f.cup.active||f.cup.phase==='penalties',`seed ${seed}: match ended (time ${f.cup.simulation?.time})`);
+   if(!requestChange)found++;
+  }
+ }
+ assert.ok(found>0,'at least one seed went to extra time');
+});

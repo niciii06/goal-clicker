@@ -312,7 +312,9 @@ export function advanceInteractive(cup:CupState,now:number):CupState {
  const next=structuredClone(cup),sim=next.simulation!;
  if(sim.status!=='running'||next.matchPaused)return next;
  const limit=next.phase==='extra-time'?7200:5400,secondsPerMs=5400/getCupRegularDurationMs(next);
- const target=Math.max(sim.time,Math.min(limit,(Math.min(now,next.matchEndsAt)-next.matchStartedAt)*secondsPerMs));
+ // Rounded to a microsecond: 400000 ms × 5400/300000 is 7199.999999999999 in floating point, which left the last play
+ // of extra time (ending at 7200) waiting forever.
+ const target=Math.max(sim.time,Math.min(limit,Math.round((Math.min(now,next.matchEndsAt)-next.matchStartedAt)*secondsPerMs*1e6)/1e6));
  next.broadcast??=createMatchBroadcast(next);
  for(let guard=0;guard<1000;guard++){
   refill(sim);const a=sim.buffer[0];if(!a||a.end>target)break;
@@ -367,7 +369,8 @@ export function advanceInteractive(cup:CupState,now:number):CupState {
    next.matchPaused=true;next.lastResult='Halbzeit. Wechsel prüfen, danach weiterspielen.';break;
   }
   if(next.matchPaused)break;
-  if(sim.pauseRequested){sim.pauseRequested=false;sim.status='editing';next.matchPaused=true;sim.buffer=[];break;}
+  // No editing pause once the final whistle is due; the match simply ends.
+  if(sim.pauseRequested&&a.end<limit){sim.pauseRequested=false;sim.status='editing';next.matchPaused=true;sim.buffer=[];break;}
  }
  if(!next.matchPaused)sim.time=target;
  next.lastTickAt=next.matchStartedAt+sim.time/secondsPerMs;
