@@ -217,14 +217,14 @@ export const SPECIAL_START_RATING = 80;
 export const SPECIAL_POTENTIAL = 100;
 
 const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
-  { id: "star-pfuschi", name: "Pfuschi", isCustom: true, benchOnly: true,
+  { id: "star-pfuschi", countryCode: "CH", name: "Pfuschi", isCustom: true, benchOnly: true,
     position: null, positions: [], rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 67, price: 1000, accent: "#64748b",
     cardType: "legendary", symbol: "☠️", packWeight: .04, originalAttributes: specialAttributes(1) },
   { id: "star-di-certo", name: "Di Certo", pitchName: "Di Certo", isCustom: true, countryCode: "CH", position: "LV",
     positions: ["LV", "RV"], rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 100, price: 5000000000, accent: "#c69214",
     cardType: "legendary", packWeight: .02, originalAttributes: specialAttributes(SPECIAL_START_RATING) },
   {
-    id: "star-goat-nicu",
+    id: "star-goat-nicu", countryCode: "CH",
     pitchName: "GOAT Nicu",
     isCustom: true,
     name: "GOAT Nicu",
@@ -237,7 +237,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
     packWeight: 0.02,
   },
   {
-    id: "star-flurin-fabrice",
+    id: "star-flurin-fabrice", countryCode: "CH",
     pitchName: "Flurin",
     isCustom: true,
     name: "Flurin Fabrice",
@@ -264,7 +264,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
     packWeight: 0.04,
   },
   {
-    id: "star-maetthu",
+    id: "star-maetthu", countryCode: "CH",
     isCustom: true,
     name: "Mätthu",
     position: "TW",
@@ -276,7 +276,7 @@ const SPECIAL_STAR_XI_PLAYERS: StarXIPlayer[] = [
     cardType: "legendary",
   },
   {
-    id: "star-champ-simu",
+    id: "star-champ-simu", countryCode: "CH",
     pitchName: "Champ Simu",
     isCustom: true,
     name: "Champ Simu",
@@ -1044,6 +1044,81 @@ export function startSeasonPrestige(value: unknown, clubName = "FC Goal", now = 
     hallOfFame: false,
     prestigeCount: state.prestigeCount + 1,
   };
+}
+
+/** Each completed Prestige adds 20 percentage points to base goal income (additive, not compounding). */
+export const PRESTIGE_GOAL_BONUS_PER_LEVEL = 0.2;
+export function getPrestigeGoalMultiplier(features?: { seasonMode?: { prestigeCount?: number } }) {
+  const count = Math.max(0, Math.floor(Number(features?.seasonMode?.prestigeCount) || 0));
+  return 1 + PRESTIGE_GOAL_BONUS_PER_LEVEL * count;
+}
+
+/** Normal (non special) cards of the playable squad; one of them may stay through Prestige. */
+export function getPrestigeKeepCandidates(features: GameFeatures) {
+  return features.starXI.ownedIds.map((id) => getStarXIPlayer(id)).filter((player): player is StarXIPlayer => Boolean(player) && !player!.isCustom);
+}
+
+/** Special cards of the playable squad; all of them stay through Prestige. */
+export function getPrestigeRetainedSpecials(features: GameFeatures) {
+  return features.starXI.ownedIds.map((id) => getStarXIPlayer(id)).filter((player): player is StarXIPlayer => Boolean(player?.isCustom));
+}
+
+/**
+ * Why Prestige cannot start right now, or "" when it can. Only the Hall of Fame and operations that are still
+ * running block it; an incomplete lineup, an open squad slot or a suspended player never do.
+ */
+export function getPrestigeBlockReason(features: GameFeatures) {
+  if (!features.seasonMode.hallOfFame) return "Prestige wird erst nach der Hall of Fame freigeschaltet.";
+  if (features.cup.active) return "Beende zuerst die laufende Partie.";
+  if (features.squadLock) return "Die letzte Partie wird noch abgeschlossen.";
+  if (features.travel.journey && !features.travel.journey.consumed) return "Schliesse zuerst die Auswärtsreise ab.";
+  if (features.cup.pendingNextRound) return "Beende zuerst das laufende Turnier.";
+  return "";
+}
+
+/**
+ * Prestige: back to Season 1 with every special card and at most one chosen normal card. The album keeps every
+ * card ever collected, the season unlocks (highest league) stay, the starter squad is never handed out again.
+ * The caller sets the goal balance to 0 in the same state update, so everything is saved together.
+ */
+export function applySeasonPrestige(value: GameFeatures, keepNormalId: string | null, now = Date.now(), requestId = ""): { features: GameFeatures; error: string; duplicate?: boolean } {
+  // One confirmed Prestige counts once: a retried or repeated request with the same id changes nothing.
+  const receipt = requestId ? `prestige:${requestId.slice(0, 60)}` : "";
+  if (receipt && value.purchaseReceipts?.includes(receipt)) return { features: value, error: "", duplicate: true };
+  const features = normalizeGameFeatures(structuredClone(value));
+  // Checked on the state as given and as normalized, so neither a raw nor a repaired flag lets it through.
+  const blocked = getPrestigeBlockReason(value) || getPrestigeBlockReason(features);
+  if (blocked) return { features: value, error: blocked };
+  const candidates = getPrestigeKeepCandidates(features);
+  if (candidates.length > 0 && !keepNormalId) return { features: value, error: "Wähle eine normale Karte, die bleibt." };
+  if (keepNormalId && !candidates.some((player) => player.id === keepNormalId)) return { features: value, error: "Diese Karte ist nicht in deinem Kader." };
+  // Album first: every card of the squad stays collected before it leaves the squad.
+  features.career.collectedIds = [...new Set([...features.career.collectedIds, ...features.starXI.ownedIds])];
+  const retained = new Set([...getPrestigeRetainedSpecials(features).map((player) => player.id), ...(keepNormalId ? [keepNormalId] : [])]);
+  const ownedIds = features.starXI.ownedIds.filter((id) => retained.has(id));
+  features.starXI = normalizeStarXIState({
+    ...features.starXI,
+    ownedIds,
+    lineupIds: features.starXI.lineupIds.map((id) => retained.has(id) ? id : ""),
+    benchIds: features.starXI.benchIds.map((id) => retained.has(id) ? id : ""),
+    lockedPlayerIds: features.starXI.lockedPlayerIds?.filter((id) => retained.has(id)),
+  });
+  const saga = features.transferSaga;
+  features.transferSaga = {
+    ...saga,
+    pendingOffer: saga.pendingOffer?.playerId && !retained.has(saga.pendingOffer.playerId) ? null : saga.pendingOffer,
+    unhappy: saga.unhappy.filter((entry) => retained.has(entry.playerId)),
+    loans: saga.loans.filter((loan) => retained.has(loan.playerId)),
+    // The squad is rebuilt from scratch; slots left open by sales no longer apply.
+    vacancies: [],
+  };
+  features.cup = { ...features.cup, suspendedPlayerIds: features.cup.suspendedPlayerIds.filter((id) => retained.has(id)) };
+  features.starterSquadGranted = true;
+  if (receipt) features.purchaseReceipts = [...features.purchaseReceipts, receipt].slice(-PURCHASE_RECEIPT_LIMIT);
+  features.seasonMode = startSeasonPrestige(features.seasonMode, features.club.name, now);
+  const keptNormal = keepNormalId ? getStarXIPlayer(keepNormalId)?.name : null;
+  addHistory(features, { title: `Prestige ${features.seasonMode.prestigeCount} gestartet`, detail: `Zurück in Saison 1 · ${retained.size} Karten bleiben im Kader${keptNormal ? ` (mit ${keptNormal})` : ""} · +${Math.round(features.seasonMode.prestigeCount * PRESTIGE_GOAL_BONUS_PER_LEVEL * 100)} % Tore`, tone: "positive" }, now);
+  return { features, error: "" };
 }
 
 export function getStarXIPlayer(id: string) {

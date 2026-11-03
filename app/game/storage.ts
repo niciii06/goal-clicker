@@ -2,7 +2,7 @@
 import type { GameState, LayoutCardId, MiniGameCooldowns, MiniGameId } from "./types";
 import { ACHIEVEMENTS, BACKUP_STORAGE_KEY, BALANCE_VERSION, DEFAULT_LAYOUT_ORDER, LAYOUT_CARD_IDS, LEGACY_STORAGE_KEYS, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_IDS, RECOVERY_STORAGE_KEY, STORAGE_KEY } from "./constants";
 import { compareStoredGameProgress, parseStoredGame, selectSafestStoredGame, shouldRejectRegressedSave } from "../save-safety";
-import { getBasePassivePower, normalizeUpgrades } from "./economy";
+import { getPassiveIncomePower, normalizeUpgrades } from "./economy";
 import { getGoalBoostedPassiveReward, initialGameFeatures, normalizeGameFeatures } from "../feature-data";
 import { bumpSaveRevision, readSaveRevision, SAVE_WRITER_KEY, setLocalSaveFailed } from "./save-revision";
 
@@ -152,7 +152,7 @@ export function pauseMiniGameCooldowns(cooldowns: Partial<MiniGameCooldowns> | u
 export function advanceLocalGameWhileOpen(state: GameState, elapsedMs: number, now = Date.now()): GameState {
   const durationMs = Math.max(0, elapsedMs);
   if (!durationMs) return { ...state, lastSaved: now };
-  const passiveReward = getGoalBoostedPassiveReward(getBasePassivePower(state.upgrades, state.stars, state.features), state.features, now - durationMs, now);
+  const passiveReward = getGoalBoostedPassiveReward(getPassiveIncomePower(state.upgrades, state.stars, state.features), state.features, now - durationMs, now);
   return {
     ...state,
     goals: state.goals + passiveReward,

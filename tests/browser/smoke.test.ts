@@ -453,6 +453,68 @@ test('"Kaderlücke schliessen" fills the free place with the best eleven and ben
   await page.close();
 });
 
+test('Prestige opens from the Hall of Fame despite an incomplete squad, cancels cleanly and resets after confirming', async () => {
+  const now = Date.now();
+  const f = richFeatures(now);
+  const specials = ['star-goat-nicu', 'star-maetthu'];
+  f.starXI = setBestStarXI({ ...f.starXI, ownedIds: [...specials, ...f.starXI.ownedIds] });
+  f.career.collectedIds = [];
+  f.seasonMode = { ...f.seasonMode, division: 15, highestDivision: 15, hallOfFame: true, prestigeCount: 0 };
+  // An open place in the eleven, a suspended player and an open squad slot do not matter for Prestige.
+  const removed = f.starXI.lineupIds[4];
+  f.starXI.lineupIds = f.starXI.lineupIds.map((id, index) => index === 4 ? '' : id);
+  f.cup.suspendedPlayerIds = [f.starXI.lineupIds[6]];
+  f.transferSaga.vacancies = [{ area: 'lineup', index: 4, requiredPlayers: 23, createdAt: now }];
+  for (const viewport of [VIEWPORTS[1], VIEWPORTS[0]]) {
+    const { page, problems } = await openWithSave(viewport, save(f, now));
+    const stored = async () => JSON.parse((await page.evaluate((key) => localStorage.getItem(key), SAVE_KEY))!) as { goals: number; features: GameFeatures };
+    await openTab(page, 'Spiele');
+    const start = page.getByRole('button', { name: 'Prestige starten' });
+    await start.waitFor();
+    assert.equal(await start.isEnabled(), true, `${viewport.name}: Prestige is not greyed out`);
+    await start.click();
+    const dialog = page.getByRole('dialog', { name: /Prestige 1 starten/ });
+    await dialog.waitFor();
+    assert.match(await dialog.innerText(), /\+20 % Tore/);
+    assert.match(await dialog.innerText(), /GOAT Nicu/);
+    assert.deepEqual(await layoutProblems(page), [], `${viewport.name}: Prestige dialog`);
+    // Without a chosen card it cannot be confirmed; cancelling changes nothing.
+    assert.equal(await dialog.getByRole('button', { name: 'Karte wählen' }).isDisabled(), true);
+    await dialog.getByRole('button', { name: 'Abbrechen' }).click();
+    await page.waitForTimeout(2600);
+    assert.equal((await stored()).features.seasonMode.prestigeCount, 0);
+    assert.ok((await stored()).goals > 1e12);
+    if (viewport === VIEWPORTS[1]) { assert.deepEqual(problems, []); await page.close(); continue; }
+    // Confirm with one chosen normal card.
+    await start.click();
+    const keep = f.starXI.lineupIds[0];
+    const keepName = STAR_XI_PLAYERS.find((player) => player.id === keep)!.name;
+    await dialog.getByRole('radio', { name: new RegExp(keepName) }).check();
+    await dialog.getByRole('button', { name: 'Prestige 1 starten' }).click();
+    await dialog.waitFor({ state: 'detached' });
+    await page.waitForTimeout(2600);
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForTimeout(1500);
+    const after = await stored();
+    assert.equal(after.features.seasonMode.prestigeCount, 1);
+    assert.equal(after.features.seasonMode.division, 1);
+    assert.ok(after.goals < 1e9, `goals reset (${after.goals})`);
+    const ownedSpecials = f.starXI.ownedIds.filter((id) => STAR_XI_PLAYERS.find((player) => player.id === id)?.isCustom);
+    assert.ok(specials.every((id) => ownedSpecials.includes(id)));
+    assert.deepEqual([...after.features.starXI.ownedIds].sort(), [...ownedSpecials, keep].sort());
+    assert.match(await page.locator('.header-goals').innerText(), /Prestige 1 ·\s*\+20 % Tore/);
+    // A card that left the squad is still in the album, marked as not in the squad.
+    const removedName = STAR_XI_PLAYERS.find((player) => player.id === removed)!.name;
+    await openTab(page, 'Packs & Album');
+    await page.getByRole('tab', { name: 'Sammelalbum' }).click();
+    await page.getByLabel('Sammelalbum durchsuchen').fill(removedName);
+    const card = page.locator('.career-album-card').filter({ hasText: removedName }).first();
+    assert.match(await card.innerText(), /GESAMMELT[\s\S]*Nicht im Kader/);
+    assert.deepEqual(problems, []);
+    await page.close();
+  }
+});
+
 test('winning the league on the last matchday shows the trophy celebration', async () => {
   for (const viewport of [VIEWPORTS[0], VIEWPORTS[1]]) {
     const now = Date.now();

@@ -11,7 +11,7 @@ import { getDb } from "../../../db";
 import { nameRecoveryAllowed, resolvePlayer } from "../../auth/player";
 import type { LightRoomRow, RoomRow, RoomSeats, RoomUpdate } from "../../../db";
 import { createHash } from "node:crypto";
-import { SPECIAL_CARD_PACK, awardMatchStamp, maybeGrantStarterSquad, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, startSeasonPrestige, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
+import { SPECIAL_CARD_PACK, awardMatchStamp, maybeGrantStarterSquad, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, applySeasonPrestige, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
 import type { GameFeatures, PenaltyDirection, StarFormationId } from "../../feature-data";
 import { isSupportedMultiplayerProtocol, MULTIPLAYER_UPDATE_MESSAGE } from "../../multiplayer-protocol";
 import { getFormationUnlockLeague, getPackUnlockLeague, getReachedLeague, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked, MAX_CAREER_SEASON } from "../../season-progression";
@@ -19,7 +19,7 @@ import { calculateBulkUpgradePurchase } from "../../upgrade-purchase";
 import { MAX_MULTIPLAYER_BODY_BYTES, readJsonBody, RequestBodyTooLargeError } from "../request-body";
 import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "../../daily-reward";
 import { ACHIEVEMENTS, BALANCE_VERSION, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_IDS } from "../../game/constants";
-import { capGoalsAfterRebalance, getBaseClickPower, getBasePassivePower, getClickPower, getCost, getLevel } from "../../game/economy";
+import { capGoalsAfterRebalance, getBaseClickPower, getBasePassivePower, getClickPower, getCost, getLevel, getPassiveIncomePower } from "../../game/economy";
 import { getUpgrade } from "../../game/upgrades";
 import { getTicketIncome, recordTicketIncome } from "../../ticket-income";
 
@@ -493,7 +493,7 @@ async function refreshPassive(db: ReturnType<typeof getDb>, room: RoomRow, minEl
   const activeUntil = getOccupiedRoomPlayers(room).length >= 2 ? Math.min(now, Math.max(last, activeLeaseEndsAt)) : last;
   const activeElapsed = Math.max(0, Math.min(fullElapsed, activeUntil - last));
   const inactiveElapsed = Math.max(0, fullElapsed - activeElapsed);
-  const passiveReward = getGoalBoostedPassiveReward(getBasePassivePower(game.upgrades, game.stars, game.features), game.features, last, last + activeElapsed);
+  const passiveReward = getGoalBoostedPassiveReward(getPassiveIncomePower(game.upgrades, game.stars, game.features), game.features, last, last + activeElapsed);
   if (passiveReward > 0) {
     game.goals += passiveReward;
     game.seasonGoals += passiveReward;
@@ -580,6 +580,9 @@ async function handlePost(request: Request) {
       formationId?: unknown;
       strategy?: unknown;
       purchaseId?: unknown;
+      requestId?: unknown;
+      keepNormalId?: unknown;
+      expectedPrestigeCount?: unknown;
       draft?: unknown;
       direction?: unknown;
       expectedPenaltyStep?: unknown;
@@ -1189,12 +1192,18 @@ async function handlePost(request: Request) {
     }
 
     if (action === "season-prestige") {
-      if (game.features.travel.journey && !game.features.travel.journey.consumed) return jsonError("Schliesse zuerst die Auswärtsreise ab.",409);
-      if (!game.features.seasonMode.hallOfFame) return jsonError("Prestige wird erst nach der Hall of Fame freigeschaltet.", 409);
-      game.features.seasonMode = startSeasonPrestige(game.features.seasonMode, game.features.club.name, Date.now());
+      // Checked against the stored world: Hall of Fame, the chosen card and running operations. The request id
+      // makes retries safe, the expected count rejects a second Prestige started from an outdated screen.
+      const requestId = typeof payload.requestId === "string" ? payload.requestId.slice(0, 60) : "";
+      if (!requestId) return jsonError("Lade die Seite neu, um Prestige zu starten.", 409);
+      const keepNormalId = typeof payload.keepNormalId === "string" && payload.keepNormalId ? payload.keepNormalId : null;
+      const result = applySeasonPrestige(game.features, keepNormalId, Date.now(), requestId);
+      if (result.duplicate) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
+      if (Number(payload.expectedPrestigeCount) !== game.features.seasonMode.prestigeCount) return jsonError("Prestige wurde in dieser Welt schon gestartet.", 409);
+      if (result.error) return jsonError(result.error, 409);
+      game.features = result.features;
+      game.goals = 0;
       game.seasons = Math.max(game.seasons, MAX_CAREER_SEASON - 1);
-      game.stars = Math.min(MAX_SEASON_STARS, game.stars + 2);
-      addHistory(game.features, { title: `Prestige ${game.features.seasonMode.prestigeCount} gestartet`, detail: "Die Hall-of-Fame-Jagd beginnt erneut in Saison 1.", tone: "positive" });
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 

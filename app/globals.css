@@ -2306,3 +2306,27 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 @keyframes star-celebrate-clap-left { 0% { transform: rotate(6deg); } 16% { transform: rotate(-24deg) scaleY(.78); } 24%, 40%, 56% { transform: rotate(-15deg) scaleY(.78); } 32%, 48%, 64% { transform: rotate(-25deg) scaleY(.78); } 80%, 100% { transform: rotate(6deg); } }
 @keyframes star-celebrate-clap-right { 0% { transform: rotate(-6deg); } 16% { transform: rotate(24deg) scaleY(.78); } 24%, 40%, 56% { transform: rotate(15deg) scaleY(.78); } 32%, 48%, 64% { transform: rotate(25deg) scaleY(.78); } 80%, 100% { transform: rotate(-6deg); } }
 @keyframes star-celebrate-nod { 0%, 24%, 40%, 56%, 72%, 100% { translate: 0 0; } 32%, 48%, 64% { translate: 0 2px; } }
+
+/* Prestige: bonus next to the goal counter, reason a running operation blocks it, and the card choice. */
+.header-prestige { display: inline-flex; align-items: center; margin-left: 3px; padding-left: 10px; border-left: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); font-size: var(--text-footnote); font-style: normal; font-weight: 850; letter-spacing: .02em; }
+.prestige-block-reason { display: block; margin-top: 6px; color: var(--soft); font-size: var(--text-footnote); line-height: 1.35; }
+.prestige-dialog { width: min(520px, 100%); max-height: min(88vh, 760px); overflow-y: auto; }
+.prestige-dialog h3 { margin: 16px 0 6px; font-size: var(--text-headline, 15px); }
+.prestige-summary { display: grid; gap: 6px; margin: 12px 0 0; }
+.prestige-summary div { display: grid; grid-template-columns: 112px 1fr; gap: 8px; }
+.prestige-summary dt { color: var(--muted); font-weight: 800; }
+.prestige-summary dd { margin: 0; color: var(--text); }
+.prestige-names { overflow-wrap: anywhere; }
+.prestige-choices { display: grid; gap: 6px; max-height: 260px; margin: 0; padding: 0; overflow-y: auto; border: 0; }
+.prestige-choices label { display: grid; grid-template-columns: auto 36px 1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--text) 12%, transparent); border-radius: 12px; cursor: pointer; }
+.prestige-choices label.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.prestige-choices input { grid-row: 1 / span 2; }
+.prestige-choices b { grid-row: 1 / span 2; color: var(--score); font-size: 17px; }
+.prestige-choices span { color: var(--text); font-weight: 750; }
+.prestige-choices small { grid-column: 3; color: var(--soft); }
+.prestige-error { margin-top: 12px !important; color: var(--danger, #c0392b) !important; font-weight: 750; }
+@media (max-width: 540px) {
+  .header-prestige { padding-left: 7px; }
+  .header-prestige-long { display: none; }
+  .prestige-summary div { grid-template-columns: 1fr; gap: 0; }
+}
