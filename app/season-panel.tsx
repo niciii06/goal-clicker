@@ -35,9 +35,11 @@ export function SeasonPanel({ features }: { features: GameFeatures }) {
   const season = features.seasonMode, schedule = getSeasonSchedule(season);
   const next = schedule.filter((day) => !day.played);
   const opponentRating = (id: string) => season.table.find((team) => team.id === id)?.rating;
+  // The season awards already count on to the next season; the Hall of Fame season is the one before.
+  const seasonLabel = season.hallOfFame ? Math.max(1, features.career.seasonNumber - 1) : features.career.seasonNumber;
   const showLastSeason = season.matchday === 0 && season.lastMatchAt > 0 && season.lastTable.some((team) => team.played > 0) && !season.hallOfFame;
   return <div className="feature-panel season-hub">
-    <div className="feature-panel-heading"><div><p className="eyebrow">SAISON {features.career.seasonNumber} / {getSeasonModeDivisionLabel(season.division).toUpperCase()}</p><h3>{season.hallOfFame ? "Hall of Fame erreicht." : `Spieltag ${season.matchday + 1} von ${SEASON_MODE_MATCHES_PER_SEASON}`}</h3></div></div>
+    <div className="feature-panel-heading"><div><p className="eyebrow">SAISON {seasonLabel} / {getSeasonModeDivisionLabel(season.division).toUpperCase()}</p><h3>{season.hallOfFame ? "Hall of Fame erreicht." : `Spieltag ${season.matchday + 1} von ${SEASON_MODE_MATCHES_PER_SEASON}`}</h3></div></div>
     {!season.hallOfFame && <p className="season-hub-stamps" aria-label="Matchstempel">Matchstempel {features.matchStamps} / {MATCH_PACK_STAMP_TARGET} · beim {MATCH_PACK_STAMP_TARGET}. Ligaspiel gibt es ein {getTournamentRewardPack("cup", season.highestDivision).label}</p>}
     <StandingsTable table={season.table} division={season.division} caption="Tabelle" />
     {showLastSeason && <details className="season-hub-last"><summary>Abschlusstabelle der letzten Saison</summary><StandingsTable table={season.lastTable} division={Math.max(1, season.division - (season.history.at(-1)?.seasonOutcome === "promoted" ? 1 : season.history.at(-1)?.seasonOutcome === "relegated" ? -1 : 0))} caption="Letzte Saison" /></details>}

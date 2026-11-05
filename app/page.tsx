@@ -39,7 +39,7 @@ import type { LocalSaveResult } from "./game/storage";
 import { answerPressConference, getPressReward } from "./press-conference";
 import { canVibrate, readVibrationSetting, setVibrationOn, vibrate, vibrationOn } from "./game/device";
 import { albumMilestonesFromStorage, claimAlbumReward, claimAllAlbumRewards, getCareerCard, prepareCareerMatch, recordCareerMatch, rivalryKey } from "./career-data";
-import { competitionFor, squadBanError, suspensionLabel } from "./discipline";
+import { competitionFor, competitionOfCup, getBannedPlayerIds, nextCompetition, squadBanError, suspensionLabel } from "./discipline";
 import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "./daily-reward";
 import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
 import { consumeTravel, eligibilityError, fixtureFor, journeyView, payTravelFines, settleTravel, travelTiming } from "./travel-data";
@@ -1530,9 +1530,22 @@ function App() {
     }
     const opening = openStarPack(pack.id, latestGame.features.starXI.ownedIds, Math.random, latestGame.features.starXI.formationPositions);
     const reveal: StarPackReveal = { packId: opening.packId, packName: opening.packName, player: opening.player, duplicate: opening.duplicate, fragmentCompensation: opening.fragmentCompensation, source: opening.source, openedAt: Date.now(), openedBy: "Du", troll: shouldTriggerPackTroll(opening.player) };
+    // The reveal and toast follow the state update: a purchase the updater refused shows nothing.
+    // The flag keeps a repeated updater call (React StrictMode) from presenting twice.
+    let settled = false;
+    const settle = (applied: boolean) => {
+      if (settled) return;
+      settled = true;
+      window.setTimeout(() => {
+        if (!applied) { packPurchaseRef.current = false; return; }
+        presentStarReveal(reveal);
+        showToast(opening.duplicate ? `Doppelter Star · +${formatNumber(opening.fragmentCompensation)} Fragmente` : `${opening.player.name} gezogen`);
+      }, 0);
+    };
     setGame((current) => {
       const features = normalizeGameFeatures(current.features);
-      if (current.goals < pack.price || features.cup.active) return current;
+      if (current.goals < pack.price || features.cup.active) { settle(false); return current; }
+      settle(true);
       features.starPackReveal = reveal;
       if (!opening.duplicate) features.starXI = addStarXIPlayer(features.starXI, opening.player.id, getBestXIUnavailablePlayerIds(features));
       if (opening.duplicate) {
@@ -1543,8 +1556,6 @@ function App() {
       }
       return { ...current, goals: current.goals - pack.price, features };
     });
-    presentStarReveal(reveal);
-    showToast(opening.duplicate ? `Doppelter Star · +${formatNumber(opening.fragmentCompensation)} Fragmente` : `${opening.player.name} gezogen`);
   }
 
   async function buySpecialCardPack() {
@@ -1812,6 +1823,8 @@ function App() {
     const player = getStarXIPlayer(source.playerId);
     if (!player || coopBusy || !displayGame.features.starXI.ownedIds.includes(source.playerId)) return false;
     if (suspendedStarIds.includes(source.playerId)) return false;
+    // A yellow card ban for the coming match keeps a reserve player out of the eleven and the bench.
+    if (source.area === "reserve" && getBannedPlayerIds(displayGame.features, displayGame.features.cup.active ? competitionOfCup(displayGame.features.cup) : nextCompetition(displayGame.features)).includes(source.playerId)) return false;
 
     if (target.area === "lineup") {
       if (target.index < 0 || target.index >= STAR_XI_SQUAD_SIZE || !canStarXIPlayerFillSlot(source.playerId, target.index, activeFormationPositions)) return false;
@@ -3084,7 +3097,7 @@ function App() {
 
       {cupCardAnnouncement && <div className="gc-notification card-notification" role="status"><span>🟥</span><div><strong>{cupCardAnnouncement.minute}′ · {cupCardAnnouncement.player}</strong><p>{cupCardAnnouncement.reason}. Vom Platz gestellt und für die nächste Partie gesperrt.</p></div></div>}
 
-      {transferAnnouncement && !gazetteAnnouncement && <div className={`transfer-insider-takeover ${transferAnnouncement.outcome}`} role="dialog" aria-modal="true" aria-label={`Transfermeldung: ${transferAnnouncement.headline}`}><div className="transfer-insider-card"><span className="transfer-insider-kicker">TRANSFER INSIDER / EXKLUSIV</span><div className="transfer-insider-reporter"><span aria-hidden="true">FR</span><div><strong>Fabrizio Romario</strong><small>@romario_transfers · gerade eben</small></div><b>LIVE</b></div><h2>{transferAnnouncement.headline}</h2><p>{transferAnnouncement.message}</p><span className="transfer-insider-result">{transferAnnouncement.outcome === "offer" ? transferAnnouncement.fee > 0 ? `ANGEBOT · ${formatNumber(transferAnnouncement.fee)} GOALS` : "WECHSELWUNSCH · ABLÖSEFREI" : transferAnnouncement.outcome === "declined" ? `BLEIBT · ${TRANSFER_UNHAPPY_MATCHES} SPIELE UNZUFRIEDEN` : transferAnnouncement.outcome === "sale" ? transferAnnouncement.fee > 0 ? `+${formatNumber(transferAnnouncement.fee)} GOALS ABLÖSE` : "ABLÖSEFREI · 0 GOALS" : transferAnnouncement.outcome === "loan" ? displayGame.features.cup.mode === "season" ? "IN DER NÄCHSTEN SAISONPARTIE NICHT IM TEAM" : "IM NÄCHSTEN TURNIER NICHT IM TEAM" : transferAnnouncement.outcome === "return" ? "WIEDER IM TEAM" : "KEIN TRANSFER"}</span>{transferAnnouncement.outcome === "offer" && pendingTransferOffer?.id === transferAnnouncement.id ? <TransferOfferActions offer={pendingTransferOffer} now={countdownNow} busy={coopBusy} onAnswer={answerTransferOffer} onLater={dismissTransferAnnouncement} /> : <button className="event-takeover-dismiss" onClick={dismissTransferAnnouncement}>Weiter</button>}</div></div>}
+      {transferAnnouncement && !gazetteAnnouncement && <div className={`transfer-insider-takeover ${transferAnnouncement.outcome}`} role="dialog" aria-modal="true" aria-label={`Transfermeldung: ${transferAnnouncement.headline}`}><div className="transfer-insider-card"><span className="transfer-insider-kicker">TRANSFER INSIDER / EXKLUSIV</span><div className="transfer-insider-reporter"><span aria-hidden="true">FR</span><div><strong>Fabrizio Romario</strong><small>@romario_transfers · gerade eben</small></div><b>LIVE</b></div><h2>{transferAnnouncement.headline}</h2><p>{transferAnnouncement.message}</p><span className="transfer-insider-result">{transferAnnouncement.outcome === "offer" ? transferAnnouncement.fee > 0 ? `ANGEBOT · ${formatNumber(transferAnnouncement.fee)} GOALS` : "WECHSELWUNSCH · ABLÖSEFREI" : transferAnnouncement.outcome === "declined" ? `BLEIBT · ${TRANSFER_UNHAPPY_MATCHES} SPIELE UNZUFRIEDEN` : transferAnnouncement.outcome === "sale" ? transferAnnouncement.fee > 0 ? `+${formatNumber(transferAnnouncement.fee)} GOALS ABLÖSE` : "ABLÖSEFREI · 0 GOALS" : transferAnnouncement.outcome === "loan" ? displayGame.features.cup.mode === "season" && !displayGame.features.seasonMode.hallOfFame ? "IN DER NÄCHSTEN SAISONPARTIE NICHT IM TEAM" : "IM NÄCHSTEN TURNIER NICHT IM TEAM" : transferAnnouncement.outcome === "return" ? "WIEDER IM TEAM" : "KEIN TRANSFER"}</span>{transferAnnouncement.outcome === "offer" && pendingTransferOffer?.id === transferAnnouncement.id ? <TransferOfferActions offer={pendingTransferOffer} now={countdownNow} busy={coopBusy} onAnswer={answerTransferOffer} onLater={dismissTransferAnnouncement} /> : <button className="event-takeover-dismiss" onClick={dismissTransferAnnouncement}>Weiter</button>}</div></div>}
       {starReveal && <div className={`star-reveal${starRevealIsWalkout ? " walkout-active" : ""}${starRevealIsRare ? " rare-active" : ""}`} role="dialog" aria-modal="true" aria-label={starRevealIsCustomDraw ? "Spezialkarte gezogen" : "Star Pack geöffnet"}>
         <div className={`star-reveal-card${starRevealIsWalkout ? " star-reveal-walkout" : ""}${starWalkoutIsTop ? " star-reveal-top-walkout" : ""}${starRevealIsIconic ? " star-reveal-iconic" : ""}${starRevealIsLegendary ? " star-reveal-legendary" : ""}${starRevealIsRare ? " star-reveal-rare" : ""}`} style={{ borderColor: `${starReveal.player.accent}55` }}>
           {starRevealIsWalkout ? <>

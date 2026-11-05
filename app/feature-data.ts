@@ -808,18 +808,20 @@ export type SeasonScheduleMatch = { homeId: string; awayId: string; home: string
 /** The whole season: every matchday with our match and the two others, with the score once it is played. */
 export function getSeasonSchedule(state: SeasonModeState): { matchday: number; played: boolean; matches: SeasonScheduleMatch[] }[] {
   const name = (id: string) => state.table.find((team) => team.id === id)?.name ?? "Unbekannt";
+  // After the Hall of Fame the finished season stays on screen: every matchday is played.
+  const playedDays = state.hallOfFame ? SEASON_MODE_MATCHES_PER_SEASON : state.matchday;
   return Array.from({ length: SEASON_MODE_MATCHES_PER_SEASON }, (_, day) => {
     const fixture = state.fixtures?.[day], opponentId = fixture?.opponentId ?? `season-opponent-${day % (SEASON_MODE_TABLE_SIZE - 1) + 1}`;
     const clubAway = fixture?.away ?? day % 2 === 1;
     const pairs: [string, string, boolean][] = [[clubAway ? opponentId : "club", clubAway ? "club" : opponentId, true], ...seasonBackgroundPairings(day).map(([first, second]): [string, string, boolean] => seasonPairingHomeFirst(day) ? [first, second, false] : [second, first, false])];
     // Saves from before results were stored still know the club's own scores from the match history.
-    const history = day < state.matchday ? state.history.slice(-state.matchday).find((entry) => entry.matchday === day + 1 && !entry.completedSeason) : undefined;
+    const history = day < playedDays ? state.history.slice(-playedDays).find((entry) => entry.matchday === day + 1 && !entry.completedSeason) : undefined;
     const matches = pairs.map(([homeId, awayId, club]) => {
       const result = state.results?.find((entry) => entry.matchday === day + 1 && entry.homeId === homeId && entry.awayId === awayId)
         ?? (club && history ? { homeScore: clubAway ? history.opponentScore : history.clubScore, awayScore: clubAway ? history.clubScore : history.opponentScore } : undefined);
       return { homeId, awayId, home: name(homeId), away: name(awayId), club, ...(result ? { homeScore: result.homeScore, awayScore: result.awayScore } : {}) };
     });
-    return { matchday: day + 1, played: day < state.matchday, matches };
+    return { matchday: day + 1, played: day < playedDays, matches };
   });
 }
 
@@ -951,10 +953,12 @@ export function recordSeasonModeMatch(value: unknown, clubScore: number, opponen
     : { matchday, homeId: "club", awayId: opponentRowId, homeScore: safeClubScore, awayScore: safeOpponentScore }];
   let table = state.table.map((team) => team.id === "club" ? updateSeasonTableRow({ ...team, name: clubName || team.name }, safeClubScore, safeOpponentScore) : team.id === opponent?.id ? updateSeasonTableRow(team, safeOpponentScore, safeClubScore) : team);
   for(const [firstId,secondId] of seasonBackgroundPairings(state.matchday)) {
-    const first=table.find(t=>t.id===firstId)!,second=table.find(t=>t.id===secondId)!;
-    const firstScore=rollSeasonScore(first.rating-second.rating+1,random),secondScore=rollSeasonScore(second.rating-first.rating-1,random);
-    table=table.map(team=>team.id===first.id?updateSeasonTableRow(team,firstScore,secondScore):team.id===second.id?updateSeasonTableRow(team,secondScore,firstScore):team);
-    results.push(seasonPairingHomeFirst(state.matchday)?{matchday,homeId:first.id,awayId:second.id,homeScore:firstScore,awayScore:secondScore}:{matchday,homeId:second.id,awayId:first.id,homeScore:secondScore,awayScore:firstScore});
+    // The home advantage goes to the team that is stored (and shown) as the home team.
+    const homeFirst=seasonPairingHomeFirst(state.matchday);
+    const home=table.find(t=>t.id===(homeFirst?firstId:secondId))!,away=table.find(t=>t.id===(homeFirst?secondId:firstId))!;
+    const homeScore=rollSeasonScore(home.rating-away.rating+1,random),awayScore=rollSeasonScore(away.rating-home.rating-1,random);
+    table=table.map(team=>team.id===home.id?updateSeasonTableRow(team,homeScore,awayScore):team.id===away.id?updateSeasonTableRow(team,awayScore,homeScore):team);
+    results.push({matchday,homeId:home.id,awayId:away.id,homeScore,awayScore});
   }
   const lastTable = sortSeasonTable(table);
   const completedSeason = matchday >= SEASON_MODE_MATCHES_PER_SEASON;
@@ -2097,7 +2101,8 @@ export function beginSeasonCupMatch(cup: CupState, seasonValue: unknown, now = D
     suspendedPlayerIds: [],
     matchPaused: false,
     pendingNextRound: false,
-    nextTournamentAt: 0,
+    // A league match leaves the tournament break (and the deadline day that reads it) running.
+    nextTournamentAt: cup.nextTournamentAt,
     penaltyHomeScore: 0,
     penaltyAwayScore: 0,
     penaltyHomeTaken: 0,
@@ -2238,7 +2243,7 @@ function finishCupRound(cup: CupState, starRating: number, won: boolean, now: nu
       active: false,
       phase: "regular",
       pendingNextRound: false,
-      nextTournamentAt: 0,
+      nextTournamentAt: cup.nextTournamentAt,
       round: 0,
       injuredPlayerIds: decrementCupInjuries(cup.injuredPlayerIds ?? {}, cup.injuryEvents ?? []),
       matchPaused: false,
@@ -3314,7 +3319,8 @@ export function resolveTransferInsiderEvent(value: GameFeatures, random: () => n
       ? { area: "lineup", index: lineupIndex, requiredPlayers, createdAt: now }
       : { area: "bench", index: benchIndex, requiredPlayers, createdAt: now };
     features.transferSaga.vacancies = [...getOpenTransferSquadVacancies(features), vacancy].slice(-20);
-    const competition = features.cup.mode === "season"
+    // After the Hall of Fame no league match follows; a pending loan then waits for the next tournament.
+    const competition = features.cup.mode === "season" && !features.seasonMode.hallOfFame
       ? { current: "der laufenden Saisonpartie", next: "der nächsten kompletten Saisonpartie", article: "eine Saisonpartie" }
       : { current: "des laufenden Turniers", next: "dem nächsten kompletten Turnier", article: "ein Turnier" };
     const joinsCurrentTournament = features.cup.pendingNextRound;
