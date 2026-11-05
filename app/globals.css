@@ -819,7 +819,6 @@ html, body { min-height: 100%; margin: 0; }
 body { overflow-x: hidden; color: var(--text); background: var(--bg); }
 body::before { position: fixed; z-index: -1; inset: 0; background: radial-gradient(circle at 8% 4%, var(--glow-1), transparent 30%), radial-gradient(circle at 92% 18%, var(--glow-2), transparent 28%); content: ""; pointer-events: none; }
 button { font: inherit; }
-button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 
 .app-shell { width: min(1440px, calc(100% - 52px)); margin: 0 auto; padding: 22px 0 28px; }
 .topbar { position: sticky; top: 0; z-index: 8; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 12px 0 18px; border-bottom: 1px solid var(--line-soft); background: var(--topbar); backdrop-filter: saturate(180%) blur(20px); }
@@ -2081,7 +2080,8 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .bulk-options button { border-color: transparent; background: var(--fill); }
 
 /* Keyboard focus: one clear ring in the accent colour. */
-:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 2px; }
+/* Solid accent: about 5:1 against the page instead of 1.7:1 for the old translucent ring. */
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 /* Confirmation before leaving co-op and similar choices. */
 .confirm-dialog { width: min(420px, 100%); }
@@ -2330,3 +2330,19 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
   .header-prestige-long { display: none; }
   .prestige-summary div { grid-template-columns: 1fr; gap: 0; }
 }
+
+/* Phones: toasts and the save banner sit above the fixed bottom navigation instead of behind it. */
+@media (max-width: 780px) {
+  .toast { bottom: calc(80px + env(safe-area-inset-bottom)); z-index: 35; max-width: calc(100% - 28px); text-align: center; }
+  .offline-banner { right: 14px; bottom: calc(80px + env(safe-area-inset-bottom)); left: 14px; z-index: 35; max-width: none; }
+}
+
+/* Touch targets: at least 44 px on coarse pointers, also on small phones. */
+@media (pointer: coarse) {
+  .top-actions .icon-button { width: 44px; height: 44px; }
+  .layout-order-controls button { min-width: 44px; min-height: 44px; }
+  .mini-game-close { width: 44px; height: 44px; }
+}
+
+/* Screen reader only status region for announcements. */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
