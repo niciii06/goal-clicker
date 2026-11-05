@@ -1,6 +1,6 @@
 import { getStarFormation, getStarXIPlayer, canStarXIPlayerFillSlot, STAR_XI_MAX_SUBSTITUTIONS, resumeCupMatch } from './feature-data';
 import type { GameFeatures } from './feature-data';
-import { advanceInteractive, invalidateInteractive, substituteSimPlayer } from './interactive-match';
+import { advanceInteractive, invalidateInteractive, simulationMinute, substituteSimPlayer } from './interactive-match';
 import { competitionOfCup, getBannedPlayerIds } from './discipline';
 import { addBroadcastSubstitution } from './match-broadcast';
 // The selectable match tactics were removed: a draft carries only lineup and formation.
@@ -21,6 +21,8 @@ export function validateMatchDraft(f:GameFeatures,d:MatchDraft):string {
  for(let i=0;i<11;i++){
   const id=d.lineup[i],old=f.starXI.lineupIds[i];
   if(c.sentOffPlayerIds.includes(old)){if(id!==old)return 'Nach einer Roten Karte bleibt der Platz leer.';continue;}
+  // An injured player who is still listed blocks nothing: the slot may stay as it is, like after a red card.
+  if(id===old&&(c.playerExitedAt[old]||c.injuredPlayerIds[old]))continue;
   if(!getStarXIPlayer(id)||!f.starXI.ownedIds.includes(id))return 'Ein Spieler ist nicht verfügbar.';
   if(!canStarXIPlayerFillSlot(id,i,form.slots.map(s=>s.position)))return `${getStarXIPlayer(id)?.name} passt nicht auf ${form.slots[i].position}.`;
   if(c.sentOffPlayerIds.includes(id)||c.suspendedPlayerIds.includes(id)||c.playerExitedAt[id]||c.injuredPlayerIds[id])return 'Ein Spieler ist nicht spielberechtigt.';
@@ -44,7 +46,7 @@ export function requestMatchEdit(f:GameFeatures,now:number):GameFeatures {
 export function confirmMatchDraft(f:GameFeatures,d:MatchDraft,now:number):{features:GameFeatures;error:string} {
  const error=validateMatchDraft(f,d);if(error)return {features:f,error};
  if(!f.cup.matchPaused)return {features:f,error:'Der laufende Spielzug wird noch abgeschlossen.'};
- const next=structuredClone(f),c=next.cup,minute=Math.max(1,Math.min(120,Math.ceil((c.simulation?.time??0)/60)));
+ const next=structuredClone(f),c=next.cup,minute=simulationMinute(c.simulation??{time:0});
  const incoming=d.lineup.filter(id=>id&&!f.starXI.lineupIds.includes(id)),outgoing=f.starXI.lineupIds.filter(id=>id&&!d.lineup.includes(id)&&!c.sentOffPlayerIds.includes(id));
  const form=getStarFormation(d.formation);
  incoming.forEach((id,i)=>{const out=outgoing[i];c.broadcast=addBroadcastSubstitution(c,out,id,minute);c.playerExitedAt[out]=minute;c.playerEnteredAt[id]=minute;c.allTimeAppearances[id]=(c.allTimeAppearances[id]??0)+1;});

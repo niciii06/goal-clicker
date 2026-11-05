@@ -18,7 +18,7 @@ import { FC27_INDIA_PROFILES, SCRAP_PACK_MIN_RATING, SCRAP_RATING_GROUPS, drawSc
 import { GAZETTE_CHAMPION_HEADLINES, GAZETTE_EXIT_HEADLINES, TRANSFER_INTERESTED_CLUBS, transferClubsForRating } from "./features/news-data";
 import { HOME_VENUE, LEAGUE_LABELS, seasonGeography, venueForClubName } from "./travel-geography";
 import { addBroadcastSubstitution, advanceMatchBroadcast, chooseGoalPattern, createMatchBroadcast, normalizeMatchBroadcast, recordedActionRating } from "./match-broadcast";
-import { advanceInteractive, normalizeInteractive, resumeInteractive } from "./interactive-match";
+import { advanceInteractive, normalizeInteractive, resumeInteractive, simulationMinute } from "./interactive-match";
 import { emptyTravel, normalizeTravel } from "./travel-data";
 import { getCareerCard, getPlayerForm, initialCareerState, normalizeCareerState, rebaseCareerForPrestige } from "./career-data";
 import { getPackUnlockLeague, hasReachedLeague, leagueForTier } from "./season-progression";
@@ -2426,8 +2426,9 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
   nextCup.broadcast = advanceMatchBroadcast(nextCup, homePlayers);
   for(const e of nextCup.broadcast.events.filter(e=>e.kind==='yellow')) {
     const yellows=nextCup.broadcast.events.filter(a=>a.kind==='yellow'&&a.side===e.side&&a.playerId===e.playerId&&a.at<=e.at);
-    if(yellows.length<2||nextCup.cardEvents.some(c=>c.playerId===e.playerId))continue;
     const side=e.side==='club'?'home':'away';
+    // The card list keeps only the latest entries, so our own players are checked against the full sent-off list.
+    if(yellows.length<2||(side==='home'?nextCup.sentOffPlayerIds.includes(e.playerId):nextCup.cardEvents.some(c=>c.side==='away'&&c.playerId===e.playerId)))continue;
     nextCup.cardEvents.push({id:`second-yellow:${e.id}`,side,playerId:e.playerId,player:e.player,reason:'zweites verwarnungswürdiges Foul',card:'red',minute:e.minute,createdAt:e.at,homeScore,awayScore});
     if(side==='home'){nextCup.sentOffPlayerIds.push(e.playerId);nextCup.suspendedPlayerIds.push(e.playerId);nextCup.playerExitedAt[e.playerId]=e.minute;}
   }
@@ -2493,20 +2494,46 @@ function getPenaltyDirectionLabel(direction: PenaltyDirection) {
   return "in die Mitte";
 }
 
-function getHomePenaltyTaker(homePlayers: readonly StarXIPlayer[], formationPositions: readonly StarPosition[], attempt: number) {
-  const ordered = homePlayers.map((player, index) => ({
+type PenaltyPlayer = { player: StarXIPlayer; position: StarPosition };
+
+/** Players still on the pitch after 120 minutes, each with the position they hold in this match.
+ * Sent off, injured and substituted players are gone and never take part in the shoot-out. */
+export function getPenaltyPlayers(cup: Pick<CupState, "sentOffPlayerIds" | "playerExitedAt" | "playerMatchPositions">, homePlayers: readonly StarXIPlayer[], formationPositions: readonly StarPosition[]): PenaltyPlayer[] {
+  return homePlayers
+    .map((player, index) => ({ player, position: cup.playerMatchPositions[player.id] ?? formationPositions[index] ?? player.position }))
+    .filter(({ player }) => !player.benchOnly && !cup.sentOffPlayerIds.includes(player.id) && cup.playerExitedAt[player.id] === undefined);
+}
+
+function getHomePenaltyTaker(players: readonly PenaltyPlayer[], attempt: number) {
+  const ordered = players.map(({ player, position }) => ({
     player,
-    score: player.rating * 10 + (GOAL_POSITION_WEIGHTS[formationPositions[index] ?? player.position] ?? 1),
+    score: player.rating * 10 + (GOAL_POSITION_WEIGHTS[position] ?? 1),
   })).sort((first, second) => second.score - first.score || first.player.name.localeCompare(second.player.name));
   return ordered[attempt % Math.max(1, ordered.length)]?.player;
 }
 
-function getPenaltyWinner(homeScore: number, awayScore: number, homeTaken: number, awayTaken: number): boolean | null {
-  const homeRemaining = Math.max(0, 5 - homeTaken);
-  const awayRemaining = Math.max(0, 5 - awayTaken);
-  if (homeScore > awayScore + awayRemaining) return true;
-  if (awayScore > homeScore + homeRemaining) return false;
-  if (homeTaken >= 5 && awayTaken >= 5 && homeTaken === awayTaken && homeScore !== awayScore) return homeScore > awayScore;
+/** The keeper of the shoot-out is the active player in goal; without one an active player who can keep steps in. */
+function getPenaltyGoalkeeper(players: readonly PenaltyPlayer[]) {
+  return players.find(({ position }) => position === "TW")?.player
+    ?? players.find(({ player }) => player.positions.includes("TW"))?.player
+    ?? players[players.length - 1]?.player;
+}
+
+/** Number of attempts both sides have had so far: a tap is only valid for the step it was aimed at. */
+export function getCupPenaltyStep(cup: Pick<CupState, "penaltyHomeTaken" | "penaltyAwayTaken">) {
+  return cup.penaltyHomeTaken + cup.penaltyAwayTaken;
+}
+
+/** Best of five: decided early once one side cannot catch up any more. After five each, sudden death is
+ * decided only when both sides have taken the same number of attempts. */
+export function getPenaltyWinner(homeScore: number, awayScore: number, homeTaken: number, awayTaken: number): boolean | null {
+  if (homeTaken <= 5 && awayTaken <= 5) {
+    const homeRemaining = 5 - homeTaken;
+    const awayRemaining = 5 - awayTaken;
+    if (homeScore > awayScore + awayRemaining) return true;
+    if (awayScore > homeScore + homeRemaining) return false;
+  }
+  if (homeTaken >= 5 && homeTaken === awayTaken && homeScore !== awayScore) return homeScore > awayScore;
   return null;
 }
 
@@ -2525,8 +2552,9 @@ export function resolveCupPenalty(cup: CupState, starRating: number, direction: 
   let event: CupPenaltyEvent;
   let penaltyMessage = cup.penaltyMessage;
 
+  const penaltyPlayers = getPenaltyPlayers(cup, homePlayers, formationPositions);
   if (cup.penaltyTurn === "home") {
-    const player = getHomePenaltyTaker(homePlayers, formationPositions, penaltyHomeTaken);
+    const player = getHomePenaltyTaker(penaltyPlayers, penaltyHomeTaken);
     const keeperDirection = PENALTY_DIRECTIONS[Math.floor(clamp(random(), 0, 0.999999) * PENALTY_DIRECTIONS.length)] ?? "center";
     const sameDirection = direction === keeperDirection;
     const shooterRating = player?.rating ?? starRating;
@@ -2545,8 +2573,7 @@ export function resolveCupPenalty(cup: CupState, starRating: number, direction: 
     event = { id: `${now}-${penaltyHomeTaken}-${penaltyAwayTaken}-home`, side: "home", playerId: player?.id ?? null, player: playerName, direction, keeperDirection, outcome, createdAt: now, homeScore: penaltyHomeScore, awayScore: penaltyAwayScore, homeTaken: penaltyHomeTaken, awayTaken: penaltyAwayTaken };
   } else {
     const shotDirection = PENALTY_DIRECTIONS[Math.floor(clamp(random(), 0, 0.999999) * PENALTY_DIRECTIONS.length)] ?? "center";
-    const goalkeeperIndex = formationPositions.findIndex((position) => position === "TW");
-    const goalkeeper = homePlayers[goalkeeperIndex] ?? homePlayers.find((player) => player.positions.includes("TW"));
+    const goalkeeper = getPenaltyGoalkeeper(penaltyPlayers);
     const opponentRoster = cup.broadcast?.opponentXI ?? createMatchBroadcast(cup).opponentXI;
       const opponentScorers = opponentRoster.filter(p=>["ST","LF","RF","ZOM","MS"].includes(p.position)).map(p=>p.name);
     const playerName = opponentScorers[penaltyAwayTaken % opponentScorers.length] ?? cup.opponent;
@@ -3572,7 +3599,8 @@ export function applyPendingMatchChanges(features:GameFeatures,now:number) {
  const stoppage=halftime||c.matchPaused||[...c.matchEvents,...c.cardEvents].some(e=>e.createdAt>=p.requestedAt)||c.broadcast?.events.some(e=>e.at>=p.requestedAt&&['corner','throw-in','free-kick','yellow','offside'].includes(e.kind));
  if(!stoppage)return;
  if(p.changes.some(x=>features.starXI.lineupIds[x.slot]!==x.outgoingId)||matchChangeError(features,p.changes)){delete c.pendingSubstitutions;return;}
- const minute=getCupMatchMinute(c,now);
+ // A simulated match counts its minutes by play time; the wall clock would disagree with its goals and cards.
+ const minute=c.simulation?simulationMinute(c.simulation):getCupMatchMinute(c,now);
  for(const x of p.changes){
   features.cup=applyCupSubstitution(features.cup,x.outgoingId,x.playerId,minute,now).cup;
   features.starXI=setStarXIStarter(features.starXI,x.slot,x.playerId,getUnavailableStarXIPlayerIds(features));
