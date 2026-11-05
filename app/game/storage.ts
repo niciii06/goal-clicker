@@ -5,6 +5,14 @@ import { compareStoredGameProgress, parseStoredGame, selectSafestStoredGame, sho
 import { getPassiveIncomePower, normalizeUpgrades } from "./economy";
 import { getGoalBoostedPassiveReward, initialGameFeatures, normalizeGameFeatures } from "../feature-data";
 import { bumpSaveRevision, readSaveRevision, SAVE_WRITER_KEY, setLocalSaveFailed } from "./save-revision";
+import { isGameFromNewerVersion } from "./save-schema";
+import { getCurrentTime } from "./clock";
+
+/**
+ * The most passive income a hidden tab earns when it comes back (or saves in the background): 8 hours. The time
+ * itself is measured with the monotonic clock (app/game/clock.ts), so changing the system clock earns nothing.
+ */
+export const MAX_BACKGROUND_CATCH_UP_MS = 8 * 60 * 60_000;
 
 export function normalizeLayoutOrder(value: unknown) {
   const saved = Array.isArray(value) ? value.filter((id): id is LayoutCardId => typeof id === "string" && LAYOUT_CARD_IDS.includes(id as LayoutCardId)) : [];
@@ -39,8 +47,11 @@ const TAB_ID = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random
 const WRITER_FRESH_MS = 3 * 60_000;
 let knownRevision = 0;
 
-/** What a save attempt did. "stale": another tab saved since this one loaded; it has to load that save first. */
-export type LocalSaveResult = "saved" | "kept" | "stale" | "other-tab" | "failed" | "suspended";
+/**
+ * What a save attempt did. "stale": another tab saved since this one loaded; it has to load that save first.
+ * "outdated": the stored game comes from a newer version of the game; this page must not write over it.
+ */
+export type LocalSaveResult = "saved" | "kept" | "stale" | "other-tab" | "failed" | "suspended" | "outdated";
 
 /** Remembers the revision this tab just loaded; call it right after reading the stored game at start. */
 export function markLocalSaveLoaded() {
@@ -115,6 +126,8 @@ export function persistLocalGame(state: GameState): LocalSaveResult {
     if (otherWriterActive(now)) return "other-tab";
     if (readSaveRevision(localStorage) > knownRevision) return "stale";
     const currentRaw = localStorage.getItem(STORAGE_KEY);
+    // Normalizing would drop what the newer version stored; the stored game stays exactly as it is.
+    if (isGameFromNewerVersion(currentRaw)) return "outdated";
     const current = parseStoredGame(currentRaw);
     // A stale tab cannot restore an already consumed reward receipt.
     if(current?.features){const saved=normalizeGameFeatures(current.features);for(const receipt of saved.earnedPacks){const next=state.features.earnedPacks.find(p=>p.id===receipt.id);if(next&&receipt.opening&&!next.opening)next.opening=receipt.opening;else if(!next)state.features.earnedPacks.push(receipt);}state.features.completedTournamentRuns=[...new Set([...state.features.completedTournamentRuns,...saved.completedTournamentRuns])];}
@@ -149,8 +162,20 @@ export function pauseMiniGameCooldowns(cooldowns: Partial<MiniGameCooldowns> | u
   return shifted;
 }
 
+/**
+ * How much hidden time to pay out now. `hiddenAt` is the monotonic reading of the last payout (or of hiding the
+ * tab), `budgetMs` what is left of this hidden period's MAX_BACKGROUND_CATCH_UP_MS. A tab hidden for days still
+ * earns at most the budget in total, however often it saves in the background.
+ */
+export function takeBackgroundTime(hiddenAt: number | null, budgetMs: number, now: number) {
+  if (hiddenAt === null || !Number.isFinite(hiddenAt) || !Number.isFinite(now)) return { elapsedMs: 0, budgetMs };
+  const elapsedMs = Math.min(Math.max(0, budgetMs), Math.max(0, now - hiddenAt));
+  return { elapsedMs, budgetMs: Math.max(0, budgetMs - elapsedMs) };
+}
+
+/** Adds the passive income of a hidden tab for `elapsedMs` (monotonic), at most MAX_BACKGROUND_CATCH_UP_MS. */
 export function advanceLocalGameWhileOpen(state: GameState, elapsedMs: number, now = Date.now()): GameState {
-  const durationMs = Math.max(0, elapsedMs);
+  const durationMs = Math.min(MAX_BACKGROUND_CATCH_UP_MS, Math.max(0, Number.isFinite(elapsedMs) ? elapsedMs : 0));
   if (!durationMs) return { ...state, lastSaved: now };
   const passiveReward = getGoalBoostedPassiveReward(getPassiveIncomePower(state.upgrades, state.stars, state.features), state.features, now - durationMs, now);
   return {
@@ -162,8 +187,9 @@ export function advanceLocalGameWhileOpen(state: GameState, elapsedMs: number, n
   };
 }
 
-export function getMiniGameCooldownUntil(id: MiniGameId) {
-  return Date.now() + MINI_GAME_COOLDOWN_SECONDS[id] * 1000;
+/** Written with the same session clock the cooldown is checked with (getCurrentTime), not the wall clock. */
+export function getMiniGameCooldownUntil(id: MiniGameId, now = getCurrentTime()) {
+  return now + MINI_GAME_COOLDOWN_SECONDS[id] * 1000;
 }
 
 export function normalizeAchievements(value: unknown) {
