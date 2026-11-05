@@ -4,7 +4,7 @@ export const revalidate = 0;
 import { getDb } from '../../../db';
 import { resolvePlayer } from '../../auth/player';
 import { normalizeGameFeatures, getTournament } from '../../feature-data';
-import { createJourney, eligibilityError, fixtureFor } from '../../travel-data';
+import { createJourney, eligibilityError, fixtureFor, statusJourney } from '../../travel-data';
 import type { Journey } from '../../travel-data';
 import { ensureRouteCache } from '../../journey-routing';
 import { MAX_GAME_STATE_BODY_BYTES, readJsonBody, refuseUnsafePost, RequestBodyTooLargeError } from '../request-body';
@@ -16,7 +16,7 @@ async function handlePost(request: Request) {
  try {
   const limited=rateLimited(request,'travel');if(limited)return limited;
   const refused=refuseUnsafePost(request);if(refused)return refused;
-  const p=await readJsonBody<{playerId?:unknown;action?:unknown;fixtureId?:unknown;features?:unknown;mode?:unknown;tournamentId?:unknown}>(request,MAX_GAME_STATE_BODY_BYTES);
+  const p=await readJsonBody<{playerId?:unknown;action?:unknown;fixtureId?:unknown;features?:unknown;mode?:unknown;tournamentId?:unknown;planStartedAt?:unknown}>(request,MAX_GAME_STATE_BODY_BYTES);
   if(typeof p.playerId!=='string'||p.playerId.length<8||p.playerId.length>80)return Response.json({error:'Spieler-ID fehlt.'},{status:400});
   // Guests play solo without login; a signed in player can only act for the account's player ID, and an
   // account's player ID needs that account.
@@ -24,8 +24,8 @@ async function handlePost(request: Request) {
   const db=getDb(), now=Date.now();
   if(p.action==='status') {
    if(typeof p.fixtureId!=='string'||p.fixtureId.length>240)return Response.json({error:'Partie fehlt.'},{status:400});
-   const journey=await db.getSoloJourney(p.playerId,p.fixtureId);
-   return Response.json({journey,serverNow:now},{headers:{'cache-control':'no-store'}});
+   const journey=await db.getSoloJourney(p.playerId,p.fixtureId) as Journey|null;
+   return Response.json({...statusJourney(journey,p.planStartedAt),serverNow:now},{headers:{'cache-control':'no-store'}});
   }
   const f=normalizeGameFeatures(p.features),mode=p.mode==='season'?'season':'tournament',t=getTournament(typeof p.tournamentId==='string'&&p.tournamentId?p.tournamentId:'stadium');
   if(!t)return Response.json({error:'Unbekanntes Turnier.'},{status:409});

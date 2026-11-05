@@ -522,15 +522,19 @@ function App() {
     if(!hydrated||!playerId||!soloJourneyId)return;
     let stopped=false;
     const sync=async()=>{try{
-      const response=await fetch('/api/travel',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'status',playerId,fixtureId:soloJourneyId})});
-      const data=await response.json() as {journey?:Journey;serverNow?:number};
+      // A journey that already has its route asks for the status without it (the plan of a journey never changes).
+      const local=gameRef.current.features.travel.journey,planStartedAt=local?.id===soloJourneyId&&local.plan?local.startedAt:undefined;
+      const response=await fetch('/api/travel',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'status',playerId,fixtureId:soloJourneyId,planStartedAt})});
+      const data=await response.json() as {journey?:Journey;serverNow?:number;planOmitted?:boolean};
       const serverJourney=data.journey, serverNow=data.serverNow;
       if(stopped||!response.ok||!serverJourney||typeof serverNow!=='number'||!Number.isFinite(serverNow))return;
       syncTravelClock(serverNow);
       setGame(current=>{
         if(current.features.travel.journey?.id!==soloJourneyId)return current;
         const old=current.features.travel;
-        const j={...serverJourney,consumed:old.journey!.consumed};
+        const plan=data.planOmitted?old.journey!.startedAt===serverJourney.startedAt?old.journey!.plan:undefined:serverJourney.plan;
+        if(data.planOmitted&&!plan)return current;
+        const j={...serverJourney,...(plan?{plan}:{}),consumed:old.journey!.consumed};
         const counted=(old.journey as Journey & {counted?:boolean}).counted, finesPaid=old.journey!.finesPaid;
         const travel=settleTravel({...old,journey:{...j,counted,finesPaid} as Journey},serverNow);
         return {...current,features:{...current.features,travel,squadLock:serverJourney.squadLock}};
@@ -1326,9 +1330,11 @@ function App() {
   }
 
   const vibrationSupported = hydrated && canVibrate();
-  // Travel previews use exact routes as soon as the background route data arrived.
+  // Travel previews show an estimate ("ca.") and use exact routes as soon as the route data arrived. The 1.5 MB
+  // route data only loads once the Spiele tab is open (the travel map loads it itself), not on every start.
   const [, setRoutesLoaded] = useState(false);
-  useEffect(() => { let active = true; void loadRouteCache().then((loaded) => { if (active && loaded) setRoutesLoaded(true); }); return () => { active = false; }; }, []);
+  const routesWanted = featureTab === "cup";
+  useEffect(() => { if (!routesWanted) return; let active = true; void loadRouteCache().then((loaded) => { if (active && loaded) setRoutesLoaded(true); }); return () => { active = false; }; }, [routesWanted]);
   // Without clicks the combo drains one click per step, so a short pause costs a little instead of everything.
   const scheduleComboDecay = useCallback(function scheduleDecay(delay: number) {
     if (comboTimerRef.current) window.clearTimeout(comboTimerRef.current);
