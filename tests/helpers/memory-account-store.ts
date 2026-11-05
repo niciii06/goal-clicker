@@ -47,6 +47,15 @@ export function memoryStore() {
       const save = saves.get(userId);
       return save ? { ...save, saveJson: save.version > since ? save.saveJson : null } : null;
     },
+    // Same as the SQL in db/index.ts: the game key inside the save, then features.schemaVersion.
+    getCloudSaveSchemaVersion: async (userId: string, gameKey: string) => {
+      await tick();
+      const save = saves.get(userId);
+      if (!save) return 0;
+      const game = (JSON.parse(save.saveJson) as Record<string, string | undefined>)[gameKey];
+      const version = Number(game ? (JSON.parse(game) as { features?: { schemaVersion?: unknown } }).features?.schemaVersion : 0);
+      return Number.isSafeInteger(version) && version > 0 ? version : 0;
+    },
     putCloudSave: async (userId: string, saveJson: string, baseVersion: number, now: string, active = true) => {
       await tick();
       const current = saves.get(userId);

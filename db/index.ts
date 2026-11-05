@@ -233,6 +233,16 @@ export class GoalClickerDatabase {
   }
 
   /**
+   * The features schema version of the stored game (`gameKey` inside the save, then features.schemaVersion), read
+   * inside PostgreSQL so the save itself does not leave the database. 0 without a save or without a version.
+   */
+  async getCloudSaveSchemaVersion(userId: string, gameKey: string): Promise<number> {
+    const [row] = await this.client.select({ schemaVersion: sql<string | null>`((${cloudSaves.saveJson}::jsonb ->> ${gameKey}::text)::jsonb #>> '{features,schemaVersion}')` }).from(cloudSaves).where(eq(cloudSaves.userId, userId)).limit(1);
+    const version = Number(row?.schemaVersion);
+    return Number.isSafeInteger(version) && version > 0 ? version : 0;
+  }
+
+  /**
    * Stores a save only on top of the version the device loaded (0: no save yet). Two devices that loaded the
    * same version cannot both write; the second gets the current save back as a conflict. A successful write
    * does not send the save back, the caller already has it.
