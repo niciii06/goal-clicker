@@ -92,3 +92,14 @@ test('the world list and the server cache never read the backup copy', async () 
   assert.equal(rooms[0].game.features, undefined);
   assert.equal(featureReads.count, 0);
 });
+
+test('a slim answer reports the same shared goals as a full one, also above the old rebalance cap (P18)', async () => {
+  setup(); row.sharedCoins = 5e9; row.sharedTotalGoals = 6e9; row.sharedSeasonGoals = 5e9;
+  const full = await get('');
+  assert.equal(full.room.featuresOmitted, false);
+  const slim = await get(full.room.featuresKey);
+  assert.equal(slim.room.featuresOmitted, true);
+  assert.equal(slim.room.sharedCoins, full.room.sharedCoins);
+  assert.equal((slim.room.game as { goals?: number }).goals, (full.room.game as { goals?: number }).goals);
+  assert.equal(slim.room.sharedCoins, 5e9);
+});

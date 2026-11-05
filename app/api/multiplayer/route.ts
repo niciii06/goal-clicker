@@ -192,13 +192,18 @@ function initialGame(): CoopGameState {
   };
 }
 
-function readGame(row: RoomRow): CoopGameState {
+/**
+ * `light`: the row came without its features (a slim answer). Then the features are neither read nor normalized
+ * (the answer leaves them out anyway), and the one-time rebalance cap, which needs the stored features, is skipped:
+ * without them it would wrongly cut the shared goals of every slim answer to the minimum.
+ */
+function readGame(row: RoomRow, light = false): CoopGameState {
   const storedUpgrades = parseJson<Record<string, number>>(row.sharedUpgradesJson, {});
   const storedCooldowns = parseJson<MiniGameCooldowns>(row.sharedMiniGameCooldownsJson, {});
-  const backupGame = parseJson<Partial<CoopGameState>>(row.sharedStateBackupJson, {});
-  const primaryFeatures = parseJson<unknown>(row.sharedFeaturesJson, undefined);
+  const primaryFeatures = light ? undefined : parseJson<unknown>(row.sharedFeaturesJson, undefined);
   const primaryFeatureRecord = primaryFeatures && typeof primaryFeatures === "object" && !Array.isArray(primaryFeatures) ? primaryFeatures as Record<string, unknown> : {};
-  const storedFeatures = Object.keys(primaryFeatureRecord).length ? primaryFeatures : backupGame.features;
+  // The backup copy is only read when the primary features are missing.
+  const storedFeatures = light ? undefined : Object.keys(primaryFeatureRecord).length ? primaryFeatures : parseJson<Partial<CoopGameState>>(row.sharedStateBackupJson, {}).features;
   const legacyRoom = row.sharedUpgradesJson === "{}" && row.sharedTotalGoals === 0 && row.sharedSeasonGoals === 0 && row.sharedCoins > 0;
   const legacyTotal = Math.max(row.sharedCoins, row.hostGoals + row.guestGoals + row.player3Goals + row.player4Goals);
   const game = initialGame();
@@ -213,6 +218,10 @@ function readGame(row: RoomRow): CoopGameState {
   game.seasons = Math.max(0, Math.floor(finite(row.sharedSeasons)));
   game.miniGameCooldowns = normalizeCooldowns(storedCooldowns);
   game.minigameWins = Math.max(0, Math.floor(finite(row.sharedMinigameWins)));
+  if (light) {
+    unlockAchievements(game);
+    return game;
+  }
   game.features = normalizeGameFeatures(storedFeatures);
   // The whole world shares one daily reward; older worlds still keep one entry per seat.
   game.features.dailyRewards = mergeDailyRewardsForWorld(game.features.dailyRewards);
@@ -572,7 +581,7 @@ function shapeRoom(input: AnyRoomRow, viewerId?: string, knownFeaturesKey = "") 
   const source = knownFeaturesKey && "sharedFeaturesJson" in input && featuresKeyOf(input) === knownFeaturesKey ? lightened(input) : input;
   const light = !("sharedFeaturesJson" in source);
   const row: RoomRow = light ? { ...source, sharedFeaturesJson: "{}", sharedStateBackupJson: "" } : source as RoomRow;
-  const game = readGame(row);
+  const game = readGame(row, light);
   if (!light) game.features.travel = settleTravel(game.features.travel, Date.now());
   const redeemedCodes = parseJson<string[]>(row.redeemedBonusCodesJson, []);
   const roomPlayers = getRoomPlayers(row);
