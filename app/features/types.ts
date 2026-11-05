@@ -43,6 +43,8 @@ export type GoalBoostState = {
 
 export type CupState = {
   simulation?: InteractiveMatch;
+  /** Set once a match that ran on the interactive simulation is over; the simulation itself is dropped then. */
+  interactiveResult?: true;
   broadcast?: MatchBroadcast;
   fixture?: {id:string;away:boolean;neutral?:boolean;venue:Venue;opponentId:string};
   careerMatchId?: string;
