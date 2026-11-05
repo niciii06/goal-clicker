@@ -76,6 +76,25 @@ test("league roadmap names every upgrade, pack and formation of its league", asy
   assert.ok(rewardsOf(1).includes("Formation 5-4-1"));
 });
 
+test("kick off text uses the real match duration", async () => {
+  const { beginSeasonCupMatch, beginCupMatch, initialGameFeatures, seasonMatchDuration, tournamentMatchDuration, TOURNAMENTS } = await import("../app/feature-data");
+  const { formatCountdown } = await import("../app/game/format");
+  for (const division of [1, 5, 13, 14, 15]) {
+    const features = initialGameFeatures();
+    features.seasonMode.division = division;
+    const cup = beginSeasonCupMatch(features.cup, features.seasonMode, 1_000_000);
+    assert.equal(cup.matchEndsAt - 1_000_000, seasonMatchDuration(division), `division ${division}`);
+  }
+  for (const tournament of TOURNAMENTS) {
+    const cup = beginCupMatch(initialGameFeatures().cup, 1_000_000, tournament.id);
+    assert.equal(cup.matchEndsAt - 1_000_000, tournamentMatchDuration(tournament.minimumRating), tournament.id);
+  }
+  assert.equal(formatCountdown(seasonMatchDuration(15), 0), "04:00");
+  assert.equal(formatCountdown(seasonMatchDuration(3), 0), "03:30");
+  const pageSource = await import("node:fs/promises").then((fs) => fs.readFile(new URL("../app/page.tsx", import.meta.url), "utf8"));
+  assert.doesNotMatch(pageSource, /06:00/);
+});
+
 test("album merges the custom and legendary groups without a double claim", async () => {
   const { claimAlbumReward, getAlbumGroups, initialCareerState } = await import("../app/career-data");
   const { initialGameFeatures, STAR_XI_ACTIVE_PLAYERS } = await import("../app/feature-data");

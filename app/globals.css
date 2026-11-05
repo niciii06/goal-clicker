@@ -2352,3 +2352,6 @@ button { font: inherit; }
   .star-walkout-avatar-wrap { animation-duration: 1ms !important; animation-delay: 0ms !important; }
 }
 .star-walkout-skip { justify-self: center; min-height: 44px; margin-bottom: 8px; }
+.feature-tab-offer-dot { display: inline-block; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%; background: #b37f00; vertical-align: middle; }
+main h2[tabindex="-1"]:focus { outline: none; }
+main h2[tabindex="-1"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
