@@ -1128,7 +1128,7 @@ export function applySeasonPrestige(value: GameFeatures, keepNormalId: string | 
   features.discipline = {
     ...features.discipline,
     league: keepIds(features.discipline.league),
-    tournaments: Object.fromEntries(Object.entries(features.discipline.tournaments).map(([id, counts]) => [id, keepIds(counts)])),
+    tournaments: Object.fromEntries(Object.entries(features.discipline.tournaments).map(([id, counts]) => [id, keepIds(counts)]).filter(([, counts]) => Object.keys(counts).length)),
     bans: features.discipline.bans.filter((ban) => retained.has(ban.playerId)),
   };
   // Retained cards keep every improvement; all others lose theirs (history and album stay).

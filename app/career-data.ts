@@ -416,7 +416,8 @@ export function rebaseCareerForPrestige(career: CareerState, retainedIds: Readon
     const stats = career.players[id];
     delete next.milestoneCards[id];
     // The category follows the catalogue again, like for a card that was never owned.
-    delete next.milestoneCategories[id];
+    if (player) next.milestoneCategories[id] = getMilestoneCategory(player);
+    else delete next.milestoneCategories[id];
     if (!stats) continue;
     next.milestoneBase[id] = Object.fromEntries(MILESTONE_METRICS.map((metric) => [metric, Math.floor(stats[metric])])) as MilestoneStats;
     if (player && hasPotential(player)) next.growthBase[id] = { points: Math.floor(stats.points) };
