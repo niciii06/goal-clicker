@@ -93,3 +93,17 @@ test('Best XI: the preview from the shown features equals the old normalize-and-
   old.starXI = setBestStarXI(old.starXI, getBestXIUnavailablePlayerIds(old), { career: old.career, cup: old.cup });
   assert.deepEqual(preview, old.starXI);
 });
+
+test('career bonuses keep only non-zero entries and rate the match exactly as before (P07)', async () => {
+  const { getStarXIEffectiveMatchRating, getCupMatchMinute } = await import('../app/feature-data');
+  const f = runningMatch(13);
+  const bonuses = f.cup.careerBonuses ?? {};
+  assert.ok(Object.values(bonuses).every((value) => value !== 0), 'no zero entries are saved');
+  const withZeros = { ...f.cup, careerBonuses: { ...Object.fromEntries(f.starXI.ownedIds.map((id) => [id, 0])), ...bonuses } };
+  const minute = getCupMatchMinute(f.cup, f.cup.matchStartedAt + 1000);
+  assert.equal(getStarXIEffectiveMatchRating(f.starXI.ownedIds, f.starXI.lineupIds, withZeros, minute), getStarXIEffectiveMatchRating(f.starXI.ownedIds, f.starXI.lineupIds, f.cup, minute));
+  // An old save with zeros loads without them.
+  const loaded = normalizeGameFeatures(JSON.parse(JSON.stringify({ ...f, cup: withZeros })));
+  assert.deepEqual(loaded.cup.careerBonuses, normalizeGameFeatures(f).cup.careerBonuses);
+  assert.ok(Object.values(loaded.cup.careerBonuses ?? {}).every((value) => value !== 0));
+});

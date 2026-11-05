@@ -211,7 +211,9 @@ export function prepareCareerMatch(features: GameFeatures) {
     if (!p) continue;
     const card = getCareerCard(features.career, p);
     if (hasPotential(p)) growth[id] = card.bonus;
-    bonuses[id] = getPlayerForm(features.career, id).bonus + (hasPotential(p) ? 0 : card.bonus) - (transferUnhappyMatches(features, id) ? TRANSFER_UNHAPPY_PENALTY : 0);
+    const bonus = getPlayerForm(features.career, id).bonus + (hasPotential(p) ? 0 : card.bonus) - (transferUnhappyMatches(features, id) ? TRANSFER_UNHAPPY_PENALTY : 0);
+    // Most cards have no bonus; every reader treats a missing entry as 0, so only the others are saved.
+    if (bonus !== 0) bonuses[id] = bonus;
   }
   features.cup.careerBonuses = bonuses;
   features.cup.careerGrowth = growth;
