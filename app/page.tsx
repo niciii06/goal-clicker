@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import type { AnimationEvent, CSSProperties, DragEvent, KeyboardEvent, MouseEvent } from "react";
+import type { AnimationEvent, CSSProperties, DragEvent, KeyboardEvent, MouseEvent, RefObject } from "react";
 import type { AppMode, ClickEffect, CoopRole, CoopRoom, CoopSession, CrossbarGame, CrossbarHeight, DribbleGame, FeedEntry, GameState, IconName, LayoutCardId, MatchPrediction, MiniGameId, PenaltyDirection, PenaltyGame, PredictionGame, PurchaseMode, SeasonStandingsAnnouncement, SquadDragSource, SquadDropTarget, Tab, UpgradeDefinition } from "./game/types";
 import type { CoopMission, CupCardEvent, GameFeatures, PenaltyDirection as CupPenaltyDirection, RandomEvent, StarFormationId, StarPackId, StarPackReveal, TournamentGazetteIssue, TournamentId, TransferInsiderEvent } from "./feature-data";
 import type { Journey, TravelFixture } from "./travel-data";
@@ -92,6 +92,37 @@ function WalkoutCountryFlag({ code, country, compact = false }: { code: string; 
 
 
 
+
+const ANNOUNCEMENT_AUTO_CLOSE_MS = 8500;
+
+/** True while the pointer is over the element, focus is inside it or one of its <details> is open. */
+function useAnnouncementHold(ref: RefObject<HTMLElement | null>, open: boolean) {
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    const element = ref.current;
+    if (!open || !element) return;
+    let hover = false;
+    const update = () => setHeld(hover || element.contains(document.activeElement) || Boolean(element.querySelector("details[open]")));
+    const enter = () => { hover = true; update(); };
+    const leave = () => { hover = false; update(); };
+    const blur = () => window.setTimeout(update, 0);
+    element.addEventListener("pointerenter", enter);
+    element.addEventListener("pointerleave", leave);
+    element.addEventListener("focusin", update);
+    element.addEventListener("focusout", blur);
+    element.addEventListener("toggle", update, true);
+    update();
+    return () => {
+      element.removeEventListener("pointerenter", enter);
+      element.removeEventListener("pointerleave", leave);
+      element.removeEventListener("focusin", update);
+      element.removeEventListener("focusout", blur);
+      element.removeEventListener("toggle", update, true);
+      setHeld(false);
+    };
+  }, [ref, open]);
+  return held;
+}
 
 const SAVE_FAILED_MESSAGE = "Speichern fehlgeschlagen: Der Browser Speicher ist voll. Sichere deinen Spielstand als Datei, bevor du die Seite schliesst.";
 /** A waiting co-op world without input for this long is polled every COOP_IDLE_POLL_MS instead of every 1.5 s. */
@@ -287,6 +318,8 @@ function App() {
   const [gazetteAnnouncement, setGazetteAnnouncement] = useState<TournamentGazetteIssue | null>(null);
   const [cupCardAnnouncement, setCupCardAnnouncement] = useState<CupCardEvent | null>(null);
   const [seasonStandingsAnnouncement, setSeasonStandingsAnnouncement] = useState<SeasonStandingsAnnouncement | null>(null);
+  const standingsCardRef = useRef<HTMLDivElement>(null);
+  const gazetteCardRef = useRef<HTMLDivElement>(null);
   const [seasonTitle, setSeasonTitle] = useState<SeasonTitle | null>(null);
   const [starReveal, setStarReveal] = useState<StarPackReveal | null>(null);
   const [starWalkoutReady, setStarWalkoutReady] = useState(false);
@@ -757,10 +790,6 @@ function App() {
       setSeasonTitle(title);
       [523, 659, 784, 1047].forEach((frequency, index) => playTone(frequency, index === 3 ? 0.5 : 0.16, "triangle", 0.045, 0.35 + index * 0.16));
     }
-    const dismissTimer = window.setTimeout(() => {
-      setSeasonStandingsAnnouncement((current) => current?.entry.id === latest.id ? null : current);
-    }, 8500);
-    return () => window.clearTimeout(dismissTimer);
   }, [activeCoopCode, displayGame.features.seasonMode.history, displayGame.features.seasonMode.lastTable, hydrated, isCoopLive]);
 
   useEffect(() => {
@@ -946,11 +975,20 @@ function App() {
     setTransferAnnouncement(null);
   }
 
+  // Table and gazette close on their own after a while, but never while the player reads them:
+  // hovering, focus inside or an opened <details> holds them until the player lets go.
+  const standingsHeld = useAnnouncementHold(standingsCardRef, Boolean(seasonStandingsAnnouncement));
+  const gazetteHeld = useAnnouncementHold(gazetteCardRef, Boolean(gazetteAnnouncement));
+  useEffect(() => {
+    if (!seasonStandingsAnnouncement || standingsHeld) return;
+    const timer = window.setTimeout(() => setSeasonStandingsAnnouncement((current) => current === seasonStandingsAnnouncement ? null : current), ANNOUNCEMENT_AUTO_CLOSE_MS);
+    return () => window.clearTimeout(timer);
+  }, [seasonStandingsAnnouncement, standingsHeld]);
   useEffect(()=>{
-    if(!gazetteAnnouncement)return;
-    const timer=window.setTimeout(()=>setGazetteAnnouncement(null),8500);
+    if(!gazetteAnnouncement || gazetteHeld)return;
+    const timer=window.setTimeout(()=>setGazetteAnnouncement(null),ANNOUNCEMENT_AUTO_CLOSE_MS);
     return ()=>window.clearTimeout(timer);
-  },[gazetteAnnouncement]);
+  },[gazetteAnnouncement, gazetteHeld]);
 
   function dismissGazetteAnnouncement() {
     setGazetteAnnouncement(null);
@@ -2964,7 +3002,7 @@ function App() {
           {featureTab === "season" && <SeasonPanel features={displayGame.features} />}
           {featureTab === "cup" && <div className="feature-panel cup-panel">
             {!displayGame.features.cup.active && <div className="post-match-extras">
-      {seasonStandingsAnnouncement && seasonStandingsEntry && <div className={`inline-standings ${seasonStandingsEntry.outcome}`}  aria-label="Aktuelle Saisonrangliste">
+      {seasonStandingsAnnouncement && seasonStandingsEntry && <div ref={standingsCardRef} className={`inline-standings ${seasonStandingsEntry.outcome}`}  aria-label="Aktuelle Saisonrangliste">
         <div className="season-standings-panel">
           <div className="season-standings-topline"><span>SAISON / SPIELTAG {seasonStandingsEntry.matchday}</span><b>{getSeasonModeDivisionLabel(seasonStandingsEntry.division)}</b></div>
           <div className="season-standings-result">
@@ -2977,7 +3015,7 @@ function App() {
           <button className="event-takeover-dismiss season-standings-dismiss" onClick={() => setSeasonStandingsAnnouncement(null)}>Weiter</button>
         </div>
       </div>}
-      {gazetteAnnouncement && <div className={`inline-gazette ${gazetteAnnouncement.tone}`}  aria-label={`Goal Gazette: ${gazetteAnnouncement.headline}`}><article className="gazette-front-page"><header><span>GOAL GAZETTE</span><b>SONDERAUSGABE</b></header><div className="gazette-dateline"><span>{getTournament(gazetteAnnouncement.tournamentId)?.label ?? "TURNIER"}</span><strong>{displayClubName} {gazetteAnnouncement.homeScore}:{gazetteAnnouncement.awayScore} {gazetteAnnouncement.opponent}</strong></div><h2>{gazetteAnnouncement.headline}</h2><h3>{gazetteAnnouncement.strapline}</h3><p>{gazetteAnnouncement.body}</p><footer><span>{gazetteAnnouncement.tieBreak ? "ENTSCHEIDUNG IM ELFMETERSCHIESSEN" : `RUNDE ${gazetteAnnouncement.completedRound} BEENDET`}</span><button className="event-takeover-dismiss" onClick={dismissGazetteAnnouncement}>Zeitung zuklappen</button></footer></article></div>}
+      {gazetteAnnouncement && <div ref={gazetteCardRef} className={`inline-gazette ${gazetteAnnouncement.tone}`}  aria-label={`Goal Gazette: ${gazetteAnnouncement.headline}`}><article className="gazette-front-page"><header><span>GOAL GAZETTE</span><b>SONDERAUSGABE</b></header><div className="gazette-dateline"><span>{getTournament(gazetteAnnouncement.tournamentId)?.label ?? "TURNIER"}</span><strong>{displayClubName} {gazetteAnnouncement.homeScore}:{gazetteAnnouncement.awayScore} {gazetteAnnouncement.opponent}</strong></div><h2>{gazetteAnnouncement.headline}</h2><h3>{gazetteAnnouncement.strapline}</h3><p>{gazetteAnnouncement.body}</p><footer><span>{gazetteAnnouncement.tieBreak ? "ENTSCHEIDUNG IM ELFMETERSCHIESSEN" : `RUNDE ${gazetteAnnouncement.completedRound} BEENDET`}</span><button className="event-takeover-dismiss" onClick={dismissGazetteAnnouncement}>Zeitung zuklappen</button></footer></article></div>}
             </div>}
             {!displayGame.features.cup.active && displayGame.features.cup.matchStartedAt > 0 && <PostMatchSummary features={displayGame.features} onCareer={()=>openFeatureTab("career")} onContinue={()=>openFeatureTab("squad")} />}
             {!displayGame.features.cup.active && displayGame.features.cup.matchStartedAt > 0 && <PressConferencePanel features={displayGame.features} busy={pressBusy || coopBusy} reward={getPressReward(getBasePassivePower(displayGame.upgrades, displayGame.stars, displayGame.features), getBaseClickPower(displayGame.upgrades, displayGame.stars, displayGame.features))} onAnswer={(matchId, questionId, index) => { void answerPress(matchId, questionId, index); }} format={formatNumber} />}
