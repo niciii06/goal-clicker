@@ -709,7 +709,7 @@ export function openEarnedPack(features:GameFeatures,id:string,now=Date.now(),ra
  const player=getStarXIPlayer(opening.player.id)!,duplicate=features.starXI.ownedIds.includes(player.id);
  const result={...opening,player,duplicate,fragmentCompensation:duplicate?getStarXIFragmentCompensation(player):0};
  earned.opening=result;
- if(duplicate)features.starXI.fragments+=result.fragmentCompensation;else features.starXI=addStarXIPlayer(features.starXI,player.id);
+ if(duplicate)features.starXI.fragments+=result.fragmentCompensation;else features.starXI=addStarXIPlayer(features.starXI,player.id,getBestXIUnavailablePlayerIds(features));
  features.starPackReveal={...result,openedAt:now,openedBy:'Du',troll:shouldTriggerPackTroll(player)};
  addHistory(features,{title:`${earned.packId==='special'?SPECIAL_CARD_PACK.label:getStarPack(earned.packId)?.label??earned.packId}: ${player.name}`,detail:duplicate?`+${result.fragmentCompensation} Fragmente`:`${player.positions.join(' / ')} · Rating ${player.rating}`,tone:'positive'},now);
  return features.starPackReveal;
@@ -1270,7 +1270,7 @@ function normalizeFormationPositions(value: unknown) {
   });
 }
 
-function normalizeLineupSlots(ownedIds: string[], rawLineupIds: unknown, formationPositions: readonly StarPosition[], blockedIds: ReadonlySet<string> = new Set()) {
+function normalizeLineupSlots(ownedIds: string[], rawLineupIds: unknown, formationPositions: readonly StarPosition[], blockedIds: ReadonlySet<string> = new Set(), formationChange?: { benchIds: readonly string[] }) {
   const lineupIds = Array.from({ length: STAR_XI_SQUAD_SIZE }, () => "");
   const requested = Array.isArray(rawLineupIds) ? rawLineupIds : [];
   const used = new Set<string>();
@@ -1279,9 +1279,10 @@ function normalizeLineupSlots(ownedIds: string[], rawLineupIds: unknown, formati
 
   for (let index = 0; index < STAR_XI_SQUAD_SIZE; index += 1) {
     const rawId = requested[index];
-    if (rawId === "" || (typeof rawId === "string" && blockedIds.has(rawId))) preservedEmptySlots.add(index);
+    // A deliberately empty slot only keeps its meaning inside the same formation.
+    if (!formationChange && (rawId === "" || (typeof rawId === "string" && blockedIds.has(rawId)))) preservedEmptySlots.add(index);
     const id = typeof rawId === "string" && ownedIds.includes(rawId) && !blockedIds.has(rawId) ? rawId : "";
-    if (!id || used.has(id)) continue;
+    if (!id || used.has(id) || displaced.includes(id)) continue;
     if (canStarXIPlayerFillSlot(id, index, formationPositions)) {
       lineupIds[index] = id;
       used.add(id);
@@ -1290,8 +1291,16 @@ function normalizeLineupSlots(ownedIds: string[], rawLineupIds: unknown, formati
     }
   }
 
-  const candidates = [...displaced, ...ownedIds.filter((id) => !used.has(id) && !displaced.includes(id) && !blockedIds.has(id))];
+  const rest = ownedIds.filter((id) => !used.has(id) && !displaced.includes(id) && !blockedIds.has(id));
+  if (formationChange) {
+    // After a formation change, gaps are filled from the bench first, strongest first.
+    const rating = (id: string) => getStarXIPlayer(id)?.rating ?? 0;
+    const bench = new Set(formationChange.benchIds);
+    rest.sort((a, b) => Number(bench.has(b)) - Number(bench.has(a)) || rating(b) - rating(a));
+  }
+  const candidates = [...displaced, ...rest];
   for (const id of candidates) {
+    if (used.has(id)) continue;
     const openIndex = lineupIds.findIndex((current, index) => !current && !preservedEmptySlots.has(index) && canStarXIPlayerFillSlot(id, index, formationPositions));
     if (openIndex < 0) continue;
     lineupIds[openIndex] = id;
@@ -1350,7 +1359,7 @@ export function removeStarXIPlayersFromSquad(state: StarXIState, playerIds: read
   return { ...next, lineupIds, benchIds };
 }
 
-export function addStarXIPlayer(state: StarXIState, playerId: string) {
+export function addStarXIPlayer(state: StarXIState, playerId: string, blockedPlayerIds: readonly string[] = []) {
   const next = normalizeStarXIState(state);
   if (!getStarXIPlayer(playerId) || next.ownedIds.includes(playerId)) return next;
   next.ownedIds = [...next.ownedIds, playerId];
@@ -1362,7 +1371,8 @@ export function addStarXIPlayer(state: StarXIState, playerId: string) {
     if (openBenchIndex >= 0) next.benchIds[openBenchIndex] = playerId;
   }
   // Completing a weak starter team may require moving an existing multi-position card.
-  return playerId.startsWith("scrap-") && next.lineupIds.some(id => !id) ? setBestStarXI(next) : next;
+  // Unavailable players (injured, banned, loaned out) must stay out of the rebuilt XI.
+  return playerId.startsWith("scrap-") && next.lineupIds.some(id => !id) ? setBestStarXI(next, blockedPlayerIds) : next;
 }
 
 export function setStarXIStarter(state: StarXIState, lineupIndex: number, playerId: string, blockedPlayerIds: readonly string[] = []) {
@@ -1394,7 +1404,7 @@ export function setStarXIFormation(state: StarXIState, formationId: StarFormatio
   if (!formation || formation.id === next.formationId) return next;
   const formationPositions = formation.slots.map((slot) => slot.position);
   const blocked = new Set(blockedPlayerIds);
-  const lineupIds = normalizeLineupSlots(next.ownedIds, next.lineupIds, formationPositions, blocked);
+  const lineupIds = normalizeLineupSlots(next.ownedIds, next.lineupIds, formationPositions, blocked, { benchIds: next.benchIds });
   const benchIds = normalizeBenchSlots(next.ownedIds, lineupIds, next.benchIds, blocked);
   return { ...next, formationId: formation.id, formationPositions, lineupIds, benchIds };
 }
@@ -1863,7 +1873,7 @@ export const WELCOME_PACK_LABEL = "Willkommenspack";
 export function grantWelcomePack(features: GameFeatures, now = Date.now(), random: () => number = Math.random): StarPackReveal {
   const pool = (STAR_RATING_POOLS.get("86-89") ?? []).filter((player) => !player.isCustom && player.cardType !== "icon" && player.cardType !== "legendary");
   const player = pickByPackWeight(pool, Math.max(0, Math.min(0.999999, random())));
-  features.starXI = addStarXIPlayer(features.starXI, player.id);
+  features.starXI = addStarXIPlayer(features.starXI, player.id, getBestXIUnavailablePlayerIds(features));
   addHistory(features, { title: `${WELCOME_PACK_LABEL}: ${player.name}`, detail: `Willkommen im Club! ${player.positions.join(" / ")} · Rating ${player.rating}`, tone: "positive" }, now);
   const reveal: StarPackReveal = { packId: "scout", packName: WELCOME_PACK_LABEL, player, duplicate: false, fragmentCompensation: 0, openedAt: now, openedBy: "Du", troll: false };
   features.starPackReveal = reveal;
@@ -3413,6 +3423,19 @@ export function acceptTransferOffer(value: GameFeatures, now = Date.now()): { fe
     benchIds: features.starXI.benchIds.map((playerId) => playerId === player.id ? "" : playerId),
   };
   features.transferSaga.unhappy = features.transferSaga.unhappy.filter((entry) => entry.playerId !== player.id);
+  // The sold card leaves no injury, yellow card count or ban behind: a copy drawn later is fit and eligible.
+  const withoutSold = <T,>(record: Record<string, T> | undefined) => Object.fromEntries(Object.entries(record ?? {}).filter(([id]) => id !== player.id));
+  features.cup = {
+    ...features.cup,
+    suspendedPlayerIds: features.cup.suspendedPlayerIds.filter((id) => id !== player.id),
+    injuredPlayerIds: withoutSold(features.cup.injuredPlayerIds),
+  };
+  features.discipline = {
+    ...features.discipline,
+    league: withoutSold(features.discipline.league),
+    tournaments: Object.fromEntries(Object.entries(features.discipline.tournaments).map(([id, counts]) => [id, withoutSold(counts)]).filter(([, counts]) => Object.keys(counts).length)),
+    bans: features.discipline.bans.filter((ban) => ban.playerId !== player.id),
+  };
   features.starXI = normalizeStarXIState(soldState, getUnavailableStarXIPlayerIds(features));
   const event: TransferInsiderEvent = {
     id: `transfer-sale-${now}-${player.id}`,
@@ -3439,6 +3462,8 @@ export function declineTransferOffer(value: GameFeatures, now = Date.now(), expi
   const features = normalizeGameFeatures(value);
   const offer = features.transferSaga.pendingOffer;
   if (!offer) return { features, event: null, goalDelta: 0, error: "Es liegt kein Angebot vor." };
+  // Selling and keeping are answered under the same rule: not while a match or journey runs.
+  if (!expired && (features.squadLock || features.cup.active)) return { features, event: null, goalDelta: 0, error: "Während eines Spiels oder einer Reise kannst du nicht antworten." };
   features.transferSaga.pendingOffer = null;
   const player = offer.playerId ? getStarXIPlayer(offer.playerId) : undefined;
   if (!player || !features.starXI.ownedIds.includes(player.id)) return { features, event: null, goalDelta: 0 };
@@ -3461,10 +3486,23 @@ export function declineTransferOffer(value: GameFeatures, now = Date.now(), expi
   return { features, event, goalDelta: 0 };
 }
 
-/** An offer nobody answered in time counts as declined; matches and journeys stop its clock. */
-export function expireTransferOffer(value: GameFeatures, now = Date.now()) {
+/** An offer nobody answered in time counts as declined; matches and journeys stop its clock.
+ * Journeys freeze it through the squad lock. A home match has no lock, so an offer that would run out
+ * while the match is on keeps the time it had left at kick-off and gets it back after the final whistle
+ * (`deferred`: the features changed without an event and must be saved). */
+export function expireTransferOffer(value: GameFeatures, now = Date.now()): { features: GameFeatures; event: TransferInsiderEvent | null; goalDelta: number; deferred?: boolean; error?: string } {
   const offer = value.transferSaga.pendingOffer;
   if (!offer || value.squadLock || now < offer.expiresAt) return { features: value, event: null, goalDelta: 0 };
+  const cup = value.cup;
+  if (cup.active) {
+    // Paused matches shift matchStartedAt and expiresAt alike, so the difference is the real time left at kick-off.
+    const leftAtKickoff = Math.min(TRANSFER_OFFER_DURATION_MS, offer.expiresAt - Math.max(offer.createdAt || 0, cup.matchStartedAt || 0));
+    if (leftAtKickoff > 0) {
+      const features = normalizeGameFeatures(value);
+      features.transferSaga.pendingOffer = { ...features.transferSaga.pendingOffer!, expiresAt: Math.max(now, cup.matchEndsAt || 0) + leftAtKickoff };
+      return { features, event: null, goalDelta: 0, deferred: true };
+    }
+  }
   return declineTransferOffer(value, now, true);
 }
 

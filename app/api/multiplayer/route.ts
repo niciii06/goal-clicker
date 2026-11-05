@@ -1010,7 +1010,7 @@ async function handlePost(request: Request) {
       const offer = game.features.transferSaga.pendingOffer;
       if (offer) {
         const expired = expireTransferOffer(game.features, transferNow);
-        if (!expired.event) return unchanged();
+        if (!expired.event && !expired.deferred) return unchanged();
         game.features = expired.features;
         return persistGameResponse(db, room, game, timestamp, playerId, role);
       }
@@ -1197,7 +1197,7 @@ async function handlePost(request: Request) {
       const reveal = { ...opening, openedAt, openedBy, troll: shouldTriggerPackTroll(opening.player) };
       if (!testMode) game.goals -= pack.price;
       game.features.starPackReveal = reveal;
-      if (!opening.duplicate) game.features.starXI = addStarXIPlayer(game.features.starXI, opening.player.id);
+      if (!opening.duplicate) game.features.starXI = addStarXIPlayer(game.features.starXI, opening.player.id, getBestXIUnavailablePlayerIds(game.features));
       if (opening.fragmentCompensation > 0) {
         game.features.starXI.fragments += opening.fragmentCompensation;
       }

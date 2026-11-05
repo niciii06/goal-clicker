@@ -536,6 +536,8 @@ function App() {
   const currentTransferLoans = displayGame.features.transferSaga.loans.map((loan) => ({ loan, player: getStarXIPlayer(loan.playerId) })).filter((entry): entry is { loan: typeof entry.loan; player: NonNullable<ReturnType<typeof getStarXIPlayer>> } => Boolean(entry.player));
   const transferArchive = [...displayGame.features.transferSaga.archive].reverse();
   const pendingTransferOffer = displayGame.features.transferSaga.pendingOffer;
+  // Only cards still in the club can be banned; older saves may list sold or discarded ones.
+  const ownedDisciplineBans = displayGame.features.discipline.bans.filter((ban) => displayGame.features.starXI.ownedIds.includes(ban.playerId));
   const reserveStarXICount = useMemo(() => {const assigned=new Set([...lineupStarIds,...benchStarIds,...loanedStarIds]);return ownedStarIds.filter(id=>!assigned.has(id)).length;},[ownedStarIds,lineupStarIds,benchStarIds,loanedStarIds]);
   const reserveStarXIPlayers = useMemo(() => featureTab!=="squad" || displayGame.features.cup.active ? [] : ownedStarXIPlayers.filter((player) => !lineupStarIds.includes(player.id) && !benchStarIds.includes(player.id) && !loanedStarIds.includes(player.id)), [benchStarIds, lineupStarIds, loanedStarIds, ownedStarXIPlayers, featureTab, displayGame.features.cup.active]);
   const suspendedStarIds = displayGame.features.cup.suspendedPlayerIds;
@@ -1403,7 +1405,7 @@ function App() {
   /** An offer nobody answered in time counts as declined. */
   function expireLocalTransferOffer() {
     const result = expireTransferOffer(gameRef.current.features, getCurrentTime());
-    if (result.event) setGame((current) => ({ ...current, features: result.features }));
+    if (result.event || result.deferred) setGame((current) => ({ ...current, features: result.features }));
   }
 
   function answerTransferOffer(accept: boolean) {
@@ -1532,7 +1534,7 @@ function App() {
       const features = normalizeGameFeatures(current.features);
       if (current.goals < pack.price || features.cup.active) return current;
       features.starPackReveal = reveal;
-      if (!opening.duplicate) features.starXI = addStarXIPlayer(features.starXI, opening.player.id);
+      if (!opening.duplicate) features.starXI = addStarXIPlayer(features.starXI, opening.player.id, getBestXIUnavailablePlayerIds(features));
       if (opening.duplicate) {
         features.starXI.fragments += opening.fragmentCompensation;
         addHistory(features, { title: `Doppelter Star: ${opening.player.name}`, detail: `+${formatNumber(opening.fragmentCompensation)} Fragmente · nur für Custom-Karten.`, tone: "neutral" });
@@ -2926,7 +2928,7 @@ function App() {
             <p className="feature-copy">10 Spieltage pro Saison, Aufstieg und Abstieg über die Tabelle. Ligaspiele dauern etwa 3–4 Minuten, Pokalspiele 4–5 Minuten plus Unterbrüche. Formation, Spielerstärke, Form und Fitness bestimmen die Partie.</p>
             <div className="starxi-summary"><div><span>STAR XI RATING</span><strong>{starXIRating}</strong><small>Bewertung deiner aktuellen Startelf</small></div><div><span>STARTELF</span><strong>{startingStarXISelection.length} / {STAR_XI_SQUAD_SIZE}</strong><small>{starXIComplete ? "Alle 11 Positionen korrekt besetzt" : `${STAR_XI_SQUAD_SIZE} passende Startplätze erforderlich`}</small></div><div><span>BANK</span><strong>{benchStarXIPlayerCount} / {STAR_XI_BENCH_SIZE}</strong><small>{reserveStarXICount} weitere Spieler im Speicher</small></div><div><span>{displayGame.features.cup.active ? "LIVE WECHSEL" : "SAISONPARTIEN"}</span><strong>{displayGame.features.cup.active ? `${displayGame.features.cup.substitutionsUsed} / ${STAR_XI_MAX_SUBSTITUTIONS}` : displayGame.features.seasonMode.history.length}</strong><small>{displayGame.features.cup.active ? "Startelf wählen, danach passenden Bankspieler" : "Alle Ergebnisse zählen für die Tabelle"}</small></div><div><span>FRAGMENTE</span><strong>{formatNumber(displayGame.features.starXI.fragments)}</strong><small>Automatisch für Custom-Karten</small></div></div>
             {suspendedStarPlayers.length > 0 && <div className="red-card-warning" role="alert"><span>🟥</span><div><strong>{suspendedStarPlayers.map((player) => player.name).join(", ")} nach Roter Karte gesperrt</strong><small>{suspendedStarPlayers.length === 1 ? pronounText("Ersetze {den Spieler} in der Startelf. {Er} darf", suspendedStarPlayers[0]) : "Ersetze die Spieler in der Startelf. Sie dürfen"} bis zum nächsten Anpfiff nicht auf die Bank.</small></div></div>}
-            {displayGame.features.discipline.bans.length > 0 && <div className="discipline-warning" role="status"><span aria-hidden="true">🟨</span><div><strong>Gelbsperren</strong>{displayGame.features.discipline.bans.map((ban) => <span key={ban.id}>{getStarXIPlayer(ban.playerId)?.name ?? "Spieler"}: {suspensionLabel(ban)}. </span>)}<small>Gesperrte Spieler dürfen in diesem Wettbewerb weder in der Startelf noch auf der Bank stehen.</small></div></div>}
+            {ownedDisciplineBans.length > 0 && <div className="discipline-warning" role="status"><span aria-hidden="true">🟨</span><div><strong>Gelbsperren</strong>{ownedDisciplineBans.map((ban) => <span key={ban.id}>{getStarXIPlayer(ban.playerId)?.name ?? "Spieler"}: {suspensionLabel(ban)}. </span>)}<small>Gesperrte Spieler dürfen in diesem Wettbewerb weder in der Startelf noch auf der Bank stehen.</small></div></div>}
             {injuredStarPlayers.length > 0 && <div className="injury-warning" role="status"><span>🩹</span><div><strong>{injuredStarPlayers.map(({ player }) => player.name).join(", ")} verletzt</strong><small>{injuredStarPlayers.map(({ player, matches }) => `${player.name}: noch ${matches} ${matches === 1 ? "Spiel" : "Spiele"}`).join(" · ")}. Verletzungen entstehen nur im laufenden Saisonspiel.</small></div></div>}
             {!displayGame.features.cup.active && !journeyUnderway && <section className="tournament-picker competition-picker" aria-label="Saisonspiele und Turniere">
               <div className="tournament-picker-heading"><div><p className="eyebrow">SPIELE / SAISON + TURNIERE</p><h4>Wähle deine nächste Partie.</h4></div><span>{displayGame.features.cup.pendingNextRound ? "POKALLAUF FORTSETZEN" : "JEDE PARTIE · 06:00"}</span></div>
