@@ -466,8 +466,9 @@ test('Prestige opens from the Hall of Fame despite an incomplete squad, cancels 
   f.cup.suspendedPlayerIds = [f.starXI.lineupIds[6]];
   f.transferSaga.vacancies = [{ area: 'lineup', index: 4, requiredPlayers: 23, createdAt: now }];
   for (const viewport of [VIEWPORTS[1], VIEWPORTS[0]]) {
-    const { page, problems } = await openWithSave(viewport, save(f, now));
-    const stored = async () => JSON.parse((await page.evaluate((key) => localStorage.getItem(key), SAVE_KEY))!) as { goals: number; features: GameFeatures };
+    // Bought Club Office levels: Prestige sets every one of them back to 0.
+    const { page, problems } = await openWithSave(viewport, JSON.stringify({ ...JSON.parse(save(f, now)), upgrades: { boots: 12, ballboy: 30, golden: 2 } }));
+    const stored = async () => JSON.parse((await page.evaluate((key) => localStorage.getItem(key), SAVE_KEY))!) as { goals: number; upgrades: Record<string, number>; features: GameFeatures };
     await openTab(page, 'Spiele');
     const start = page.getByRole('button', { name: 'Prestige starten' });
     await start.waitFor();
@@ -477,6 +478,7 @@ test('Prestige opens from the Hall of Fame despite an incomplete squad, cancels 
     await dialog.waitFor();
     assert.match(await dialog.innerText(), /\+20 % Tore/);
     assert.match(await dialog.innerText(), /GOAT Nicu/);
+    assert.match(await dialog.innerText(), /44 Stufen → Stufe 0/);
     assert.deepEqual(await layoutProblems(page), [], `${viewport.name}: Prestige dialog`);
     // Without a chosen card it cannot be confirmed; cancelling changes nothing.
     assert.equal(await dialog.getByRole('button', { name: 'Karte wählen' }).isDisabled(), true);
@@ -499,6 +501,7 @@ test('Prestige opens from the Hall of Fame despite an incomplete squad, cancels 
     assert.equal(after.features.seasonMode.prestigeCount, 1);
     assert.equal(after.features.seasonMode.division, 1);
     assert.ok(after.goals < 1e9, `goals reset (${after.goals})`);
+    assert.deepEqual(after.upgrades, {}, 'every Club Office upgrade is back at level 0');
     const ownedSpecials = f.starXI.ownedIds.filter((id) => STAR_XI_PLAYERS.find((player) => player.id === id)?.isCustom);
     assert.ok(specials.every((id) => ownedSpecials.includes(id)));
     assert.deepEqual([...after.features.starXI.ownedIds].sort(), [...ownedSpecials, keep].sort());
