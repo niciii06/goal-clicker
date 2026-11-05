@@ -203,9 +203,7 @@ test('7 album and historical statistics stay; registration never grants ownershi
   for (const id of [...SPECIALS, ALEXIA, ...NORMALS, 'star-di-santo']) assert.ok(reloaded.career.collectedIds.includes(id), id);
   assert.deepEqual([...reloaded.starXI.ownedIds].sort(), [...SPECIALS, KEEPER_NORMAL].sort());
   for (const [id, stats] of Object.entries(before.features.career.players)) {
-    const { recent: _beforeRecent, ...total } = stats;
-    const { recent: _afterRecent, ...kept } = reloaded.career.players[id];
-    assert.deepEqual(kept, total, id);
+    assert.deepEqual({ ...reloaded.career.players[id], recent: [] }, { ...stats, recent: [] }, id);
   }
   assert.deepEqual(reloaded.career.reports, before.features.career.reports);
   assert.deepEqual(reloaded.career.awards, before.features.career.awards);

@@ -30,7 +30,7 @@ import { AccountContext, AccountGate, GuestContext } from "./account-gate";
 import { FLUSH_SAVE_EVENT } from "./cloud-sync";
 import { resolveSquadTap, SquadBenchCard, SquadBenchPanel, SquadBenchSlot, SquadPitchPanel, SquadPitchSlot, formatStarXIPositions, useSquadDrag } from "./squad-board";
 import type { SquadPick } from "./squad-board";
-import { MAX_CAREER_SEASON, SEASON_MILESTONES, getFormationUnlockLeague, sortFormationsForPicker, getPackUnlockLeague, getReachedLeague, getSeasonMilestone, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked, leagueForTier } from "./season-progression";
+import { SEASON_MILESTONES, getFormationUnlockLeague, sortFormationsForPicker, getPackUnlockLeague, getReachedLeague, getSeasonMilestone, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked, leagueForTier } from "./season-progression";
 import { MULTIPLAYER_PROTOCOL_VERSION } from "./multiplayer-protocol";
 import { PressConferencePanel } from "./press-conference-panel";
 import { TravelPanel, TravelStatsPanel, durationLabel } from "./travel-panel";
