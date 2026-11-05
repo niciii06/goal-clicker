@@ -45,7 +45,7 @@ import { competitionFor, competitionOfCup, getBannedPlayerIds, nextCompetition, 
 import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "./daily-reward";
 import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
 import { consumeTravel, eligibilityError, fixtureFor, journeyView, payTravelFines, settleTravel, travelTiming } from "./travel-data";
-import { COOP_UPDATE_REQUIRED_EVENT, coopRetryDelay, coopRoleLabel, isCoopRole, multiplayerUrl, newCoopActionId, notifyCoopOffline, occupiedCoopPlayers, readCoopResponse, reloadForUpdate, upsertSavedRoom } from "./game/coop";
+import { COOP_UPDATE_REQUIRED_EVENT, coopRetryDelay, coopRoleLabel, createCoopGameNormalizer, isCoopRole, multiplayerUrl, newCoopActionId, notifyCoopOffline, occupiedCoopPlayers, readCoopResponse, reloadForUpdate, upsertSavedRoom } from "./game/coop";
 import { capGoalsAfterRebalance, createClickResult, decayComboCount, formatComboMultiplier, getBaseClickPower, getBasePassivePower, getBulkPurchase, getClickPower, getComboLevel, getComboProgress, getCost, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades } from "./game/economy";
 import { UPGRADES } from "./game/upgrades";
 import { applyGamePrestige } from "./game/prestige";
@@ -509,7 +509,8 @@ function App() {
   }, [activeCoopCode, activeCoopPlayerId, loadSavedRooms]);
 
   const rawCoopGame = coopSession?.room.game;
-  const normalizedCoopGame = useMemo(() => coopSession?.room.status === "live" ? normalizeRuntimeGame(rawCoopGame, game.sound) : null, [coopSession?.room.status, game.sound, rawCoopGame]);
+  const [normalizeCoopGame] = useState(createCoopGameNormalizer);
+  const normalizedCoopGame = useMemo(() => coopSession?.room.status === "live" ? normalizeCoopGame(rawCoopGame, game.sound) : null, [coopSession?.room.status, game.sound, rawCoopGame, normalizeCoopGame]);
   const isCoopLive = appMode === "coop" && coopSession?.room.status === "live" && Boolean(normalizedCoopGame);
   const displayGame = isCoopLive && normalizedCoopGame ? { ...normalizedCoopGame, sound: game.sound, lastSaved: game.lastSaved } : game;
   const hasFullTestAccess = isCoopLive && Boolean(coopSession?.room.testMode);

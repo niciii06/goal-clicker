@@ -1,4 +1,5 @@
 // Local save handling, normalisation of stored games and mini game cooldowns.
+import type { GameFeatures } from "../feature-data";
 import type { GameState, LayoutCardId, MiniGameCooldowns, MiniGameId } from "./types";
 import { ACHIEVEMENTS, BACKUP_STORAGE_KEY, BALANCE_VERSION, DEFAULT_LAYOUT_ORDER, LAYOUT_CARD_IDS, LEGACY_STORAGE_KEYS, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_IDS, RECOVERY_STORAGE_KEY, STORAGE_KEY } from "./constants";
 import { compareStoredGameProgress, parseStoredGame, selectSafestStoredGame, shouldRejectRegressedSave } from "../save-safety";
@@ -238,7 +239,8 @@ export function initialGame(): GameState {
   return { goals: 0, totalGoals: 0, seasonGoals: 0, clicks: 0, upgrades: {}, achievements: [], stars: 0, seasons: 0, balanceVersion: BALANCE_VERSION, sound: true, lastSaved: Date.now(), miniGameCooldowns: initialMiniGameCooldowns(), minigameWins: 0, features: initialGameFeatures() };
 }
 
-export function normalizeRuntimeGame(value: unknown, soundFallback = true): GameState {
+/** `features`: already normalized features of this game (the co-op client reuses them while they are unchanged). */
+export function normalizeRuntimeGame(value: unknown, soundFallback = true, features?: GameFeatures): GameState {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
   const nonNegative = (raw: unknown) => {
     const number = Number(raw);
@@ -258,7 +260,7 @@ export function normalizeRuntimeGame(value: unknown, soundFallback = true): Game
     lastSaved: Number.isFinite(Number(source.lastSaved)) ? Number(source.lastSaved) : Date.now(),
     miniGameCooldowns: normalizeMiniGameCooldowns(source.miniGameCooldowns as Partial<MiniGameCooldowns> | undefined),
     minigameWins: Math.floor(nonNegative(source.minigameWins)),
-    features: normalizeGameFeatures(source.features),
+    features: features ?? normalizeGameFeatures(source.features),
   };
 }
 
