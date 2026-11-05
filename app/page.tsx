@@ -320,7 +320,7 @@ function App() {
     if (!tabFocusPendingRef.current) return;
     tabFocusPendingRef.current = false;
     window.scrollTo({ top: 0, behavior: "auto" });
-    const heading = [...document.querySelectorAll<HTMLElement>("main h2")].find((element) => element.offsetParent !== null);
+    const heading = [...document.querySelectorAll<HTMLElement>("main h2, main h3, main h4")].find((element) => element.getClientRects().length > 0 && getComputedStyle(element).visibility !== "hidden");
     if (!heading) return;
     if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
     heading.focus({ preventScroll: true });
