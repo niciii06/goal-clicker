@@ -21,16 +21,22 @@ export type RecoveryCompletion = { ok: true; identity: AuthIdentity; already: bo
 
 export type RoomSeatRole = "host" | "guest" | "player3" | "player4";
 
-// Egress: every byte Postgres sends to the server counts against the Supabase quota, uncompressed. A world
+// Egress: every byte Postgres sends to the server counts against the database quota, uncompressed. A world
 // row holds the shared features (several hundred KB) and a full backup copy of the game (as much again),
 // and open worlds are polled every few seconds. So the backup is only read where the features are missing
-// (old rooms), the features only where they are needed, and their md5 is computed inside Postgres.
+// (old rooms), the features only where they are needed, and their md5 is computed inside Postgres. Once the
+// prepared migration 0009 is applied, a trigger stores that md5 in features_key whenever the features are
+// written, so a poll reads the stored key instead of hashing the features again.
 const { sharedStateBackupJson: backupColumn, sharedFeaturesJson: featuresColumn, ...lightColumns } = getTableColumns(coopRooms);
 const backupIfNeeded = sql<string>`case when ${featuresColumn} in ('', '{}') then ${backupColumn} else '' end`;
 /** Every column except the backup copy, which comes along only when the features are empty. */
 const ROOM_FIELDS = { ...lightColumns, sharedFeaturesJson: featuresColumn, sharedStateBackupJson: backupIfNeeded };
 /** A world without its features and backup, plus the md5 of the features to tell whether they changed. */
 const LIGHT_ROOM_FIELDS = { ...lightColumns, featuresKey: sql<string>`md5(${featuresColumn})` };
+/** The same with the stored key of migration 0009; rows the trigger has not seen yet fall back to md5. */
+const STORED_KEY_LIGHT_ROOM_FIELDS = { ...lightColumns, featuresKey: sql<string>`coalesce(${sql.identifier("features_key")}, md5(${featuresColumn}))` };
+/** How long an instance trusts "the column is not there yet" before it looks again. */
+const COLUMN_RECHECK_MS = 5 * 60_000;
 export type LightRoomRow = Omit<RoomRow, "sharedFeaturesJson" | "sharedStateBackupJson"> & { featuresKey: string };
 const SEAT_FIELDS = {
   hostPlayerId: coopRooms.hostPlayerId, hostName: coopRooms.hostName, hostLastSeenAt: coopRooms.hostLastSeenAt,
@@ -100,10 +106,20 @@ function increment(column: AnyColumn, amount: number) {
   return sql`${column} + ${safeAmount}`;
 }
 
-/** drizzle wraps the driver error; 23505 is a unique violation. */
+/** drizzle wraps the driver error; the Postgres code is on the error or its cause. */
+function errorCode(error: unknown) {
+  const failure = error as { code?: string; cause?: { code?: string } } | null;
+  return failure?.code ?? failure?.cause?.code;
+}
+
+/** 23505 is a unique violation. */
 function isUniqueViolation(error: unknown) {
-  const failure = error as { code?: string; cause?: { code?: string } };
-  return (failure.code ?? failure.cause?.code) === "23505";
+  return errorCode(error) === "23505";
+}
+
+/** 42703: a column the query names does not exist (a prepared migration was rolled back). */
+function isUndefinedColumn(error: unknown) {
+  return errorCode(error) === "42703";
 }
 
 function roleClickUpdate(role: string, amount: number, clickCount: number) {
@@ -115,6 +131,8 @@ function roleClickUpdate(role: string, amount: number, clickCount: number) {
 
 export class GoalClickerDatabase {
   private database: Database | null = null;
+  /** Whether coop_rooms.features_key (migration 0009) exists; null until first asked. */
+  private storedFeaturesKey: { present: boolean; checkedAt: number } | null = null;
 
   /** The pool opens on the first query, so a missing DATABASE_URL only fails requests that need it. */
   constructor(private readonly connect: () => Database) {}
@@ -375,6 +393,9 @@ export class GoalClickerDatabase {
    */
   async deleteAccountData(accountId: string, now: string) {
     await this.client.transaction(async (tx) => {
+      // Solo journey and reward receipts are keyed by the account's player ID; worlds stay (shared).
+      const [link] = await tx.select({ playerId: playerAccounts.playerId }).from(playerAccounts).where(eq(playerAccounts.userId, accountId)).limit(1);
+      if (link) await tx.delete(soloTravel).where(eq(soloTravel.owner, link.playerId));
       await tx.delete(cloudSaves).where(eq(cloudSaves.userId, accountId));
       await tx.delete(profiles).where(eq(profiles.userId, accountId));
       await tx.delete(playerAccounts).where(eq(playerAccounts.userId, accountId));
@@ -410,6 +431,37 @@ export class GoalClickerDatabase {
     return identity && !identity.deletedAt ? identity.loginEmail : null;
   }
 
+  /**
+   * The light columns with the cheapest features key this database offers. The code works the same before and
+   * after migration 0009: without the column, Postgres hashes the features as before.
+   */
+  private async lightFields() {
+    const now = Date.now();
+    const known = this.storedFeaturesKey;
+    if (known && (known.present || now - known.checkedAt < COLUMN_RECHECK_MS)) return known.present ? STORED_KEY_LIGHT_ROOM_FIELDS : LIGHT_ROOM_FIELDS;
+    let present = false;
+    try {
+      const rows = await this.client.execute(sql`select 1 from information_schema.columns where table_schema = current_schema() and table_name = 'coop_rooms' and column_name = 'features_key' limit 1`);
+      present = Array.from(rows as ArrayLike<unknown>).length > 0;
+    } catch {
+      present = false;
+    }
+    this.storedFeaturesKey = { present, checkedAt: now };
+    return present ? STORED_KEY_LIGHT_ROOM_FIELDS : LIGHT_ROOM_FIELDS;
+  }
+
+  /** Runs a light query; when the stored key column vanished (rollback), once more with md5. */
+  private async withLightFields<T>(query: (fields: typeof LIGHT_ROOM_FIELDS) => Promise<T>): Promise<T> {
+    const fields = await this.lightFields();
+    try {
+      return await query(fields);
+    } catch (error) {
+      if (fields === LIGHT_ROOM_FIELDS || !isUndefinedColumn(error)) throw error;
+      this.storedFeaturesKey = { present: false, checkedAt: Date.now() };
+      return query(LIGHT_ROOM_FIELDS);
+    }
+  }
+
   async getRoom(code: string): Promise<RoomRow | null> {
     const [room] = await this.client.select(ROOM_FIELDS).from(coopRooms).where(eq(coopRooms.code, code)).limit(1);
     return room ?? null;
@@ -417,7 +469,7 @@ export class GoalClickerDatabase {
 
   /** The world without its big JSON columns: enough to answer "nothing changed" to a poll. */
   async getLightRoom(code: string): Promise<LightRoomRow | null> {
-    const [room] = await this.client.select(LIGHT_ROOM_FIELDS).from(coopRooms).where(eq(coopRooms.code, code)).limit(1);
+    const [room] = await this.withLightFields((fields) => this.client.select(fields).from(coopRooms).where(eq(coopRooms.code, code)).limit(1));
     return room ?? null;
   }
 
@@ -429,8 +481,8 @@ export class GoalClickerDatabase {
 
   /** The worlds of a player for the world list; the list shows no game, so it reads none. */
   async listRoomsForPlayer(playerId: string): Promise<LightRoomRow[]> {
-    return this.client
-      .select(LIGHT_ROOM_FIELDS)
+    return this.withLightFields((fields) => this.client
+      .select(fields)
       .from(coopRooms)
       .where(or(
         eq(coopRooms.hostPlayerId, playerId),
@@ -439,7 +491,7 @@ export class GoalClickerDatabase {
         eq(coopRooms.player4PlayerId, playerId),
       ))
       .orderBy(desc(coopRooms.updatedAt))
-      .limit(12);
+      .limit(12));
   }
 
   /** The best worlds by goals, by league reached (1 is the top) or by trophies; ties go to more goals. */
@@ -458,17 +510,24 @@ export class GoalClickerDatabase {
       .limit(Math.max(1, Math.min(100, Math.floor(limit))));
   }
 
-  async insertRoom(values: typeof coopRooms.$inferInsert) {
-    const [room] = await this.client.insert(coopRooms).values(values).returning(ROOM_FIELDS);
-    if (!room) throw new Error("Die Welt konnte nicht gespeichert werden.");
-    return room;
+  /** Creates a world; null when its code is already taken (the caller picks another code). */
+  async insertRoom(values: typeof coopRooms.$inferInsert): Promise<RoomRow | null> {
+    try {
+      const [room] = await this.client.insert(coopRooms).values(values).onConflictDoNothing({ target: coopRooms.code }).returning(ROOM_FIELDS);
+      return room ?? null;
+    } catch (error) {
+      if (isUniqueViolation(error)) return null;
+      throw error;
+    }
   }
 
   /**
    * Updates a world and returns it. The features are never sent back: a write that sets them already has
-   * them, and only the rare writes without them (joining, renaming) read them once afterwards.
+   * them, and only the rare writes without them (joining, renaming) read them once afterwards. `unchanged`:
+   * the features (and backup) the caller read, for a write guarded by the shared state version that leaves them
+   * as they were; a successful write proves they are still current, so they are not read again.
    */
-  async updateRoom(code: string, values: RoomUpdate, conditions: RoomConditions = {}): Promise<RoomRow | null> {
+  async updateRoom(code: string, values: RoomUpdate, conditions: RoomConditions = {}, unchanged?: Pick<RoomRow, "sharedFeaturesJson" | "sharedStateBackupJson">): Promise<RoomRow | null> {
     const predicates = [eq(coopRooms.code, code)];
     if (conditions.sharedStateVersion !== undefined) predicates.push(eq(coopRooms.sharedStateVersion, conditions.sharedStateVersion));
     if (conditions.lastPassiveAt !== undefined) predicates.push(eq(coopRooms.lastPassiveAt, conditions.lastPassiveAt));
@@ -483,6 +542,7 @@ export class GoalClickerDatabase {
       .returning(lightColumns);
     if (!room) return null;
     if (typeof values.sharedFeaturesJson === "string" && values.sharedFeaturesJson !== "{}") return { ...room, sharedFeaturesJson: values.sharedFeaturesJson, sharedStateBackupJson: "" };
+    if (unchanged && values.sharedFeaturesJson === undefined && conditions.sharedStateVersion !== undefined) return { ...room, sharedFeaturesJson: unchanged.sharedFeaturesJson, sharedStateBackupJson: unchanged.sharedStateBackupJson };
     const [game] = await this.client.select({ sharedFeaturesJson: featuresColumn, sharedStateBackupJson: backupIfNeeded }).from(coopRooms).where(eq(coopRooms.code, code)).limit(1);
     return game ? { ...room, ...game } : null;
   }
@@ -491,13 +551,13 @@ export class GoalClickerDatabase {
     await this.client.delete(coopRooms).where(eq(coopRooms.code, code));
   }
 
-  /** Clicks change only counters, so the world comes back without its features (with their md5). */
   /**
-   * Books a batch of clicks the server counted. `previousClickState` is the seat's click state the amount was
-   * computed from; when another request of the same seat changed it meanwhile, nothing is written (null).
+   * Books a batch of clicks the server counted. Clicks change only counters, so the world comes back without its
+   * features (with their key). `previousClickState` is the seat's click state the amount was computed from; when
+   * another request of the same seat changed it meanwhile, nothing is written (null).
    */
   async applyClick(code: string, role: string, amount: number, clickCount: number, timestamp: string, previousClickState: unknown = null, nextClickState: unknown = null, presence: RoomUpdate = {}): Promise<LightRoomRow | null> {
-    const [room] = await this.client
+    const [room] = await this.withLightFields((fields) => this.client
       .update(coopRooms)
       .set({
         sharedCoins: increment(coopRooms.sharedCoins, amount),
@@ -518,7 +578,7 @@ export class GoalClickerDatabase {
         eq(coopRooms.code, code),
         nextClickState ? sql`(${coopRooms.clickStateJson}::jsonb -> ${role}::text) is not distinct from ${previousClickState === null ? null : JSON.stringify(previousClickState)}::jsonb` : undefined,
       ))
-      .returning(LIGHT_ROOM_FIELDS);
+      .returning(fields));
     return room ?? null;
   }
 
