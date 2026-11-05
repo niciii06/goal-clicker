@@ -2242,6 +2242,7 @@ function getCupBaseResult(cup: CupState, starRating: number) {
 export function compactFinishedCup(cup: CupState): CupState {
   if (cup.active || !cup.simulation) return cup;
   const { simulation: _simulation, ...rest } = cup;
+  void _simulation;
   return { ...rest, interactiveResult: true };
 }
 
