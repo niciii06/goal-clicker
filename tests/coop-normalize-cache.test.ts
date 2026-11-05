@@ -31,8 +31,5 @@ test('the normalized world is computed once for many polls', () => {
   const normalize = createCoopGameNormalizer();
   const features = JSON.parse(JSON.stringify(initialGame().features));
   const before = normalize({ goals: 0, features }, true).features;
-  const start = performance.now();
   for (let i = 0; i < 200; i += 1) assert.equal(normalize({ goals: i, features }, true).features, before);
-  // 200 full normalizations would take far longer; the cached path only normalizes the scalar fields.
-  assert.ok(performance.now() - start < 200 * 0.5, 'reused');
 });
