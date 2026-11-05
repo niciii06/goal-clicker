@@ -2846,6 +2846,18 @@ function clearHundredCardsFromAlbum(source: Record<string, unknown>) {
   };
 }
 
+/**
+ * The pack receipts and finished tournament runs of a stored game, normalized exactly like normalizeGameFeatures
+ * does. The local save merges these from the stored copy; a full normalize would cost several milliseconds.
+ */
+export function normalizeSaveReceipts(value: unknown): Pick<GameFeatures, 'completedTournamentRuns' | 'earnedPacks'> {
+  const source = asRecord(value);
+  return {
+    completedTournamentRuns: Array.isArray(source.completedTournamentRuns)?[...new Set(source.completedTournamentRuns.filter((id):id is string=>typeof id==='string'))].slice(-MAX_COMPLETED_TOURNAMENT_RUNS):[],
+    earnedPacks: keepRecentOpenedPacks((Array.isArray(source.earnedPacks)?source.earnedPacks:[]).map(asRecord).filter(p=>typeof p.id==='string'&&isEarnedPackId(String(p.packId))).filter((p,i,a)=>a.findIndex(x=>x.id===p.id)===i).map(p=>{const saved=asRecord(p.opening),player=getStarXIPlayer(String(asRecord(saved.player).id)),special=p.packId==='special';return {id:String(p.id),packId:p.packId as EarnedPackId,earnedAt:Number(p.earnedAt)||0,...(player?{opening:special?{packId:'legend' as const,packName:SPECIAL_CARD_PACK.label,player,duplicate:saved.duplicate===true,fragmentCompensation:Math.max(0,Number(saved.fragmentCompensation)||0),source:'custom-draw' as const}:{packId:p.packId as RewardPackId,packName:getStarPack(String(p.packId))!.label,player,duplicate:saved.duplicate===true,fragmentCompensation:Math.max(0,Number(saved.fragmentCompensation)||0)}}:{})};}))
+  };
+}
+
 export function normalizeGameFeatures(value: unknown): GameFeatures {
   const migration = removeEarlyHundredSpecialCards(asRecord(value));
   const album = clearHundredCardsFromAlbum(migration.source);
@@ -3066,8 +3078,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     // Clubs that already field eleven never need the starter squad.
     starterSquadGranted: source.starterSquadGranted === true || getStarXISelection(normalizedStarXI.ownedIds, normalizedStarXI.lineupIds).length >= STAR_XI_SQUAD_SIZE,
     matchStamps: clamp(Math.floor(Number(source.matchStamps) || 0), 0, MATCH_PACK_STAMP_TARGET - 1),
-    completedTournamentRuns: Array.isArray(source.completedTournamentRuns)?[...new Set(source.completedTournamentRuns.filter((id):id is string=>typeof id==='string'))].slice(-MAX_COMPLETED_TOURNAMENT_RUNS):[],
-    earnedPacks: keepRecentOpenedPacks((Array.isArray(source.earnedPacks)?source.earnedPacks:[]).map(asRecord).filter(p=>typeof p.id==='string'&&isEarnedPackId(String(p.packId))).filter((p,i,a)=>a.findIndex(x=>x.id===p.id)===i).map(p=>{const saved=asRecord(p.opening),player=getStarXIPlayer(String(asRecord(saved.player).id)),special=p.packId==='special';return {id:String(p.id),packId:p.packId as EarnedPackId,earnedAt:Number(p.earnedAt)||0,...(player?{opening:special?{packId:'legend' as const,packName:SPECIAL_CARD_PACK.label,player,duplicate:saved.duplicate===true,fragmentCompensation:Math.max(0,Number(saved.fragmentCompensation)||0),source:'custom-draw' as const}:{packId:p.packId as RewardPackId,packName:getStarPack(String(p.packId))!.label,player,duplicate:saved.duplicate===true,fragmentCompensation:Math.max(0,Number(saved.fragmentCompensation)||0)}}:{})};})),
+    ...normalizeSaveReceipts(source),
     travel: normalizeTravel(source.travel),
     miniGameRuns: Object.fromEntries(Object.entries(asRecord(source.miniGameRuns)).filter(([key, startedAt]) => /^[a-z]+:[a-z0-9]+$/.test(key) && Number.isFinite(Number(startedAt))).slice(0, 16).map(([key, startedAt]) => [key, Number(startedAt)])),
     squadLock: normalizeSquadLock(source.squadLock ?? asRecord(asRecord(source.travel).journey).squadLock),
