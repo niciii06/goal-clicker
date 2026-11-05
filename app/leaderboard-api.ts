@@ -39,9 +39,10 @@ export async function leaderboardResponse(request: Request, deps: LeaderboardApi
   const sort = LEADERBOARD_SORTS.find((value) => value === url.searchParams.get("sort")) ?? "goals";
   const playerId = (url.searchParams.get("playerId") ?? "").trim().slice(0, 80);
   if (playerId.length < 8) return Response.json({ error: "Spieler-ID fehlt." }, { status: 400, headers: { "cache-control": "no-store" } });
-  const auth = await deps.resolve(request, playerId);
-  if (!auth.ok) return auth.response;
   try {
+    // The login check reads the database too; when it fails, the answer is the same 503 as for the board itself.
+    const auth = await deps.resolve(request, playerId);
+    if (!auth.ok) return auth.response;
     const rows = await deps.db().getLeaderboard(sort, LEADERBOARD_SIZE);
     return Response.json({ sort, entries: rows.map((row, index) => leaderboardEntry(row, index + 1, auth.playerId)) }, { headers });
   } catch {

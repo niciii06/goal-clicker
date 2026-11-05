@@ -6,7 +6,7 @@ import { resolvePlayer } from '../../auth/player';
 import { normalizeGameFeatures, getTournament } from '../../feature-data';
 import { createJourney, eligibilityError, fixtureFor } from '../../travel-data';
 import type { Journey } from '../../travel-data';
-import { MAX_GAME_STATE_BODY_BYTES, readJsonBody, RequestBodyTooLargeError } from '../request-body';
+import { MAX_GAME_STATE_BODY_BYTES, readJsonBody, refuseUnsafePost, RequestBodyTooLargeError } from '../request-body';
 import { rateLimited } from '../rate-limit';
 import { withGzip } from '../compression';
 // Solo saves remain browser-local; this ledger makes elapsed travel server-authoritative.
@@ -14,6 +14,7 @@ import { withGzip } from '../compression';
 async function handlePost(request: Request) {
  try {
   const limited=rateLimited(request,'travel');if(limited)return limited;
+  const refused=refuseUnsafePost(request);if(refused)return refused;
   const p=await readJsonBody<{playerId?:unknown;action?:unknown;fixtureId?:unknown;features?:unknown;mode?:unknown;tournamentId?:unknown}>(request,MAX_GAME_STATE_BODY_BYTES);
   if(typeof p.playerId!=='string'||p.playerId.length<8||p.playerId.length>80)return Response.json({error:'Spieler-ID fehlt.'},{status:400});
   // Guests play solo without login; a signed in player can only act for the account's player ID, and an

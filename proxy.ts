@@ -27,6 +27,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Everything except static files and the app shell files.
-  matcher: ["/((?!_next/static|_next/image|favicon\\.ico|sw\\.js|manifest\\.webmanifest|offline\\.html|sounds/|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)"],
+  // Everything except the API (its routes check sessions themselves and the proxy has nothing to do there, so
+  // polls skip one function run), static files and the app shell files.
+  matcher: ["/((?!api/|_next/static|_next/image|favicon\\.ico|sw\\.js|manifest\\.webmanifest|offline\\.html|sounds/|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)"],
 };

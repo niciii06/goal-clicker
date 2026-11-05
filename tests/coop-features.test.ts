@@ -96,10 +96,20 @@ test('frequent click batches do not rewrite the whole world each time',async t=>
  fullWrites.count=0;
  for(let i=0;i<10;i++){clock+=100;assert.equal((await action('click',{clickCount:1})).status,200);}
  assert.equal(fullWrites.count,0);
- // Passive income still arrives: after a few seconds a click books it once.
+ // Passive income still arrives: after a few seconds a click books it once, as a counter write without the features.
+ clock+=6000;
+ const passiveBefore=row.lastPassiveAt;
+ assert.equal((await action('click',{clickCount:1})).status,200);
+ assert.equal(row.lastPassiveAt,new Date(clock).toISOString());
+ assert.notEqual(row.lastPassiveAt,passiveBefore);
+ // The first world write may store the normalised features once; later passive writes only move counters.
+ assert.ok(fullWrites.count<=1);
+ const afterFirst=fullWrites.count,goalsBefore=row.sharedTotalGoals;
  clock+=6000;
  assert.equal((await action('click',{clickCount:1})).status,200);
- assert.equal(fullWrites.count,1);
+ assert.equal(row.lastPassiveAt,new Date(clock).toISOString());
+ assert.ok(row.sharedTotalGoals>goalsBefore);
+ assert.equal(fullWrites.count,afterFirst);
 });
 
 test('coming back after ten days pays at most the one day of passive income an absence allows',async t=>{

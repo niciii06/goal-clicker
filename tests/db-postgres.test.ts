@@ -35,7 +35,7 @@ function room(code: string) {
 }
 
 test('rooms round trip with numbers, defaults and ISO timestamps', { skip }, async () => {
-  const created = await db.insertRoom({ ...room('RT01'), sharedCoins: 1.5e15, hostClicks: 2 ** 40 });
+  const created = (await db.insertRoom({ ...room('RT01'), sharedCoins: 1.5e15, hostClicks: 2 ** 40 }))!;
   assert.equal(created.sharedCoins, 1.5e15);
   assert.equal(created.hostClicks, 2 ** 40);
   assert.equal(created.sharedStateVersion, 0);

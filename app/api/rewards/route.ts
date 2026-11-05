@@ -4,12 +4,13 @@ export const revalidate = 0;
 import { getDb } from '../../../db';
 import { resolvePlayer } from '../../auth/player';
 import { normalizeGameFeatures, openEarnedPackDraw } from '../../feature-data';
-import { MAX_GAME_STATE_BODY_BYTES, readJsonBody, RequestBodyTooLargeError } from '../request-body';
+import { MAX_GAME_STATE_BODY_BYTES, readJsonBody, refuseUnsafePost, RequestBodyTooLargeError } from '../request-body';
 import { rateLimited } from '../rate-limit';
 // Reuse the existing insert-once solo receipt ledger with a separate key namespace.
 export async function POST(request:Request) {
  try {
   const limited=rateLimited(request,'rewards');if(limited)return limited;
+  const refused=refuseUnsafePost(request);if(refused)return refused;
   const p=await readJsonBody<{playerId?:unknown;rewardId?:unknown;features?:unknown}>(request,MAX_GAME_STATE_BODY_BYTES);
   if(typeof p.playerId!=='string'||p.playerId.length<8||p.playerId.length>80||typeof p.rewardId!=='string'||p.rewardId.length>240)return Response.json({error:'Ungültige Prämie.'},{status:400});
   // Guests play solo without login; a player ID that belongs to an account needs that account.

@@ -31,7 +31,7 @@ import { FLUSH_SAVE_EVENT } from "./cloud-sync";
 import { resolveSquadTap, SquadBenchCard, SquadBenchPanel, SquadBenchSlot, SquadPitchPanel, SquadPitchSlot, formatStarXIPositions, useSquadDrag } from "./squad-board";
 import type { SquadPick } from "./squad-board";
 import { MAX_CAREER_SEASON, SEASON_MILESTONES, getFormationUnlockLeague, sortFormationsForPicker, getPackUnlockLeague, getReachedLeague, getSeasonMilestone, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked, leagueForTier } from "./season-progression";
-import { MULTIPLAYER_PROTOCOL_VERSION } from "./multiplayer-protocol";
+import { MULTIPLAYER_PROTOCOL_VERSION, MULTIPLAYER_UPDATE_MESSAGE } from "./multiplayer-protocol";
 import { PressConferencePanel } from "./press-conference-panel";
 import { TravelPanel, TravelStatsPanel, durationLabel } from "./travel-panel";
 import { advanceLocalGameWhileOpen, claimLocalSave, getMiniGameCooldownUntil, initialGame, isLocalSaveWriter, markLocalSaveLoaded, normalizeAchievements, normalizeLayoutOrder, normalizeNickname, normalizeRuntimeGame, pauseMiniGameCooldowns, persistLocalGame, readStoredGame, suspendLocalPersistence } from "./game/storage";
@@ -43,7 +43,7 @@ import { competitionFor, squadBanError, suspensionLabel } from "./discipline";
 import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "./daily-reward";
 import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
 import { consumeTravel, eligibilityError, fixtureFor, journeyView, payTravelFines, settleTravel, travelTiming } from "./travel-data";
-import { coopRoleLabel, isCoopRole, multiplayerUrl, notifyCoopOffline, occupiedCoopPlayers, readCoopResponse, upsertSavedRoom } from "./game/coop";
+import { COOP_UPDATE_REQUIRED_EVENT, coopRetryDelay, coopRoleLabel, isCoopRole, multiplayerUrl, newCoopActionId, notifyCoopOffline, occupiedCoopPlayers, readCoopResponse, reloadForUpdate, upsertSavedRoom } from "./game/coop";
 import { capGoalsAfterRebalance, createClickResult, decayComboCount, formatComboMultiplier, getBaseClickPower, getBasePassivePower, getBulkPurchase, getClickPower, getComboLevel, getComboProgress, getCost, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades } from "./game/economy";
 import { UPGRADES } from "./game/upgrades";
 import { TransferOfferActions } from "./transfer-offer-actions";
@@ -178,6 +178,7 @@ function formatStableInteger(value: number) {
 function App() {
   const packPurchaseRef = useRef(false);
   const starterSquadRequestedRef = useRef(false);
+  const [starterSquadRetry, setStarterSquadRetry] = useState(0);
   const travelActionRef = useRef(false);
   const [travelBusy, setTravelBusy] = useState(false);
   const [game, setGame] = useState<GameState>(initialGame);
@@ -218,6 +219,13 @@ function App() {
   const [savedRooms, setSavedRooms] = useState<CoopRoom[]>([]);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [coopMessage, setCoopMessage] = useState("");
+  // A newer server refused this client's protocol: a banner offers the reload instead of reloading mid action.
+  const [coopUpdateRequired, setCoopUpdateRequired] = useState(false);
+  useEffect(() => {
+    const onUpdateRequired = () => setCoopUpdateRequired(true);
+    window.addEventListener(COOP_UPDATE_REQUIRED_EVENT, onUpdateRequired);
+    return () => window.removeEventListener(COOP_UPDATE_REQUIRED_EVENT, onUpdateRequired);
+  }, []);
   const [coopBusy, setCoopBusy] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("all");
   const [purchaseMode, setPurchaseMode] = useState<PurchaseMode>(1);
@@ -309,6 +317,7 @@ function App() {
   const coopClickBatchRef = useRef({ amount: 0, count: 0 });
   const coopClickBatchTimerRef = useRef<number | null>(null);
   const coopClickInFlightRef = useRef(false);
+  const coopMiniGameStartingRef = useRef(false);
   const cupGoalRef = useRef<string | null>(null);
   const cupCardRef = useRef<string | null>(null);
   const coopControlQueueRef = useRef<Promise<unknown>>(Promise.resolve());
@@ -904,6 +913,10 @@ function App() {
   }
 
   function flushCoopClickBatch() {
+    // Exactly one timer waits at a time: a flush called while one is pending (more than 50 clicks queued during a
+    // blocked request) replaces it instead of starting a second chain.
+    if (coopClickBatchTimerRef.current) window.clearTimeout(coopClickBatchTimerRef.current);
+    coopClickBatchTimerRef.current = null;
     if (coopForegroundPendingRef.current > 0) {
       coopClickBatchTimerRef.current = window.setTimeout(flushCoopClickBatch, 70);
       return;
@@ -1226,18 +1239,25 @@ function App() {
   }, [latestClubGoalId, liveMatch]);
   async function sendCoopAction(action: string, extra: Record<string, unknown> = {}) {
     if (!coopSession) return null;
+    // Foreground actions carry one id for all their attempts: a resend after a lost answer is answered from the
+    // server's receipt instead of being applied a second time.
+    const actionId = action === "click" || action === "tick" || action === "cup-tick" ? undefined : newCoopActionId();
     const run = async () => {
       const maxAttempts = action === "click" ? 1 : 4;
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        // Growing pauses with jitter, so clients that collided do not collide again in lockstep.
+        if (attempt > 0) await new Promise((resolve) => window.setTimeout(resolve, coopRetryDelay(attempt)));
         try {
           const response = await fetch("/api/multiplayer", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ action, code: coopSession.code, playerId: coopSession.playerId, protocol: MULTIPLAYER_PROTOCOL_VERSION, ...extra }),
+            body: JSON.stringify({ action, code: coopSession.code, playerId: coopSession.playerId, protocol: MULTIPLAYER_PROTOCOL_VERSION, featuresKey: coopFeaturesKeyRef.current, ...(actionId ? { actionId } : {}), ...extra }),
           });
           const data = await readCoopResponse(response);
       syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
           if (data.room) setCoopSession((current) => mergeCoopSessionRoom(current, data.room!, data.role));
+          // A newer server: the reload banner explains it (readCoopResponse); nothing was saved.
+          if (response.status === 426) return null;
           if (!response.ok && data.errorCode === "STALE_STATE" && attempt + 1 < maxAttempts) continue;
           if (!response.ok) {
             // Clicks beyond the server's click budget are simply not counted; that is no error to show.
@@ -1252,7 +1272,7 @@ function App() {
           return data;
         } catch {
           const retryUnsafe = NETWORK_RETRY_UNSAFE_COOP_ACTIONS.has(action);
-          if (action !== "click" && !retryUnsafe && attempt + 1 < Math.min(3, maxAttempts)) continue;
+          if (action !== "click" && !retryUnsafe && attempt + 1 < maxAttempts) continue;
           setCoopMessage(retryUnsafe ? "Die Verbindung wurde unterbrochen. Prüfe den gemeinsamen Kontostand, bevor du den Kauf wiederholst." : "Die Verbindung zum Koop-Raum ist gerade unterbrochen.");
           return null;
         }
@@ -2162,7 +2182,12 @@ function App() {
     };
     const timer = window.setTimeout(() => {
       if (isCoopLive) {
-        void sendCoopAction("starter-squad").then((data) => { if (data?.starterSquad) announce(data.starterSquad.added, data.starterSquad.complete); });
+        void sendCoopAction("starter-squad").then((data) => {
+          if (data?.starterSquad) { announce(data.starterSquad.added, data.starterSquad.complete); return; }
+          // Not granted (network, conflict): ask again a little later. When another player got it meanwhile, the
+          // synced world no longer needs it and nothing is sent.
+          window.setTimeout(() => { starterSquadRequestedRef.current = false; setStarterSquadRetry((count) => count + 1); }, 10_000);
+        });
         return;
       }
       const features = normalizeGameFeatures(structuredClone(gameRef.current.features));
@@ -2173,7 +2198,7 @@ function App() {
     }, 0);
     return () => window.clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [starterSquadDue, isCoopLive]);
+  }, [starterSquadDue, isCoopLive, starterSquadRetry]);
 
   function handleBallClick(event: MouseEvent<HTMLButtonElement>) {
     const comboMultiplier = registerCombo(Date.now());
@@ -2201,12 +2226,27 @@ function App() {
 
   function awardMiniGame(reward: number, name: string, id: MiniGameId, icon: IconName = "star") {
     const safeReward = Math.max(0, Math.floor(reward));
-    if (isCoopLive) void sendCoopAction("minigame", { minigameId: id, reward: safeReward });
-    else setGame((current) => ({ ...current, goals: current.goals + safeReward, seasonGoals: current.seasonGoals + safeReward, totalGoals: current.totalGoals + safeReward, minigameWins: current.minigameWins + 1, miniGameCooldowns: { ...current.miniGameCooldowns, [id]: getMiniGameCooldownUntil(id) } }));
-    addFeed(`${name}: +${formatNumber(safeReward)} Tore Prämie. Nächste Runde in ${MINI_GAME_COOLDOWN_SECONDS[id]} Sekunden.`, icon);
-    showToast(`${name}: +${formatNumber(safeReward)} Tore`);
-    playTone(523, 0.1, "triangle", 0.035);
-    playTone(784, 0.18, "triangle", 0.04, 0.1);
+    const celebrate = () => {
+      addFeed(`${name}: +${formatNumber(safeReward)} Tore Prämie. Nächste Runde in ${MINI_GAME_COOLDOWN_SECONDS[id]} Sekunden.`, icon);
+      showToast(`${name}: +${formatNumber(safeReward)} Tore`);
+      playTone(523, 0.1, "triangle", 0.035);
+      playTone(784, 0.18, "triangle", 0.04, 0.1);
+    };
+    // In a world the server decides; the reward is only announced once it accepted it (else its message shows).
+    if (isCoopLive) {
+      void sendCoopAction("minigame", { minigameId: id, reward: safeReward }).then((data) => { if (data) celebrate(); });
+      return;
+    }
+    setGame((current) => ({ ...current, goals: current.goals + safeReward, seasonGoals: current.seasonGoals + safeReward, totalGoals: current.totalGoals + safeReward, minigameWins: current.minigameWins + 1, miniGameCooldowns: { ...current.miniGameCooldowns, [id]: getMiniGameCooldownUntil(id) } }));
+    celebrate();
+  }
+
+  /** Opens a mini game; in a world only after the server started the run, without which no reward counts. */
+  function openMiniGame(id: MiniGameId, open: () => void) {
+    if (!isCoopLive) { open(); return; }
+    if (coopMiniGameStartingRef.current) return;
+    coopMiniGameStartingRef.current = true;
+    void sendCoopAction("minigame-start", { minigameId: id }).then((data) => { if (data) open(); }).finally(() => { coopMiniGameStartingRef.current = false; });
   }
 
   function closeMiniGame() {
@@ -2218,9 +2258,10 @@ function App() {
       showToast(`${MINI_GAME_NAMES.penalty} ist noch ${formatCountdown(displayGame.miniGameCooldowns.penalty, countdownNow)} gesperrt.`);
       return;
     }
-    if (isCoopLive) void sendCoopAction("minigame-start", { minigameId: "penalty" });
-    setActiveMiniGame("penalty");
-    setPenaltyGame({ shots: 0, goals: 0, message: "Such dir eine Ecke aus.", finished: false, reward: 0 });
+    openMiniGame("penalty", () => {
+      setActiveMiniGame("penalty");
+      setPenaltyGame({ shots: 0, goals: 0, message: "Such dir eine Ecke aus.", finished: false, reward: 0 });
+    });
   }
 
   function takePenalty(direction: PenaltyDirection) {
@@ -2244,9 +2285,10 @@ function App() {
       return;
     }
     const sequence = Array.from({ length: 6 }, () => getRandomPenaltyDirection());
-    if (isCoopLive) void sendCoopAction("minigame-start", { minigameId: "dribble" });
-    setActiveMiniGame("dribble");
-    setDribbleGame({ sequence, step: 0, attempts: 0, misses: 0, message: `Erster Move: ${directionLabel(sequence[0])}.`, finished: false, reward: 0 });
+    openMiniGame("dribble", () => {
+      setActiveMiniGame("dribble");
+      setDribbleGame({ sequence, step: 0, attempts: 0, misses: 0, message: `Erster Move: ${directionLabel(sequence[0])}.`, finished: false, reward: 0 });
+    });
   }
 
   function takeDribble(direction: PenaltyDirection) {
@@ -2276,9 +2318,10 @@ function App() {
       showToast(`${MINI_GAME_NAMES.crossbar} ist noch ${formatCountdown(displayGame.miniGameCooldowns.crossbar, countdownNow)} gesperrt.`);
       return;
     }
-    if (isCoopLive) void sendCoopAction("minigame-start", { minigameId: "crossbar" });
-    setActiveMiniGame("crossbar");
-    setCrossbarGame({ shots: 0, hits: 0, message: "Zielhöhe wählen und die Latte treffen.", finished: false, reward: 0 });
+    openMiniGame("crossbar", () => {
+      setActiveMiniGame("crossbar");
+      setCrossbarGame({ shots: 0, hits: 0, message: "Zielhöhe wählen und die Latte treffen.", finished: false, reward: 0 });
+    });
   }
 
   function takeCrossbar(height: CrossbarHeight) {
@@ -2301,9 +2344,10 @@ function App() {
       showToast(`${MINI_GAME_NAMES.prediction} ist noch ${formatCountdown(displayGame.miniGameCooldowns.prediction, countdownNow)} gesperrt.`);
       return;
     }
-    if (isCoopLive) void sendCoopAction("minigame-start", { minigameId: "prediction" });
-    setActiveMiniGame("prediction");
-    setPredictionGame({ round: 0, wins: 0, message: "Wer gewinnt das nächste Match?", finished: false, reward: 0 });
+    openMiniGame("prediction", () => {
+      setActiveMiniGame("prediction");
+      setPredictionGame({ round: 0, wins: 0, message: "Wer gewinnt das nächste Match?", finished: false, reward: 0 });
+    });
   }
 
   function takePrediction(prediction: MatchPrediction) {
@@ -2746,7 +2790,7 @@ function App() {
         <p>Als Gast spielst du nur Einzelspieler. Melde dich an oder erstelle ein Konto, um mit anderen in einer Koop Welt zu spielen. Hat dein Konto noch keinen Spielstand, nimmt es deinen Gast Spielstand mit.</p>
       </ConfirmDialog>}
       {prestigeDialog && <PrestigeDialog features={displayGame.features} goals={displayGame.goals} busy={coopBusy} error={prestigeDialog.error} onCancel={() => setPrestigeDialog(null)} onConfirm={(keepNormalId) => void confirmSeasonPrestige(keepNormalId)} />}
-      {confirmSingle && <ConfirmDialog title="Zum Singleplayer wechseln?" confirmLabel="Wechseln" onCancel={() => setConfirmSingle(false)} onConfirm={() => { setConfirmSingle(false); setAppMode("single"); }}>
+      {confirmSingle && <ConfirmDialog title="Zum Singleplayer wechseln?" confirmLabel="Wechseln" onCancel={() => setConfirmSingle(false)} onConfirm={() => { setConfirmSingle(false); notifyCoopOffline(coopSession?.code, coopSession?.playerId); setAppMode("single"); }}>
         <p>{coopSession ? `Du verlässt „${coopSession.room.roomName}“. Die Welt bleibt gespeichert und du kannst jederzeit zurück.` : "Du verlässt den Koop Multiplayer und spielst mit deinem eigenen Spielstand weiter."}</p>
       </ConfirmDialog>}
       <nav className="mode-switch" aria-label="Spielmodus">
@@ -2975,6 +3019,7 @@ function App() {
               <div className="coop-players coop-waiting-players">{coopSession.room.players.map((player) => <div className={`coop-player-card${player.role === coopSession.role ? " you" : ""}${player.online ? " online" : ""}${!player.occupied ? " waiting" : ""}`} key={player.role}><span className="coop-player-tag">{player.role === coopSession.role ? `DU · ${coopRoleLabel(player.role)}` : coopRoleLabel(player.role)}</span><strong>{player.occupied ? player.name : "Wartet auf Beitritt …"}</strong><small>{player.occupied ? "Bereit für den Anpfiff" : "Raumcode teilen"}</small></div>)}</div>
             </div>}
           </div>}
+          {coopUpdateRequired && <p className="mode-message" role="status">{MULTIPLAYER_UPDATE_MESSAGE} <button type="button" onClick={reloadForUpdate}>Jetzt neu laden</button></p>}
           {coopMessage && <p className="mode-message" role="status">{coopMessage}</p>}
         </section>
       </main>}

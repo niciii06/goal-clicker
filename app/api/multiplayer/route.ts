@@ -16,7 +16,7 @@ import type { GameFeatures, PenaltyDirection, StarFormationId } from "../../feat
 import { isSupportedMultiplayerProtocol, MULTIPLAYER_UPDATE_MESSAGE } from "../../multiplayer-protocol";
 import { getFormationUnlockLeague, getPackUnlockLeague, getReachedLeague, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked, MAX_CAREER_SEASON } from "../../season-progression";
 import { calculateBulkUpgradePurchase } from "../../upgrade-purchase";
-import { MAX_MULTIPLAYER_BODY_BYTES, readJsonBody, RequestBodyTooLargeError } from "../request-body";
+import { MAX_MULTIPLAYER_BODY_BYTES, readJsonBody, refuseUnsafePost, RequestBodyTooLargeError } from "../request-body";
 import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "../../daily-reward";
 import { ACHIEVEMENTS, BALANCE_VERSION, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_IDS } from "../../game/constants";
 import { capGoalsAfterRebalance, getBaseClickPower, getBasePassivePower, getClickPower, getCost, getLevel, getPassiveIncomePower } from "../../game/economy";
@@ -41,6 +41,19 @@ const TICK_PASSIVE_REFRESH_MIN_MS = 5000;
 const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const PRESENCE_TIMEOUT_MS = 180000;
 const SIMULATION_LEADER_TIMEOUT_MS = 5000;
+// Presence is written at most this often per seat: online (3 minutes) only needs a rough time. The simulation
+// leader is the exception, its seat must stay fresh within SIMULATION_LEADER_TIMEOUT_MS, so it writes every
+// LEADER_PRESENCE_TOUCH_MS; a polling seat that finds no fresh leader before it takes over at once.
+const PRESENCE_TOUCH_INTERVAL_MS = 15000;
+const LEADER_PRESENCE_TOUCH_MS = 2500;
+// Conditional writes of the shared world: retried on the server against the newest state before the client
+// sees a conflict (8 attempts, like the upgrade purchase before). Every attempt recomputes the action from that
+// state, and only one write can succeed.
+// Receipts let a client resend an action after a lost answer without applying it twice.
+const RECEIPTS_KEY = "_receipts";
+const RECEIPT_TTL_MS = 5 * 60_000;
+const MAX_RECEIPTS = 12;
+const MAX_RECEIPT_EXTRAS_BYTES = 4096;
 const PASSIVE_BACKGROUND_GRACE_MS = 24 * 60 * 60 * 1000;
 const TRANSFER_MARKET_CLOSED_MESSAGE = "Der Transfermarkt ist geschlossen. Fabrizio Romario bleibt aktiv.";
 
@@ -276,8 +289,15 @@ function recordMultiplayerSeasonMatch(game: CoopGameState, now: number) {
   addHistory(game.features, { title: `Saisonspiel · ${outcomeLabel}`, detail: result.state.lastResult, tone: result.entry.seasonOutcome === "relegated" || result.entry.outcome === "loss" ? "negative" : result.entry.outcome === "win" || result.entry.seasonOutcome === "promoted" || result.entry.seasonOutcome === "hall-of-fame" ? "positive" : "neutral" });
 }
 
-function gameColumns(game: CoopGameState, timestamp: string, previousRevision = 0) {
+/**
+ * The columns of a world write. The features (and the backup copy of the whole game) are only part of it when
+ * they differ from `previousFeaturesJson`, the features the write builds on: most writes (passive income,
+ * counters, upgrades) change numbers only, and the features are by far the biggest part of a world.
+ */
+function gameColumns(game: CoopGameState, timestamp: string, previousRevision = 0, previousFeaturesJson?: string) {
   unlockAchievements(game);
+  const sharedFeaturesJson = JSON.stringify(game.features);
+  const featuresChanged = previousFeaturesJson === undefined || sharedFeaturesJson !== previousFeaturesJson;
   return {
     sharedCoins: game.goals,
     sharedUpgradeLevel: Object.values(game.upgrades).reduce((total, level) => total + level, 0),
@@ -291,8 +311,9 @@ function gameColumns(game: CoopGameState, timestamp: string, previousRevision = 
     sharedBestLeague: getReachedLeague(game.seasons, game.features.seasonMode.highestDivision),
     sharedTrophies: Object.values(game.features.cup.trophies).reduce((total, count) => total + count, 0),
     sharedMiniGameCooldownsJson: JSON.stringify(game.miniGameCooldowns),
-    sharedFeaturesJson: JSON.stringify(game.features),
-    sharedStateBackupJson: JSON.stringify(game),
+    // The backup is a second copy for recovery (readGame reads it when the features are empty), so it only has
+    // to follow the features.
+    ...(featuresChanged ? { sharedFeaturesJson, sharedStateBackupJson: JSON.stringify(game) } : {}),
     sharedStateVersion: Math.max(0, Math.floor(previousRevision)) + 1,
     lastPassiveAt: timestamp,
     pendingPlayerId: null,
@@ -304,34 +325,193 @@ function gameColumns(game: CoopGameState, timestamp: string, previousRevision = 
   };
 }
 
-async function persistGameResponse(
-  db: ReturnType<typeof getDb>,
-  room: RoomRow,
-  game: CoopGameState,
-  timestamp: string,
-  playerId: string,
-  role: CoopRole,
+/** An action that wants the game saved; the shared write itself happens in mutateWorld. */
+type SaveRequest = { kind: "save"; extraColumns: CoopRoomUpdate; responseExtras: Record<string, unknown> };
+/** Nothing to save; the answer is the world as it is. */
+type NoChange = { kind: "unchanged"; responseExtras: Record<string, unknown> };
+type ActionOutcome = Response | SaveRequest | NoChange;
+
+function persistGameResponse(
+  _db: unknown,
+  _room: RoomRow,
+  _game: CoopGameState,
+  _timestamp: string,
+  _playerId: string,
+  _role: CoopRole,
   extraColumns: CoopRoomUpdate = {},
   responseExtras: Record<string, unknown> = {},
-) {
-  game.features.travel = settleTravel(game.features.travel, Date.now());
-  // Fines from the journey (speeding, parking) are paid once the team has arrived.
-  const travelFine = payTravelFines(game.features, game.goals, getBasePassivePower(game.upgrades, game.stars, game.features), Date.now());
-  game.goals -= travelFine;
-  game.seasonGoals = Math.max(0, game.seasonGoals - travelFine);
+): SaveRequest {
+  return { kind: "save", extraColumns, responseExtras };
+}
+
+function unchanged(responseExtras: Record<string, unknown> = {}): NoChange {
+  return { kind: "unchanged", responseExtras };
+}
+
+/**
+ * Books passive income and the timer shift of the time nobody was there over [lastPassiveAt, now] into `game`.
+ * `presence`: the seats as they were before this request marked its player present; past income depends on them.
+ */
+function bookPassive(game: CoopGameState, room: AnyRoomRow, now: number, presence: AnyRoomRow = room) {
+  const last = Date.parse(room.lastPassiveAt || room.updatedAt) || now;
+  const fullElapsed = Math.max(0, now - last);
+  const latestSeenAt = Math.max(...getOccupiedRoomPlayers(presence).map((player) => Date.parse(player.lastSeenAt || "") || 0), 0);
+  const activeLeaseEndsAt = latestSeenAt + PASSIVE_BACKGROUND_GRACE_MS;
+  const activeUntil = getOccupiedRoomPlayers(room).length >= 2 ? Math.min(now, Math.max(last, activeLeaseEndsAt)) : last;
+  const activeElapsed = Math.max(0, Math.min(fullElapsed, activeUntil - last));
+  const inactiveElapsed = Math.max(0, fullElapsed - activeElapsed);
+  const passiveReward = getGoalBoostedPassiveReward(getPassiveIncomePower(game.upgrades, game.stars, game.features), game.features, last, last + activeElapsed);
+  if (passiveReward > 0) {
+    game.goals += passiveReward;
+    game.seasonGoals += passiveReward;
+    game.totalGoals += passiveReward;
+  }
+  if (inactiveElapsed > 0) {
+    const inactiveStartedAt = last + activeElapsed;
+    game.features = pauseGameFeatureTimers(game.features, inactiveElapsed, now);
+    for (const id of Object.keys(game.miniGameCooldowns)) {
+      if (game.miniGameCooldowns[id] > inactiveStartedAt) game.miniGameCooldowns[id] += inactiveElapsed;
+    }
+  }
+}
+
+/** One version guarded write of `game` on top of `room`; counters only when the features did not change. */
+async function writeWorld(db: ReturnType<typeof getDb>, room: RoomRow, game: CoopGameState, timestamp: string, extraColumns: CoopRoomUpdate = {}) {
+  const columns = gameColumns(game, timestamp, room.sharedStateVersion, room.sharedFeaturesJson);
   const updated = await db.updateRoom(
     room.code,
-    { ...gameColumns(game, timestamp, room.sharedStateVersion), ...extraColumns },
+    { ...columns, ...extraColumns },
     { sharedStateVersion: room.sharedStateVersion },
+    { sharedFeaturesJson: room.sharedFeaturesJson, sharedStateBackupJson: room.sharedStateBackupJson },
   );
-  if (updated) return Response.json({ serverNow: Date.now(), room: shapeRoom(rememberRoom(updated)!, playerId), role, ...responseExtras });
+  return updated ? rememberRoom(updated)! : null;
+}
 
-  const latest = (await loadRoom(room.code)).room;
-  if (!latest) return jsonError("Dieser Raum wurde gelöscht.", 404);
+type Receipt = { id: string; role: string; action: string; at: number; extras?: Record<string, unknown> };
+
+function readReceipts(room: AnyRoomRow, now = Date.now()): Receipt[] {
+  const raw = parseJson<Record<string, unknown>>(room.clickStateJson, {})[RECEIPTS_KEY];
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((item): item is Receipt => Boolean(item) && typeof item === "object" && typeof (item as Receipt).id === "string" && typeof (item as Receipt).role === "string" && Number.isFinite((item as Receipt).at) && now - (item as Receipt).at < RECEIPT_TTL_MS);
+}
+
+function findReceipt(room: AnyRoomRow, actionId: string, role: CoopRole) {
+  return actionId ? readReceipts(room).find((receipt) => receipt.id === actionId && receipt.role === role) ?? null : null;
+}
+
+/** The click state column with this receipt added; the seats' click states stay as they are. */
+function clickStateWithReceipt(room: AnyRoomRow, receipt: Receipt) {
+  const state = parseJson<Record<string, unknown>>(room.clickStateJson, {});
+  const extras = receipt.extras && JSON.stringify(receipt.extras).length <= MAX_RECEIPT_EXTRAS_BYTES ? receipt.extras : undefined;
+  state[RECEIPTS_KEY] = [...readReceipts(room, receipt.at), { ...receipt, extras }].slice(-MAX_RECEIPTS);
+  return JSON.stringify(state);
+}
+
+type WorldContext = { db: ReturnType<typeof getDb>; playerId: string; role: CoopRole; action: string; knownFeaturesKey: string; actionId: string };
+type WorldOptions = {
+  /** Book passive income into the action's own write (no separate write before it). */
+  passive: boolean;
+  /** Seats before this request touched its presence, for the passive income of the past. */
+  presence?: AnyRoomRow;
+  /** Mark the player present in the same write (foreground actions). */
+  touch: boolean;
+  /** Settle travel and pay its fines with the write, like every action did before. */
+  settleTravel: boolean;
+};
+
+/**
+ * The time of a world write: never at or before the last one, so every write moves lastPassiveAt forward and a
+ * changed lastPassiveAt always means another world write happened (clock differences between instances).
+ */
+function worldWriteTime(room: AnyRoomRow) {
+  const last = Date.parse(room.lastPassiveAt || "");
+  const now = Date.now();
+  return Number.isFinite(last) && now <= last ? last + 1 : now;
+}
+
+/**
+ * Whether `latest` differs from `room` only by click batches (counters, click states, presence): no world write
+ * came in between, since each one moves lastPassiveAt. An action computed on `room` can then be stored on top of
+ * `latest` as if it had happened just before those clicks.
+ */
+export function onlyClicksMoved(room: RoomRow, latest: RoomRow) {
+  return room.lastPassiveAt === latest.lastPassiveAt
+    && room.sharedFeaturesJson === latest.sharedFeaturesJson
+    && room.sharedUpgradesJson === latest.sharedUpgradesJson
+    && room.sharedAchievementsJson === latest.sharedAchievementsJson
+    && room.sharedMiniGameCooldownsJson === latest.sharedMiniGameCooldownsJson
+    && room.sharedStars === latest.sharedStars
+    && room.sharedSeasons === latest.sharedSeasons
+    && room.sharedMinigameWins === latest.sharedMinigameWins
+    && room.redeemedBonusCodesJson === latest.redeemedBonusCodesJson
+    && COOP_ROLES.every((role) => getRoomPlayer(room, role).playerId === getRoomPlayer(latest, role).playerId)
+    && latest.sharedCoins >= room.sharedCoins
+    && latest.sharedTotalGoals >= room.sharedTotalGoals;
+}
+
+/**
+ * Runs `apply` against the current world and saves the result with the shared state version as condition. A
+ * conflict reloads the world. When only click batches came in between, the computed action is stored on top of
+ * their goals at once; otherwise `apply` runs again on the newest state. Either way every action is applied at
+ * most once and never on an outdated state. Only after 8 conflicts in a row does the client get STALE_STATE.
+ */
+async function mutateWorld(context: WorldContext, initial: RoomRow, apply: (game: CoopGameState, room: RoomRow, timestamp: string) => ActionOutcome | Promise<ActionOutcome>, options: WorldOptions) {
+  const { db, playerId, role, knownFeaturesKey, actionId } = context;
+  const respond = (target: AnyRoomRow, extras: Record<string, unknown> = {}) => Response.json({ serverNow: Date.now(), room: shapeRoom(target, playerId, knownFeaturesKey), role, ...extras });
+  let room = initial;
+  let prepared: { game: CoopGameState; outcome: SaveRequest; now: number; timestamp: string } | null = null;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    if (!prepared) {
+      const receipt = findReceipt(room, actionId, role);
+      if (receipt) return respond(room, { ...(receipt.extras ?? {}), duplicate: true });
+      const now = worldWriteTime(room);
+      const timestamp = new Date(now).toISOString();
+      const game = readGame(room);
+      if (options.passive) bookPassive(game, room, now, attempt === 0 ? options.presence ?? room : room);
+      const outcome = await apply(game, room, timestamp);
+      if (outcome instanceof Response) {
+        if (options.touch) await touchPresence(db, room, role, timestamp);
+        return outcome;
+      }
+      if (outcome.kind === "unchanged") {
+        const touched = options.touch ? await touchPresence(db, room, role, timestamp) : room;
+        return respond(touched, outcome.responseExtras);
+      }
+      if (options.settleTravel) {
+        game.features.travel = settleTravel(game.features.travel, now);
+        // Fines from the journey (speeding, parking) are paid once the team has arrived.
+        const travelFine = payTravelFines(game.features, game.goals, getBasePassivePower(game.upgrades, game.stars, game.features), now);
+        game.goals -= travelFine;
+        game.seasonGoals = Math.max(0, game.seasonGoals - travelFine);
+      }
+      prepared = { game, outcome, now, timestamp };
+    }
+    const { game, outcome, now, timestamp } = prepared;
+    const extraColumns: CoopRoomUpdate = {
+      ...(options.touch ? rolePresenceUpdate(role, timestamp) : {}),
+      ...(actionId ? { clickStateJson: clickStateWithReceipt(room, { id: actionId, role, action: context.action, at: now, extras: outcome.responseExtras }) } : {}),
+      ...outcome.extraColumns,
+    };
+    const updated = await writeWorld(db, room, game, timestamp, extraColumns);
+    if (updated) return respond(updated, outcome.responseExtras);
+    const latest = (await loadRoom(room.code)).room;
+    if (!latest) return jsonError("Dieser Raum wurde gelöscht.", 404);
+    if (onlyClicksMoved(room, latest)) {
+      // The goals the clicks added in between stay; the action itself is unchanged.
+      game.goals += latest.sharedCoins - room.sharedCoins;
+      game.totalGoals += latest.sharedTotalGoals - room.sharedTotalGoals;
+      game.seasonGoals += latest.sharedSeasonGoals - room.sharedSeasonGoals;
+    } else {
+      prepared = null;
+    }
+    room = latest;
+    // A short random pause after repeated conflicts, so racing requests do not collide again in lockstep.
+    if (attempt >= 1) await new Promise((resolve) => setTimeout(resolve, Math.random() * 15 * attempt));
+  }
   return Response.json({
     error: "Der gemeinsame Spielstand wurde gleichzeitig geändert. Die Aktion wird automatisch nochmals ausgeführt.",
     errorCode: "STALE_STATE",
-    serverNow: Date.now(), room: shapeRoom(latest, playerId),
+    serverNow: Date.now(), room: shapeRoom(room, playerId, knownFeaturesKey),
     role,
   }, { status: 409 });
 }
@@ -341,8 +521,13 @@ function isOnline(lastSeenAt: string | null | undefined) {
   return Number.isFinite(lastSeen) && Date.now() - lastSeen <= PRESENCE_TIMEOUT_MS;
 }
 
-function getSimulationLeaderRole(room: AnyRoomRow, now = Date.now()) {
+/**
+ * The seat that simulates matches and books passive income: the first seat seen within
+ * SIMULATION_LEADER_TIMEOUT_MS. `present`: a seat whose request is being answered right now counts as seen.
+ */
+function getSimulationLeaderRole(room: AnyRoomRow, now = Date.now(), present?: CoopRole) {
   return getOccupiedRoomPlayers(room).find((player) => {
+    if (player.role === present) return true;
     const lastSeen = Date.parse(player.lastSeenAt || "");
     return Number.isFinite(lastSeen) && now - lastSeen <= SIMULATION_LEADER_TIMEOUT_MS;
   })?.role ?? null;
@@ -354,16 +539,36 @@ function withoutFeatures<T extends { features: unknown }>(game: T): Omit<T, "fea
   return copy as Omit<T, "features">;
 }
 
-/** md5 of the shared features, the same value Postgres computes for a light row. */
+// The md5 of the features last hashed per world, so the same features are not hashed on every answer.
+const featuresKeyCache = new Map<string, { json: string; key: string }>();
+
+/** md5 of the shared features, the same value Postgres computes (or stores) for a light row. */
 function featuresKeyOf(row: AnyRoomRow) {
-  return "featuresKey" in row ? row.featuresKey : createHash("md5").update(row.sharedFeaturesJson, "utf8").digest("hex");
+  if ("featuresKey" in row) return row.featuresKey;
+  const cached = featuresKeyCache.get(row.code);
+  if (cached && cached.json === row.sharedFeaturesJson) return cached.key;
+  const key = createHash("md5").update(row.sharedFeaturesJson, "utf8").digest("hex");
+  featuresKeyCache.delete(row.code);
+  featuresKeyCache.set(row.code, { json: row.sharedFeaturesJson, key });
+  if (featuresKeyCache.size > ROOM_CACHE_LIMIT) featuresKeyCache.delete(featuresKeyCache.keys().next().value!);
+  return key;
+}
+
+/** The world without its big columns, keeping the key of the features it had. */
+function lightened(row: AnyRoomRow): LightRoomRow {
+  if (!("sharedFeaturesJson" in row)) return row;
+  const { sharedFeaturesJson: _features, sharedStateBackupJson: _backup, ...columns } = row;
+  void _features; void _backup;
+  return { ...columns, featuresKey: featuresKeyOf(row) };
 }
 
 /**
  * The room as the client sees it. From a light row (no features read) the game comes without its features,
  * marked `featuresOmitted`; the client keeps the features it already has for the same `featuresKey`.
  */
-function shapeRoom(source: AnyRoomRow, viewerId?: string) {
+function shapeRoom(input: AnyRoomRow, viewerId?: string, knownFeaturesKey = "") {
+  // A client that already has these features gets the same slim answer as from a light row.
+  const source = knownFeaturesKey && "sharedFeaturesJson" in input && featuresKeyOf(input) === knownFeaturesKey ? lightened(input) : input;
   const light = !("sharedFeaturesJson" in source);
   const row: RoomRow = light ? { ...source, sharedFeaturesJson: "{}", sharedStateBackupJson: "" } : source as RoomRow;
   const game = readGame(row);
@@ -415,9 +620,21 @@ function jsonError(message: string, status = 400) {
   return Response.json({ error: message }, { status });
 }
 
+/**
+ * What a failed request logs: the error code and the first line of the message. A failed query repeats its
+ * parameters (the whole shared features) in its message and cause, so neither is logged.
+ */
+export function describeError(error: unknown) {
+  const failure = error as { name?: string; code?: string; message?: string; cause?: { code?: string; message?: string } } | null;
+  const code = failure?.code ?? failure?.cause?.code ?? "";
+  const message = String(failure?.message ?? "").split("\n")[0].replace(/\bparams:[\s\S]*$/, "").slice(0, 200);
+  const cause = String(failure?.cause?.message ?? "").split("\n")[0].slice(0, 200);
+  return [failure?.name ?? "Error", code, message, cause].filter(Boolean).join(" | ");
+}
+
 function errorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "";
-  console.error("[multiplayer]", error);
+  console.error("[multiplayer]", describeError(error));
   if (message.includes("no such table") || message.includes("no such column") || message.includes("Failed query")) return "Die Koop-Datenbank wird gerade aktualisiert. Bitte lade die Seite in einem Moment nochmals.";
   if (message === "Die Welt konnte nicht gespeichert werden." || message.startsWith("Cloudflare D1 binding")) return message;
   return "Unbekannter Serverfehler. Bitte erneut versuchen.";
@@ -453,8 +670,22 @@ async function loadRoom(code: string) {
   return { db, room: rememberRoom(await db.getRoom(code)) };
 }
 
+/**
+ * Whether this request has to write the player's presence. Online needs only a rough time, so a seat writes it at
+ * most every PRESENCE_TOUCH_INTERVAL_MS. The simulation leader (or the seat that is about to become it) keeps its
+ * presence within SIMULATION_LEADER_TIMEOUT_MS, so the leader never changes just because a write was skipped.
+ */
+export function presenceWriteDue(room: AnyRoomRow, role: CoopRole, now = Date.now()) {
+  const lastSeen = Date.parse(getRoomPlayer(room, role).lastSeenAt || "");
+  if (!Number.isFinite(lastSeen)) return true;
+  const age = now - lastSeen;
+  if (age >= PRESENCE_TOUCH_INTERVAL_MS) return true;
+  return age >= LEADER_PRESENCE_TOUCH_MS && getSimulationLeaderRole(room, now, role) === role;
+}
+
 /** Marks the player as present and puts the fresh seats into the room; no game travels back. */
 async function touchPresence<T extends AnyRoomRow>(db: ReturnType<typeof getDb>, room: T, role: CoopRole, at = new Date().toISOString()): Promise<T> {
+  if (!presenceWriteDue(room, role, Date.parse(at))) return room;
   const seats: RoomSeats | null = await db.touchRoom(room.code, rolePresenceUpdate(role, at));
   return seats ? { ...room, ...seats } : room;
 }
@@ -475,44 +706,26 @@ async function quickPoll(code: string, playerId: string, knownFeaturesKey: strin
   const elapsed = now - (Date.parse(light.lastPassiveAt || light.updatedAt) || now);
   // Passive income due: the full path books it with the presence as it was, and only then marks the player present.
   // Marking first would make a long absence look like presence and pay the whole gap.
-  if (elapsed >= passiveMinMs && (!leaderOnly || getSimulationLeaderRole(light, now) === role)) return null;
+  if (elapsed >= passiveMinMs && (!leaderOnly || getSimulationLeaderRole(light, now, role) === role)) return null;
   const room = await touchPresence(db, light, role, new Date(now).toISOString());
   return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
 }
 
-/** `presence`: the seats as they were before this request marked its player present; past income depends on them. */
+/**
+ * Saves passive income on its own (polls, joins), at most every `minElapsedMs`. Actions book it into their
+ * own write instead (mutateWorld). `presence`: the seats as they were before this request marked its player
+ * present; past income depends on them.
+ */
 async function refreshPassive(db: ReturnType<typeof getDb>, room: RoomRow, minElapsedMs = 0, presence: AnyRoomRow = room) {
   const now = Date.now();
   const last = Date.parse(room.lastPassiveAt || room.updatedAt) || now;
-  const fullElapsed = Math.max(0, now - last);
   // Passive income and timer shifts are additive over [last, now], so a deferred refresh loses nothing.
-  if (fullElapsed < minElapsedMs) return room;
+  if (now - last < minElapsedMs) return room;
+  const writeAt = worldWriteTime(room);
   const game = readGame(room);
-  const latestSeenAt = Math.max(...getOccupiedRoomPlayers(presence).map((player) => Date.parse(player.lastSeenAt || "") || 0), 0);
-  const activeLeaseEndsAt = latestSeenAt + PASSIVE_BACKGROUND_GRACE_MS;
-  const activeUntil = getOccupiedRoomPlayers(room).length >= 2 ? Math.min(now, Math.max(last, activeLeaseEndsAt)) : last;
-  const activeElapsed = Math.max(0, Math.min(fullElapsed, activeUntil - last));
-  const inactiveElapsed = Math.max(0, fullElapsed - activeElapsed);
-  const passiveReward = getGoalBoostedPassiveReward(getPassiveIncomePower(game.upgrades, game.stars, game.features), game.features, last, last + activeElapsed);
-  if (passiveReward > 0) {
-    game.goals += passiveReward;
-    game.seasonGoals += passiveReward;
-    game.totalGoals += passiveReward;
-  }
-  if (inactiveElapsed > 0) {
-    const inactiveStartedAt = last + activeElapsed;
-    game.features = pauseGameFeatureTimers(game.features, inactiveElapsed, now);
-    for (const id of Object.keys(game.miniGameCooldowns)) {
-      if (game.miniGameCooldowns[id] > inactiveStartedAt) game.miniGameCooldowns[id] += inactiveElapsed;
-    }
-  }
-  const timestamp = new Date(now).toISOString();
-  const updated = await db.updateRoom(
-    room.code,
-    gameColumns(game, timestamp, room.sharedStateVersion),
-    { lastPassiveAt: room.lastPassiveAt, sharedStateVersion: room.sharedStateVersion },
-  );
-  if (updated) return rememberRoom(updated)!;
+  bookPassive(game, room, writeAt, presence);
+  const updated = await writeWorld(db, room, game, new Date(writeAt).toISOString());
+  if (updated) return updated;
   return (await loadRoom(room.code)).room ?? room;
 }
 
@@ -541,14 +754,15 @@ async function handleGet(request: Request) {
     }
     const code = cleanCode(url.searchParams.get("code"));
     if (!code) return jsonError("Raumcode fehlt.");
-    const quick = await quickPoll(code, playerId, url.searchParams.get("featuresKey") ?? "", GET_PASSIVE_REFRESH_MIN_MS, false);
+    const knownFeaturesKey = url.searchParams.get("featuresKey") ?? "";
+    const quick = await quickPoll(code, playerId, knownFeaturesKey, GET_PASSIVE_REFRESH_MIN_MS, false);
     if (quick) return quick;
     const { db, room } = await loadRoom(code);
     if (!room) return jsonError("Raum nicht gefunden.", 404);
     const role = roomRole(room, playerId);
     if (!role) return jsonError("Du bist nicht in diesem Raum.", 403);
     const refreshed = await refreshPassive(db, room, GET_PASSIVE_REFRESH_MIN_MS);
-    return Response.json({ serverNow: Date.now(), room: shapeRoom(await touchPresence(db, refreshed, role), playerId), role });
+    return Response.json({ serverNow: Date.now(), room: shapeRoom(await touchPresence(db, refreshed, role), playerId, knownFeaturesKey), role });
   } catch (error) {
     return Response.json({ error: errorMessage(error) }, { status: 500 });
   }
@@ -558,6 +772,8 @@ async function handlePost(request: Request) {
   try {
     const limited = rateLimited(request, "multiplayer");
     if (limited) return limited;
+    const refused = refuseUnsafePost(request);
+    if (refused) return refused;
     const payload = await readJsonBody<{
       action?: unknown;
       mode?: unknown;
@@ -598,6 +814,7 @@ async function handlePost(request: Request) {
       answerIndex?: unknown;
       protocol?: unknown;
       featuresKey?: unknown;
+      actionId?: unknown;
     }>(request, MAX_MULTIPLAYER_BODY_BYTES);
     if (!isSupportedMultiplayerProtocol(payload.protocol)) return jsonError(MULTIPLAYER_UPDATE_MESSAGE, 426);
     const action = typeof payload.action === "string" ? payload.action : "";
@@ -611,19 +828,15 @@ async function handlePost(request: Request) {
     if (action === "create") {
       if (nickname.length < 2) return jsonError("Der Spielername muss mindestens 2 Zeichen haben.");
       const db = getDb();
-      let code = "";
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        const candidate = makeRoomCode();
-        if (!(await db.getLightRoom(candidate))) {
-          code = candidate;
-          break;
-        }
-      }
-      if (!code) return jsonError("Es konnte gerade kein freier Raumcode erzeugt werden. Bitte erneut versuchen.", 503);
       const now = new Date().toISOString();
       const roomName = cleanRoomName(payload.roomName, `${nickname}s Welt`);
-      const room = await db.insertRoom({ code, roomName, hostPlayerId: playerId, hostName: nickname, hostLastSeenAt: now, lastPassiveAt: now, updatedAt: now });
-      return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role: "host" }, { status: 201 });
+      // The insert itself decides whether a code is free: a taken code (also one taken a moment ago by a
+      // concurrent request) gives null and the next code is tried.
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const room = await db.insertRoom({ code: makeRoomCode(), roomName, hostPlayerId: playerId, hostName: nickname, hostLastSeenAt: now, lastPassiveAt: now, updatedAt: now });
+        if (room) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role: "host" }, { status: 201 });
+      }
+      return jsonError("Es konnte gerade kein freier Raumcode erzeugt werden. Bitte erneut versuchen.", 503);
     }
 
     const code = cleanCode(payload.code);
@@ -699,38 +912,42 @@ async function handlePost(request: Request) {
       const renamed = await db.updateRoom(code, { roomName, updatedAt: new Date().toISOString() });
       return Response.json({ serverNow: Date.now(), room: shapeRoom(renamed ?? room, playerId), role });
     }
-    if (action === "presence-offline") {
-      room = await refreshPassive(db, room);
-      const offlineAt = "1970-01-01T00:00:00.000Z";
-      const offlineRoom = await db.updateRoom(code, rolePresenceUpdate(role, offlineAt));
-      return Response.json({ serverNow: Date.now(), room: shapeRoom(offlineRoom ?? room, playerId), role });
-    }
+    const knownFeaturesKey = typeof payload.featuresKey === "string" ? payload.featuresKey.slice(0, 64) : "";
     const isBackgroundAction = action === "tick" || action === "cup-tick";
+    // Foreground actions may carry an id, so a resend after a lost answer is answered from its receipt.
+    const actionId = !isBackgroundAction && action !== "click" && typeof payload.actionId === "string" ? payload.actionId.slice(0, 80) : "";
+    const context: WorldContext = { db, playerId, role, action, knownFeaturesKey, actionId };
+    if (action === "presence-offline") {
+      // The income of the time before is booked with the presence as it was, in the same write as the offline mark.
+      const offlineAt = "1970-01-01T00:00:00.000Z";
+      return mutateWorld({ ...context, actionId: "" }, room, (game, current, timestamp) => persistGameResponse(db, current, game, timestamp, playerId, role, rolePresenceUpdate(role, offlineAt)), { passive: true, touch: false, settleTravel: false });
+    }
+    let presenceBefore: AnyRoomRow | undefined;
     if (isBackgroundAction) {
       const presenceTimestamp = new Date().toISOString();
       const beforePresence = room;
       room = await touchPresence(db, room, role, presenceTimestamp);
-      if (getSimulationLeaderRole(room, Date.parse(presenceTimestamp)) !== role) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
-      room = await refreshPassive(db, room, 0, beforePresence);
-      if (action === "tick") return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
-    } else if (action === "click") {
-      // Clicks arrive every few hundred milliseconds. Passive income adds up over time, so it is booked at most every
-      // few seconds instead of rewriting the whole world on each batch; the click itself marks the player present.
-      room = await refreshPassive(db, room, TICK_PASSIVE_REFRESH_MIN_MS);
-    } else {
-      room = await refreshPassive(db, room);
-      room = await touchPresence(db, room, role);
+      if (getSimulationLeaderRole(room, Date.parse(presenceTimestamp)) !== role) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId, knownFeaturesKey), role });
+      presenceBefore = beforePresence;
+      if (action === "tick") {
+        // The leader books passive income every few seconds; most of the time only the counters change.
+        const last = Date.parse(room.lastPassiveAt || room.updatedAt) || Date.now();
+        if (Date.now() - last < TICK_PASSIVE_REFRESH_MIN_MS) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId, knownFeaturesKey), role });
+        return mutateWorld(context, room, (game, current, timestamp) => persistGameResponse(db, current, game, timestamp, playerId, role), { passive: true, presence: beforePresence, touch: false, settleTravel: false });
+      }
     }
-    const game = readGame(room);
     // Lobby codes are switched off; worlds that redeemed AZB earlier keep their test mode.
     if (action === "redeem-lobby-code") return jsonError("Lobby Codes sind deaktiviert.", 409);
     const liveError = requireLive(room);
     if (liveError) return liveError;
-    const timestamp = new Date().toISOString();
     const testMode = parseJson<string[]>(room.redeemedBonusCodesJson, []).includes("AZB");
 
     if (action === "click") {
-      const clickPower = getClickPower(game.upgrades, game.stars, game.features, Date.parse(timestamp));
+      // Clicks arrive every few hundred milliseconds. Passive income adds up over time, so it is booked at most every
+      // few seconds (counters only, unless timers moved) instead of on each batch; the click marks the player present.
+      room = await refreshPassive(db, room, TICK_PASSIVE_REFRESH_MIN_MS);
+      const clickGame = readGame(room);
+      const clickPower = getClickPower(clickGame.upgrades, clickGame.stars, clickGame.features, Date.now());
       const requested = Math.max(1, Math.min(50, Math.floor(finite(payload.clickCount, 1))));
       // The client only says how often it clicked; budget, combo, streak and critical hits are the server's.
       let clickRoom: AnyRoomRow = room;
@@ -749,6 +966,9 @@ async function handlePost(request: Request) {
       return jsonError("Die Klicks konnten gerade nicht gezählt werden.", 409);
     }
 
+    // Every other action runs against the current world inside mutateWorld: passive income goes into the action's
+    // own write, the presence too (foreground), and a conflict runs the action again on the newest state.
+    const applyAction = async (game: CoopGameState, room: RoomRow, timestamp: string): Promise<ActionOutcome> => {
     if (action === "starter-squad") {
       // Once per world: the flag lives in the shared features and is written with the version check.
       const result = maybeGrantStarterSquad(game.features, game.clicks, Date.now());
@@ -789,11 +1009,11 @@ async function handlePost(request: Request) {
       const offer = game.features.transferSaga.pendingOffer;
       if (offer) {
         const expired = expireTransferOffer(game.features, transferNow);
-        if (!expired.event) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
+        if (!expired.event) return unchanged();
         game.features = expired.features;
         return persistGameResponse(db, room, game, timestamp, playerId, role);
       }
-      if (game.features.transferSaga.nextAt > transferNow) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
+      if (game.features.transferSaga.nextAt > transferNow) return unchanged();
       if (game.features.squadLock || game.features.cup.active) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
       const result = resolveTransferInsiderEvent(game.features, Math.random, transferNow);
       game.features = result.features;
@@ -817,8 +1037,8 @@ async function handlePost(request: Request) {
     }
 
     if (action === "event") {
-      if (game.features.squadLock) return Response.json({serverNow:Date.now(),room:shapeRoom(room,playerId),role});
-      if (game.features.nextEventAt > Date.now()) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
+      if (game.features.squadLock) return unchanged();
+      if (game.features.nextEventAt > Date.now()) return unchanged();
       const event = resolveRandomEvent(game.goals);
       game.goals = Math.max(0, game.goals + event.amount);
       game.seasonGoals = Math.max(0, game.seasonGoals + event.amount);
@@ -830,8 +1050,8 @@ async function handlePost(request: Request) {
     }
 
     if (action === "var-event") {
-      if (game.features.squadLock) return Response.json({serverNow:Date.now(),room:shapeRoom(room,playerId),role});
-      if (game.features.nextVarAt > Date.now()) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
+      if (game.features.squadLock) return unchanged();
+      if (game.features.nextVarAt > Date.now()) return unchanged();
       const event = resolveVarEvent(game.goals);
       game.goals = Math.max(0, game.goals + event.amount);
       game.seasonGoals = Math.max(0, game.seasonGoals + event.amount);
@@ -846,35 +1066,17 @@ async function handlePost(request: Request) {
       const upgradeId = typeof payload.upgradeId === "string" ? payload.upgradeId : "";
       if (!getUpgrade(upgradeId)) return jsonError("Dieses Upgrade gibt es nicht.");
       const requestedCount = finite(payload.count, 1);
-      let purchaseRoom = room;
-      for (let attempt = 0; attempt < 8; attempt += 1) {
-        const purchaseGame = readGame(purchaseRoom);
-        const upgradeUnlockLeague = getUpgradeUnlockLeague(upgradeId);
-        if (getLevel(purchaseGame.upgrades, upgradeId) === 0 && !isLeagueContentUnlocked(upgradeUnlockLeague, reachedLeagueOf(purchaseGame), testMode)) return jsonError(`Dieses Upgrade wird ab Liga ${upgradeUnlockLeague} freigeschaltet.`, 409);
-        const purchase = getBulkPurchase(upgradeId, purchaseGame, requestedCount, testMode);
-        if (purchase.count === 0) {
-          const price = getCost(getUpgrade(upgradeId)!, purchaseGame.upgrades);
-          return jsonError(`${getUpgrade(upgradeId)!.name} kostet ${price.toLocaleString("de-CH")} Tore.`);
-        }
-        if (!testMode) purchaseGame.goals -= purchase.totalCost;
-        purchaseGame.upgrades[upgradeId] = getLevel(purchaseGame.upgrades, upgradeId) + purchase.count;
-        const purchaseTimestamp = new Date().toISOString();
-        const updated = await db.updateRoom(
-          purchaseRoom.code,
-          gameColumns(purchaseGame, purchaseTimestamp, purchaseRoom.sharedStateVersion),
-          { sharedStateVersion: purchaseRoom.sharedStateVersion },
-        );
-        if (updated) return Response.json({ serverNow: Date.now(), room: shapeRoom(rememberRoom(updated)!, playerId), role });
-        const latest = (await loadRoom(purchaseRoom.code)).room;
-        if (!latest) return jsonError("Dieser Raum wurde gelöscht.", 404);
-        purchaseRoom = latest;
+      // Checked and paid against the game of this attempt; mutateWorld retries a conflict on the newest goals.
+      const upgradeUnlockLeague = getUpgradeUnlockLeague(upgradeId);
+      if (getLevel(game.upgrades, upgradeId) === 0 && !isLeagueContentUnlocked(upgradeUnlockLeague, reachedLeagueOf(game), testMode)) return jsonError(`Dieses Upgrade wird ab Liga ${upgradeUnlockLeague} freigeschaltet.`, 409);
+      const purchase = getBulkPurchase(upgradeId, game, requestedCount, testMode);
+      if (purchase.count === 0) {
+        const price = getCost(getUpgrade(upgradeId)!, game.upgrades);
+        return jsonError(`${getUpgrade(upgradeId)!.name} kostet ${price.toLocaleString("de-CH")} Tore.`);
       }
-      return Response.json({
-        error: "Der gemeinsame Spielstand wurde gleichzeitig geändert. Der Kauf wird automatisch nochmals ausgeführt.",
-        errorCode: "STALE_STATE",
-        serverNow: Date.now(), room: shapeRoom(purchaseRoom, playerId),
-        role,
-      }, { status: 409 });
+      if (!testMode) game.goals -= purchase.totalCost;
+      game.upgrades[upgradeId] = getLevel(game.upgrades, upgradeId) + purchase.count;
+      return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 
     if (action === "transfer-buy") return jsonError(TRANSFER_MARKET_CLOSED_MESSAGE, 410);
@@ -1105,7 +1307,7 @@ async function handlePost(request: Request) {
       const expectedPenaltyStep = Number(payload.expectedPenaltyStep);
       const currentPenaltyStep = game.features.cup.penaltyHomeTaken + game.features.cup.penaltyAwayTaken;
       if (!Number.isInteger(expectedPenaltyStep) || expectedPenaltyStep < 0) return jsonError("Der Elfmeterstand ist ungültig.", 409);
-      if (expectedPenaltyStep !== currentPenaltyStep) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
+      if (expectedPenaltyStep !== currentPenaltyStep) return unchanged();
       const homePlayers = getStarXISelection(game.features.starXI.ownedIds, game.features.starXI.lineupIds).filter((player) => !game.features.cup.sentOffPlayerIds.includes(player.id));
       const effectiveRating = getStarXIEffectiveMatchRating(game.features.starXI.ownedIds, game.features.starXI.lineupIds, game.features.cup, 120);
       const cupNow = Date.now();
@@ -1134,8 +1336,8 @@ async function handlePost(request: Request) {
     }
 
     if (action === "cup-tick") {
-      if (!game.features.cup.active) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
-      if (game.features.cup.phase === "penalties") return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
+      if (!game.features.cup.active) return unchanged();
+      if (game.features.cup.phase === "penalties") return unchanged();
       const homePlayers = getStarXISelection(game.features.starXI.ownedIds, game.features.starXI.lineupIds).filter((player) => !game.features.cup.sentOffPlayerIds.includes(player.id));
       const cupNow = Date.now();
       const matchMinute = getCupMatchMinute(game.features.cup, cupNow);
@@ -1237,6 +1439,8 @@ async function handlePost(request: Request) {
     }
 
     return jsonError("Unbekannte Aktion.");
+    };
+    return mutateWorld(context, room, applyAction, { passive: true, presence: presenceBefore, touch: !isBackgroundAction, settleTravel: true });
   } catch (error) {
     if (error instanceof RequestBodyTooLargeError) return jsonError(error.message, 413);
     if (error instanceof SyntaxError) return jsonError("Die Anfrage ist ungültig.", 400);
