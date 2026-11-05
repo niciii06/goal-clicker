@@ -15,6 +15,8 @@ export const RATE_LIMITS = {
   save: { limit: 60, windowMs: 60_000 },
   rewards: { limit: 30, windowMs: 60_000 },
   travel: { limit: 60, windowMs: 60_000 },
+  // The board is cached privately for 30 s; a few players behind one address still fit easily.
+  leaderboard: { limit: 30, windowMs: 60_000 },
   // Up to four players behind one address click, poll and tick several times a second.
   multiplayer: { limit: 3000, windowMs: 60_000 },
 } satisfies Record<string, Bucket>;

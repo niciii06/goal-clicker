@@ -52,3 +52,23 @@ test('a database failure answers 503 without caching', async () => {
   assert.equal(response.status, 503);
   assert.equal(response.headers.get('cache-control'), 'no-store');
 });
+
+test('a failing login check answers 503 instead of a raw server error', async () => {
+  const response = await leaderboardResponse(new Request('http://localhost/api/leaderboard?playerId=reader-player-1'), {
+    resolve: async () => { throw new Error('auth database down'); },
+    db: () => ({ getLeaderboard: async () => [] }),
+  });
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+});
+
+test('the leaderboard route is limited per address', async () => {
+  const { GET } = await import('../app/api/leaderboard/route.ts');
+  const { RATE_LIMITS, clearRateLimitsForTests } = await import('../app/api/rate-limit.ts');
+  clearRateLimitsForTests();
+  // Without a player ID the answer comes at once without the database, so only the limit decides the status.
+  const call = () => GET(new Request('http://localhost/api/leaderboard', { headers: { 'x-forwarded-for': '203.0.113.9' } }));
+  for (let i = 0; i < RATE_LIMITS.leaderboard.limit; i++) assert.equal((await call()).status, 400);
+  assert.equal((await call()).status, 429);
+  clearRateLimitsForTests();
+});

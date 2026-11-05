@@ -12,6 +12,10 @@ import { bigint, boolean, doublePrecision, index, integer, jsonb, pgTable, prima
 /** ISO 8601 in UTC, the same text format the API writes into every timestamp column. */
 const isoNow = sql`to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 
+// Prepared migration 0009 (not applied yet) adds features_key (md5 of the features, kept by a trigger) to
+// coop_rooms and created_at to solo_travel. Neither column is declared here on purpose: drizzle names every
+// declared column in its queries and inserts, which would fail on a database without the migration. db/index.ts
+// asks Postgres whether features_key exists; created_at is filled by its column default.
 export const coopRooms = pgTable("coop_rooms", {
   code: text("code").primaryKey(),
   roomName: text("room_name").notNull().default("Meine Welt"),
