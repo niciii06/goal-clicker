@@ -51,3 +51,31 @@ test("reserve filters and sorts by the shown career rating", () => {
   assert.deepEqual(filterAndSortReserve(entries, { search: "", ratingFilter: "0-70", positionFilter: "all" }).map((entry) => entry.id), ["low"]);
   assert.deepEqual(filterAndSortReserve(entries, { search: "95", ratingFilter: "all", positionFilter: "MS" }).map((entry) => entry.id), ["grown"]);
 });
+
+test("album merges the custom and legendary groups without a double claim", async () => {
+  const { claimAlbumReward, getAlbumGroups, initialCareerState } = await import("../app/career-data");
+  const { initialGameFeatures, STAR_XI_ACTIVE_PLAYERS } = await import("../app/feature-data");
+  const specials = STAR_XI_ACTIVE_PLAYERS.filter((player) => player.isCustom || player.cardType === "legendary").map((player) => player.id);
+  assert.ok(specials.length > 0);
+  const groups = getAlbumGroups(initialCareerState());
+  assert.equal(groups.filter((group) => group.id === "custom" || group.id === "legendary").length, 1);
+
+  const fresh = initialGameFeatures();
+  fresh.career.collectedIds = [...specials];
+  const before = fresh.starXI.fragments;
+  assert.equal(claimAlbumReward(fresh, "legendary"), true);
+  assert.equal(fresh.starXI.fragments, before + 5000);
+  assert.equal(claimAlbumReward(fresh, "legendary"), false);
+  assert.equal(claimAlbumReward(fresh, "custom"), false);
+  assert.equal(fresh.starXI.fragments, before + 5000);
+
+  for (const earlierClaims of [["custom"], ["legendary"], ["custom", "legendary"]]) {
+    const saved = initialGameFeatures();
+    saved.career.collectedIds = [...specials];
+    saved.career.claimedAlbumRewards = [...earlierClaims];
+    assert.equal(getAlbumGroups(saved.career).find((group) => group.id === "legendary")?.claimed, true);
+    assert.equal(claimAlbumReward(saved, "legendary"), false);
+    assert.equal(claimAlbumReward(saved, "custom"), false);
+    assert.deepEqual(saved.career.claimedAlbumRewards, earlierClaims);
+  }
+});
