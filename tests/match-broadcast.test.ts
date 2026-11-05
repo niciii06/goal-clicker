@@ -108,7 +108,7 @@ test('motion has bounded acceleration and speeds, removes departed actors and ne
 test('compact viewer exposes three tabs, canvas, cameras and one substitution entry point',()=>{
  const f=fixture();f.cup.broadcast=createMatchBroadcast(f.cup);
  const html=renderToStaticMarkup(createElement(LiveMatchViewer,{features:f,now:1030000,clubName:'Testclub',clubColor:'#0071e3',onSubstitute:()=>{}}));
- assert.ok(html.includes('<canvas'));assert.ok(html.includes('Grosse Spielansicht'));assert.ok(html.includes('Ball verfolgen'));assert.ok(html.includes('Highlight-Kamera'));assert.equal((html.match(/role="tab"/g)??[]).length,3);assert.ok(html.includes('MATCH'));assert.ok(html.includes('TEAM'));assert.ok(html.includes('STATISTIK'));assert.ok(html.includes('Wechseln'));assert.equal((html.match(/gc-team-list/g)??[]).length,0);
+ assert.ok(html.includes('class="gc-viewer-pitch gc-viewer-pitch-placeholder" role="img" aria-label="Live Fussballfeld wird geladen"'));assert.ok(!html.includes('<canvas'),'a canvas placeholder never draws its SVG child');assert.ok(html.includes('Grosse Spielansicht'));assert.ok(html.includes('Ball verfolgen'));assert.ok(html.includes('Highlight-Kamera'));assert.equal((html.match(/role="tab"/g)??[]).length,3);assert.ok(html.includes('MATCH'));assert.ok(html.includes('TEAM'));assert.ok(html.includes('STATISTIK'));assert.ok(html.includes('Wechseln'));assert.equal((html.match(/gc-team-list/g)??[]).length,0);
 });
 
 test('pitch geometry draws both goals, penalty areas and centre circle through a canvas context',()=>{
