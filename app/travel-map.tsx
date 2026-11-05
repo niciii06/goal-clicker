@@ -3,6 +3,8 @@ import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } fro
 import type { Journey } from './travel-data';
 import { cameraCenter, cameraReducer, fitRoutes, initialCamera, projectRoutes, suggestedZoom, vehicleAt } from './travel-map-geometry';
 import type { MapPoint, VehicleState } from './travel-map-geometry';
+import { routeCache, routeCacheReady } from './journey-routing';
+import { loadRouteCache } from './travel-route-cache-lazy';
 const ICONS={walk:'🚶',bike:'🚲',car:'🚗',bus:'🚌',train:'🚆',plane:'✈️'};
 const VIEW={width:800,height:340,cx:400,cy:170};
 /** Map props arrive about every 100 ms; between them the vehicle is extrapolated for at most this long. */
@@ -20,7 +22,10 @@ function vehicleTransforms(vehicle:VehicleState,scale:number){
 }
 
 export function TravelMap({journey,now,progress}:{journey:Journey;now:number;progress:number}) {
- const routes=useMemo(()=>projectRoutes(journey),[journey]);
+ // The route data loads in the background; once it is there, legs saved without road geometry are redrawn on the road.
+ const [routeData,setRouteData]=useState(()=>routeCacheReady()?routeCache():undefined);
+ useEffect(()=>{if(routeData)return;let active=true;void loadRouteCache().then(loaded=>{if(active&&loaded&&routeCacheReady())setRouteData(routeCache());});return()=>{active=false;};},[routeData]);
+ const routes=useMemo(()=>projectRoutes(journey,routeData),[journey,routeData]);
  const fit=useMemo(()=>fitRoutes(routes),[routes]);
  const vehicle=vehicleAt(routes,journey,now,progress);
  const [camera,dispatch]=useReducer(cameraReducer,undefined,()=>initialCamera(suggestedZoom(vehicle.mode,fit.zoom),vehicle.point));

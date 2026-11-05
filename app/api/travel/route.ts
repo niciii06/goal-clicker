@@ -6,6 +6,7 @@ import { resolvePlayer } from '../../auth/player';
 import { normalizeGameFeatures, getTournament } from '../../feature-data';
 import { createJourney, eligibilityError, fixtureFor } from '../../travel-data';
 import type { Journey } from '../../travel-data';
+import { ensureRouteCache } from '../../journey-routing';
 import { MAX_GAME_STATE_BODY_BYTES, readJsonBody, refuseUnsafePost, RequestBodyTooLargeError } from '../request-body';
 import { rateLimited } from '../rate-limit';
 import { withGzip } from '../compression';
@@ -33,7 +34,8 @@ async function handlePost(request: Request) {
   if(!fixture.away)return Response.json({error:'Das ist ein Heimspiel.'},{status:409});
   let journey=await db.getSoloJourney(p.playerId,fixture.id) as Journey|null;
   if(p.action==='depart') {
-   if(!journey)journey=await db.putSoloJourney(p.playerId,fixture.id,createJourney(fixture,now,Math.random,f));
+   // A plan is stored for the whole trip, so it is only made with the road and rail geometry loaded.
+   if(!journey){if(!await ensureRouteCache())return Response.json({error:'Die Reiseroute konnte nicht geladen werden. Bitte erneut versuchen.'},{status:503});journey=await db.putSoloJourney(p.playerId,fixture.id,createJourney(fixture,now,Math.random,f));}
   } else if(p.action==='start') {
    if(!journey||journey.endsAt>now)return Response.json({error:'Die Mannschaft ist noch nicht angekommen.'},{status:409});
    if(journey.consumed)return Response.json({journey,serverNow:now},{headers:{'cache-control':'no-store'}});

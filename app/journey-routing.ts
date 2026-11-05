@@ -2,6 +2,7 @@ import { HOME_VENUE, distanceKm, routePoints } from './travel-geography';
 import type { GeoPoint, Venue } from './travel-geography';
 // Browser builds get the lazily loaded copy through the package.json "imports" browser condition.
 import ROUTES from '#travel-route-cache';
+import { loadRouteCache } from './travel-route-cache-lazy';
 
 export const TRAVEL_CONFIG = { acceleration: 60, version: 2 } as const;
 export type Hub = GeoPoint & { id: string; name: string };
@@ -11,8 +12,19 @@ export type Segment = {
  geometry: 'road'|'rail'|'great-circle'|'approximate'|'stationary'; source: string;
 };
 export type JourneyPlan = { version: 2; acceleration: number; segments: Segment[]; realSeconds: number };
-type CachedRoute = { points: GeoPoint[]; seconds: number; km: number; source: string; geometry: 'road'|'rail'|'approximate' };
-const cachedRoutes = ROUTES as Record<string,CachedRoute>;
+export type CachedRoute = { points: GeoPoint[]; seconds: number; km: number; source: string; geometry: 'road'|'rail'|'approximate' };
+export type RouteCache = Record<string,CachedRoute>;
+// In the browser this object starts empty and is filled once the lazy route data arrived (travel-route-cache-lazy.ts).
+const cachedRoutes = ROUTES as RouteCache;
+// Planning reads this; planJourney can swap in another cache (tests, an explicitly empty cache).
+let activeRoutes: RouteCache = cachedRoutes;
+/** True once road and rail geometry is available here. On the server the full cache is bundled. */
+export function routeCacheReady() { return Object.keys(cachedRoutes).length>0; }
+/** The route cache this module plans with (empty in the browser until it is loaded). */
+export function routeCache():RouteCache { return cachedRoutes; }
+/** Resolves when the route geometry is available, so a plan never falls back to estimated straight lines
+ * only because the lazy browser copy had not arrived yet. */
+export async function ensureRouteCache() { return routeCacheReady() || (await loadRouteCache() && routeCacheReady()); }
 export const STATIONS: Record<string,Hub> = {
  bern:{id:'rail-bern',name:'Bahnhof Bern',lat:46.949,lon:7.439},
  zurich:{id:'rail-zurich',name:'Zürich HB',lat:47.3782,lon:8.5402},
@@ -81,7 +93,7 @@ export function interpolatePath(points:GeoPoint[],fraction:number):{point:GeoPoi
  return {point:points[0],bearing:0};
 }
 function ground(from:Hub,to:Hub,mode:'bus'|'train',label:string):Segment {
- const key=routeKey(from,to,mode),cache=cachedRoutes[key],direct=distanceKm(from,to);
+ const key=routeKey(from,to,mode),cache=activeRoutes[key],direct=distanceKm(from,to);
  const km=cache?.km??direct*(mode==='bus'?1.3:1.2);
  // Urban bus: 25 km/h, regional roads: 55, motorway: 75. IC rail: 95 km/h,
  // including intermediate stops; no unsupported high-speed assumption.
@@ -96,8 +108,8 @@ function flight(from:Hub,to:Hub):Segment {
 }
 function plan(input:Segment[]):JourneyPlan {
  const segments=input.flatMap(s=>{
-  if(s.mode!=='bus'||s.geometry!=='approximate'||cachedRoutes[s.id])return [s];
-  const candidates=Object.entries(cachedRoutes).filter(([key,r])=>key.startsWith('bus:')&&r.geometry==='road'&&r.points.length>=3&&distanceKm(r.points[0],s.from)<.001&&distanceKm(r.points.at(-1)!,s.to)<3).sort((a,b)=>distanceKm(a[1].points.at(-1)!,s.to)-distanceKm(b[1].points.at(-1)!,s.to));
+  if(s.mode!=='bus'||s.geometry!=='approximate'||activeRoutes[s.id])return [s];
+  const candidates=Object.entries(activeRoutes).filter(([key,r])=>key.startsWith('bus:')&&r.geometry==='road'&&r.points.length>=3&&distanceKm(r.points[0],s.from)<.001&&distanceKm(r.points.at(-1)!,s.to)<3).sort((a,b)=>distanceKm(a[1].points.at(-1)!,s.to)-distanceKm(b[1].points.at(-1)!,s.to));
   const cached=candidates[0];if(!cached)return [s];
   const [key,route]=cached,point=route.points.at(-1)!,hub={...point,id:`route-end:${key}`,name:'Ende der geprüften Strassenroute'};
   const road:Segment={...s,id:`road:${key}`,to:hub,points:route.points.map(p=>({...p})),realSeconds:route.seconds*1.12,distanceKm:route.km,geometry:'road',source:route.source};
@@ -136,10 +148,61 @@ export function journeyCandidates(destination:Venue) {
 /** The team takes the fastest door-to-door option: the team bus below 80 km and as long as
  * it beats the train or the plane, the train where a direct main line ends near the stadium,
  * and the plane for long distances, overseas and across the Channel. Estimates, no timetable. */
-export function planJourney(destination:Venue):JourneyPlan {
- const {road,roadAllowed,rail,air}=journeyCandidates(destination);
- const options=[...(roadAllowed?[plan(road)]:[]),...(rail?[plan(rail)]:[]),...air.map(plan)];
- return options.reduce((best,option)=>option.realSeconds<best.realSeconds?option:best);
+export function planJourney(destination:Venue,routes:RouteCache=cachedRoutes):JourneyPlan {
+ const previous=activeRoutes;activeRoutes=routes;
+ try {
+  const {road,roadAllowed,rail,air}=journeyCandidates(destination);
+  const options=[...(roadAllowed?[plan(road)]:[]),...(rail?[plan(rail)]:[]),...air.map(plan)];
+  return options.reduce((best,option)=>option.realSeconds<best.realSeconds?option:best);
+ } finally { activeRoutes=previous; }
+}
+/** Within this distance two saved hub coordinates count as the same place (rounding, small anchor fixes). */
+const SAME_PLACE_KM=.05;
+/** A stored route may end this far before a leg's end; the gap is drawn as a short straight connection. */
+const ROUTE_END_GAP_KM=3;
+/**
+ * Cached road or rail geometry for drawing a saved leg that was planned without it (an older plan, or a plan
+ * made while the route data was not loaded). Exact cache key first, then a cached route of the same mode that
+ * starts at the leg's start and ends next to its end. Returns null when nothing fits.
+ */
+export function cachedLegPoints(segment:{mode:Segment['mode'];from:GeoPoint;to:GeoPoint},routes:RouteCache=cachedRoutes):{points:GeoPoint[];geometry:'road'|'rail'}|null {
+ if(segment.mode!=='bus'&&segment.mode!=='train')return null;
+ const mode=segment.mode,from=segment.from,to=segment.to;
+ if(distanceKm(from,to)<=.15)return null;
+ const usable=(r:CachedRoute|undefined):r is CachedRoute=>Boolean(r&&Array.isArray(r.points)&&r.points.length>=3);
+ let route:CachedRoute|undefined=routes[routeKey(from,to,mode)];
+ if(!usable(route)){
+  let best=Infinity;route=undefined;
+  for(const [key,candidate] of Object.entries(routes)){
+   if(!key.startsWith(`${mode}:`)||!usable(candidate)||distanceKm(candidate.points[0],from)>SAME_PLACE_KM)continue;
+   const gap=distanceKm(candidate.points.at(-1)!,to);
+   if(gap<=ROUTE_END_GAP_KM&&gap<best){best=gap;route=candidate;}
+  }
+ }
+ if(!route)return null;
+ const points=route.points.map(p=>({lat:p.lat,lon:p.lon}));
+ if(distanceKm(points[0],from)>.001)points.unshift({lat:from.lat,lon:from.lon});
+ if(distanceKm(points.at(-1)!,to)>.001)points.push({lat:to.lat,lon:to.lon});
+ return {points,geometry:mode==='train'?'rail':'road'};
+}
+/** True for a bus or train leg that is stored as a straight line between its two hubs (no cached course). */
+export function lacksRouteGeometry(segment:Pick<Segment,'mode'|'points'>) {
+ return (segment.mode==='bus'||segment.mode==='train')&&segment.points.length<=2;
+}
+/**
+ * The plan as it is drawn: legs saved without road or rail geometry get it from the route cache. Only `points`
+ * and `geometry` change; every duration, the segment order and therefore the arrival time stay exactly as saved.
+ */
+export function withRouteGeometry(plan:JourneyPlan,routes:RouteCache=cachedRoutes):JourneyPlan {
+ let changed=false;
+ const segments=plan.segments.map(s=>{
+  if(!lacksRouteGeometry(s))return s;
+  const resolved=cachedLegPoints(s,routes);
+  if(!resolved)return s;
+  changed=true;
+  return {...s,points:resolved.points,geometry:resolved.geometry};
+ });
+ return changed?{...plan,segments}:plan;
 }
 export function segmentAt(plan:JourneyPlan,elapsedGameSeconds:number) {
  let elapsed=Math.max(0,elapsedGameSeconds)*plan.acceleration;
