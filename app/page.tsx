@@ -10,7 +10,7 @@ import type { MatchDraft } from "./match-commands";
 import { ACHIEVEMENTS, BALANCE_VERSION, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, COMBO_MAX_COUNT, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, ALBUM_MILESTONES_STORAGE_KEY, STAR_RATING_FILTERS, TUTORIAL_STORAGE_KEY, VIBRATION_STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from "./game/constants";
 import { AL, AR, AT, AU, AZ, BA, BE, BF, BG, BR, CA, CD, CH, CI, CL, CM, CN, CO, CR, CZ, DE, DK, DZ, EC, EG, ES, FI, FR, GB_ENG, GB_NIR, GB_SCT, GB_WLS, GE, GH, GM, GN, GR, GT, HR, HT, HU, IE, IL, IS, IT, JM, JP, KN, KR, MA, ME, ML, MW, MX, NG, NL, NO, NZ, PA, PH, PL, PT, PY, RO, RS, RU, SE, SI, SK, SN, SR, TR, UA, US, UY, VE, XK, ZA, ZM } from "country-flag-icons/react/3x2";
 import { AlbumPanel, CareerPanel, CareerPlayerBadge, MatchRatingsPanel, PostMatchSummary } from "./career-panels";
-import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, SPECIAL_CARD_PACK, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_SQUAD_SIZE, STAR_XI_TOTAL_CARD_COUNT, TOURNAMENTS, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, applyPendingMatchChanges, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, getSpecialCardPackOdds, purchaseSpecialCardPack, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getRewardPackOdds, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXIRating, getStarXISelection, getTournament, getTournamentRewardPack, getBestXIUnavailablePlayerIds, grantWelcomePack, awardMatchStamp, canDrawHundredSpecialCards, maybeGrantStarterSquad, STARTER_SQUAD_UNLOCK_CLICKS, getUnavailableStarXIPlayerIds, initialGameFeatures, isRewardPack, isTransferDeadlineDay, normalizeGameFeatures, openEarnedPack, openStarPack, pauseGameFeatureTimers, queueMatchChanges, recordSeasonModeMatch, releaseMatchSquad, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, TRANSFER_UNHAPPY_MATCHES, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, applySeasonPrestige, getPrestigeBlockReason } from "./feature-data";
+import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, SPECIAL_CARD_PACK, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_SQUAD_SIZE, STAR_XI_TOTAL_CARD_COUNT, TOURNAMENTS, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, applyPendingMatchChanges, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, getSpecialCardPackOdds, purchaseSpecialCardPack, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getRewardPackOdds, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXIRating, getStarXISelection, getTournament, getTournamentRewardPack, getBestXIUnavailablePlayerIds, grantWelcomePack, awardMatchStamp, canDrawHundredSpecialCards, maybeGrantStarterSquad, STARTER_SQUAD_UNLOCK_CLICKS, getUnavailableStarXIPlayerIds, initialGameFeatures, isRewardPack, isTransferDeadlineDay, normalizeGameFeatures, openEarnedPack, openStarPack, pauseGameFeatureTimers, queueMatchChanges, recordSeasonModeMatch, releaseMatchSquad, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, TRANSFER_UNHAPPY_MATCHES, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, getPrestigeBlockReason } from "./feature-data";
 import { DailyRewardCard } from "./daily-reward-panel";
 import { FootballGraphic, GameErrorBoundary, Icon, StarXIPositionBadges } from "./game/ui";
 import { LiveMatchViewer } from "./match-viewer";
@@ -46,6 +46,7 @@ import { consumeTravel, eligibilityError, fixtureFor, journeyView, payTravelFine
 import { coopRoleLabel, isCoopRole, multiplayerUrl, notifyCoopOffline, occupiedCoopPlayers, readCoopResponse, upsertSavedRoom } from "./game/coop";
 import { capGoalsAfterRebalance, createClickResult, decayComboCount, formatComboMultiplier, getBaseClickPower, getBasePassivePower, getBulkPurchase, getClickPower, getComboLevel, getComboProgress, getCost, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades } from "./game/economy";
 import { UPGRADES } from "./game/upgrades";
+import { applyGamePrestige } from "./game/prestige";
 import { TransferOfferActions } from "./transfer-offer-actions";
 import { pronounText } from "./player-pronouns";
 import { LeaderboardPanel } from "./leaderboard-panel";
@@ -208,7 +209,9 @@ function App() {
   const [coopSession, setCoopSession] = useState<CoopSession | null>(null);
   const [confirmSingle, setConfirmSingle] = useState(false);
   // Open Prestige dialog with its own request id: a double click or a retry starts one Prestige only.
-  const [prestigeDialog, setPrestigeDialog] = useState<{ requestId: string; error: string } | null>(null);
+  // `prestigeCount`: the count when the dialog opened; when it changes (another seat started Prestige), the dialog closes.
+  const [prestigeDialog, setPrestigeDialog] = useState<{ requestId: string; error: string; prestigeCount: number } | null>(null);
+  const prestigeConfirmedRef = useRef(new Set<string>());
   // The md5 of the shared features this client holds; polls send it so the server can leave them out.
   const coopFeaturesKeyRef = useRef("");
   const [savedRooms, setSavedRooms] = useState<CoopRoom[]>([]);
@@ -587,6 +590,15 @@ function App() {
   const seasonCareerComplete = seasonMode.hallOfFame;
   // Prestige has its own rules: lineup, open slots and suspensions never block it, running operations do.
   const prestigeBlockReason = seasonCareerComplete ? getPrestigeBlockReason(displayGame.features) : "";
+  // Another seat (or this one, after a lost response) already started Prestige: the open dialog would offer a
+  // second one, so it closes with a neutral note instead of saying nothing changed.
+  const shownPrestigeCount = displayGame.features.seasonMode.prestigeCount;
+  useEffect(() => {
+    if (!prestigeDialog || shownPrestigeCount === prestigeDialog.prestigeCount) return;
+    const ownRequest = prestigeConfirmedRef.current.has(prestigeDialog.requestId);
+    setPrestigeDialog(null);
+    if (!ownRequest) setCoopMessage(`Prestige ${shownPrestigeCount} wurde in dieser Welt gestartet. Alle Upgrades stehen wieder auf Stufe 0.`);
+  }, [prestigeDialog, shownPrestigeCount]);
   const seasonTable = [...seasonMode.table].sort((first, second) => second.points - first.points || (second.goalsFor - second.goalsAgainst) - (first.goalsFor - first.goalsAgainst) || second.goalsFor - first.goalsFor || first.name.localeCompare(second.name));
   const seasonInProgress = seasonMode.matchday > 0 || seasonMode.table.some((team) => team.played > 0);
   const seasonStandingsEntry = seasonStandingsAnnouncement?.entry ?? null;
@@ -2415,32 +2427,41 @@ function App() {
   function openPrestigeDialog() {
     const reason = getPrestigeBlockReason(displayGame.features);
     if (reason) { showToast(reason); return; }
-    setPrestigeDialog({ requestId: crypto.randomUUID(), error: "" });
+    setPrestigeDialog({ requestId: crypto.randomUUID(), error: "", prestigeCount: displayGame.features.seasonMode.prestigeCount });
   }
 
   async function confirmSeasonPrestige(keepNormalId: string | null) {
     if (!prestigeDialog) return;
-    const { requestId } = prestigeDialog;
+    const { requestId, prestigeCount } = prestigeDialog;
+    // A double click confirms once: the feed, the toast and the sound come only with the first confirmation.
+    if (prestigeConfirmedRef.current.has(requestId)) return;
     if (isCoopLive) {
+      prestigeConfirmedRef.current.add(requestId);
       setCoopBusy(true);
-      const data = await sendCoopAction("season-prestige", { requestId, keepNormalId, expectedPrestigeCount: displayGame.features.seasonMode.prestigeCount });
+      const data = await sendCoopAction("season-prestige", { requestId, keepNormalId, expectedPrestigeCount: prestigeCount });
       setCoopBusy(false);
-      if (!data) { setPrestigeDialog((current) => current && { ...current, error: "Prestige wurde nicht gestartet. Dein Stand ist unverändert." }); return; }
+      if (!data) {
+        // The same request id may be sent again: the server counts it once.
+        prestigeConfirmedRef.current.delete(requestId);
+        setPrestigeDialog((current) => current && { ...current, error: "Prestige wurde nicht bestätigt. Wurde es in dieser Welt doch gestartet, schliesst sich dieses Fenster von selbst." });
+        return;
+      }
       setPrestigeDialog(null);
-      setCoopMessage("Prestige gestartet. Die Aufstiegsjagd beginnt wieder in Saison 1.");
+      setCoopMessage("Prestige gestartet. Die Aufstiegsjagd beginnt wieder in Saison 1, alle Upgrades stehen wieder auf Stufe 0.");
     } else {
       const now = getCurrentTime();
-      // Checked once more against the current state; season, squad, album, goals and count change in one update.
-      const check = applySeasonPrestige(gameRef.current.features, keepNormalId, now, requestId);
+      // Checked once more against the current state; season, squad, album, upgrades, goals and count change in one update.
+      const check = applyGamePrestige(gameRef.current, keepNormalId, now, requestId);
+      if (check.duplicate) { setPrestigeDialog(null); return; }
       if (check.error) { setPrestigeDialog((current) => current && { ...current, error: check.error }); return; }
+      prestigeConfirmedRef.current.add(requestId);
       setGame((current) => {
-        const result = applySeasonPrestige(current.features, keepNormalId, now, requestId);
-        if (result.error || result.duplicate) return current;
-        return { ...current, features: result.features, goals: 0, seasons: Math.max(current.seasons, MAX_CAREER_SEASON - 1) };
+        const result = applyGamePrestige(current, keepNormalId, now, requestId);
+        return result.error || result.duplicate ? current : result.game;
       });
       setPrestigeDialog(null);
     }
-    addFeed("Prestige gestartet: zurück auf Saison 1, alle Freischaltungen bleiben.", "star");
+    addFeed("Prestige gestartet: zurück auf Saison 1, alle Upgrades wieder auf Stufe 0, die Freischaltungen bleiben.", "star");
     showToast("Prestige gestartet");
     playTone(523, 0.12, "triangle", 0.04);
     playTone(784, 0.2, "triangle", 0.05, 0.1);

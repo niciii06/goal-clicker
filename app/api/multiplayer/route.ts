@@ -11,7 +11,7 @@ import { getDb } from "../../../db";
 import { nameRecoveryAllowed, resolvePlayer } from "../../auth/player";
 import type { LightRoomRow, RoomRow, RoomSeats, RoomUpdate } from "../../../db";
 import { createHash } from "node:crypto";
-import { SPECIAL_CARD_PACK, awardMatchStamp, maybeGrantStarterSquad, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, applySeasonPrestige, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
+import { SPECIAL_CARD_PACK, awardMatchStamp, maybeGrantStarterSquad, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
 import type { GameFeatures, PenaltyDirection, StarFormationId } from "../../feature-data";
 import { isSupportedMultiplayerProtocol, MULTIPLAYER_UPDATE_MESSAGE } from "../../multiplayer-protocol";
 import { getFormationUnlockLeague, getPackUnlockLeague, getReachedLeague, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked, MAX_CAREER_SEASON } from "../../season-progression";
@@ -21,6 +21,7 @@ import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "..
 import { ACHIEVEMENTS, BALANCE_VERSION, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_IDS } from "../../game/constants";
 import { capGoalsAfterRebalance, getBaseClickPower, getBasePassivePower, getClickPower, getCost, getLevel, getPassiveIncomePower } from "../../game/economy";
 import { getUpgrade } from "../../game/upgrades";
+import { applyGamePrestige } from "../../game/prestige";
 import { getTicketIncome, recordTicketIncome } from "../../ticket-income";
 
 import { answerPressConference, getPressReward } from "../../press-conference";
@@ -1194,16 +1195,17 @@ async function handlePost(request: Request) {
     if (action === "season-prestige") {
       // Checked against the stored world: Hall of Fame, the chosen card and running operations. The request id
       // makes retries safe, the expected count rejects a second Prestige started from an outdated screen.
+      // applyGamePrestige is the same reset single player uses: season, squad, card improvements, goals and all
+      // upgrade levels change together and are written in one versioned update.
       const requestId = typeof payload.requestId === "string" ? payload.requestId.slice(0, 60) : "";
       if (!requestId) return jsonError("Lade die Seite neu, um Prestige zu starten.", 409);
       const keepNormalId = typeof payload.keepNormalId === "string" && payload.keepNormalId ? payload.keepNormalId : null;
-      const result = applySeasonPrestige(game.features, keepNormalId, Date.now(), requestId);
+      const result = applyGamePrestige(game, keepNormalId, Date.now(), requestId);
       if (result.duplicate) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
-      if (Number(payload.expectedPrestigeCount) !== game.features.seasonMode.prestigeCount) return jsonError("Prestige wurde in dieser Welt schon gestartet.", 409);
+      // The room goes along, so the screen that asked shows the Prestige another seat already started.
+      if (Number(payload.expectedPrestigeCount) !== game.features.seasonMode.prestigeCount) return Response.json({ error: "Prestige wurde in dieser Welt schon gestartet.", errorCode: "PRESTIGE_ALREADY_STARTED", serverNow: Date.now(), room: shapeRoom(room, playerId), role }, { status: 409 });
       if (result.error) return jsonError(result.error, 409);
-      game.features = result.features;
-      game.goals = 0;
-      game.seasons = Math.max(game.seasons, MAX_CAREER_SEASON - 1);
+      Object.assign(game, result.game);
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 

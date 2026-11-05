@@ -20,7 +20,7 @@ import { HOME_VENUE, LEAGUE_LABELS, seasonGeography, venueForClubName } from "./
 import { addBroadcastSubstitution, advanceMatchBroadcast, chooseGoalPattern, createMatchBroadcast, normalizeMatchBroadcast, recordedActionRating } from "./match-broadcast";
 import { advanceInteractive, normalizeInteractive, resumeInteractive } from "./interactive-match";
 import { emptyTravel, normalizeTravel } from "./travel-data";
-import { getCareerCard, getPlayerForm, initialCareerState, normalizeCareerState } from "./career-data";
+import { getCareerCard, getPlayerForm, initialCareerState, normalizeCareerState, rebaseCareerForPrestige } from "./career-data";
 import { getPackUnlockLeague, hasReachedLeague, leagueForTier } from "./season-progression";
 import { getFunnyPlayerName } from "./funny-player-names";
 import { normalizeDailyRewards } from "./daily-reward";
@@ -1112,7 +1112,27 @@ export function applySeasonPrestige(value: GameFeatures, keepNormalId: string | 
     // The squad is rebuilt from scratch; slots left open by sales no longer apply.
     vacancies: [],
   };
-  features.cup = { ...features.cup, suspendedPlayerIds: features.cup.suspendedPlayerIds.filter((id) => retained.has(id)) };
+  // Discarded cards leave no injury, red card, yellow card count, ban or prepared match bonus behind: a copy
+  // obtained later is fit, eligible and at its base rating.
+  const keepIds = <T,>(record: Record<string, T> | undefined) => Object.fromEntries(Object.entries(record ?? {}).filter(([id]) => retained.has(id)));
+  features.cup = {
+    ...features.cup,
+    suspendedPlayerIds: features.cup.suspendedPlayerIds.filter((id) => retained.has(id)),
+    sentOffPlayerIds: features.cup.sentOffPlayerIds.filter((id) => retained.has(id)),
+    injuredPlayerIds: keepIds(features.cup.injuredPlayerIds),
+    careerBonuses: keepIds(features.cup.careerBonuses),
+    careerGrowth: keepIds(features.cup.careerGrowth),
+  };
+  features.discipline = {
+    ...features.discipline,
+    league: keepIds(features.discipline.league),
+    tournaments: Object.fromEntries(Object.entries(features.discipline.tournaments).map(([id, counts]) => [id, keepIds(counts)])),
+    bans: features.discipline.bans.filter((ban) => retained.has(ban.playerId)),
+  };
+  // Retained cards keep every improvement; all others lose theirs (history and album stay).
+  features.career = rebaseCareerForPrestige(features.career, retained);
+  // The retained cards fill the starting eleven and the bench right away (an unavailable one stays out).
+  features.starXI = setBestStarXI(features.starXI, getBestXIUnavailablePlayerIds(features), { career: features.career, cup: features.cup });
   features.starterSquadGranted = true;
   if (receipt) features.purchaseReceipts = [...features.purchaseReceipts, receipt].slice(-PURCHASE_RECEIPT_LIMIT);
   features.seasonMode = startSeasonPrestige(features.seasonMode, features.club.name, now);

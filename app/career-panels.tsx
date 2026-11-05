@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { getStarXIPlayer, getStarXIPositions, getUnavailableStarXIPlayerIds, STAR_POSITIONS, STAR_XI_PLAYERS, TRANSFER_UNHAPPY_PENALTY, transferUnhappyMatches } from './feature-data';
 import type { GameFeatures, StarXIPlayer } from './feature-data';
-import { CAREER_MILESTONES, GROWTH_POINTS_PER_LEVEL, getPlayerMilestones, MILESTONE_METRIC_LABELS, emptyPlayerStats, getAlbumGroups, getCareerCard, getPlayerForm } from './career-data';
+import { CAREER_MILESTONES, GROWTH_POINTS_PER_LEVEL, getPlayerMilestones, getMilestoneStats, MILESTONE_METRIC_LABELS, emptyPlayerStats, getAlbumGroups, getCareerCard, getPlayerForm } from './career-data';
 import type { AwardWinner, PlayerMatchReport } from './career-data';
 import { formatNumber } from './game/format';
 import { leagueForTier } from './season-progression';
@@ -79,7 +79,8 @@ export function CareerPanel({ features }: { features: GameFeatures }) {
   const ids = [...new Set([...features.starXI.ownedIds,...Object.keys(features.career.players)])];
   const players = ids.map(getStarXIPlayer).filter((p): p is StarXIPlayer=>!!p).sort((a,b)=>a.name.localeCompare(b.name));
   const selectedPlayer = players.find(p=>p.id===playerId) ?? players[0];
-  const stats = selectedPlayer ? features.career.players[selectedPlayer.id] ?? emptyPlayerStats() : emptyPlayerStats();
+  // Milestone progress of the current Prestige run; the full history stays in the statistics above.
+  const stats = selectedPlayer ? getMilestoneStats(features.career, selectedPlayer.id) : getMilestoneStats(features.career, '');
   const awards = [...features.career.awards].reverse();
   const award = awards.find(a=>a.id===awardId) ?? awards[0];
   const rivals = Object.values(features.career.rivals).sort((a,b)=>Number(b.active)-Number(a.active)||b.played-a.played||b.lastPlayedAt-a.lastPlayedAt);
