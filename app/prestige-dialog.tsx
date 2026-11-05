@@ -41,7 +41,7 @@ export function PrestigeDialog({ features, goals, upgradeLevels, busy, error, on
         <div><dt>Torkontostand</dt><dd>{formatNumber(goals)} → <strong>0</strong></dd></div>
         <div><dt>Upgrades</dt><dd>{formatNumber(upgradeLevels)} {upgradeLevels === 1 ? "Stufe" : "Stufen"} → <strong>Stufe 0</strong>. Freigeschaltete Upgrades kannst du sofort wieder kaufen.</dd></div>
         <div><dt>Kader</dt><dd>{features.starXI.ownedIds.length} Karten → <strong>{squadAfter} Karten</strong>. Alle anderen bleiben im Album («Nicht im Kader»).</dd></div>
-        <div><dt>Verbesserungen</dt><dd>Spezialkarten und die gewählte Karte behalten Meilensteine und Wachstum. Abgegebene Karten verlieren ihre Verbesserungen: Ziehst du sie wieder, starten sie mit ihrer Grundwertung. Statistiken und abgeholte Albumprämien bleiben.</dd></div>
+        <div><dt>Kartenboni</dt><dd>Spezialkarten und die gewählte Karte behalten Meilensteine und Wachstum. Abgegebene Karten verlieren ihre Verbesserungen: Ziehst du sie wieder, starten sie mit ihrer Grundwertung. Statistiken und abgeholte Albumprämien bleiben.</dd></div>
       </dl>
       <h3>Spezialkarten bleiben ({specials.length})</h3>
       <p className="prestige-names">{specials.length ? specials.map((player) => player.name).join(", ") : "Keine Spezialkarten im Kader."}</p>
