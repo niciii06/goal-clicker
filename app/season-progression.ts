@@ -1,6 +1,3 @@
-import { UPGRADES } from "./game/upgrades";
-import { STAR_FORMATIONS, TOURNAMENTS } from "./features/catalog";
-
 export type SeasonMilestone = {
   /** Progression tier (1 = entry, 15 = top); shown to players as Liga 16 - season. */
   season: number;
@@ -9,7 +6,7 @@ export type SeasonMilestone = {
   rewards: readonly string[];
 };
 
-const UPGRADE_UNLOCK_SEASONS: Record<string, number> = {
+export const UPGRADE_UNLOCK_SEASONS: Record<string, number> = {
   boots: 1,
   ballboy: 1,
   technique: 1,
@@ -40,7 +37,7 @@ const UPGRADE_UNLOCK_SEASONS: Record<string, number> = {
 };
 
 // Tier = 16 - league: every pack opens in the league whose opponents match its cards.
-const PACK_UNLOCK_SEASONS: Record<string, number> = {
+export const PACK_UNLOCK_SEASONS: Record<string, number> = {
   scrap: 1,
   regional: 3,
   scout: 5,
@@ -52,13 +49,13 @@ const PACK_UNLOCK_SEASONS: Record<string, number> = {
   special: 13,
 };
 
-const TOURNAMENT_UNLOCK_SEASONS: Record<string, number> = {
+export const TOURNAMENT_UNLOCK_SEASONS: Record<string, number> = {
   stadium: 1,
   champions: 6,
   world: 12,
 };
 
-const FORMATION_UNLOCK_SEASONS: Record<string, number> = {
+export const FORMATION_UNLOCK_SEASONS: Record<string, number> = {
   "433": 1,
   "442": 1,
   "4231": 1,
@@ -108,29 +105,10 @@ const SEASON_MILESTONE_TEXTS: readonly { title: string; description: string; ext
   { title: "Hall of Fame", description: "Liga 1 ist erreicht. Dein Club gehört jetzt zur ewigen Elite.", extras: ["Hall of Fame Status", "Prestige freigeschaltet"] },
 ];
 
-// Pack labels live in feature-data, which imports this module; tests/ui-fixes.test.ts keeps them equal.
-export const PACK_NAMES: Record<string, string> = { scrap: "Schrott-Pack", regional: "Regional-Pack", scout: "Scout Pack", profi: "Profi-Pack", elite: "Elite Pack", weltklasse: "Weltklasse-Pack", legend: "Legenden Pack", special: "Spezialkarten-Pack" };
+/** Tier texts of the league roadmap; app/season-roadmap.ts adds the rewards from the unlock tables. */
+export const SEASON_TIERS = SEASON_MILESTONE_TEXTS;
 
-function idsAt(table: Record<string, number>, tier: number) {
-  return Object.keys(table).filter((id) => table[id] === tier);
-}
-
-/** Rewards of a tier, generated from the unlock tables so the roadmap names every upgrade, pack, cup and formation. */
-function getSeasonRewards(tier: number, extras: readonly string[] = []) {
-  const upgrades = idsAt(UPGRADE_UNLOCK_SEASONS, tier).map((id) => UPGRADES.find((upgrade) => upgrade.id === id)?.name ?? id);
-  const packs = idsAt(PACK_UNLOCK_SEASONS, tier).map((id) => PACK_NAMES[id] ?? id);
-  const cups = idsAt(TOURNAMENT_UNLOCK_SEASONS, tier).map((id) => TOURNAMENTS.find((tournament) => tournament.id === id)?.label ?? id);
-  const formations = idsAt(FORMATION_UNLOCK_SEASONS, tier);
-  const formationText = tier === 1 ? `${formations.length} Formationen`
-    : formations.length === 1 ? `Formation ${STAR_FORMATIONS.find((formation) => formation.id === formations[0])?.label ?? formations[0]}`
-    : `${formations.length} neue Formationen`;
-  const upgradeText = tier === 1 ? [`${upgrades.length} Basis Upgrades`] : upgrades;
-  return [...upgradeText, ...packs, ...cups, ...(formations.length ? [formationText] : []), ...extras];
-}
-
-export const SEASON_MILESTONES: readonly SeasonMilestone[] = SEASON_MILESTONE_TEXTS.map((text, index) => ({ season: index + 1, title: text.title, description: text.description, rewards: getSeasonRewards(index + 1, text.extras) }));
-
-export const MAX_CAREER_SEASON = SEASON_MILESTONES.length;
+export const MAX_CAREER_SEASON = SEASON_MILESTONE_TEXTS.length;
 
 export function getCurrentSeason(completedSeasons: number) {
   return Math.min(MAX_CAREER_SEASON, Math.max(1, Math.floor(Number.isFinite(completedSeasons) ? completedSeasons : 0) + 1));
@@ -180,10 +158,6 @@ export function leagueUnlockLabel(league: number) {
   return `Liga ${league}`;
 }
 
-export function getSeasonMilestone(season: number) {
-  const normalized = Math.max(1, Math.floor(season));
-  return SEASON_MILESTONES.find((milestone) => milestone.season === normalized) ?? SEASON_MILESTONES[SEASON_MILESTONES.length - 1];
-}
 
 /** Formations for the picker: available ones first in catalogue order, locked ones after them
  * in the order they unlock (Liga 15 is the entry, so Liga 14 comes before Liga 13). */

@@ -53,7 +53,8 @@ test("reserve filters and sorts by the shown career rating", () => {
 });
 
 test("league roadmap names every upgrade, pack and formation of its league", async () => {
-  const { SEASON_MILESTONES, PACK_NAMES, getUpgradeUnlockLeague, getPackUnlockLeague, getFormationUnlockLeague, leagueForTier } = await import("../app/season-progression");
+  const { SEASON_MILESTONES, PACK_NAMES } = await import("../app/season-roadmap");
+  const { getUpgradeUnlockLeague, getPackUnlockLeague, getFormationUnlockLeague, leagueForTier } = await import("../app/season-progression");
   const { UPGRADES } = await import("../app/game/upgrades");
   const { STAR_PACKS, SPECIAL_CARD_PACK, STAR_FORMATIONS } = await import("../app/feature-data");
   assert.equal(SEASON_MILESTONES.length, 15);
