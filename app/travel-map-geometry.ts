@@ -3,7 +3,8 @@
 import { HOME_VENUE } from './travel-geography';
 import { distanceKm, routePoints } from './travel-geography';
 import type { GeoPoint } from './travel-geography';
-import { journeyClock, segmentAt } from './journey-routing';
+import { cachedLegPoints, journeyClock, segmentAt, withRouteGeometry } from './journey-routing';
+import type { RouteCache } from './journey-routing';
 import type { Journey } from './travel-data';
 
 export type MapPoint = { x: number; y: number };
@@ -22,8 +23,9 @@ export function project(p: GeoPoint): MapPoint {
 }
 
 /** Projects every segment and keeps x continuous across the date line, so a route never jumps across the map. */
-export function projectRoutes(journey: Journey): ProjectedRoute[] {
-  const segments = journey.plan?.segments ?? [{ id: 'legacy', mode: journey.transport, geometry: 'approximate', points: routePoints(journey.origin ?? HOME_VENUE, journey.fixture.venue, journey.transport === 'plane'), to: undefined }];
+/** Saved legs without road or rail geometry are drawn on the cached route; timing always comes from the stored plan. */
+export function projectRoutes(journey: Journey, routes?: RouteCache): ProjectedRoute[] {
+  const segments = journey.plan ? withRouteGeometry(journey.plan, routes).segments : [legacySegment(journey, routes)];
   let previous: number | undefined;
   return segments.map(segment => {
     const projected = segment.points.map(p => {
@@ -37,6 +39,13 @@ export function projectRoutes(journey: Journey): ProjectedRoute[] {
     const to = 'to' in segment ? segment.to as { name?: string } | undefined : undefined;
     return { id: segment.id, mode: segment.mode as MapMode, geometry: segment.geometry, points: segment.points, projected, cumulative, length: cumulative.at(-1) ?? 0, name: to?.name };
   });
+}
+
+/** A journey from before travel plans: one leg from the origin to the stadium, on the cached road when there is one. */
+function legacySegment(journey: Journey, routes?: RouteCache) {
+  const from = journey.origin ?? HOME_VENUE, to = journey.fixture.venue, mode = journey.transport;
+  const cached = mode === 'bus' || mode === 'train' ? cachedLegPoints({ mode, from, to }, routes) : null;
+  return { id: 'legacy', mode, geometry: cached?.geometry ?? 'approximate', points: cached?.points ?? routePoints(from, to, mode === 'plane'), to: undefined };
 }
 
 /** Fraction of the flown distance after a fraction of the flight time: smooth take-off, cruise and landing. */
