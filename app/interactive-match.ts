@@ -23,6 +23,8 @@ export type InteractiveMatch = { version:2; id:string; seed:number; time:number;
 const clamp=(v:number,a:number,b:number)=>Math.max(a,Math.min(b,v));
 const dist=(a:SimPoint,b:SimPoint)=>Math.hypot(a.x-b.x,a.y-b.y);
 const point=(p:SimPoint):SimPoint=>({x:p.x,y:p.y});
+/** Match minute of a simulated match: derived from the play time, like the minutes of its goals, cards and injuries. */
+export function simulationMinute(sim:Pick<InteractiveMatch,'time'>){return Math.max(1,Math.min(120,Math.ceil((Number(sim.time)||0)/60)));}
 /** Game seconds between a goal and the following kickoff (about three real seconds in a league match). */
 export const GOAL_CELEBRATION_SECONDS=90;
 function seedHash(s:string){let n=2166136261;for(const c of s)n=Math.imul(n^c.charCodeAt(0),16777619);return n>>>0||1;}
