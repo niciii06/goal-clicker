@@ -35,9 +35,9 @@ async function linkAccount(playerId: string) {
 }
 
 function useSyncStatus() {
-  const [status, setStatus] = useState<SyncStatus>("saved");
-  useEffect(() => subscribeSyncStatus(setStatus), []);
-  return status;
+  const [state, setState] = useState<{ status: SyncStatus; message: string | null }>({ status: "saved", message: null });
+  useEffect(() => subscribeSyncStatus((status, message) => setState({ status, message })), []);
+  return state;
 }
 
 /**
@@ -75,7 +75,7 @@ async function patchProfile(body: { displayName?: string; username?: string }) {
 /** Profile settings: display name, username (every 30 days), password of username accounts and deleting the profile. */
 export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void }) {
   const account = useContext(AccountContext);
-  const status = useSyncStatus();
+  const { status, message: syncMessage } = useSyncStatus();
   const [displayName, setDisplayName] = useState(account?.profile.displayName ?? "");
   const [username, setUsername] = useState(account?.profile.username ?? "");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -149,7 +149,7 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
   }
 
   return <section className="profile-panel" aria-label="Profil">
-    <div><p className="eyebrow">PROFIL / KONTO</p><h4>{profile.displayName} <small>@{profile.username}</small></h4><p>{account.passwordLogin ? "Angemeldet mit Benutzername und Passwort." : `Angemeldet mit Google (${account.email ?? "unbekannt"}).`} Dein Spielstand wird automatisch in deinem Profil gespeichert: <strong className={`account-sync ${status}`}>{SYNC_LABELS[status]}</strong></p></div>
+    <div><p className="eyebrow">PROFIL / KONTO</p><h4>{profile.displayName} <small>@{profile.username}</small></h4><p>{account.passwordLogin ? "Angemeldet mit Benutzername und Passwort." : `Angemeldet mit Google (${account.email ?? "unbekannt"}).`} Dein Spielstand wird automatisch in deinem Profil gespeichert: <strong className={`account-sync ${status}`}>{syncMessage ?? SYNC_LABELS[status]}</strong></p></div>
     <form className="profile-row" onSubmit={saveDisplayName}><label><span>Anzeigename</span><input className="mode-input" maxLength={DISPLAY_NAME_MAX} value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || displayName.trim() === profile.displayName}>Speichern</button></form>
     <form className="profile-row" onSubmit={saveUsername}><label><span>Benutzername</span><input className="mode-input" maxLength={USERNAME_MAX} autoCapitalize="none" spellCheck={false} value={username} onChange={(event) => setUsername(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || usernameLocked || username.trim() === profile.username}>Ändern</button>
       <small>{nextChange.getTime() > now ? `Nächste Änderung ab ${nextChange.toLocaleDateString("de-CH")} möglich (nur Gross und Kleinschreibung jederzeit).` : "Du kannst den Benutzernamen jetzt ändern. Danach erst wieder in 30 Tagen."}{account.passwordLogin ? " Du meldest dich danach mit dem neuen Namen an." : ""}</small></form>

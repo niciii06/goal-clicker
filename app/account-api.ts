@@ -23,7 +23,8 @@ import type { AuthSession } from "./auth/server";
 import { readJsonBody, RequestBodyTooLargeError } from "./api/request-body";
 import { sharedRateLimited } from "./api/rate-limit";
 import type { RateLimitName } from "./api/rate-limit";
-import { cleanCloudSaveKeys, MAX_CLOUD_SAVE_BYTES, serializeCloudSaveKeys } from "./cloud-save-rules";
+import { cleanCloudSaveKeys, MAX_CLOUD_SAVE_REQUEST_BYTES, serializeCloudSaveKeys } from "./cloud-save-rules";
+import { STORAGE_KEY } from "./game/constants";
 import { cleanDisplayName, displayNameError, nextUsernameChangeAt, PASSWORD_LOGIN_DOMAIN, passwordError, usernameChangeCutoff, usernameError, usernameKey } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
 
@@ -32,7 +33,9 @@ type Store = Pick<GoalClickerDatabase,
   | "getCloudSave" | "getCloudSaveSince" | "putCloudSave"
   | "getIdentity" | "getIdentityForAccount" | "bindIdentity" | "lockFailedLogin" | "listLegacyIdentities"
   | "openRecoveryClaim" | "rotateRecoveryDestination" | "completeRecovery" | "findRecoveryCode"
-  | "deleteAccountData" | "finishAccountDeletion">;
+  | "deleteAccountData" | "finishAccountDeletion">
+  // Optional: a store without it accepts every upload, as before the schema check existed.
+  & Partial<Pick<GoalClickerDatabase, "getCloudSaveSchemaVersion">>;
 
 export type AccountApiDeps = {
   getSession: (request: Request, options?: { fresh?: boolean }) => Promise<AuthSession | null>;
@@ -187,7 +190,6 @@ export function updateProfileResponse(request: Request, deps = defaults) {
   });
 }
 
-const REAUTH_FOR_DELETE = { error: "Zum Löschen musst du dich zuerst neu anmelden. Melde dich ab, wieder an und lösche das Profil dann sofort.", errorCode: "REAUTH_REQUIRED" };
 const DELETION_REQUESTED = {
   deleted: false,
   dataDeleted: true,
@@ -229,12 +231,16 @@ export function deleteProfileResponse(request: Request, deps = defaults) {
         if (profile && confirm !== profile.usernameKey) return json({ error: "Zur Bestätigung den Benutzernamen eintippen.", errorCode: "CONFIRM_REQUIRED" }, 400);
       }
       const password = typeof body.password === "string" && body.password ? body.password : undefined;
-      const outcome = await deps.neon.deleteUser(session.sessionCookie, origin, password);
-      if (outcome === "needs-reauth") return json(REAUTH_FOR_DELETE, 401);
+      // The game data goes first, in one transaction that also marks the login: if anything after it fails, no
+      // data is left without a way back. A marked login skips the confirmation, so the request can simply be
+      // repeated; deleteAccountData and the steps after it are safe to run again.
+      await store.deleteAccountData(accountId, now);
       forgetSession(request);
       forgetIdentity(session);
       forgetAccountLink(accountId);
-      await store.deleteAccountData(accountId, now);
+      // The login itself last. Asking for a new login is no longer useful once the data is gone: such a login
+      // stays marked and locked and the owner removes it, exactly like a login Neon Auth cannot delete.
+      const outcome = await deps.neon.deleteUser(session.sessionCookie, origin, password).catch(() => "not-deleted" as const);
       if (outcome === "deleted") {
         await store.finishAccountDeletion(accountId);
         return json({ deleted: true, dataDeleted: true, loginDeleted: true }, 200, browserSetCookies(expiredSessionCookies()));
@@ -462,7 +468,7 @@ export function getCloudSaveResponse(request: Request, deps = defaults) {
 export function putCloudSaveResponse(request: Request, deps = defaults) {
   // The first save creates a row and asks Neon Auth itself (fresh): a deleted login must not get one back.
   return withAccount(request, deps, { fresh: false }, async ({ accountId, session }) => {
-    const body = await readJsonBody<{ baseVersion?: unknown; keys?: unknown; active?: unknown }>(request, MAX_CLOUD_SAVE_BYTES + 4096);
+    const body = await readJsonBody<{ baseVersion?: unknown; keys?: unknown; active?: unknown; schemaVersion?: unknown }>(request, MAX_CLOUD_SAVE_REQUEST_BYTES);
     const baseVersion = Number(body.baseVersion);
     if (!Number.isSafeInteger(baseVersion) || baseVersion < 0) return json({ error: "Die Spielstand Version fehlt.", errorCode: "INVALID" }, 400);
     const keys = cleanCloudSaveKeys(body.keys);
@@ -471,7 +477,15 @@ export function putCloudSaveResponse(request: Request, deps = defaults) {
       const fresh = await deps.getSession(request, { fresh: true });
       if (!fresh || fresh.subject !== session.subject) return json({ error: "Dieses Konto gibt es nicht mehr. Bitte melde dich neu an.", errorCode: "LOGIN_REQUIRED" }, 401);
     }
-    const result = await deps.db().putCloudSave(accountId, serializeCloudSaveKeys(keys), baseVersion, deps.now().toISOString(), body.active !== false);
+    const store = deps.db();
+    // A client that says which game schema it writes must not replace a save from a newer version of the game
+    // (an old tab after a deploy would drop what it does not know). Clients without the field stay accepted.
+    const schemaVersion = Number(body.schemaVersion);
+    if (body.schemaVersion !== undefined && Number.isFinite(schemaVersion) && store.getCloudSaveSchemaVersion) {
+      const stored = await store.getCloudSaveSchemaVersion(accountId, STORAGE_KEY).catch(() => 0);
+      if (stored > schemaVersion) return json({ error: "Dein Spielstand wurde mit einer neueren Version gespeichert. Bitte lade die Seite neu.", errorCode: "SAVE_SCHEMA_NEWER", schemaVersion: stored }, 409);
+    }
+    const result = await store.putCloudSave(accountId, serializeCloudSaveKeys(keys), baseVersion, deps.now().toISOString(), body.active !== false);
     if (result.save) return json({ version: result.save.version, updatedAt: result.save.updatedAt });
     return json({ error: "Auf einem anderen Gerät wurde inzwischen weitergespielt.", errorCode: "SAVE_CONFLICT", ...cloudSaveBody(result.conflict) }, 409);
   });

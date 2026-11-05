@@ -8,10 +8,14 @@ import { createContext, useCallback, useEffect, useMemo, useRef, useState } from
 import type { FormEvent, ReactNode } from "react";
 import { authErrorMessage, refreshAuthSession, registerWithUsername, signInWithGoogle, signInWithUsername, signOutOfAuth } from "./auth/browser";
 import { browserAuthMode } from "./auth/config";
-import { adoptOwnUpload, applyCloudSave, clearLocalAccountData, CloudSync, FLUSH_SAVE_EVENT, fetchCloudSave, holdsOtherAccountSave, planInitialSync, readCloudMeta, readCloudMetaOwner, readLocalSaveKeys, writeCloudMeta } from "./cloud-sync";
+import { adoptOwnUpload, applyCloudSave, clearLocalAccountData, CloudSync, FLUSH_SAVE_EVENT, fetchCloudSave, holdsOtherAccountSave, NEWER_VERSION_MESSAGE, planInitialSync, readCloudMeta, readCloudMetaOwner, readLocalSaveKeys, reportSyncProblem, STORAGE_FULL_MESSAGE, writeCloudMeta } from "./cloud-sync";
 import type { CloudSaveState } from "./cloud-sync";
+import { cleanCloudSaveKeys, summarizeSave } from "./cloud-save-rules";
+import type { SaveSummary } from "./cloud-save-rules";
 import { PLAYER_NAME_KEY } from "./game/constants";
-import { suspendLocalPersistence } from "./game/storage";
+import { isSaveFromNewerVersion } from "./game/save-schema";
+import { resumeLocalPersistence, suspendLocalPersistence } from "./game/storage";
+import { exportCurrentSave } from "./save-file-controls";
 import { cleanDisplayName, DISPLAY_NAME_MAX, displayNameError, PASSWORD_MAX, PASSWORD_MIN, passwordError, USERNAME_MAX, usernameError } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
 
@@ -58,6 +62,12 @@ type Phase =
   | { name: "profile"; user: SessionUser }
   | { name: "unreachable"; message: string; user: SessionUser | null; offlineProfile: PublicProfile | null }
   | { name: "deletion"; message: string }
+  // A save from a newer version of the game is in this browser or the cloud: this (older) page must not touch it.
+  | { name: "outdated" }
+  // The browser storage could not take the account's save; nothing was replaced.
+  | { name: "storage-full"; user: SessionUser; profile: PublicProfile }
+  // A guest's save meets an account that already has a different save: the player chooses.
+  | { name: "choose-save"; user: SessionUser; profile: PublicProfile; cloud: CloudSaveState; local: SaveSummary | null; account: SaveSummary | null }
   | { name: "ready"; user: SessionUser; profile: PublicProfile };
 
 /** The account and profile this device last started with: lets a signed in player continue offline. */
@@ -110,7 +120,15 @@ function RequiredAccount({ children }: { children: ReactNode }) {
     const sync = new CloudSync(user.id, {
       onNewerSave: (cloud) => {
         suspendLocalPersistence();
-        applyCloudSave(user.id, cloud);
+        try {
+          applyCloudSave(user.id, cloud);
+        } catch {
+          // Storage full: the previous game is back in place and keeps saving locally. The sync stays stopped,
+          // so this older game is never uploaded over the newer cloud save; the next start tries again.
+          resumeLocalPersistence();
+          reportSyncProblem(STORAGE_FULL_MESSAGE);
+          return;
+        }
         window.location.reload();
       },
     });
@@ -129,16 +147,26 @@ function RequiredAccount({ children }: { children: ReactNode }) {
 
       return;
     }
-    // Only a save that never belonged to an account may move into this one; another account's save is removed.
-    if (holdsOtherAccountSave(user.id)) clearLocalAccountData();
-    // An upload that went through while the page closed is this device's own save, not another device's.
-    const own = adoptOwnUpload(readCloudMeta(user.id), cloud);
-    if (own) writeCloudMeta(own);
-    const plan = planInitialSync(readCloudMeta(user.id), cloud, readLocalSaveKeys());
-    if (plan === "use-cloud") applyCloudSave(user.id, cloud);
-    // The next upload replaces the cloud save on top of its current version.
-    else if (plan === "keep-local") writeCloudMeta({ userId: user.id, version: cloud.version, hash: "", played: true });
-    else if (!cloud.keys) writeCloudMeta({ userId: user.id, version: cloud.version, hash: "" });
+    try {
+      // Only a save that never belonged to an account may move into this one; another account's save is removed.
+      if (holdsOtherAccountSave(user.id)) clearLocalAccountData();
+      // A newer version of the game wrote one of the saves: this page leaves both untouched.
+      if (isSaveFromNewerVersion(cloud.keys) || isSaveFromNewerVersion(cleanCloudSaveKeys(readLocalSaveKeys()))) { setPhase({ name: "outdated" }); return; }
+      // An upload that went through while the page closed is this device's own save, not another device's.
+      const own = adoptOwnUpload(readCloudMeta(user.id), cloud);
+      if (own) writeCloudMeta(own);
+      const local = readLocalSaveKeys();
+      const plan = planInitialSync(readCloudMeta(user.id), cloud, local);
+      if (plan === "choose") { setPhase({ name: "choose-save", user, profile, cloud, local: summarizeSave(cleanCloudSaveKeys(local)), account: summarizeSave(cloud.keys) }); return; }
+      if (plan === "use-cloud") applyCloudSave(user.id, cloud);
+      // The next upload replaces the cloud save on top of its current version.
+      else if (plan === "keep-local") writeCloudMeta({ userId: user.id, version: cloud.version, hash: "", played: true });
+      else if (!cloud.keys) writeCloudMeta({ userId: user.id, version: cloud.version, hash: "" });
+    } catch {
+      // applyCloudSave put the previous game back; nothing starts that could upload it over the cloud save.
+      setPhase({ name: "storage-full", user, profile });
+      return;
+    }
     startGame(user, profile);
   }, [startGame]);
 
@@ -270,7 +298,7 @@ function RequiredAccount({ children }: { children: ReactNode }) {
     // The running game writes its last state first; signing in then takes it into a new account.
     window.dispatchEvent(new Event(FLUSH_SAVE_EVENT));
     localStorage.removeItem(GUEST_MODE_KEY);
-    setPhase({ name: "signed-out", message: "Dein Gast Spielstand kommt in dein Konto, wenn es noch keinen Spielstand hat." });
+    setPhase({ name: "signed-out", message: "Dein Gast Spielstand kommt in dein Konto. Hat dein Konto schon einen Spielstand, wählst du nach der Anmeldung, welcher weitergespielt wird." });
   }, []);
   const guestContext = useMemo<GuestContextValue>(() => ({ signIn: guestSignIn }), [guestSignIn]);
 
@@ -300,6 +328,22 @@ function RequiredAccount({ children }: { children: ReactNode }) {
       {phase.name === "signed-out" && <LoginForm message={phase.message} onSignedIn={() => void enter()} onGuest={playAsGuest} />}
       {phase.name === "profile" && <ProfileSetup user={phase.user} onCreated={(profile) => { writeProfileCache(phase.user, profile); void syncAndStart(phase.user, profile); }} onSignOut={() => void signOut()} />}
       {phase.name === "deletion" && <FinishDeletion message={phase.message} />}
+      {phase.name === "outdated" && <>
+        <h2>Neue Version verfügbar</h2>
+        <p role="alert">{NEWER_VERSION_MESSAGE}</p>
+        <div className="account-actions">
+          <button type="button" className="mode-primary" onClick={() => window.location.reload()}>Neu laden</button>
+        </div>
+      </>}
+      {phase.name === "storage-full" && <>
+        <h2>Speicher voll</h2>
+        <p role="alert">{STORAGE_FULL_MESSAGE} Der Spielstand aus deinem Profil konnte nicht in diesem Browser gespeichert werden; dein bisheriger Spielstand hier ist unverändert.</p>
+        <div className="account-actions">
+          <button type="button" className="mode-primary" onClick={() => void syncAndStart(phase.user, phase.profile)}>Erneut versuchen</button>
+          <button type="button" className="mode-secondary" onClick={() => exportCurrentSave(undefined)}>Spielstand als Datei sichern</button>
+        </div>
+      </>}
+      {phase.name === "choose-save" && <ChooseSave phase={phase} onAccount={() => { exportCurrentSave(undefined); try { applyCloudSave(phase.user.id, phase.cloud); } catch { setPhase({ name: "storage-full", user: phase.user, profile: phase.profile }); return; } startGame(phase.user, phase.profile); }} onGuest={() => { writeCloudMeta({ userId: phase.user.id, version: phase.cloud.version, hash: "", played: true }); startGame(phase.user, phase.profile); }} />}
       {phase.name === "unreachable" && <>
         <h2>Keine Verbindung</h2>
         <p>{phase.message} Prüfe dein Internet und versuche es nochmal.{phase.offlineProfile ? " Du kannst auch offline weiterspielen; dein Fortschritt wird gespeichert, sobald die Verbindung zurück ist." : ""}</p>
@@ -310,6 +354,23 @@ function RequiredAccount({ children }: { children: ReactNode }) {
       </>}
     </section>
   </main>;
+}
+
+const describeSave = (summary: SaveSummary | null) => summary ? `${Math.floor(summary.totalGoals).toLocaleString("de-CH")} Tore insgesamt, ${summary.seasons} Saisons, ${summary.stars} Sterne` : "kein Spielstand";
+
+/** A guest signs in to an account that already has a save: which one continues. Nothing is replaced silently. */
+function ChooseSave({ phase, onAccount, onGuest }: { phase: { local: SaveSummary | null; account: SaveSummary | null }; onAccount: () => void; onGuest: () => void }) {
+  return <>
+    <h2>Welcher Spielstand?</h2>
+    <p>Dein Konto hat schon einen Spielstand. In diesem Browser liegt dein Gast Spielstand. Nur einer kann weitergespielt werden.</p>
+    <p><strong>Konto:</strong> {describeSave(phase.account)}<br /><strong>Gast:</strong> {describeSave(phase.local)}</p>
+    <p className="account-hint">Lädst du den Kontospielstand, wird dein Gast Spielstand vorher als Datei gesichert. Behältst du den Gast Spielstand, ersetzt er den Spielstand in deinem Konto.</p>
+    <div className="account-actions">
+      <button type="button" className="mode-primary" onClick={onAccount}>Kontospielstand laden</button>
+      <button type="button" className="mode-secondary" onClick={onGuest}>Gast Spielstand behalten</button>
+      <button type="button" className="mode-secondary quiet" onClick={() => exportCurrentSave(undefined)}>Gast Spielstand als Datei sichern</button>
+    </div>
+  </>;
 }
 
 /** The live "free or taken" check while a username is typed. */

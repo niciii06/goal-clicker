@@ -57,6 +57,10 @@ import { getStarCardTier, getWalkoutPresentation } from "./walkout-data";
 import { WalkoutAvatar } from "./walkout-avatar";
 import { loadRouteCache } from "./travel-route-cache-lazy";
 import { isAway, onReturn } from "./activity";
+import { MAX_BACKGROUND_CATCH_UP_MS, takeBackgroundTime } from "./game/storage";
+import { monotonicNow } from "./game/clock";
+import { NEWER_VERSION_MESSAGE } from "./game/save-schema";
+import { exportCurrentSave, SaveFileControls } from "./save-file-controls";
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 
@@ -85,7 +89,7 @@ function WalkoutCountryFlag({ code, country, compact = false }: { code: string; 
 
 
 
-const SAVE_FAILED_MESSAGE = "Speichern fehlgeschlagen: Der Browser Speicher ist voll. Lade deinen Spielstand als Datei herunter, bevor du die Seite schliesst.";
+const SAVE_FAILED_MESSAGE = "Speichern fehlgeschlagen: Der Browser Speicher ist voll. Sichere deinen Spielstand als Datei, bevor du die Seite schliesst.";
 /** A waiting co-op world without input for this long is polled every COOP_IDLE_POLL_MS instead of every 1.5 s. */
 const COOP_IDLE_AFTER_MS = 30_000;
 const COOP_IDLE_POLL_MS = 4000;
@@ -2512,10 +2516,16 @@ function App() {
   }
 
   // What the autosave did: another tab saved meanwhile (load that game), or the browser storage is full.
+  const outdatedShownRef = useRef(false);
   const handleLocalSave = useCallback((result: LocalSaveResult) => {
     if (result === "stale") {
       suspendLocalPersistence();
       window.location.reload();
+      return;
+    }
+    // A newer version of the game stored this save; it stays untouched until the page is reloaded.
+    if (result === "outdated") {
+      if (!outdatedShownRef.current) { outdatedShownRef.current = true; setOffline(NEWER_VERSION_MESSAGE); }
       return;
     }
     if (result === "failed" && !saveFailedRef.current) {
@@ -2596,6 +2606,20 @@ function App() {
     window.setTimeout(() => setHydrated(true), 0);
   }, []);
 
+  // Hidden time is measured on the monotonic clock (system clock changes earn nothing), and one hidden period
+  // earns at most MAX_BACKGROUND_CATCH_UP_MS of passive income in total. pageInactiveAtRef holds monotonic readings.
+  const hiddenBudgetRef = useRef(MAX_BACKGROUND_CATCH_UP_MS);
+  const markPageHidden = useCallback((now: number) => {
+    if (pageInactiveAtRef.current !== null) return;
+    pageInactiveAtRef.current = now;
+    hiddenBudgetRef.current = MAX_BACKGROUND_CATCH_UP_MS;
+  }, []);
+  const takeHiddenTime = useCallback((now: number) => {
+    const taken = takeBackgroundTime(pageInactiveAtRef.current, hiddenBudgetRef.current, now);
+    hiddenBudgetRef.current = taken.budgetMs;
+    return taken.elapsedMs;
+  }, []);
+
   useEffect(() => {
     if (!hydrated) return;
     const tick = window.setInterval(() => {
@@ -2606,16 +2630,16 @@ function App() {
     }, 200);
     const save = window.setInterval(() => {
       const now = Date.now();
-      const hiddenAt = pageInactiveAtRef.current;
-      const next = document.hidden && hiddenAt
-        ? advanceLocalGameWhileOpen(gameRef.current, now - hiddenAt, now)
+      const mono = monotonicNow();
+      const next = document.hidden && pageInactiveAtRef.current !== null
+        ? advanceLocalGameWhileOpen(gameRef.current, takeHiddenTime(mono), now)
         : { ...gameRef.current, lastSaved: now };
-      if (document.hidden) pageInactiveAtRef.current = now;
+      if (document.hidden) { markPageHidden(mono); pageInactiveAtRef.current = mono; }
       gameRef.current = next;
       handleLocalSave(persistLocalGame(next));
     }, 2200);
     return () => { window.clearInterval(tick); window.clearInterval(save); };
-  }, [hydrated, handleLocalSave]);
+  }, [hydrated, handleLocalSave, markPageHidden, takeHiddenTime]);
 
   useEffect(() => {
     if (!hydrated || isCoopLive) return;
@@ -2636,9 +2660,10 @@ function App() {
     if (!hydrated) return;
     const saveOnExit = () => {
       const now = Date.now();
-      const hiddenAt = pageInactiveAtRef.current;
-      const next = hiddenAt ? advanceLocalGameWhileOpen(gameRef.current, now - hiddenAt, now) : { ...gameRef.current, lastSaved: now };
-      if (hiddenAt) pageInactiveAtRef.current = now;
+      const mono = monotonicNow();
+      const hidden = pageInactiveAtRef.current !== null;
+      const next = hidden ? advanceLocalGameWhileOpen(gameRef.current, takeHiddenTime(mono), now) : { ...gameRef.current, lastSaved: now };
+      if (hidden) pageInactiveAtRef.current = mono;
       gameRef.current = next;
       // No reload while the page closes; the next start reads the newest save anyway.
       const result = persistLocalGame(next);
@@ -2650,17 +2675,16 @@ function App() {
     };
     const onVisibility = () => {
       if (document.hidden) {
-        const hiddenAt = pageInactiveAtRef.current ?? Date.now();
-        pageInactiveAtRef.current = hiddenAt;
-        persistLocalGame({ ...gameRef.current, lastSaved: hiddenAt });
+        markPageHidden(monotonicNow());
+        persistLocalGame({ ...gameRef.current, lastSaved: Date.now() });
         return;
       }
       if (!isLocalSaveWriter() && claimLocalSave() === "stale") { handleLocalSave("stale"); return; }
-      const hiddenAt = pageInactiveAtRef.current;
-      if (!hiddenAt) return;
-      pageInactiveAtRef.current = null;
+      if (pageInactiveAtRef.current === null) return;
       const now = Date.now();
-      const next = advanceLocalGameWhileOpen(gameRef.current, now - hiddenAt, now);
+      const elapsed = takeHiddenTime(monotonicNow());
+      pageInactiveAtRef.current = null;
+      const next = advanceLocalGameWhileOpen(gameRef.current, elapsed, now);
       gameRef.current = next;
       handleLocalSave(persistLocalGame(next));
       setGame(next);
@@ -2673,7 +2697,7 @@ function App() {
     window.addEventListener("keydown", claim, { capture: true, passive: true });
     document.addEventListener("visibilitychange", onVisibility);
     return () => { window.removeEventListener("beforeunload", saveOnExit); window.removeEventListener("pagehide", saveOnExit); window.removeEventListener(FLUSH_SAVE_EVENT, saveOnExit); window.removeEventListener("pointerdown", claim, { capture: true }); window.removeEventListener("keydown", claim, { capture: true }); document.removeEventListener("visibilitychange", onVisibility); };
-  }, [hydrated, handleLocalSave]);
+  }, [hydrated, handleLocalSave, markPageHidden, takeHiddenTime]);
 
   // Tutorial tasks tick off from the game itself; a league match counts at kick off, before its history exists.
   const tutorialCup = game.features.cup;
@@ -2897,6 +2921,7 @@ function App() {
             <section className="club-scorer-board" aria-label="Ewige Torschützenliste"><div className="club-scorer-heading"><div><p className="eyebrow">CLUBREKORDE / EWIG</p><h4>Deine drei besten Torschützen.</h4></div><span>ALLE SPIELE</span></div>{allTimeTopScorers.length ? <ol>{allTimeTopScorers.map(({ player, goals, appearances }, index) => <li key={`all-time-${player.id}`}><span>{index + 1}</span><div><strong>{player.name}</strong><small>{formatStarXIPositions(player)} · OVR {player.rating}</small></div><b>{goals} {goals === 1 ? "TOR" : "TORE"} · {appearances} {appearances === 1 ? "SPIEL" : "SPIELE"}</b></li>)}</ol> : <div className="club-scorer-empty"><strong>Die Rekordliste wartet.</strong><small>Das erste Tor eröffnet deine Klubgeschichte.</small></div>}</section>
             <TravelStatsPanel travel={displayGame.features.travel} now={getTravelTime()} clubName={displayGame.features.club.name} />
             <section className="tutorial-restart" aria-label="Tutorial"><div><p className="eyebrow">TUTORIAL / ERSTE SCHRITTE</p><strong>Noch einmal von vorn erklärt.</strong><small>Das Begrüssungsfenster und die Aufgaben für den Einstieg. Dein Spielstand bleibt, wie er ist.</small></div><button type="button" className="mode-secondary" onClick={restartTutorial}>Tutorial erneut starten</button></section>
+            <section className="tutorial-restart" aria-label="Spielstand als Datei"><div><p className="eyebrow">SPIELSTAND / DATEI</p><strong>Deinen Spielstand sichern.</strong><small>Speichert deinen Einzelspieler Spielstand als Datei auf diesem Gerät. Aus der Datei kannst du ihn später wieder laden; vorher wird nachgefragt.</small></div><SaveFileControls getGame={() => gameRef.current} onMessage={showToast} /></section>
 <div className="feature-panel-heading"><div><p className="eyebrow">CLUBIDENTITÄT / DEIN VEREIN</p><h3>Mach ihn zu deinem Club.</h3></div><span className="club-preview" style={{ color: clubDraft.color, borderColor: clubDraft.color }}>{clubDraft.badge}</span></div><div className="club-form"><label htmlFor="club-name">Clubname</label><input id="club-name" className="mode-input" value={clubDraft.name} maxLength={22} onChange={(event) => setClubDraft((current) => ({ ...current, name: event.target.value }))} /><div><span className="club-form-label">Wappen</span><div className="club-choice-row">{CLUB_BADGES.map((badge) => <button key={badge} className={clubDraft.badge === badge ? "selected" : ""} onClick={() => setClubDraft((current) => ({ ...current, badge }))}>{badge}</button>)}</div></div><div><span className="club-form-label">Clubfarbe</span><div className="club-choice-row colors">{CLUB_COLORS.map((color) => <button key={color} className={clubDraft.color === color ? "selected" : ""} style={{ background: color }} aria-label={`Clubfarbe ${color}`} onClick={() => setClubDraft((current) => ({ ...current, color }))} />)}</div></div><button className="mode-primary" onClick={() => void saveClubProfile()} disabled={coopBusy}>Clubprofil speichern</button></div></div>}
 
           {featureTab === "missions" && <div className="feature-panel">{!isCoopLive ? <div className="feature-empty"><Icon name="stadium" size={25} /><strong>Koop Missionen</strong><p>Starte ein Koop Match, um gemeinsame Ziele mit deinem Team freizuschalten.</p></div> : <><div className="feature-panel-heading"><div><p className="eyebrow">KOOP / GEMEINSAME ZIELE</p><h3>Missionen für euer Team.</h3></div><span className="feature-stat">SAISON {currentSeason}</span></div><div className="mission-list">{featureMissions.map((mission) => { const progress = getMissionProgress(mission, { seasonGoals: displayGame.seasonGoals, clicks: displayGame.clicks, minigameWins: displayGame.minigameWins, cupWins: displayGame.features.cup.wins }); const complete = progress >= mission.target; return <div className={`mission-row${mission.claimed ? " claimed" : ""}`} key={mission.id}><div className="mission-copy"><strong>{mission.title}</strong><small>{mission.description}</small><div className="mission-progress"><span style={{ width: `${Math.min(100, (progress / mission.target) * 100)}%` }} /></div><em>{formatNumber(Math.min(progress, mission.target))} / {formatNumber(mission.target)}</em></div><button className="feature-buy-button" onClick={() => void claimMission(mission)} disabled={mission.claimed || !complete || coopBusy}>{mission.claimed ? "Abgeholt" : complete ? `+${formatNumber(mission.reward)}` : "offen"}</button></div>; })}</div></>}</div>}
@@ -3011,7 +3036,7 @@ function App() {
         </div>
       </div>}
       {eventAnnouncement && <div key={`${eventAnnouncement.id}:${eventAnnouncement.createdAt}`} className={`gc-notification ${eventAnnouncement.tone}`} role="status" aria-live="polite"><span aria-hidden="true">{eventAnnouncement.id==='var'?'📺':eventAnnouncement.tone==='negative'?'⚠️':'🏟️'}</span><div><strong>{eventAnnouncement.title}</strong><p>{eventAnnouncement.message}</p><small>{eventAnnouncement.amount<0?`−${formatNumber(Math.abs(eventAnnouncement.amount))} TORE`:eventAnnouncement.amount>0?`+${formatNumber(eventAnnouncement.amount)} TORE`:'Keine Kontoänderung'}</small></div></div>}
-      {offline && <div className="offline-banner"><span className="offline-mark">Ⅱ</span><p>{offline}</p><button onClick={() => setOffline("")} aria-label="Hinweis schliessen">×</button></div>}
+      {offline && <div className="offline-banner" role="alert"><span className="offline-mark">Ⅱ</span><p>{offline}</p>{offline === SAVE_FAILED_MESSAGE && <button type="button" className="mode-secondary" style={{ minHeight: 44, flexShrink: 0, color: "var(--text)", fontSize: "var(--text-caption2)" }} onClick={() => showToast(exportCurrentSave(gameRef.current) ? "Spielstand als Datei gesichert." : "Der Spielstand konnte nicht als Datei gesichert werden.")}>Als Datei sichern</button>}{offline === NEWER_VERSION_MESSAGE && <button type="button" className="mode-secondary" style={{ minHeight: 44, flexShrink: 0, color: "var(--text)", fontSize: "var(--text-caption2)" }} onClick={() => window.location.reload()}>Neu laden</button>}<button type="button" style={{ minWidth: 44, minHeight: 44 }} onClick={() => setOffline("")} aria-label="Hinweis schliessen">×</button></div>}
       <footer className="footer-note">Made by xevihans</footer>
       {toast && <div className="toast" role="status">{toast}</div>}
     </div>

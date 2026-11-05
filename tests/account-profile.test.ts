@@ -205,7 +205,8 @@ test('a device keeps its save when it continues the cloud version, otherwise tak
   const playedThenPassive = { ...cloud, version: 5, active: false, activeVersion: 4 };
   assert.equal(planInitialSync({ userId: 'u', version: 3, hash: 'changed-since', played: true }, playedThenPassive, local), 'use-cloud');
   assert.equal(planInitialSync({ userId: 'u', version: 4, hash: 'changed-since', played: true }, playedThenPassive, local), 'keep-local');
-  assert.equal(planInitialSync(null, cloud, local), 'use-cloud');
+  // A guest's save with progress meets an account save with progress: the player chooses (L11), nothing is replaced.
+  assert.equal(planInitialSync(null, cloud, local), 'choose');
   assert.equal(planInitialSync(null, cloud, { ...cloud.keys }), 'use-cloud');
   // An upload sent while the page closed went through without an answer: the device recognises its own save
   // and simply continues, instead of mistaking it for another device's save.
@@ -217,6 +218,68 @@ test('a device keeps its save when it continues the cloud version, otherwise tak
   assert.deepEqual(adoptOwnUpload({ userId: 'u', version: 3, hash: 'older', played: true, pending: [sent, 'newer-progress'] }, cloud), own);
   assert.equal(adoptOwnUpload({ userId: 'u', version: 3, hash: 'older', pending: ['something-else'] }, cloud), null);
   assert.equal(adoptOwnUpload({ userId: 'u', version: 3, hash: 'older' }, cloud), null);
+});
+
+test('B04, R02, L11: the start never replaces a save by a fresh game, a restored older cloud or a silent guest takeover', () => {
+  const save = (goals: number) => ({ goalClickerSiteSaveV3: game(goals) });
+  const cloud = (version: number, goals: number) => ({ version, updatedAt: null, active: true, activeVersion: version, keys: save(goals) });
+  // B04: the local game is gone (storage cleared) although the meta says "same version": take the cloud game.
+  assert.equal(planInitialSync({ userId: 'u', version: 7, hash: 'x' }, cloud(7, 1e9), {}), 'use-cloud');
+  // R02: the cloud went back from version 7 to 3 (database restore). An unplayed device with more progress keeps it.
+  const local = save(900);
+  const unchanged = { userId: 'u', version: 7, hash: hashText(serializeCloudSaveKeys(local)), played: false };
+  assert.equal(planInitialSync(unchanged, cloud(3, 500), local), 'keep-local');
+  assert.equal(planInitialSync({ ...unchanged, played: true }, cloud(3, 500), local), 'keep-local');
+  // ...but a restored cloud that is further along still wins.
+  assert.equal(planInitialSync(unchanged, cloud(3, 5000), local), 'use-cloud');
+  // L11: a guest save (no meta) and an account save with progress: the player chooses.
+  assert.equal(planInitialSync(null, cloud(4, 80), save(50)), 'choose');
+  // A guest save and an account save without any progress: the guest game moves in.
+  assert.equal(planInitialSync(null, { ...cloud(1, 0), keys: { goalClickerSiteSaveV3: JSON.stringify({ goals: 0, totalGoals: 0, clicks: 0, seasons: 0 }) } }, save(50)), 'keep-local');
+  // Unchanged rules: no cloud save, or the same version with a game here.
+  assert.equal(planInitialSync(null, { version: 0, updatedAt: null, active: false, keys: null }, local), 'use-local');
+  assert.equal(planInitialSync(unchanged, cloud(7, 900), local), 'use-local');
+});
+
+test('R01: PUT /api/save refuses an upload from an older schema than the stored save, and accepts clients without the field', async () => {
+  const { call, store } = setup();
+  const withSchema = (goals: number, schemaVersion?: number) => JSON.stringify({ goals, totalGoals: goals, clicks: goals, seasons: 1, ...(schemaVersion === undefined ? {} : { features: { schemaVersion } }) });
+  assert.equal((await call(putCloudSaveResponse, 'PUT', { baseVersion: 0, keys: { goalClickerSiteSaveV3: withSchema(5, 9) }, schemaVersion: 9 }, '/api/save')).status, 200);
+  const refused = await call(putCloudSaveResponse, 'PUT', { baseVersion: 1, keys: { goalClickerSiteSaveV3: withSchema(6, 8) }, schemaVersion: 8 }, '/api/save');
+  assert.equal(refused.status, 409);
+  assert.equal(refused.data.errorCode, 'SAVE_SCHEMA_NEWER');
+  assert.equal(store.saves.get('user-a')!.version, 1, 'the newer save is untouched');
+  // An old client that does not send the field is still accepted (as before the check existed).
+  assert.equal((await call(putCloudSaveResponse, 'PUT', { baseVersion: 1, keys: { goalClickerSiteSaveV3: withSchema(7, 9) } }, '/api/save')).status, 200);
+  // Same or newer schema is accepted; an old save without any schema version in the cloud blocks nothing.
+  assert.equal((await call(putCloudSaveResponse, 'PUT', { baseVersion: 2, keys: { goalClickerSiteSaveV3: withSchema(8, 10) }, schemaVersion: 10 }, '/api/save')).status, 200);
+  store.saves.set('user-a', { ...store.saves.get('user-a')!, saveJson: JSON.stringify({ goalClickerSiteSaveV3: withSchema(8) }) });
+  assert.equal((await call(putCloudSaveResponse, 'PUT', { baseVersion: 3, keys: { goalClickerSiteSaveV3: withSchema(9, 8) }, schemaVersion: 8 }, '/api/save')).status, 200);
+});
+
+test('L10: the account deletion removes the game data before the login, and a failure after that can be repeated', async () => {
+  const { call, store, neon, deps } = setup();
+  await call(createProfileResponse, 'POST', { username: 'Nico_06', displayName: 'Nico' });
+  await call(putCloudSaveResponse, 'PUT', { baseVersion: 0, keys: { goalClickerSiteSaveV3: game(5) } }, '/api/save');
+  const order: string[] = [];
+  const deleteData = store.deleteAccountData;
+  store.deleteAccountData = async (...args) => { order.push('data'); return deleteData(...args); };
+  let failNeon = true;
+  deps.neon.deleteUser = async () => { order.push('login'); if (failNeon) throw new Error('Neon Auth down'); return 'not-deleted'; };
+  const endAll = deps.neon.endAllSessions;
+  let failEnd = true;
+  deps.neon.endAllSessions = async (cookie, origin) => { if (failEnd) throw new Error('Neon Auth down'); return endAll(cookie, origin); };
+  const first = await call(deleteProfileResponse, 'DELETE', { confirm: 'nico_06' });
+  assert.equal(first.status, 503, 'the failure is reported');
+  assert.deepEqual(order, ['data', 'login']);
+  assert.equal(store.profiles.size + store.saves.size, 0, 'no game data is left behind');
+  assert.ok(store.identities[0].deletedAt, 'the login is locked');
+  // The retry needs no confirmation (the login is already marked) and completes the request.
+  failNeon = false; failEnd = false;
+  const retry = await call(deleteProfileResponse, 'DELETE', {});
+  assert.equal(retry.status, 202);
+  assert.equal(retry.data.dataDeleted, true);
+  assert.equal(neon.sessions.size, 0);
 });
 
 test('only the game, layout and vibration keys travel to the cloud', () => {
