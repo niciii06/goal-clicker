@@ -38,13 +38,14 @@ export const DEFAULT_LAYOUT_ORDER: LayoutCardId[] = ["hero", "shop", "feature", 
 export const STAR_RARE_REVEAL_DURATION_MS = 2600;
 export const PACK_TROLL_INTRO_MS = 2800;
 export const RESERVE_PAGE_SIZE = 48;
+/** Rating chips of the reserve, aligned with the card tiers of the pack reveal (`CARD_TIERS` in feature-data). */
 export const STAR_RATING_FILTERS = [
-  { id: "all", label: "Alle" },
-  { id: "67-78", label: "67–78" },
-  { id: "79-85", label: "79–85" },
-  { id: "86-89", label: "86–89" },
-  { id: "90-94", label: "90–94" },
-  { id: "95-100", label: "95–100" },
+  { id: "all", label: "Alle", min: 0, max: 100 },
+  { id: "0-70", label: "bis 70", min: 0, max: 70 },
+  { id: "71-79", label: "71 bis 79", min: 71, max: 79 },
+  { id: "80-85", label: "80 bis 85", min: 80, max: 85 },
+  { id: "86-89", label: "86 bis 89", min: 86, max: 89 },
+  { id: "90-100", label: "90+", min: 90, max: 100 },
 ] as const;
 export const GOAL_CONFETTI = Array.from({ length: 46 }, (_, index) => ({ left: `${(index * 37) % 101}%`, delay: `${(index % 12) * 45}ms`, duration: `${2300 + (index % 7) * 180}ms`, color: ["#0071e3", "#34c759", "#ffcc00", "#ff375f", "#af52de", "#ffffff"][index % 6] }));
 export const GOLD_CONFETTI = ["#ffe28d", "#f6c94c", "#fff4bd", "#d49b19"];

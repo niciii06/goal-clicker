@@ -7,6 +7,7 @@ import type { AppMode, ClickEffect, CoopRole, CoopRoom, CoopSession, CrossbarGam
 import type { CoopMission, CupCardEvent, GameFeatures, PenaltyDirection as CupPenaltyDirection, RandomEvent, StarFormationId, StarPackId, StarPackReveal, TournamentGazetteIssue, TournamentId, TransferInsiderEvent } from "./feature-data";
 import type { Journey, TravelFixture } from "./travel-data";
 import type { MatchDraft } from "./match-commands";
+import { filterAndSortReserve } from "./game/reserve-filter";
 import { ACHIEVEMENTS, BALANCE_VERSION, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, COMBO_MAX_COUNT, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, ALBUM_MILESTONES_STORAGE_KEY, STAR_RATING_FILTERS, TUTORIAL_STORAGE_KEY, VIBRATION_STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from "./game/constants";
 import { AL, AR, AT, AU, AZ, BA, BE, BF, BG, BR, CA, CD, CH, CI, CL, CM, CN, CO, CR, CZ, DE, DK, DZ, EC, EG, ES, FI, FR, GB_ENG, GB_NIR, GB_SCT, GB_WLS, GE, GH, GM, GN, GR, GT, HR, HT, HU, IE, IL, IS, IT, JM, JP, KN, KR, MA, ME, ML, MW, MX, NG, NL, NO, NZ, PA, PH, PL, PT, PY, RO, RS, RU, SE, SI, SK, SN, SR, TR, UA, US, UY, VE, XK, ZA, ZM } from "country-flag-icons/react/3x2";
 import { AlbumPanel, CareerPanel, CareerPlayerBadge, MatchRatingsPanel, PostMatchSummary } from "./career-panels";
@@ -562,24 +563,10 @@ function App() {
   const journeyUnderway = Boolean(displayGame.features.travel.journey && !displayGame.features.travel.journey.consumed);
   const transferSquadVacancyLabel = startingStarXISelection.length < STAR_XI_SQUAD_SIZE ? "in der Startelf" : "auf der Bank";
   const filteredReserveStarXIPlayers = useMemo(() => {
-    const search = starSearch.trim().toLocaleLowerCase("de-CH");
-    return reserveStarXIPlayers.filter((player) => {
-      const filter = STAR_RATING_FILTERS.find((item) => item.id === starRatingFilter);
-      const inRatingRange = !filter || filter.id === "all" || (() => {
-        const [minimum, maximum] = filter.id.split("-").map(Number);
-        return player.rating >= minimum && player.rating <= maximum;
-      })();
-      const inPosition = starPositionFilter === "all" || getStarXIPositions(player).includes(starPositionFilter as (typeof STAR_POSITIONS)[number]);
-      return inRatingRange && inPosition && (!search || `${player.name} ${getStarXIPositions(player).join(" ")} ${player.rating}`.toLocaleLowerCase("de-CH").includes(search));
-    }).sort((first, second) => {
-      if (activeLineupSlot !== null) {
-        const firstCompatible = canStarXIPlayerFillSlot(first.id, activeLineupSlot, activeFormationPositions);
-        const secondCompatible = canStarXIPlayerFillSlot(second.id, activeLineupSlot, activeFormationPositions);
-        if (firstCompatible !== secondCompatible) return firstCompatible ? -1 : 1;
-      }
-      return second.rating - first.rating || first.name.localeCompare(second.name);
-    });
-  }, [activeFormationPositions, activeLineupSlot, reserveStarXIPlayers, starPositionFilter, starRatingFilter, starSearch]);
+    const career = displayGame.features.career;
+    const entries = reserveStarXIPlayers.map((player) => ({ id: player.id, name: player.name, positions: getStarXIPositions(player), rating: getCareerCard(career, player).rating, compatible: activeLineupSlot !== null && canStarXIPlayerFillSlot(player.id, activeLineupSlot, activeFormationPositions), player }));
+    return filterAndSortReserve(entries, { search: starSearch, ratingFilter: starRatingFilter, positionFilter: starPositionFilter, preferCompatible: activeLineupSlot !== null }).map((entry) => entry.player);
+  }, [activeFormationPositions, activeLineupSlot, reserveStarXIPlayers, starPositionFilter, starRatingFilter, starSearch, displayGame.features.career]);
   const reservePageCount = Math.max(1, Math.ceil(filteredReserveStarXIPlayers.length / RESERVE_PAGE_SIZE));
   const activeReservePage = Math.min(reservePage, reservePageCount - 1);
   const visibleReserveStarXIPlayers = useMemo(() => {

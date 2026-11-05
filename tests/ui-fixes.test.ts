@@ -1,0 +1,53 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { formatNumber } from "../app/game/format";
+import { STAR_RATING_FILTERS } from "../app/game/constants";
+import { filterAndSortReserve, matchesReservePosition, matchesReserveRating } from "../app/game/reserve-filter";
+
+test("formatNumber rounds before choosing the unit", () => {
+  assert.equal(formatNumber(999), "999");
+  assert.equal(formatNumber(1000), "1.0K");
+  assert.equal(formatNumber(1500), "1.5K");
+  assert.equal(formatNumber(9949), "9.9K");
+  assert.equal(formatNumber(9960), "10K");
+  assert.equal(formatNumber(99_499), "99K");
+  assert.equal(formatNumber(999_499), "999K");
+  assert.equal(formatNumber(999_600), "1.0M");
+  assert.equal(formatNumber(1e6), "1.0M");
+  assert.equal(formatNumber(999_999_999), "1.0B");
+  assert.equal(formatNumber(1e9), "1.0B");
+  assert.equal(formatNumber(1.2345e12), "1.2T");
+  assert.equal(formatNumber(Infinity), "MAX");
+  assert.equal(formatNumber(0), "0");
+  assert.match(formatNumber(1e40), /e/);
+});
+
+test("reserve rating chips follow the card tiers and cover every rating", () => {
+  assert.deepEqual(STAR_RATING_FILTERS.map((filter) => filter.label), ["Alle", "bis 70", "71 bis 79", "80 bis 85", "86 bis 89", "90+"]);
+  for (const filter of STAR_RATING_FILTERS) assert.doesNotMatch(filter.label, /[–—]/);
+  for (let rating = 40; rating <= 100; rating += 1) {
+    const chips = STAR_RATING_FILTERS.filter((filter) => filter.id !== "all" && matchesReserveRating(rating, filter.id));
+    assert.equal(chips.length, 1, `rating ${rating}`);
+  }
+  assert.ok(matchesReserveRating(55, "0-70"));
+});
+
+test("reserve position filter maps FC27 positions onto LAV, RAV and MS", () => {
+  assert.ok(matchesReservePosition(["LV"], "LAV"));
+  assert.ok(matchesReservePosition(["ST"], "MS"));
+  assert.ok(matchesReservePosition(["RAV"], "RV"));
+  assert.ok(!matchesReservePosition(["IV"], "LAV"));
+  assert.ok(matchesReservePosition(["IV"], "all"));
+});
+
+test("reserve filters and sorts by the shown career rating", () => {
+  const entries = [
+    { id: "grown", name: "Gewachsen", positions: ["ST" as const], rating: 95 },
+    { id: "plain", name: "Normal", positions: ["ST" as const], rating: 88 },
+    { id: "low", name: "Starter", positions: ["IV" as const], rating: 57 },
+  ];
+  assert.deepEqual(filterAndSortReserve(entries, { search: "", ratingFilter: "all", positionFilter: "all" }).map((entry) => entry.id), ["grown", "plain", "low"]);
+  assert.deepEqual(filterAndSortReserve(entries, { search: "", ratingFilter: "90-100", positionFilter: "all" }).map((entry) => entry.id), ["grown"]);
+  assert.deepEqual(filterAndSortReserve(entries, { search: "", ratingFilter: "0-70", positionFilter: "all" }).map((entry) => entry.id), ["low"]);
+  assert.deepEqual(filterAndSortReserve(entries, { search: "95", ratingFilter: "all", positionFilter: "MS" }).map((entry) => entry.id), ["grown"]);
+});
