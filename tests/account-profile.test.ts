@@ -205,7 +205,8 @@ test('a device keeps its save when it continues the cloud version, otherwise tak
   const playedThenPassive = { ...cloud, version: 5, active: false, activeVersion: 4 };
   assert.equal(planInitialSync({ userId: 'u', version: 3, hash: 'changed-since', played: true }, playedThenPassive, local), 'use-cloud');
   assert.equal(planInitialSync({ userId: 'u', version: 4, hash: 'changed-since', played: true }, playedThenPassive, local), 'keep-local');
-  assert.equal(planInitialSync(null, cloud, local), 'use-cloud');
+  // A guest's save with progress meets an account save with progress: the player chooses (L11), nothing is replaced.
+  assert.equal(planInitialSync(null, cloud, local), 'choose');
   assert.equal(planInitialSync(null, cloud, { ...cloud.keys }), 'use-cloud');
   // An upload sent while the page closed went through without an answer: the device recognises its own save
   // and simply continues, instead of mistaking it for another device's save.

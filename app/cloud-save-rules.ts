@@ -5,6 +5,8 @@ import { ALBUM_MILESTONES_STORAGE_KEY, LAYOUT_STORAGE_KEY, STORAGE_KEY, TUTORIAL
 
 export const SYNCED_SAVE_KEYS = [STORAGE_KEY, LAYOUT_STORAGE_KEY, VIBRATION_STORAGE_KEY, WHATS_NEW_STORAGE_KEY, TUTORIAL_STORAGE_KEY, ALBUM_MILESTONES_STORAGE_KEY] as const;
 export const MAX_CLOUD_SAVE_BYTES = 2 * 1024 * 1024;
+/** The largest PUT /api/save body (the save plus its version fields) the server reads, after decompression. */
+export const MAX_CLOUD_SAVE_REQUEST_BYTES = MAX_CLOUD_SAVE_BYTES + 4096;
 
 export type CloudSaveKeys = Partial<Record<(typeof SYNCED_SAVE_KEYS)[number], string>>;
 
@@ -58,4 +60,24 @@ export function summarizeSave(keys: CloudSaveKeys | null): SaveSummary | null {
 /** A save worth keeping: someone clicked or earned a goal. */
 export function hasProgress(summary: SaveSummary | null) {
   return Boolean(summary && (summary.totalGoals > 0 || summary.clicks > 0 || summary.seasons > 0));
+}
+
+/**
+ * The features schema a stored game was written with (features.schemaVersion), 0 for old saves without one or
+ * anything unreadable. Takes the raw game text of STORAGE_KEY.
+ */
+export function readGameSchemaVersion(game: string | null | undefined) {
+  if (!game) return 0;
+  try {
+    const parsed = JSON.parse(game) as { features?: { schemaVersion?: unknown } } | null;
+    const version = Number(parsed?.features?.schemaVersion);
+    return Number.isSafeInteger(version) && version > 0 ? version : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** The schema version of the game inside a set of cloud save keys. */
+export function readSaveSchemaVersion(keys: CloudSaveKeys | null | undefined) {
+  return readGameSchemaVersion(keys?.[STORAGE_KEY]);
 }
