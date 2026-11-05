@@ -3657,7 +3657,9 @@ export function applyPendingMatchChanges(features:GameFeatures,now:number) {
  delete features.cup.pendingSubstitutions;
 }
 
-function tournamentMatchDuration(minimumRating:number){return minimumRating>=85?300000:minimumRating>=70?270000:240000;}
+export function tournamentMatchDuration(minimumRating:number){return minimumRating>=85?300000:minimumRating>=70?270000:240000;}
+/** Regular time of a league match (Liga 15 and 14 play 4:00, the rest 3:30); beginSeasonCupMatch uses the same rule. */
+export function seasonMatchDuration(division:number){return division>=14?240000:210000;}
 function normalizeTimedPause(value:unknown):CupState['timedPause'] {
  const p=asRecord(value);
  if(!['goal','halftime'].includes(String(p.kind))||typeof p.id!=='string'||!Number.isFinite(p.startsAt)||!Number.isFinite(p.endsAt)||!Number.isFinite(p.frozenAt))return undefined;

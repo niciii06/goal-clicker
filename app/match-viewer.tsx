@@ -16,7 +16,8 @@ export type { Actor, Replay, MatchEvent } from './match-visual-frame';
 type Phase = 'live' | 'team' | 'statistics';
 const MatchPitchCanvas=dynamic(()=>import('./match-pitch-canvas').then(module=>module.MatchPitchCanvas), {
  ssr:false,
- loading:()=> <canvas className="gc-viewer-pitch" role="img" aria-label="Live Fussballfeld wird geladen"><svg viewBox="-3 -3 111 74" role="img" aria-label="Fussballfeld wird geladen"><rect width="105" height="68" fill="#237648"/><path d="M52.5 0V68" stroke="white"/></svg></canvas>,
+ // A canvas never draws its children, so the placeholder is a plain element with the pitch as SVG.
+ loading:()=> <div className="gc-viewer-pitch gc-viewer-pitch-placeholder" role="img" aria-label="Live Fussballfeld wird geladen"><svg viewBox="-3 -3 111 74" aria-hidden="true" focusable="false" style={{display:'block',width:'100%',height:'100%'}}><rect width="105" height="68" fill="#237648"/><path d="M52.5 0V68" stroke="white"/></svg></div>,
 });
 export function LegacyLiveMatchViewer({ features, now, clubName, clubColor, disabled=false, onSubstitute }: { features: GameFeatures; now: number; clubName: string; clubColor: string; disabled?:boolean; onSubstitute?:(changes:{playerId:string;slot:number}[])=>void }) {
   const [tab, setTab] = useState<Phase>("live");

@@ -53,11 +53,16 @@ export function formatNumber(value: number) {
   if (value <= 0) return "0";
   if (value < 1000) return Math.floor(value).toLocaleString("de-CH");
   const units = ["K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc", "Ud"];
-  const exponent = Math.min(units.length - 1, Math.floor(Math.log10(value) / 3) - 1);
-  if (Math.floor(Math.log10(value) / 3) - 1 >= units.length) return value.toExponential(2).replace("e+", "e");
-  const divisor = 1000 ** (exponent + 1);
-  const scaled = value / divisor;
-  return `${scaled.toFixed(scaled < 10 ? 1 : 0)}${units[exponent]}`;
+  // unit index: 0 for thousands, 1 for millions; log10 can land just beside an exact power of 1000, so correct it.
+  let unit = Math.floor(Math.log10(value) / 3) - 1;
+  if (1000 ** (unit + 1) > value) unit -= 1;
+  else if (value >= 1000 ** (unit + 2)) unit += 1;
+  // Round first, then move up a unit when rounding reaches 1000 (999 600 is 1.0M, not 1000K; 9 960 is 10K, not 10.0K).
+  let scaled = value / 1000 ** (unit + 1);
+  if (Number(scaled.toFixed(scaled < 10 ? 1 : 0)) >= 1000) { unit += 1; scaled = value / 1000 ** (unit + 1); }
+  if (unit >= units.length) return value.toExponential(2).replace("e+", "e");
+  const digits = Number(scaled.toFixed(1)) < 10 ? 1 : 0;
+  return `${scaled.toFixed(digits)}${units[unit]}`;
 }
 
 export function formatGoalDifference(team: Pick<SeasonTableRow, "goalsFor" | "goalsAgainst">) {

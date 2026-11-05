@@ -369,6 +369,8 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
   }
   return features;
 }
+/** Old album group ids that now belong to a merged group; claiming any of them claimed the group. */
+const ALBUM_GROUP_ALIASES: Record<string, readonly string[]> = { legendary: ['custom'] };
 export type AlbumGroup = { id: string; label: string; total: number; collected: number; reward: number; claimed: boolean };
 export function getAlbumGroups(career: CareerState): AlbumGroup[] {
   const owned = new Set(career.collectedIds), claimed = new Set(career.claimedAlbumRewards);
@@ -376,14 +378,15 @@ export function getAlbumGroups(career: CareerState): AlbumGroup[] {
     { id:'base',label:'Alle Basiskarten',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>!p.id.startsWith('scrap-')&&!p.isCustom&&p.cardType!=='icon'&&p.cardType!=='legendary'),reward:10000 },
     { id:'scrap',label:'Alle Schrottkarten',players:SCRAP_PACK_PLAYERS,reward:500 },
     { id:'icons',label:'Alle Icons',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.cardType==='icon'),reward:5000 },
-    { id:'custom',label:'Alle Custom-Karten',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.isCustom),reward:5000 },
-    { id:'legendary',label:'Alle legendären Karten',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.cardType==='legendary'),reward:5000 },
+    // One group for the special cards: they are all custom and legendary, so "custom" and "legendary" were the same
+    // ten cards paying twice. A save that claimed either old group counts as claimed (see ALBUM_GROUP_ALIASES).
+    { id:'legendary',label:'Alle legendären Karten',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.isCustom||p.cardType==='legendary'),reward:5000 },
     ...[...new Set(STAR_XI_ACTIVE_PLAYERS.map(p=>p.countryCode).filter(Boolean))].sort().map(code=>({ id:`nation-${code}`,label:`Nation ${code}`,players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.countryCode===code),reward:500 })),
   ];
   const distinct = STAR_XI_ACTIVE_PLAYERS.filter(p=>owned.has(p.id)).length;
   // Near goals on the way to the full collections: a few different cards already pay out once.
   const milestones = ALBUM_MILESTONES.map(m=>({id:`collect-${m.cards}`,label:`${m.cards} verschiedene Karten`,total:m.cards,collected:Math.min(m.cards,distinct),reward:m.reward,claimed:claimed.has(`collect-${m.cards}`)}));
-  return [...milestones, ...definitions.filter(d=>d.players.length).map(d=>({id:d.id,label:d.label,total:d.players.length,collected:d.players.filter(p=>owned.has(p.id)).length,reward:d.reward,claimed:claimed.has(d.id)}))];
+  return [...milestones, ...definitions.filter(d=>d.players.length).map(d=>({id:d.id,label:d.label,total:d.players.length,collected:d.players.filter(p=>owned.has(p.id)).length,reward:d.reward,claimed:claimed.has(d.id)||(ALBUM_GROUP_ALIASES[d.id]??[]).some(id=>claimed.has(id))}))];
 }
 export const ALBUM_MILESTONES = [{ cards:10, reward:100 }, { cards:25, reward:250 }, { cards:50, reward:500 }] as const;
 export function claimAlbumReward(features: GameFeatures, groupId: string) {

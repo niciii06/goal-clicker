@@ -819,7 +819,6 @@ html, body { min-height: 100%; margin: 0; }
 body { overflow-x: hidden; color: var(--text); background: var(--bg); }
 body::before { position: fixed; z-index: -1; inset: 0; background: radial-gradient(circle at 8% 4%, var(--glow-1), transparent 30%), radial-gradient(circle at 92% 18%, var(--glow-2), transparent 28%); content: ""; pointer-events: none; }
 button { font: inherit; }
-button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 
 .app-shell { width: min(1440px, calc(100% - 52px)); margin: 0 auto; padding: 22px 0 28px; }
 .topbar { position: sticky; top: 0; z-index: 8; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 12px 0 18px; border-bottom: 1px solid var(--line-soft); background: var(--topbar); backdrop-filter: saturate(180%) blur(20px); }
@@ -1699,7 +1698,7 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .career-toolbar{display:flex;gap:8px;align-items:start;flex-wrap:wrap;margin:12px 0}.career-toolbar>.mode-input{flex:1;min-width:150px}.career-toolbar select,.career-filters input{padding:10px;border-radius:9px;background:color-mix(in oklab, var(--accent) 62%, var(--text));color:color-mix(in srgb, var(--accent) 7%, var(--surface-raised));border:1px solid color-mix(in srgb, var(--surface-raised) 13%, transparent);max-width:100%}.career-filters{flex:1;min-width:150px}.career-filters summary{cursor:pointer;padding:10px}.career-filters>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px;background:color-mix(in oklab, var(--accent) 62%, var(--text));border-radius:12px}.career-form-list{max-height:430px;overflow:auto}.match-archive{padding:16px}.archive-match{border-bottom:1px solid color-mix(in srgb, var(--surface-raised) 8%, transparent);padding:10px 0}.archive-match>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;list-style:none}.archive-match summary small{display:block;font-size: var(--text-footnote);opacity:.65;margin-top:3px}.archive-match>p,.archive-events{font-size: var(--text-footnote);line-height:1.8}.archive-events{padding-left:20px}.archive-match .career-rating-list{margin-top:12px}.archive-match .career-rating-row summary{padding:8px}.post-match-summary{padding:20px;border:1px solid #ffffff20;background:#12262b;border-radius:18px;margin:14px 0}.summary-score{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center;text-align:center}.summary-score b{font-size:30px}.summary-score strong{font-size: var(--text-subhead)}.summary-performances{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:14px 0}.summary-performances>span{padding:10px;background:#ffffff08;border-radius:10px;display:grid;gap:4px;font-size: var(--text-footnote)}.summary-performances small{opacity:.65}.summary-actions{display:flex;gap:8px;margin-top:16px}.post-match-summary details{padding:9px 0;font-size: var(--text-footnote)}.post-match-summary summary{cursor:pointer}
 .gc-match-viewer.pitch-focus .gc-viewer-main{grid-template-columns:minmax(0,1fr)}.gc-match-viewer .gc-viewer-scoreboard{margin-top:8px}.gc-viewer-player-list>div{gap:8px}.gc-viewer-player-list progress{max-width:90px}.match-sub-button{margin:10px 12px}.gc-viewer-caption{font-size: var(--text-footnote)}.gc-viewer-tabs{grid-template-columns:repeat(3,1fr)}
 .match-in-progress .cup-panel>.starxi-summary,.match-in-progress .cup-panel>.trophy-room,.match-in-progress .cup-panel>.tournament-reward-odds,.match-in-progress .cup-panel>.club-scorer-board,.match-in-progress .feature-card-heading{display:none}.match-in-progress .shop-card,.match-in-progress .stadium-card,.match-in-progress .side-column{display:none}.match-in-progress .game-layout{grid-template-columns:minmax(0,1fr)}.match-in-progress .feature-card{grid-column:1/-1;order:-1!important}
-.post-match-extras:empty{display:none}.inline-standings,.inline-gazette{margin:12px 0;border:1px solid color-mix(in srgb, var(--surface-raised) 9%, transparent);border-radius:12px;padding:12px}.inline-standings .season-standings-card{width:auto;max-width:none;max-height:none;padding:12px;background:transparent;box-shadow:none;border:0}.inline-standings .season-standings-result{display:none}.inline-standings .season-standings-topline{font-size: var(--text-footnote)}.inline-standings .season-standings-card h2{font-size:18px}.inline-standings .season-standings-dismiss{display:none}.inline-gazette .gazette-front-page{width:auto;max-width:none;transform:none;padding:14px;box-shadow:none}.inline-gazette .gazette-dateline,.inline-gazette footer{display:none}.inline-gazette h2{font-size:20px}.inline-gazette h3{font-size:14px}.inline-gazette header{font-size:16px}.inline-gazette p{font-size: var(--text-footnote)}.feature-tabs>div{overflow-x:auto}.feature-tabs button{white-space:nowrap}
+.post-match-extras:empty{display:none}.inline-standings,.inline-gazette{margin:12px 0;border:1px solid color-mix(in srgb, var(--surface-raised) 9%, transparent);border-radius:12px;padding:12px}.inline-standings .season-standings-card{width:auto;max-width:none;max-height:none;padding:12px;background:transparent;box-shadow:none;border:0}.inline-standings .season-standings-topline{font-size: var(--text-footnote)}.inline-standings .season-standings-card h2{font-size:18px}.inline-gazette .gazette-front-page{width:auto;max-width:none;transform:none;padding:14px;box-shadow:none}.inline-gazette h2{font-size:20px}.inline-gazette h3{font-size:14px}.inline-gazette header{font-size:16px}.inline-gazette p{font-size: var(--text-footnote)}.feature-tabs>div{overflow-x:auto}.feature-tabs button{white-space:nowrap}
 @media(max-width:700px){.career-toolbar{display:grid;grid-template-columns:1fr}.career-filters>div{grid-template-columns:1fr}.summary-performances{grid-template-columns:1fr}.summary-score{gap:7px}.summary-score strong{font-size: var(--text-footnote)}.summary-score b{font-size:24px}.summary-actions{flex-wrap:wrap}.gc-viewer-tabs button{min-width:0}.gc-match-viewer.team-open .gc-viewer-main{grid-template-columns:1fr}.gc-match-viewer.team-open .gc-team-list{display:none}.gc-notification{padding:12px 14px}.match-in-progress .feature-card{padding:10px}}
 @media(prefers-reduced-motion:reduce){.gc-notification{animation:none}}
 .app-shell:not(.section-home) .click-zone-card,.app-shell:not(.section-home) .shop-card,.app-shell:not(.section-home) .layout-toolbar,.app-shell:not(.section-home) .side-column{display:none}.section-home .feature-card{display:none}.app-shell:not(.section-home) .clicker-layout{grid-template-columns:minmax(0,1fr)}.app-shell:not(.section-home) .feature-card{grid-column:1/-1}.app-shell:not(.section-home) .coop-world-tools{display:none}.feature-card-heading{display:none}.section-home .layout-toolbar{display:flex}.inline-standings .season-standings-panel{width:100%;max-width:none;padding:8px;background:none;box-shadow:none;border:0}.inline-standings .season-standings-table-head,.inline-standings .season-standings-note{display:none}.gc-viewer-tabs button{flex:1}.summary-performances b{color:#94d5b6}
@@ -2081,7 +2080,8 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .bulk-options button { border-color: transparent; background: var(--fill); }
 
 /* Keyboard focus: one clear ring in the accent colour. */
-:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 2px; }
+/* Solid accent: about 5:1 against the page instead of 1.7:1 for the old translucent ring. */
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 /* Confirmation before leaving co-op and similar choices. */
 .confirm-dialog { width: min(420px, 100%); }
@@ -2330,3 +2330,28 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
   .header-prestige-long { display: none; }
   .prestige-summary div { grid-template-columns: 1fr; gap: 0; }
 }
+
+/* Phones: toasts and the save banner sit above the fixed bottom navigation instead of behind it. */
+@media (max-width: 780px) {
+  .toast { bottom: calc(80px + env(safe-area-inset-bottom)); z-index: 35; max-width: calc(100% - 28px); text-align: center; }
+  .offline-banner { right: 14px; bottom: calc(80px + env(safe-area-inset-bottom)); left: 14px; z-index: 35; max-width: none; }
+}
+
+/* Touch targets: at least 44 px on coarse pointers, also on small phones. */
+@media (pointer: coarse) {
+  .top-actions .icon-button { width: 44px; height: 44px; }
+  .layout-order-controls button { min-width: 44px; min-height: 44px; }
+  .mini-game-close { width: 44px; height: 44px; }
+}
+
+/* Screen reader only status region for announcements. */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Walkout: with reduced motion the player stands in place at once; a seen walkout can be skipped. */
+@media (prefers-reduced-motion: reduce) {
+  .star-walkout-avatar-wrap { animation-duration: 1ms !important; animation-delay: 0ms !important; }
+}
+.star-walkout-skip { justify-self: center; min-height: 44px; margin-bottom: 8px; }
+.feature-tab-offer-dot { display: inline-block; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%; background: #b37f00; vertical-align: middle; }
+main :is(h2, h3, h4)[tabindex="-1"]:focus { outline: none; }
+main :is(h2, h3, h4)[tabindex="-1"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
