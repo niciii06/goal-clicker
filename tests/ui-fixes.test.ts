@@ -52,6 +52,29 @@ test("reserve filters and sorts by the shown career rating", () => {
   assert.deepEqual(filterAndSortReserve(entries, { search: "95", ratingFilter: "all", positionFilter: "MS" }).map((entry) => entry.id), ["grown"]);
 });
 
+test("league roadmap names every upgrade, pack and formation of its league", async () => {
+  const { SEASON_MILESTONES, PACK_NAMES, getUpgradeUnlockLeague, getPackUnlockLeague, getFormationUnlockLeague, leagueForTier } = await import("../app/season-progression");
+  const { UPGRADES } = await import("../app/game/upgrades");
+  const { STAR_PACKS, SPECIAL_CARD_PACK, STAR_FORMATIONS } = await import("../app/feature-data");
+  assert.equal(SEASON_MILESTONES.length, 15);
+  const rewardsOf = (league: number) => SEASON_MILESTONES.find((milestone) => leagueForTier(milestone.season) === league)!.rewards;
+  for (const upgrade of UPGRADES) {
+    const league = getUpgradeUnlockLeague(upgrade.id);
+    if (league === 15) continue; // summarised as "6 Basis Upgrades"
+    assert.ok(rewardsOf(league).includes(upgrade.name), `${upgrade.name} in Liga ${league}`);
+  }
+  assert.ok(rewardsOf(15).includes(`${UPGRADES.filter((upgrade) => getUpgradeUnlockLeague(upgrade.id) === 15).length} Basis Upgrades`));
+  for (const pack of [...STAR_PACKS, SPECIAL_CARD_PACK]) {
+    assert.equal(PACK_NAMES[pack.id], pack.label);
+    assert.ok(rewardsOf(getPackUnlockLeague(pack.id)).includes(pack.label), pack.label);
+  }
+  for (let league = 1; league <= 15; league += 1) {
+    const count = STAR_FORMATIONS.filter((formation) => getFormationUnlockLeague(formation.id) === league).length;
+    if (count) assert.ok(rewardsOf(league).some((reward) => reward.includes("Formation")), `Liga ${league}`);
+  }
+  assert.ok(rewardsOf(1).includes("Formation 5-4-1"));
+});
+
 test("album merges the custom and legendary groups without a double claim", async () => {
   const { claimAlbumReward, getAlbumGroups, initialCareerState } = await import("../app/career-data");
   const { initialGameFeatures, STAR_XI_ACTIVE_PLAYERS } = await import("../app/feature-data");

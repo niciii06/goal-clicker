@@ -1,3 +1,6 @@
+import { UPGRADES } from "./game/upgrades";
+import { STAR_FORMATIONS, TOURNAMENTS } from "./features/catalog";
+
 export type SeasonMilestone = {
   /** Progression tier (1 = entry, 15 = top); shown to players as Liga 16 - season. */
   season: number;
@@ -87,23 +90,45 @@ const FORMATION_UNLOCK_SEASONS: Record<string, number> = {
   "541": 15,
 };
 
-export const SEASON_MILESTONES: readonly SeasonMilestone[] = [
-  { season: 1, title: "Der Anpfiff", description: "Das Fundament für deinen neuen Club.", rewards: ["6 Basis Upgrades", "Schrott-Pack", "Stadionpokal", "4 Formationen"] },
-  { season: 2, title: "Nachwuchsprojekt", description: "Der Club beginnt, eigene Talente aufzubauen.", rewards: ["Nachwuchsakademie", "Distanzschütze", "2 neue Formationen"] },
-  { season: 3, title: "Abendspiele", description: "Mehr Reichweite und neue taktische Möglichkeiten.", rewards: ["Flutlichtanlage", "Freistoss-Spezialist", "Regional-Pack", "2 neue Formationen"] },
-  { season: 4, title: "Scouting Netzwerk", description: "Dein Club sucht jetzt weit über die Region hinaus.", rewards: ["Talent Scouting", "2 neue Formationen"] },
-  { season: 5, title: "Video Ära", description: "Technik und das Scout Pack verändern den Club.", rewards: ["VAR 2.0", "Weltklasse-Abschluss", "Scout Pack", "2 neue Formationen"] },
-  { season: 6, title: "Grosse Bühne", description: "Das Stadion wächst und Europa schaut zu.", rewards: ["Arena Ausbau", "Champions Cup", "2 neue Formationen"] },
-  { season: 7, title: "Medienhaus", description: "Jedes Spiel wird in die ganze Welt übertragen.", rewards: ["Weltweite Übertragung", "Ballon-d'Or-Angreifer", "Profi-Pack", "2 neue Formationen"] },
-  { season: 8, title: "Weltmarke", description: "Der erste globale Partner steigt ein.", rewards: ["Globaler Sponsor", "2 neue Formationen"] },
-  { season: 9, title: "Superclub", description: "Aus einem Verein wird ein internationales Netzwerk.", rewards: ["Superclub Netzwerk", "Elite Pack", "2 neue Formationen"] },
-  { season: 10, title: "Captain Era", description: "Ein Leader prägt die nächste Generation.", rewards: ["Kapitänsbinde", "2 neue Formationen"] },
-  { season: 11, title: "Goldene Generation", description: "Deine Klicks werden zur echten Weltklasse.", rewards: ["Goldener Schuh", "Weltklasse-Pack", "2 neue Formationen"] },
-  { season: 12, title: "Weltbühne", description: "Jetzt wartet das härteste Turnier im Spiel.", rewards: ["Weltmeisterschaft", "Legenden Pack", "2 neue Formationen"] },
-  { season: 13, title: "Legendenjagd", description: "Die seltensten Karten kommen in Reichweite.", rewards: ["Spezialkarten-Pack", "Formation 5-2-3"] },
-  { season: 14, title: "Vereins Dynastie", description: "Dein Club verdient dauerhaft auf höchstem Niveau.", rewards: ["Vereins Dynastie", "Formation 5-3-2"] },
-  { season: 15, title: "Hall of Fame", description: "Liga 1 ist erreicht. Dein Club gehört jetzt zur ewigen Elite.", rewards: ["Hall of Fame Status", "Prestige freigeschaltet", "Alle 29 Formationen"] },
-] as const;
+const SEASON_MILESTONE_TEXTS: readonly { title: string; description: string; extras?: readonly string[] }[] = [
+  { title: "Der Anpfiff", description: "Das Fundament für deinen neuen Club." },
+  { title: "Nachwuchsprojekt", description: "Der Club beginnt, eigene Talente aufzubauen." },
+  { title: "Abendspiele", description: "Mehr Reichweite und neue taktische Möglichkeiten." },
+  { title: "Scouting Netzwerk", description: "Dein Club sucht jetzt weit über die Region hinaus." },
+  { title: "Video Ära", description: "Technik und das Scout Pack verändern den Club." },
+  { title: "Grosse Bühne", description: "Das Stadion wächst und Europa schaut zu." },
+  { title: "Medienhaus", description: "Jedes Spiel wird in die ganze Welt übertragen." },
+  { title: "Weltmarke", description: "Der erste globale Partner steigt ein." },
+  { title: "Superclub", description: "Aus einem Verein wird ein internationales Netzwerk." },
+  { title: "Captain Era", description: "Ein Leader prägt die nächste Generation." },
+  { title: "Goldene Generation", description: "Deine Klicks werden zur echten Weltklasse." },
+  { title: "Weltbühne", description: "Jetzt wartet das härteste Turnier im Spiel." },
+  { title: "Legendenjagd", description: "Die seltensten Karten kommen in Reichweite." },
+  { title: "Vereins Dynastie", description: "Dein Club verdient dauerhaft auf höchstem Niveau." },
+  { title: "Hall of Fame", description: "Liga 1 ist erreicht. Dein Club gehört jetzt zur ewigen Elite.", extras: ["Hall of Fame Status", "Prestige freigeschaltet"] },
+];
+
+// Pack labels live in feature-data, which imports this module; tests/ui-fixes.test.ts keeps them equal.
+export const PACK_NAMES: Record<string, string> = { scrap: "Schrott-Pack", regional: "Regional-Pack", scout: "Scout Pack", profi: "Profi-Pack", elite: "Elite Pack", weltklasse: "Weltklasse-Pack", legend: "Legenden Pack", special: "Spezialkarten-Pack" };
+
+function idsAt(table: Record<string, number>, tier: number) {
+  return Object.keys(table).filter((id) => table[id] === tier);
+}
+
+/** Rewards of a tier, generated from the unlock tables so the roadmap names every upgrade, pack, cup and formation. */
+function getSeasonRewards(tier: number, extras: readonly string[] = []) {
+  const upgrades = idsAt(UPGRADE_UNLOCK_SEASONS, tier).map((id) => UPGRADES.find((upgrade) => upgrade.id === id)?.name ?? id);
+  const packs = idsAt(PACK_UNLOCK_SEASONS, tier).map((id) => PACK_NAMES[id] ?? id);
+  const cups = idsAt(TOURNAMENT_UNLOCK_SEASONS, tier).map((id) => TOURNAMENTS.find((tournament) => tournament.id === id)?.label ?? id);
+  const formations = idsAt(FORMATION_UNLOCK_SEASONS, tier);
+  const formationText = tier === 1 ? `${formations.length} Formationen`
+    : formations.length === 1 ? `Formation ${STAR_FORMATIONS.find((formation) => formation.id === formations[0])?.label ?? formations[0]}`
+    : `${formations.length} neue Formationen`;
+  const upgradeText = tier === 1 ? [`${upgrades.length} Basis Upgrades`] : upgrades;
+  return [...upgradeText, ...packs, ...cups, ...(formations.length ? [formationText] : []), ...extras];
+}
+
+export const SEASON_MILESTONES: readonly SeasonMilestone[] = SEASON_MILESTONE_TEXTS.map((text, index) => ({ season: index + 1, title: text.title, description: text.description, rewards: getSeasonRewards(index + 1, text.extras) }));
 
 export const MAX_CAREER_SEASON = SEASON_MILESTONES.length;
 
