@@ -1847,9 +1847,15 @@ function App() {
       setCoopBusy(false);
       return;
     }
+    const shown = displayGame.features;
     setGame((current) => {
-      const features = normalizeGameFeatures(current.features);
-      features.starXI = setBestStarXI(features.starXI, getBestXIUnavailablePlayerIds(features), { career: features.career, cup: features.cup });
+      // The preview was computed from exactly these features: reuse it instead of normalizing and searching again.
+      let features: GameFeatures;
+      if (current.features === shown) features = { ...current.features, starXI: preview };
+      else {
+        features = normalizeGameFeatures(current.features);
+        features.starXI = setBestStarXI(features.starXI, getBestXIUnavailablePlayerIds(features), { career: features.career, cup: features.cup });
+      }
       const count = features.starXI.lineupIds.filter(Boolean).length;
       addHistory(features, { title: "Beste Startelf aufgestellt", detail: `${count} von ${STAR_XI_SQUAD_SIZE} Positionen mit den stärksten passenden Spielern besetzt.`, tone: "positive" });
       return { ...current, features };

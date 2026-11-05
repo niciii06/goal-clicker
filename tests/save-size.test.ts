@@ -82,3 +82,14 @@ test('a legacy match without simulation does not claim interactive statistics', 
   const loaded = normalizeGameFeatures({ ...f, cup: { ...f.cup, active: false, matchStartedAt: 5, interactiveResult: 'yes' } });
   assert.equal(loaded.cup.interactiveResult, undefined);
 });
+
+test('Best XI: the preview from the shown features equals the old normalize-and-search result (P11)', async () => {
+  const { setBestStarXI, getBestXIUnavailablePlayerIds } = await import('../app/feature-data');
+  const f = finish(runningMatch(11));
+  const shown = normalizeGameFeatures(JSON.parse(JSON.stringify(f)));
+  shown.starXI = { ...shown.starXI, lineupIds: [...shown.starXI.lineupIds].reverse() };
+  const preview = setBestStarXI(shown.starXI, getBestXIUnavailablePlayerIds(shown), { career: shown.career, cup: shown.cup });
+  const old = normalizeGameFeatures(shown);
+  old.starXI = setBestStarXI(old.starXI, getBestXIUnavailablePlayerIds(old), { career: old.career, cup: old.cup });
+  assert.deepEqual(preview, old.starXI);
+});
