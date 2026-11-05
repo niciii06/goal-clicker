@@ -16,7 +16,7 @@ import { DailyRewardCard } from "./daily-reward-panel";
 import { FootballGraphic, GameErrorBoundary, Icon, StarXIPositionBadges } from "./game/ui";
 import { LiveMatchViewer } from "./match-viewer";
 import { AccountButton, AccountLink } from "./account-panel";
-import { ConfirmDialog } from "./confirm-dialog";
+import { ConfirmDialog, useDialogFocus } from "./confirm-dialog";
 import { PrestigeDialog, prestigeBonusLabel, prestigeBonusPercent } from "./prestige-dialog";
 import { WHATS_NEW } from "./whats-new";
 import { WhatsNewDialog } from "./whats-new-dialog";
@@ -102,7 +102,18 @@ const STAR_TOP_WALKOUT_ANIMATION_MS = 11500;
 const STAR_WALKOUT_READY_MS = 7500;
 const STAR_TOP_WALKOUT_READY_MS = 10900;
 
+/** With reduced motion the reveal skips its animations and is ready almost at once. */
+const STAR_REVEAL_REDUCED_MOTION_READY_MS = 700;
+/** A player who has seen one walkout may skip the next ones after this long. */
+const STAR_WALKOUT_SKIP_AFTER_MS = 2000;
+const WALKOUT_SEEN_STORAGE_KEY = "goal-clicker-walkout-seen";
+
+function prefersReducedMotion() {
+  try { return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; }
+}
+
 function getStarRevealReadyDelay(reveal: StarPackReveal) {
+  if (prefersReducedMotion() && getStarCardTier(reveal.player) !== "standard") return STAR_REVEAL_REDUCED_MOTION_READY_MS;
   const tier = getStarCardTier(reveal.player);
   const trollDelay = reveal.troll && (tier === "walkout" || tier === "icon" || tier === "legendary") ? PACK_TROLL_INTRO_MS : 0;
   if (tier === "rare") return STAR_RARE_REVEAL_DURATION_MS;
@@ -279,6 +290,17 @@ function App() {
   const [seasonTitle, setSeasonTitle] = useState<SeasonTitle | null>(null);
   const [starReveal, setStarReveal] = useState<StarPackReveal | null>(null);
   const [starWalkoutReady, setStarWalkoutReady] = useState(false);
+  const [walkoutSkippable, setWalkoutSkippable] = useState(false);
+  const [starRevealSkipped, setStarRevealSkipped] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  useEffect(() => {
+    let query: MediaQueryList;
+    try { query = window.matchMedia("(prefers-reduced-motion: reduce)"); } catch { return; }
+    const update = () => setReducedMotion(query.matches);
+    update();
+    query.addEventListener?.("change", update);
+    return () => query.removeEventListener?.("change", update);
+  }, []);
   // How far the reveal had already run when it appeared (after a reload); fixed for the whole animation.
   const [starRevealLag, setStarRevealLag] = useState(0);
   const packSoundRef = useRef<(() => void) | null>(null);
@@ -310,6 +332,7 @@ function App() {
   const clubGoalRef = useRef<string | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const starRevealTimerRef = useRef<number | null>(null);
+  const walkoutSkipTimerRef = useRef<number | null>(null);
   const cupCardTimerRef = useRef<number | null>(null);
   const seasonHistoryRef = useRef<string | null>(null);
   const feedIdRef = useRef(2);
@@ -498,7 +521,11 @@ function App() {
   const starRevealIsIconic = starRevealTier === "icon";
   const starRevealIsLegendary = starRevealTier === "legendary";
   const starRevealIsRare = starRevealTier === "rare";
-  const starRevealTrollActive = Boolean(starReveal?.troll && starRevealIsWalkout && starRevealAge < PACK_TROLL_INTRO_MS);
+  const starRevealTrollActive = Boolean(starReveal?.troll && starRevealIsWalkout && starRevealAge < PACK_TROLL_INTRO_MS && !reducedMotion && !starRevealSkipped);
+  useEffect(() => {
+    if (!starWalkoutReady || !starReveal || (!starRevealIsWalkout && !starRevealIsRare)) return;
+    try { window.localStorage.setItem(WALKOUT_SEEN_STORAGE_KEY, "1"); } catch { /* storage blocked */ }
+  }, [starWalkoutReady, starReveal, starRevealIsWalkout, starRevealIsRare]);
   const starRevealTrollDelay = starReveal?.troll && starRevealIsWalkout ? PACK_TROLL_INTRO_MS : 0;
   const starWalkoutIsTop = starRevealIsWalkout && (starReveal?.player.rating ?? 0) >= 90;
   const starWalkoutConfetti = starRevealIsLegendary || starWalkoutIsTop ? GOLD_CONFETTI : starRevealIsIconic ? SILVER_CONFETTI : null;
@@ -576,6 +603,31 @@ function App() {
   }, [activeReservePage, filteredReserveStarXIPlayers]);
   const currentRank = useMemo(() => getRank(displayGame.totalGoals), [displayGame.totalGoals]);
   const nextRank = useMemo(() => RANKS.find((rank) => rank.minimum > displayGame.totalGoals), [displayGame.totalGoals]);
+  // Take over overlays: focus moves into them and stays there; Escape closes only what may close.
+  const starWalkoutReadyRef = useRef(starWalkoutReady);
+  useEffect(() => { starWalkoutReadyRef.current = starWalkoutReady; }, [starWalkoutReady]);
+  const penaltyDialogRef = useRef<HTMLDivElement>(null);
+  const transferDialogRef = useRef<HTMLDivElement>(null);
+  const starRevealDialogRef = useRef<HTMLDivElement>(null);
+  const penaltyOverlayOpen = Boolean(displayGame.features.cup.active && displayGame.features.cup.phase === "penalties");
+  useDialogFocus(penaltyOverlayOpen, penaltyDialogRef, () => undefined);
+  useDialogFocus(Boolean(transferAnnouncement && !gazetteAnnouncement), transferDialogRef, () => dismissTransferAnnouncement());
+  useDialogFocus(Boolean(starReveal), starRevealDialogRef, () => { if (starWalkoutReadyRef.current) dismissStarReveal(); });
+  useEffect(() => {
+    if (!starReveal) return;
+    const dialog = starRevealDialogRef.current;
+    if (!dialog || dialog.contains(document.activeElement)) { if (starWalkoutReady) dialog?.querySelector<HTMLElement>(".star-walkout-dismiss:not([disabled]), .event-takeover-dismiss:not([disabled])")?.focus(); return; }
+    (dialog.querySelector<HTMLElement>("button:not([disabled])") ?? dialog).focus();
+  }, [starReveal, starWalkoutReady, walkoutSkippable]);
+  // One persistent live region: the goal counter and combo are not live (they change several times a second);
+  // toasts and rank milestones are announced here instead.
+  const [srAnnouncement, setSrAnnouncement] = useState("");
+  const announcedRankRef = useRef<string | null>(null);
+  useEffect(() => { if (toast) setSrAnnouncement(toast); }, [toast]);
+  useEffect(() => {
+    if (announcedRankRef.current !== null && announcedRankRef.current !== currentRank.name) setSrAnnouncement(`Neuer Rang: ${currentRank.name}`);
+    announcedRankRef.current = currentRank.name;
+  }, [currentRank.name]);
   const goalBoostMultiplier = getGoalBoostMultiplier(displayGame.features, countdownNow);
   const goalBoostActive = goalBoostMultiplier > 1;
   const goalBoostLabel = String(goalBoostMultiplier).replace(".", ",");
@@ -967,10 +1019,17 @@ function App() {
       const tier = getStarCardTier(reveal.player);
       if (tier === "walkout" || tier === "icon" || tier === "legendary") vibrate([90, 50, 90, 50, 260]);
       setStarWalkoutReady(false);
+      setWalkoutSkippable(false);
+      setStarRevealSkipped(false);
       starRevealTimerRef.current = window.setTimeout(() => {
         setStarWalkoutReady(true);
         starRevealTimerRef.current = null;
       }, revealDuration - elapsed);
+      if (walkoutSkipTimerRef.current) window.clearTimeout(walkoutSkipTimerRef.current);
+      walkoutSkipTimerRef.current = null;
+      let seen = false;
+      try { seen = window.localStorage.getItem(WALKOUT_SEEN_STORAGE_KEY) === "1"; } catch { /* storage blocked */ }
+      if (seen && revealDuration - elapsed > STAR_WALKOUT_SKIP_AFTER_MS) walkoutSkipTimerRef.current = window.setTimeout(() => { setWalkoutSkippable(true); walkoutSkipTimerRef.current = null; }, Math.max(0, STAR_WALKOUT_SKIP_AFTER_MS - elapsed));
       return;
     }
     setStarWalkoutReady(true);
@@ -983,8 +1042,22 @@ function App() {
     packSoundRef.current = null;
     if (starRevealTimerRef.current) window.clearTimeout(starRevealTimerRef.current);
     starRevealTimerRef.current = null;
+    if (walkoutSkipTimerRef.current) window.clearTimeout(walkoutSkipTimerRef.current);
+    walkoutSkipTimerRef.current = null;
+    setWalkoutSkippable(false);
+    setStarRevealSkipped(false);
     setStarWalkoutReady(false);
     setStarReveal(null);
+  }
+
+  /** Skips the rest of a walkout or rare reveal: the card shows at once, ready to take over. */
+  function skipStarReveal() {
+    if (starRevealTimerRef.current) window.clearTimeout(starRevealTimerRef.current);
+    starRevealTimerRef.current = null;
+    setWalkoutSkippable(false);
+    setStarRevealSkipped(true);
+    setStarRevealLag(24 * 60 * 60 * 1000);
+    setStarWalkoutReady(true);
   }
 
   function finishStarWalkout(event: AnimationEvent<HTMLDivElement>) {
@@ -2808,7 +2881,7 @@ function App() {
     <div className={`app-shell section-${featureTab}${displayGame.features.cup.active && featureTab === "cup" ? " match-in-progress" : ""}`}>
       <header className="topbar">
         <div className="brand-lockup"><div className="brand-ball"><FootballGraphic /></div><div className="brand-copy"><p className="eyebrow">FOOTBALL IDLE CLUB</p><h1>GOAL <span>CLICKER</span></h1></div></div>
-        <div className={`header-goals${goalBoostActive ? " goal-boost-active" : ""}`} aria-live="polite" aria-label={`Aktueller Kontostand: ${hasInfiniteMoney ? "unbegrenzt" : formatNumber(displayGame.goals)} Tore${goalBoostActive ? `; ${goalBoostLabel}-facher Goalboost noch ${goalBoostCountdown}` : ""}`}><span>{hasInfiniteMoney ? "AZB TESTMODUS" : "AKTUELLER STAND"}</span><strong>{displayBalance}</strong><small>TORE</small>{goalBoostActive && <em className="header-goal-boost">⚡ {goalBoostLabel}× · {goalBoostCountdown}</em>}{seasonMode.prestigeCount > 0 && <em className="header-prestige" title={prestigeBonusLabel(seasonMode.prestigeCount)}><span className="header-prestige-long">Prestige {seasonMode.prestigeCount} · </span>+{prestigeBonusPercent(seasonMode.prestigeCount)} % Tore</em>}</div>
+        <div className={`header-goals${goalBoostActive ? " goal-boost-active" : ""}`} role="group" aria-label={`Aktueller Kontostand: ${hasInfiniteMoney ? "unbegrenzt" : formatNumber(displayGame.goals)} Tore${goalBoostActive ? `; ${goalBoostLabel}-facher Goalboost noch ${goalBoostCountdown}` : ""}`}><span>{hasInfiniteMoney ? "AZB TESTMODUS" : "AKTUELLER STAND"}</span><strong>{displayBalance}</strong><small>TORE</small>{goalBoostActive && <em className="header-goal-boost">⚡ {goalBoostLabel}× · {goalBoostCountdown}</em>}{seasonMode.prestigeCount > 0 && <em className="header-prestige" title={prestigeBonusLabel(seasonMode.prestigeCount)}><span className="header-prestige-long">Prestige {seasonMode.prestigeCount} · </span>+{prestigeBonusPercent(seasonMode.prestigeCount)} % Tore</em>}</div>
         <div className="top-actions"><AccountButton /><button className="icon-button" aria-label="Benachrichtigungsverlauf" onClick={()=>openFeatureTab("history")}><Icon name="bell" size={18} /></button><button className="icon-button" onClick={toggleSound} aria-label={game.sound ? "Sound ausschalten" : "Sound einschalten"}><Icon name={game.sound ? "sound" : "mute"} size={17} /></button>{vibrationSupported && <button className={`icon-button vibration-toggle${vibrationEnabled ? "" : " off"}`} onClick={toggleVibration} aria-pressed={vibrationEnabled} aria-label={vibrationEnabled ? "Vibration ausschalten" : "Vibration einschalten"}><Icon name="vibrate" size={18} /></button>}</div>
       </header>
 
@@ -2845,7 +2918,7 @@ function App() {
             <button type="button" className={`ball-button${pulse ? " hit" : ""}${comboLevel.tier > 1 ? ` combo-${comboLevel.tier}` : ""}`} onClick={handleBallClick} onKeyDown={handleBallKeyDown} aria-label={isCoopLive ? "Team-Ball anklicken" : "Fussball anklicken"}><span className="ball-aura" /><FootballGraphic /></button>
             <p className="click-label"><span>CLICK</span> den Ball {isCoopLive ? "fürs Team" : "für Tore"}</p>
             <div className="floating-layer">{effects.map((effect) => <span className={`floating-number${effect.critical ? " critical" : ""}${effect.combo > 1 ? ` combo-${effect.combo}` : ""}`} key={effect.id} style={{ left: effect.x, top: effect.y }}>{effect.critical ? `CRIT! +${formatNumber(effect.amount)}` : `+${formatNumber(effect.amount)}`}</span>)}</div>
-            <div className={`combo-meter level-${comboLevel.tier}${combo.count > 1 ? " active" : ""}`} aria-live="polite"><span className="combo-label">{comboPaused && combo.count > 1 ? `Combo pausiert${combo.multiplier > 1 ? ` · ${formatComboMultiplier(combo.multiplier)}` : ""}` : combo.multiplier > 1 ? `COMBO ${formatComboMultiplier(combo.multiplier)}` : combo.count > 1 ? `${combo.count} Klicks` : "Schnell klicken für Combo"}</span><span className="combo-track"><i style={{ width: `${Math.round(getComboProgress(combo.count) * 100)}%` }} /></span><small>{nextComboLevel ? `Nächste Stufe: ${formatComboMultiplier(nextComboLevel.multiplier)}` : "Maximum erreicht"}</small></div>
+            <div className={`combo-meter level-${comboLevel.tier}${combo.count > 1 ? " active" : ""}`}><span className="combo-label">{comboPaused && combo.count > 1 ? `Combo pausiert${combo.multiplier > 1 ? ` · ${formatComboMultiplier(combo.multiplier)}` : ""}` : combo.multiplier > 1 ? `COMBO ${formatComboMultiplier(combo.multiplier)}` : combo.count > 1 ? `${combo.count} Klicks` : "Schnell klicken für Combo"}</span><span className="combo-track"><i style={{ width: `${Math.round(getComboProgress(combo.count) * 100)}%` }} /></span><small>{nextComboLevel ? `Nächste Stufe: ${formatComboMultiplier(nextComboLevel.multiplier)}` : "Maximum erreicht"}</small></div>
             {comboBurst && <div className={`combo-burst${comboBurst.text === "Combo vorbei" ? " ended" : ""}`} key={comboBurst.id} aria-hidden="true">{comboBurst.text}</div>}
           </div>
           <div className="production-strip"><div className="production-item"><span className="production-icon">/s</span><div><small>PRO SEKUNDE</small><strong>{formatNumber(passivePower)}</strong></div></div><div className="production-divider" /><div className="production-item"><span className="production-icon">+1</span><div><small>PRO KLICK</small><strong>{formatNumber(clickPower)}</strong></div></div><div className="production-divider" /><div className="production-item"><span className="production-icon">#</span><div><small>KLICKS</small><strong>{formatNumber(displayGame.clicks)}</strong></div></div></div>
@@ -3053,7 +3126,7 @@ function App() {
         </section>
       </main>}
 
-      {displayGame.features.cup.active && displayGame.features.cup.phase === "penalties" && <div className={`cup-penalty-takeover ${displayGame.features.cup.penaltyTurn}`} role="dialog" aria-modal="true" aria-label="Elfmeterschiessen steuern">
+      {displayGame.features.cup.active && displayGame.features.cup.phase === "penalties" && <div ref={penaltyDialogRef} className={`cup-penalty-takeover ${displayGame.features.cup.penaltyTurn}`} role="dialog" aria-modal="true" aria-label="Elfmeterschiessen steuern">
         <div className="cup-penalty-panel">
           <div className="cup-penalty-topline"><span>{displayGame.features.cup.mode === "season" ? "SAISON / ELFMETERSCHIESSEN" : "POKAL / ELFMETERSCHIESSEN"}</span><b>{cupPenaltyIsSuddenDeath ? "SUDDEN DEATH" : "BEST OF FIVE"}</b></div>
           <div className="cup-penalty-match-score"><span>NACH 120′</span><strong>{displayClubName} {displayGame.features.cup.homeScore}:{displayGame.features.cup.awayScore} {displayGame.features.cup.opponent}</strong></div>
@@ -3070,8 +3143,8 @@ function App() {
 
       {cupCardAnnouncement && <div className="gc-notification card-notification" role="status"><span>🟥</span><div><strong>{cupCardAnnouncement.minute}′ · {cupCardAnnouncement.player}</strong><p>{cupCardAnnouncement.reason}. Vom Platz gestellt und für die nächste Partie gesperrt.</p></div></div>}
 
-      {transferAnnouncement && !gazetteAnnouncement && <div className={`transfer-insider-takeover ${transferAnnouncement.outcome}`} role="dialog" aria-modal="true" aria-label={`Transfermeldung: ${transferAnnouncement.headline}`}><div className="transfer-insider-card"><span className="transfer-insider-kicker">TRANSFER INSIDER / EXKLUSIV</span><div className="transfer-insider-reporter"><span aria-hidden="true">FR</span><div><strong>Fabrizio Romario</strong><small>@romario_transfers · gerade eben</small></div><b>LIVE</b></div><h2>{transferAnnouncement.headline}</h2><p>{transferAnnouncement.message}</p><span className="transfer-insider-result">{transferAnnouncement.outcome === "offer" ? transferAnnouncement.fee > 0 ? `ANGEBOT · ${formatNumber(transferAnnouncement.fee)} GOALS` : "WECHSELWUNSCH · ABLÖSEFREI" : transferAnnouncement.outcome === "declined" ? `BLEIBT · ${TRANSFER_UNHAPPY_MATCHES} SPIELE UNZUFRIEDEN` : transferAnnouncement.outcome === "sale" ? transferAnnouncement.fee > 0 ? `+${formatNumber(transferAnnouncement.fee)} GOALS ABLÖSE` : "ABLÖSEFREI · 0 GOALS" : transferAnnouncement.outcome === "loan" ? displayGame.features.cup.mode === "season" ? "IN DER NÄCHSTEN SAISONPARTIE NICHT IM TEAM" : "IM NÄCHSTEN TURNIER NICHT IM TEAM" : transferAnnouncement.outcome === "return" ? "WIEDER IM TEAM" : "KEIN TRANSFER"}</span>{transferAnnouncement.outcome === "offer" && pendingTransferOffer?.id === transferAnnouncement.id ? <TransferOfferActions offer={pendingTransferOffer} now={countdownNow} busy={coopBusy} onAnswer={answerTransferOffer} onLater={dismissTransferAnnouncement} /> : <button className="event-takeover-dismiss" onClick={dismissTransferAnnouncement}>Weiter</button>}</div></div>}
-      {starReveal && <div className={`star-reveal${starRevealIsWalkout ? " walkout-active" : ""}${starRevealIsRare ? " rare-active" : ""}`} role="dialog" aria-modal="true" aria-label={starRevealIsCustomDraw ? "Spezialkarte gezogen" : "Star Pack geöffnet"}>
+      {transferAnnouncement && !gazetteAnnouncement && <div ref={transferDialogRef} className={`transfer-insider-takeover ${transferAnnouncement.outcome}`} role="dialog" aria-modal="true" aria-label={`Transfermeldung: ${transferAnnouncement.headline}`}><div className="transfer-insider-card"><span className="transfer-insider-kicker">TRANSFER INSIDER / EXKLUSIV</span><div className="transfer-insider-reporter"><span aria-hidden="true">FR</span><div><strong>Fabrizio Romario</strong><small>@romario_transfers · gerade eben</small></div><b>LIVE</b></div><h2>{transferAnnouncement.headline}</h2><p>{transferAnnouncement.message}</p><span className="transfer-insider-result">{transferAnnouncement.outcome === "offer" ? transferAnnouncement.fee > 0 ? `ANGEBOT · ${formatNumber(transferAnnouncement.fee)} GOALS` : "WECHSELWUNSCH · ABLÖSEFREI" : transferAnnouncement.outcome === "declined" ? `BLEIBT · ${TRANSFER_UNHAPPY_MATCHES} SPIELE UNZUFRIEDEN` : transferAnnouncement.outcome === "sale" ? transferAnnouncement.fee > 0 ? `+${formatNumber(transferAnnouncement.fee)} GOALS ABLÖSE` : "ABLÖSEFREI · 0 GOALS" : transferAnnouncement.outcome === "loan" ? displayGame.features.cup.mode === "season" ? "IN DER NÄCHSTEN SAISONPARTIE NICHT IM TEAM" : "IM NÄCHSTEN TURNIER NICHT IM TEAM" : transferAnnouncement.outcome === "return" ? "WIEDER IM TEAM" : "KEIN TRANSFER"}</span>{transferAnnouncement.outcome === "offer" && pendingTransferOffer?.id === transferAnnouncement.id ? <TransferOfferActions offer={pendingTransferOffer} now={countdownNow} busy={coopBusy} onAnswer={answerTransferOffer} onLater={dismissTransferAnnouncement} /> : <button className="event-takeover-dismiss" onClick={dismissTransferAnnouncement}>Weiter</button>}</div></div>}
+      {starReveal && <div ref={starRevealDialogRef} tabIndex={-1} className={`star-reveal${starRevealIsWalkout ? " walkout-active" : ""}${starRevealIsRare ? " rare-active" : ""}`} role="dialog" aria-modal="true" aria-label={starRevealIsCustomDraw ? "Spezialkarte gezogen" : "Star Pack geöffnet"}>
         <div className={`star-reveal-card${starRevealIsWalkout ? " star-reveal-walkout" : ""}${starWalkoutIsTop ? " star-reveal-top-walkout" : ""}${starRevealIsIconic ? " star-reveal-iconic" : ""}${starRevealIsLegendary ? " star-reveal-legendary" : ""}${starRevealIsRare ? " star-reveal-rare" : ""}`} style={{ borderColor: `${starReveal.player.accent}55` }}>
           {starRevealIsWalkout ? <>
             <span className="star-reveal-walkout-label">{starRevealTrollActive ? "WALKOUT? · ETWAS KOMMT" : starRevealIsLegendary ? "LEGENDÄRER WALKOUT · EINZIGARTIG" : starRevealIsIconic ? "ICON WALKOUT · SILBER" : starWalkoutIsTop ? "TOP WALKOUT · 90+" : "WALKOUT · 86+"}</span>
@@ -3088,6 +3161,7 @@ function App() {
             </div>}
             <p className={`star-walkout-copy${starWalkoutReady ? " ready" : ""}`}>{starRevealTrollActive ? "Das Stadion wurde kurz getrollt. Gleich beginnt der echte Walkout." : `${isCoopLive ? `${starReveal.openedBy} hat ${starRevealAction}. ` : ""}${starReveal.duplicate ? `Doppelt gezogen. Du bekommst automatisch ${formatNumber(starReveal.fragmentCompensation)} Fragmente für Custom-Karten.` : `${formatStarXIPositions(starReveal.player)} · Rating ${starReveal.player.rating}. Der Walkout gehört jetzt deinem Club.`}`}</p>
             <span className={`star-reveal-status star-walkout-status${starWalkoutReady ? " ready" : ""}`}>{starRevealTrollActive ? "PACK TROLL" : starWalkoutReady ? starReveal.duplicate ? "DOPPELT · FRAGMENTE" : starRevealIsLegendary ? "LEGENDÄR · STAR XI" : starRevealIsIconic ? "ICON · STAR XI" : "WALKOUT · STAR XI" : "WALKOUT LÄUFT"}</span>
+            {walkoutSkippable && !starWalkoutReady && <button type="button" className="mode-secondary star-walkout-skip" onClick={skipStarReveal}>Überspringen</button>}
             <button className={`event-takeover-dismiss star-walkout-dismiss${starWalkoutReady ? " ready" : ""}`} disabled={!starWalkoutReady} onClick={dismissStarReveal}>{starRevealTrollActive ? "Maskottchen läuft …" : starWalkoutReady ? starReveal.duplicate || isCoopLive ? "Weiter" : "In Star XI übernehmen" : "Walkout läuft …"}</button>
           </> : starRevealIsRare ? <>
             <span className="star-reveal-walkout-label">SELTENE KARTE · 80 BIS 85</span>
@@ -3098,6 +3172,7 @@ function App() {
             </div>
             <p className={`star-walkout-copy${starWalkoutReady ? " ready" : ""}`}>{`${isCoopLive ? `${starReveal.openedBy} hat ${starRevealAction}. ` : ""}${starReveal.duplicate ? `Doppelt gezogen. Du bekommst automatisch ${formatNumber(starReveal.fragmentCompensation)} Fragmente für Custom-Karten.` : `${formatStarXIPositions(starReveal.player)} · Rating ${starReveal.player.rating}. Seltene Karte für deinen Club.`}`}</p>
             <span className={`star-reveal-status star-walkout-status${starWalkoutReady ? " ready" : ""}`}>{starWalkoutReady ? starReveal.duplicate ? "DOPPELT · FRAGMENTE" : "SELTEN · STAR XI" : "SELTENE KARTE"}</span>
+            {walkoutSkippable && !starWalkoutReady && <button type="button" className="mode-secondary star-walkout-skip" onClick={skipStarReveal}>Überspringen</button>}
             <button className={`event-takeover-dismiss star-walkout-dismiss${starWalkoutReady ? " ready" : ""}`} disabled={!starWalkoutReady} onClick={dismissStarReveal}>{starWalkoutReady ? starReveal.duplicate || isCoopLive ? "Weiter" : "In Star XI übernehmen" : "Karte wird enthüllt …"}</button>
           </> : <>
             <span className="star-reveal-kicker">{starRevealKicker}</span>
@@ -3112,7 +3187,8 @@ function App() {
       {eventAnnouncement && <div key={`${eventAnnouncement.id}:${eventAnnouncement.createdAt}`} className={`gc-notification ${eventAnnouncement.tone}`} role="status" aria-live="polite"><span aria-hidden="true">{eventAnnouncement.id==='var'?'📺':eventAnnouncement.tone==='negative'?'⚠️':'🏟️'}</span><div><strong>{eventAnnouncement.title}</strong><p>{eventAnnouncement.message}</p><small>{eventAnnouncement.amount<0?`−${formatNumber(Math.abs(eventAnnouncement.amount))} TORE`:eventAnnouncement.amount>0?`+${formatNumber(eventAnnouncement.amount)} TORE`:'Keine Kontoänderung'}</small></div></div>}
       {offline && <div className="offline-banner" role="alert"><span className="offline-mark">Ⅱ</span><p>{offline}</p>{offline === SAVE_FAILED_MESSAGE && <button type="button" className="mode-secondary" style={{ minHeight: 44, flexShrink: 0, color: "var(--text)", fontSize: "var(--text-caption2)" }} onClick={() => showToast(exportCurrentSave(gameRef.current) ? "Spielstand als Datei gesichert." : "Der Spielstand konnte nicht als Datei gesichert werden.")}>Als Datei sichern</button>}{offline === NEWER_VERSION_MESSAGE && <button type="button" className="mode-secondary" style={{ minHeight: 44, flexShrink: 0, color: "var(--text)", fontSize: "var(--text-caption2)" }} onClick={() => window.location.reload()}>Neu laden</button>}<button type="button" style={{ minWidth: 44, minHeight: 44 }} onClick={() => setOffline("")} aria-label="Hinweis schliessen">×</button></div>}
       <footer className="footer-note">Made by xevihans</footer>
-      {toast && <div className="toast" role="status">{toast}</div>}
+      {toast && <div className="toast" aria-hidden="true">{toast}</div>}
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{srAnnouncement}</div>
     </div>
   );
 }

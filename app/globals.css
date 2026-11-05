@@ -2346,3 +2346,9 @@ button { font: inherit; }
 
 /* Screen reader only status region for announcements. */
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Walkout: with reduced motion the player stands in place at once; a seen walkout can be skipped. */
+@media (prefers-reduced-motion: reduce) {
+  .star-walkout-avatar-wrap { animation-duration: 1ms !important; animation-delay: 0ms !important; }
+}
+.star-walkout-skip { justify-self: center; min-height: 44px; margin-bottom: 8px; }

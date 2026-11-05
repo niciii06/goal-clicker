@@ -37,9 +37,9 @@ export function ConfirmDialog({ title, children, confirmLabel, cancelLabel = "Ab
   useDialogFocus(true, dialogRef, onCancel);
   // The header blurs its background, which would trap a fixed dialog inside it; the dialog lives on <body>.
   return createPortal(<div className="account-overlay" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) onCancel(); }}>
-    <div ref={dialogRef} className="account-dialog confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
+    <div ref={dialogRef} className="account-dialog confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-dialog-title" aria-describedby={children ? "confirm-dialog-description" : undefined}>
       <h2 id="confirm-dialog-title">{title}</h2>
-      {children}
+      {children && <div id="confirm-dialog-description">{children}</div>}
       <div className="confirm-dialog-actions">
         <button type="button" className="mode-secondary" onClick={onCancel}>{cancelLabel}</button>
         <button type="button" className="mode-primary" onClick={onConfirm}>{confirmLabel}</button>
