@@ -39,7 +39,7 @@ import type { LocalSaveResult } from "./game/storage";
 import { answerPressConference, getPressReward } from "./press-conference";
 import { canVibrate, readVibrationSetting, setVibrationOn, vibrate, vibrationOn } from "./game/device";
 import { albumMilestonesFromStorage, claimAlbumReward, claimAllAlbumRewards, getCareerCard, prepareCareerMatch, recordCareerMatch, rivalryKey } from "./career-data";
-import { competitionFor, squadBanError, suspensionLabel } from "./discipline";
+import { competitionFor, competitionOfCup, getBannedPlayerIds, nextCompetition, squadBanError, suspensionLabel } from "./discipline";
 import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "./daily-reward";
 import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
 import { consumeTravel, eligibilityError, fixtureFor, journeyView, payTravelFines, settleTravel, travelTiming } from "./travel-data";
@@ -536,6 +536,8 @@ function App() {
   const currentTransferLoans = displayGame.features.transferSaga.loans.map((loan) => ({ loan, player: getStarXIPlayer(loan.playerId) })).filter((entry): entry is { loan: typeof entry.loan; player: NonNullable<ReturnType<typeof getStarXIPlayer>> } => Boolean(entry.player));
   const transferArchive = [...displayGame.features.transferSaga.archive].reverse();
   const pendingTransferOffer = displayGame.features.transferSaga.pendingOffer;
+  // Only cards still in the club can be banned; older saves may list sold or discarded ones.
+  const ownedDisciplineBans = displayGame.features.discipline.bans.filter((ban) => displayGame.features.starXI.ownedIds.includes(ban.playerId));
   const reserveStarXICount = useMemo(() => {const assigned=new Set([...lineupStarIds,...benchStarIds,...loanedStarIds]);return ownedStarIds.filter(id=>!assigned.has(id)).length;},[ownedStarIds,lineupStarIds,benchStarIds,loanedStarIds]);
   const reserveStarXIPlayers = useMemo(() => featureTab!=="squad" || displayGame.features.cup.active ? [] : ownedStarXIPlayers.filter((player) => !lineupStarIds.includes(player.id) && !benchStarIds.includes(player.id) && !loanedStarIds.includes(player.id)), [benchStarIds, lineupStarIds, loanedStarIds, ownedStarXIPlayers, featureTab, displayGame.features.cup.active]);
   const suspendedStarIds = displayGame.features.cup.suspendedPlayerIds;
@@ -1403,7 +1405,7 @@ function App() {
   /** An offer nobody answered in time counts as declined. */
   function expireLocalTransferOffer() {
     const result = expireTransferOffer(gameRef.current.features, getCurrentTime());
-    if (result.event) setGame((current) => ({ ...current, features: result.features }));
+    if (result.event || result.deferred) setGame((current) => ({ ...current, features: result.features }));
   }
 
   function answerTransferOffer(accept: boolean) {
@@ -1528,11 +1530,24 @@ function App() {
     }
     const opening = openStarPack(pack.id, latestGame.features.starXI.ownedIds, Math.random, latestGame.features.starXI.formationPositions);
     const reveal: StarPackReveal = { packId: opening.packId, packName: opening.packName, player: opening.player, duplicate: opening.duplicate, fragmentCompensation: opening.fragmentCompensation, source: opening.source, openedAt: Date.now(), openedBy: "Du", troll: shouldTriggerPackTroll(opening.player) };
+    // The reveal and toast follow the state update: a purchase the updater refused shows nothing.
+    // The flag keeps a repeated updater call (React StrictMode) from presenting twice.
+    let settled = false;
+    const settle = (applied: boolean) => {
+      if (settled) return;
+      settled = true;
+      window.setTimeout(() => {
+        if (!applied) { packPurchaseRef.current = false; return; }
+        presentStarReveal(reveal);
+        showToast(opening.duplicate ? `Doppelter Star · +${formatNumber(opening.fragmentCompensation)} Fragmente` : `${opening.player.name} gezogen`);
+      }, 0);
+    };
     setGame((current) => {
       const features = normalizeGameFeatures(current.features);
-      if (current.goals < pack.price || features.cup.active) return current;
+      if (current.goals < pack.price || features.cup.active) { settle(false); return current; }
+      settle(true);
       features.starPackReveal = reveal;
-      if (!opening.duplicate) features.starXI = addStarXIPlayer(features.starXI, opening.player.id);
+      if (!opening.duplicate) features.starXI = addStarXIPlayer(features.starXI, opening.player.id, getBestXIUnavailablePlayerIds(features));
       if (opening.duplicate) {
         features.starXI.fragments += opening.fragmentCompensation;
         addHistory(features, { title: `Doppelter Star: ${opening.player.name}`, detail: `+${formatNumber(opening.fragmentCompensation)} Fragmente · nur für Custom-Karten.`, tone: "neutral" });
@@ -1541,8 +1556,6 @@ function App() {
       }
       return { ...current, goals: current.goals - pack.price, features };
     });
-    presentStarReveal(reveal);
-    showToast(opening.duplicate ? `Doppelter Star · +${formatNumber(opening.fragmentCompensation)} Fragmente` : `${opening.player.name} gezogen`);
   }
 
   async function buySpecialCardPack() {
@@ -1810,6 +1823,8 @@ function App() {
     const player = getStarXIPlayer(source.playerId);
     if (!player || coopBusy || !displayGame.features.starXI.ownedIds.includes(source.playerId)) return false;
     if (suspendedStarIds.includes(source.playerId)) return false;
+    // A yellow card ban for the coming match keeps a reserve player out of the eleven and the bench.
+    if (source.area === "reserve" && getBannedPlayerIds(displayGame.features, displayGame.features.cup.active ? competitionOfCup(displayGame.features.cup) : nextCompetition(displayGame.features)).includes(source.playerId)) return false;
 
     if (target.area === "lineup") {
       if (target.index < 0 || target.index >= STAR_XI_SQUAD_SIZE || !canStarXIPlayerFillSlot(source.playerId, target.index, activeFormationPositions)) return false;
@@ -2926,7 +2941,7 @@ function App() {
             <p className="feature-copy">10 Spieltage pro Saison, Aufstieg und Abstieg über die Tabelle. Ligaspiele dauern etwa 3–4 Minuten, Pokalspiele 4–5 Minuten plus Unterbrüche. Formation, Spielerstärke, Form und Fitness bestimmen die Partie.</p>
             <div className="starxi-summary"><div><span>STAR XI RATING</span><strong>{starXIRating}</strong><small>Bewertung deiner aktuellen Startelf</small></div><div><span>STARTELF</span><strong>{startingStarXISelection.length} / {STAR_XI_SQUAD_SIZE}</strong><small>{starXIComplete ? "Alle 11 Positionen korrekt besetzt" : `${STAR_XI_SQUAD_SIZE} passende Startplätze erforderlich`}</small></div><div><span>BANK</span><strong>{benchStarXIPlayerCount} / {STAR_XI_BENCH_SIZE}</strong><small>{reserveStarXICount} weitere Spieler im Speicher</small></div><div><span>{displayGame.features.cup.active ? "LIVE WECHSEL" : "SAISONPARTIEN"}</span><strong>{displayGame.features.cup.active ? `${displayGame.features.cup.substitutionsUsed} / ${STAR_XI_MAX_SUBSTITUTIONS}` : displayGame.features.seasonMode.history.length}</strong><small>{displayGame.features.cup.active ? "Startelf wählen, danach passenden Bankspieler" : "Alle Ergebnisse zählen für die Tabelle"}</small></div><div><span>FRAGMENTE</span><strong>{formatNumber(displayGame.features.starXI.fragments)}</strong><small>Automatisch für Custom-Karten</small></div></div>
             {suspendedStarPlayers.length > 0 && <div className="red-card-warning" role="alert"><span>🟥</span><div><strong>{suspendedStarPlayers.map((player) => player.name).join(", ")} nach Roter Karte gesperrt</strong><small>{suspendedStarPlayers.length === 1 ? pronounText("Ersetze {den Spieler} in der Startelf. {Er} darf", suspendedStarPlayers[0]) : "Ersetze die Spieler in der Startelf. Sie dürfen"} bis zum nächsten Anpfiff nicht auf die Bank.</small></div></div>}
-            {displayGame.features.discipline.bans.length > 0 && <div className="discipline-warning" role="status"><span aria-hidden="true">🟨</span><div><strong>Gelbsperren</strong>{displayGame.features.discipline.bans.map((ban) => <span key={ban.id}>{getStarXIPlayer(ban.playerId)?.name ?? "Spieler"}: {suspensionLabel(ban)}. </span>)}<small>Gesperrte Spieler dürfen in diesem Wettbewerb weder in der Startelf noch auf der Bank stehen.</small></div></div>}
+            {ownedDisciplineBans.length > 0 && <div className="discipline-warning" role="status"><span aria-hidden="true">🟨</span><div><strong>Gelbsperren</strong>{ownedDisciplineBans.map((ban) => <span key={ban.id}>{getStarXIPlayer(ban.playerId)?.name ?? "Spieler"}: {suspensionLabel(ban)}. </span>)}<small>Gesperrte Spieler dürfen in diesem Wettbewerb weder in der Startelf noch auf der Bank stehen.</small></div></div>}
             {injuredStarPlayers.length > 0 && <div className="injury-warning" role="status"><span>🩹</span><div><strong>{injuredStarPlayers.map(({ player }) => player.name).join(", ")} verletzt</strong><small>{injuredStarPlayers.map(({ player, matches }) => `${player.name}: noch ${matches} ${matches === 1 ? "Spiel" : "Spiele"}`).join(" · ")}. Verletzungen entstehen nur im laufenden Saisonspiel.</small></div></div>}
             {!displayGame.features.cup.active && !journeyUnderway && <section className="tournament-picker competition-picker" aria-label="Saisonspiele und Turniere">
               <div className="tournament-picker-heading"><div><p className="eyebrow">SPIELE / SAISON + TURNIERE</p><h4>Wähle deine nächste Partie.</h4></div><span>{displayGame.features.cup.pendingNextRound ? "POKALLAUF FORTSETZEN" : "JEDE PARTIE · 06:00"}</span></div>
@@ -3082,7 +3097,7 @@ function App() {
 
       {cupCardAnnouncement && <div className="gc-notification card-notification" role="status"><span>🟥</span><div><strong>{cupCardAnnouncement.minute}′ · {cupCardAnnouncement.player}</strong><p>{cupCardAnnouncement.reason}. Vom Platz gestellt und für die nächste Partie gesperrt.</p></div></div>}
 
-      {transferAnnouncement && !gazetteAnnouncement && <div className={`transfer-insider-takeover ${transferAnnouncement.outcome}`} role="dialog" aria-modal="true" aria-label={`Transfermeldung: ${transferAnnouncement.headline}`}><div className="transfer-insider-card"><span className="transfer-insider-kicker">TRANSFER INSIDER / EXKLUSIV</span><div className="transfer-insider-reporter"><span aria-hidden="true">FR</span><div><strong>Fabrizio Romario</strong><small>@romario_transfers · gerade eben</small></div><b>LIVE</b></div><h2>{transferAnnouncement.headline}</h2><p>{transferAnnouncement.message}</p><span className="transfer-insider-result">{transferAnnouncement.outcome === "offer" ? transferAnnouncement.fee > 0 ? `ANGEBOT · ${formatNumber(transferAnnouncement.fee)} GOALS` : "WECHSELWUNSCH · ABLÖSEFREI" : transferAnnouncement.outcome === "declined" ? `BLEIBT · ${TRANSFER_UNHAPPY_MATCHES} SPIELE UNZUFRIEDEN` : transferAnnouncement.outcome === "sale" ? transferAnnouncement.fee > 0 ? `+${formatNumber(transferAnnouncement.fee)} GOALS ABLÖSE` : "ABLÖSEFREI · 0 GOALS" : transferAnnouncement.outcome === "loan" ? displayGame.features.cup.mode === "season" ? "IN DER NÄCHSTEN SAISONPARTIE NICHT IM TEAM" : "IM NÄCHSTEN TURNIER NICHT IM TEAM" : transferAnnouncement.outcome === "return" ? "WIEDER IM TEAM" : "KEIN TRANSFER"}</span>{transferAnnouncement.outcome === "offer" && pendingTransferOffer?.id === transferAnnouncement.id ? <TransferOfferActions offer={pendingTransferOffer} now={countdownNow} busy={coopBusy} onAnswer={answerTransferOffer} onLater={dismissTransferAnnouncement} /> : <button className="event-takeover-dismiss" onClick={dismissTransferAnnouncement}>Weiter</button>}</div></div>}
+      {transferAnnouncement && !gazetteAnnouncement && <div className={`transfer-insider-takeover ${transferAnnouncement.outcome}`} role="dialog" aria-modal="true" aria-label={`Transfermeldung: ${transferAnnouncement.headline}`}><div className="transfer-insider-card"><span className="transfer-insider-kicker">TRANSFER INSIDER / EXKLUSIV</span><div className="transfer-insider-reporter"><span aria-hidden="true">FR</span><div><strong>Fabrizio Romario</strong><small>@romario_transfers · gerade eben</small></div><b>LIVE</b></div><h2>{transferAnnouncement.headline}</h2><p>{transferAnnouncement.message}</p><span className="transfer-insider-result">{transferAnnouncement.outcome === "offer" ? transferAnnouncement.fee > 0 ? `ANGEBOT · ${formatNumber(transferAnnouncement.fee)} GOALS` : "WECHSELWUNSCH · ABLÖSEFREI" : transferAnnouncement.outcome === "declined" ? `BLEIBT · ${TRANSFER_UNHAPPY_MATCHES} SPIELE UNZUFRIEDEN` : transferAnnouncement.outcome === "sale" ? transferAnnouncement.fee > 0 ? `+${formatNumber(transferAnnouncement.fee)} GOALS ABLÖSE` : "ABLÖSEFREI · 0 GOALS" : transferAnnouncement.outcome === "loan" ? displayGame.features.cup.mode === "season" && !displayGame.features.seasonMode.hallOfFame ? "IN DER NÄCHSTEN SAISONPARTIE NICHT IM TEAM" : "IM NÄCHSTEN TURNIER NICHT IM TEAM" : transferAnnouncement.outcome === "return" ? "WIEDER IM TEAM" : "KEIN TRANSFER"}</span>{transferAnnouncement.outcome === "offer" && pendingTransferOffer?.id === transferAnnouncement.id ? <TransferOfferActions offer={pendingTransferOffer} now={countdownNow} busy={coopBusy} onAnswer={answerTransferOffer} onLater={dismissTransferAnnouncement} /> : <button className="event-takeover-dismiss" onClick={dismissTransferAnnouncement}>Weiter</button>}</div></div>}
       {starReveal && <div className={`star-reveal${starRevealIsWalkout ? " walkout-active" : ""}${starRevealIsRare ? " rare-active" : ""}`} role="dialog" aria-modal="true" aria-label={starRevealIsCustomDraw ? "Spezialkarte gezogen" : "Star Pack geöffnet"}>
         <div className={`star-reveal-card${starRevealIsWalkout ? " star-reveal-walkout" : ""}${starWalkoutIsTop ? " star-reveal-top-walkout" : ""}${starRevealIsIconic ? " star-reveal-iconic" : ""}${starRevealIsLegendary ? " star-reveal-legendary" : ""}${starRevealIsRare ? " star-reveal-rare" : ""}`} style={{ borderColor: `${starReveal.player.accent}55` }}>
           {starRevealIsWalkout ? <>

@@ -130,8 +130,10 @@ export function persistLocalGame(state: GameState): LocalSaveResult {
     if (isGameFromNewerVersion(currentRaw)) return "outdated";
     const current = parseStoredGame(currentRaw);
     // A stale tab cannot restore an already consumed reward receipt.
-    if(current?.features){const saved=normalizeGameFeatures(current.features);for(const receipt of saved.earnedPacks){const next=state.features.earnedPacks.find(p=>p.id===receipt.id);if(next&&receipt.opening&&!next.opening)next.opening=receipt.opening;else if(!next)state.features.earnedPacks.push(receipt);}state.features.completedTournamentRuns=[...new Set([...state.features.completedTournamentRuns,...saved.completedTournamentRuns])];}
-    const nextRaw = JSON.stringify(state);
+    // The merge goes into a copy: the React state passed in is never changed.
+    let toStore = state;
+    if(current?.features){const saved=normalizeGameFeatures(current.features);const earnedPacks=state.features.earnedPacks.map(pack=>{const receipt=saved.earnedPacks.find(p=>p.id===pack.id);return receipt?.opening&&!pack.opening?{...pack,opening:receipt.opening}:pack;});for(const receipt of saved.earnedPacks)if(!earnedPacks.some(p=>p.id===receipt.id))earnedPacks.push(receipt);toStore={...state,features:{...state.features,earnedPacks,completedTournamentRuns:[...new Set([...state.features.completedTournamentRuns,...saved.completedTournamentRuns])]}};}
+    const nextRaw = JSON.stringify(toStore);
     const next = parseStoredGame(nextRaw);
     if (shouldRejectRegressedSave(current, next)) {
       if (currentRaw) localStorage.setItem(BACKUP_STORAGE_KEY, currentRaw);
