@@ -6,10 +6,10 @@
 // cloud save. Only a cloud save from a device that merely collected passive goals (nobody clicked there)
 // is overwritten by a device that is actually played, so an idle tab cannot wipe real progress.
 import { BACKUP_STORAGE_KEY, COOP_ROOM_KEY, LEGACY_STORAGE_KEYS, PLAYER_NAME_KEY, RECOVERY_STORAGE_KEY, STORAGE_KEY } from "./game/constants";
-import { cleanCloudSaveKeys, hashText, hasProgress, MAX_CLOUD_SAVE_REQUEST_BYTES, readSaveSchemaVersion, serializeCloudSaveKeys, summarizeSave, SYNCED_SAVE_KEYS } from "./cloud-save-rules";
+import { cleanCloudSaveKeys, hashText, hasProgress, MAX_CLOUD_SAVE_REQUEST_BYTES, serializeCloudSaveKeys, summarizeSave, SYNCED_SAVE_KEYS } from "./cloud-save-rules";
 import type { CloudSaveKeys } from "./cloud-save-rules";
 import { bumpSaveRevision, localSaveFailed } from "./game/save-revision";
-import { isSaveFromNewerVersion, NEWER_VERSION_MESSAGE } from "./game/save-schema";
+import { isSaveFromNewerVersion, NEWER_VERSION_MESSAGE, uploadSchemaVersion } from "./game/save-schema";
 import { compareStoredGameProgress, parseStoredGame } from "./save-safety";
 import { isAway } from "./activity";
 
@@ -399,7 +399,7 @@ export class CloudSync {
     const generation = this.generation;
     const active = this.played || meta.played === true;
     // The schema version lets the server refuse an upload from an older game version than the stored save.
-    const json = JSON.stringify({ baseVersion: overwriteVersion ?? meta.version, keys, active, schemaVersion: readSaveSchemaVersion(keys) });
+    const json = JSON.stringify({ baseVersion: overwriteVersion ?? meta.version, keys, active, schemaVersion: uploadSchemaVersion(keys) });
     const jsonBytes = byteLength(json);
     if (jsonBytes > MAX_CLOUD_SAVE_REQUEST_BYTES) {
       this.tooLargeHash = hash;

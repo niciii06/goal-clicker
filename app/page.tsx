@@ -36,7 +36,7 @@ import { getFormationUnlockLeague, sortFormationsForPicker, getPackUnlockLeague,
 import { MULTIPLAYER_PROTOCOL_VERSION, MULTIPLAYER_UPDATE_MESSAGE } from "./multiplayer-protocol";
 import { PressConferencePanel } from "./press-conference-panel";
 import { TravelPanel, TravelStatsPanel, durationLabel } from "./travel-panel";
-import { advanceLocalGameWhileOpen, claimLocalSave, getMiniGameCooldownUntil, initialGame, isLocalSaveWriter, markLocalSaveLoaded, normalizeAchievements, normalizeLayoutOrder, normalizeNickname, normalizeRuntimeGame, pauseMiniGameCooldowns, persistLocalGame, readStoredGame, suspendLocalPersistence } from "./game/storage";
+import { advanceLocalGameWhileOpen, claimLocalSave, getMiniGameCooldownUntil, initialGame, isLocalSaveWriter, markLocalSaveLoaded, normalizeAchievements, normalizeLayoutOrder, normalizeNickname, pauseMiniGameCooldowns, persistLocalGame, readStoredGame, suspendLocalPersistence } from "./game/storage";
 import type { LocalSaveResult } from "./game/storage";
 import { answerPressConference, getPressReward } from "./press-conference";
 import { canVibrate, readVibrationSetting, setVibrationOn, vibrate, vibrationOn } from "./game/device";
@@ -45,7 +45,7 @@ import { competitionFor, competitionOfCup, getBannedPlayerIds, nextCompetition, 
 import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "./daily-reward";
 import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
 import { consumeTravel, eligibilityError, fixtureFor, journeyView, payTravelFines, settleTravel, travelTiming } from "./travel-data";
-import { COOP_UPDATE_REQUIRED_EVENT, coopRetryDelay, coopRoleLabel, isCoopRole, multiplayerUrl, newCoopActionId, notifyCoopOffline, occupiedCoopPlayers, readCoopResponse, reloadForUpdate, upsertSavedRoom } from "./game/coop";
+import { COOP_UPDATE_REQUIRED_EVENT, coopRetryDelay, coopRoleLabel, createCoopGameNormalizer, isCoopRole, multiplayerUrl, newCoopActionId, notifyCoopOffline, occupiedCoopPlayers, readCoopResponse, reloadForUpdate, upsertSavedRoom } from "./game/coop";
 import { capGoalsAfterRebalance, createClickResult, decayComboCount, formatComboMultiplier, getBaseClickPower, getBasePassivePower, getBulkPurchase, getClickPower, getComboLevel, getComboProgress, getCost, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades } from "./game/economy";
 import { UPGRADES } from "./game/upgrades";
 import { applyGamePrestige } from "./game/prestige";
@@ -509,7 +509,8 @@ function App() {
   }, [activeCoopCode, activeCoopPlayerId, loadSavedRooms]);
 
   const rawCoopGame = coopSession?.room.game;
-  const normalizedCoopGame = useMemo(() => coopSession?.room.status === "live" ? normalizeRuntimeGame(rawCoopGame, game.sound) : null, [coopSession?.room.status, game.sound, rawCoopGame]);
+  const [normalizeCoopGame] = useState(createCoopGameNormalizer);
+  const normalizedCoopGame = useMemo(() => coopSession?.room.status === "live" ? normalizeCoopGame(rawCoopGame, game.sound) : null, [coopSession?.room.status, game.sound, rawCoopGame, normalizeCoopGame]);
   const isCoopLive = appMode === "coop" && coopSession?.room.status === "live" && Boolean(normalizedCoopGame);
   const displayGame = isCoopLive && normalizedCoopGame ? { ...normalizedCoopGame, sound: game.sound, lastSaved: game.lastSaved } : game;
   const hasFullTestAccess = isCoopLive && Boolean(coopSession?.room.testMode);
@@ -521,15 +522,19 @@ function App() {
     if(!hydrated||!playerId||!soloJourneyId)return;
     let stopped=false;
     const sync=async()=>{try{
-      const response=await fetch('/api/travel',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'status',playerId,fixtureId:soloJourneyId})});
-      const data=await response.json() as {journey?:Journey;serverNow?:number};
+      // A journey that already has its route asks for the status without it (the plan of a journey never changes).
+      const local=gameRef.current.features.travel.journey,planStartedAt=local?.id===soloJourneyId&&local.plan?local.startedAt:undefined;
+      const response=await fetch('/api/travel',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'status',playerId,fixtureId:soloJourneyId,planStartedAt})});
+      const data=await response.json() as {journey?:Journey;serverNow?:number;planOmitted?:boolean};
       const serverJourney=data.journey, serverNow=data.serverNow;
       if(stopped||!response.ok||!serverJourney||typeof serverNow!=='number'||!Number.isFinite(serverNow))return;
       syncTravelClock(serverNow);
       setGame(current=>{
         if(current.features.travel.journey?.id!==soloJourneyId)return current;
         const old=current.features.travel;
-        const j={...serverJourney,consumed:old.journey!.consumed};
+        const plan=data.planOmitted?old.journey!.startedAt===serverJourney.startedAt?old.journey!.plan:undefined:serverJourney.plan;
+        if(data.planOmitted&&!plan)return current;
+        const j={...serverJourney,...(plan?{plan}:{}),consumed:old.journey!.consumed};
         const counted=(old.journey as Journey & {counted?:boolean}).counted, finesPaid=old.journey!.finesPaid;
         const travel=settleTravel({...old,journey:{...j,counted,finesPaid} as Journey},serverNow);
         return {...current,features:{...current.features,travel,squadLock:serverJourney.squadLock}};
@@ -1325,9 +1330,11 @@ function App() {
   }
 
   const vibrationSupported = hydrated && canVibrate();
-  // Travel previews use exact routes as soon as the background route data arrived.
+  // Travel previews show an estimate ("ca.") and use exact routes as soon as the route data arrived. The 1.5 MB
+  // route data only loads once the Spiele tab is open (the travel map loads it itself), not on every start.
   const [, setRoutesLoaded] = useState(false);
-  useEffect(() => { let active = true; void loadRouteCache().then((loaded) => { if (active && loaded) setRoutesLoaded(true); }); return () => { active = false; }; }, []);
+  const routesWanted = featureTab === "cup";
+  useEffect(() => { if (!routesWanted) return; let active = true; void loadRouteCache().then((loaded) => { if (active && loaded) setRoutesLoaded(true); }); return () => { active = false; }; }, [routesWanted]);
   // Without clicks the combo drains one click per step, so a short pause costs a little instead of everything.
   const scheduleComboDecay = useCallback(function scheduleDecay(delay: number) {
     if (comboTimerRef.current) window.clearTimeout(comboTimerRef.current);
@@ -1846,9 +1853,15 @@ function App() {
       setCoopBusy(false);
       return;
     }
+    const shown = displayGame.features;
     setGame((current) => {
-      const features = normalizeGameFeatures(current.features);
-      features.starXI = setBestStarXI(features.starXI, getBestXIUnavailablePlayerIds(features), { career: features.career, cup: features.cup });
+      // The preview was computed from exactly these features: reuse it instead of normalizing and searching again.
+      let features: GameFeatures;
+      if (current.features === shown) features = { ...current.features, starXI: preview };
+      else {
+        features = normalizeGameFeatures(current.features);
+        features.starXI = setBestStarXI(features.starXI, getBestXIUnavailablePlayerIds(features), { career: features.career, cup: features.cup });
+      }
       const count = features.starXI.lineupIds.filter(Boolean).length;
       addHistory(features, { title: "Beste Startelf aufgestellt", detail: `${count} von ${STAR_XI_SQUAD_SIZE} Positionen mit den stärksten passenden Spielern besetzt.`, tone: "positive" });
       return { ...current, features };

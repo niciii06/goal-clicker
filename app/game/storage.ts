@@ -1,11 +1,12 @@
 // Local save handling, normalisation of stored games and mini game cooldowns.
+import type { GameFeatures } from "../feature-data";
 import type { GameState, LayoutCardId, MiniGameCooldowns, MiniGameId } from "./types";
 import { ACHIEVEMENTS, BACKUP_STORAGE_KEY, BALANCE_VERSION, DEFAULT_LAYOUT_ORDER, LAYOUT_CARD_IDS, LEGACY_STORAGE_KEYS, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_IDS, RECOVERY_STORAGE_KEY, STORAGE_KEY } from "./constants";
 import { compareStoredGameProgress, parseStoredGame, selectSafestStoredGame, shouldRejectRegressedSave } from "../save-safety";
+import type { StoredGameLike } from "../save-safety";
 import { getPassiveIncomePower, normalizeUpgrades } from "./economy";
-import { getGoalBoostedPassiveReward, initialGameFeatures, normalizeGameFeatures } from "../feature-data";
+import { GAME_FEATURES_SCHEMA_VERSION, getGoalBoostedPassiveReward, initialGameFeatures, normalizeGameFeatures, normalizeSaveReceipts } from "../feature-data";
 import { bumpSaveRevision, readSaveRevision, SAVE_WRITER_KEY, setLocalSaveFailed } from "./save-revision";
-import { isGameFromNewerVersion } from "./save-schema";
 import { getCurrentTime } from "./clock";
 
 /**
@@ -109,6 +110,7 @@ export function resumeLocalPersistence() {
 /** Forgets every stored copy of the game, including backups and old save versions, so a reset stays a reset. */
 export function clearStoredGames() {
   for (const key of [STORAGE_KEY, BACKUP_STORAGE_KEY, RECOVERY_STORAGE_KEY, ...LEGACY_STORAGE_KEYS]) localStorage.removeItem(key);
+  resetLocalSaveCache();
   // Other tabs still hold the old game; the new revision keeps them from saving it back.
   try {
     knownRevision = bumpSaveRevision(localStorage);
@@ -118,21 +120,46 @@ export function clearStoredGames() {
   }
 }
 
+/** Backup and recovery copies rotate at most this often; the main save is still written every time. */
+export const BACKUP_ROTATION_INTERVAL_MS = 60_000;
+
+/**
+ * The save this tab wrote last, already parsed. While the stored text is still exactly this one (and no other tab
+ * bumped the revision) the autosave does not parse it again.
+ */
+let lastWrite: { raw: string; revision: number; parsed: StoredGameLike | null } | null = null;
+let lastRotationAt = Number.NEGATIVE_INFINITY;
+
+/** Forgets the autosave caches (tests, and after anything else replaced the stored game). */
+export function resetLocalSaveCache() {
+  lastWrite = null;
+  lastRotationAt = Number.NEGATIVE_INFINITY;
+}
+
+function storedSchemaVersion(game: StoredGameLike | null) {
+  const features = game?.features;
+  const version = Number(features && typeof features === "object" ? (features as { schemaVersion?: unknown }).schemaVersion : undefined);
+  return Number.isSafeInteger(version) && version > 0 ? version : 0;
+}
+
 export function persistLocalGame(state: GameState): LocalSaveResult {
   if (persistenceSuspended) return "suspended";
   const now = Date.now();
   try {
     // A tab in the background leaves the save to the tab in use; it only catches up once it is used itself.
     if (otherWriterActive(now)) return "other-tab";
-    if (readSaveRevision(localStorage) > knownRevision) return "stale";
+    const revision = readSaveRevision(localStorage);
+    if (revision > knownRevision) return "stale";
     const currentRaw = localStorage.getItem(STORAGE_KEY);
+    // Fast path: the stored game is the text this tab wrote last, so its parsed copy is still the right one.
+    const ownWrite = lastWrite !== null && currentRaw !== null && lastWrite.revision === revision && lastWrite.raw === currentRaw;
+    const current = ownWrite ? lastWrite!.parsed : parseStoredGame(currentRaw);
     // Normalizing would drop what the newer version stored; the stored game stays exactly as it is.
-    if (isGameFromNewerVersion(currentRaw)) return "outdated";
-    const current = parseStoredGame(currentRaw);
+    if (!ownWrite && storedSchemaVersion(current) > GAME_FEATURES_SCHEMA_VERSION) return "outdated";
     // A stale tab cannot restore an already consumed reward receipt.
     // The merge goes into a copy: the React state passed in is never changed.
     let toStore = state;
-    if(current?.features){const saved=normalizeGameFeatures(current.features);const earnedPacks=state.features.earnedPacks.map(pack=>{const receipt=saved.earnedPacks.find(p=>p.id===pack.id);return receipt?.opening&&!pack.opening?{...pack,opening:receipt.opening}:pack;});for(const receipt of saved.earnedPacks)if(!earnedPacks.some(p=>p.id===receipt.id))earnedPacks.push(receipt);toStore={...state,features:{...state.features,earnedPacks,completedTournamentRuns:[...new Set([...state.features.completedTournamentRuns,...saved.completedTournamentRuns])]}};}
+    if(current?.features){const saved=normalizeSaveReceipts(current.features);const earnedPacks=state.features.earnedPacks.map(pack=>{const receipt=saved.earnedPacks.find(p=>p.id===pack.id);return receipt?.opening&&!pack.opening?{...pack,opening:receipt.opening}:pack;});for(const receipt of saved.earnedPacks)if(!earnedPacks.some(p=>p.id===receipt.id))earnedPacks.push(receipt);toStore={...state,features:{...state.features,earnedPacks,completedTournamentRuns:[...new Set([...state.features.completedTournamentRuns,...saved.completedTournamentRuns])]}};}
     const nextRaw = JSON.stringify(toStore);
     const next = parseStoredGame(nextRaw);
     if (shouldRejectRegressedSave(current, next)) {
@@ -140,19 +167,27 @@ export function persistLocalGame(state: GameState): LocalSaveResult {
       setLocalSaveFailed(false);
       return "kept";
     }
-    const backupRaw = localStorage.getItem(BACKUP_STORAGE_KEY);
-    const backup = parseStoredGame(backupRaw);
-    if (currentRaw && current && (!backup || compareStoredGameProgress(current, backup) >= 0)) {
-      if (backupRaw && backup) localStorage.setItem(RECOVERY_STORAGE_KEY, backupRaw);
-      localStorage.setItem(BACKUP_STORAGE_KEY, currentRaw);
+    // The backup (and the recovery copy behind it) only rotate once a minute: three 300 KB writes every few
+    // seconds cost more than a backup that is a minute old.
+    if (currentRaw && current && now - lastRotationAt >= BACKUP_ROTATION_INTERVAL_MS) {
+      const backupRaw = localStorage.getItem(BACKUP_STORAGE_KEY);
+      const backup = parseStoredGame(backupRaw);
+      if (!backup || compareStoredGameProgress(current, backup) >= 0) {
+        if (backupRaw && backup) localStorage.setItem(RECOVERY_STORAGE_KEY, backupRaw);
+        localStorage.setItem(BACKUP_STORAGE_KEY, currentRaw);
+        lastRotationAt = now;
+      }
     }
+    lastWrite = null;
     localStorage.setItem(STORAGE_KEY, nextRaw);
     knownRevision = bumpSaveRevision(localStorage);
+    lastWrite = { raw: nextRaw, revision: knownRevision, parsed: next };
     markWriter(now);
     setLocalSaveFailed(false);
     return "saved";
   } catch {
     // A full browser storage must never crash the game or replace a valid save, but it must not look saved either.
+    lastWrite = null;
     setLocalSaveFailed(true);
     return "failed";
   }
@@ -204,7 +239,8 @@ export function initialGame(): GameState {
   return { goals: 0, totalGoals: 0, seasonGoals: 0, clicks: 0, upgrades: {}, achievements: [], stars: 0, seasons: 0, balanceVersion: BALANCE_VERSION, sound: true, lastSaved: Date.now(), miniGameCooldowns: initialMiniGameCooldowns(), minigameWins: 0, features: initialGameFeatures() };
 }
 
-export function normalizeRuntimeGame(value: unknown, soundFallback = true): GameState {
+/** `features`: already normalized features of this game (the co-op client reuses them while they are unchanged). */
+export function normalizeRuntimeGame(value: unknown, soundFallback = true, features?: GameFeatures): GameState {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
   const nonNegative = (raw: unknown) => {
     const number = Number(raw);
@@ -224,7 +260,7 @@ export function normalizeRuntimeGame(value: unknown, soundFallback = true): Game
     lastSaved: Number.isFinite(Number(source.lastSaved)) ? Number(source.lastSaved) : Date.now(),
     miniGameCooldowns: normalizeMiniGameCooldowns(source.miniGameCooldowns as Partial<MiniGameCooldowns> | undefined),
     minigameWins: Math.floor(nonNegative(source.minigameWins)),
-    features: normalizeGameFeatures(source.features),
+    features: features ?? normalizeGameFeatures(source.features),
   };
 }
 

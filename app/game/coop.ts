@@ -1,5 +1,8 @@
 // Client helpers for coop rooms: roles, saved rooms and API requests.
-import type { CoopApiResponse, CoopRole, CoopRoom } from "./types";
+import type { CoopApiResponse, CoopRole, CoopRoom, GameState } from "./types";
+import type { GameFeatures } from "../feature-data";
+import { normalizeGameFeatures } from "../feature-data";
+import { normalizeRuntimeGame } from "./storage";
 import { COOP_ROLES } from "./constants";
 import { MULTIPLAYER_PROTOCOL_VERSION } from "../multiplayer-protocol";
 
@@ -80,4 +83,18 @@ export function newCoopActionId() {
 export function coopRetryDelay(attempt: number, random: () => number = Math.random) {
   const base = 120 * 2 ** Math.max(0, attempt - 1);
   return Math.round(base / 2 + random() * base);
+}
+
+/**
+ * Normalizes the co-op world for display. Every poll and click answer brings a new game object, but a slim answer
+ * keeps the very same features object (same `featuresKey`): its normalized copy is reused then instead of
+ * normalizing the whole world again, so the views (and the match canvas) also keep the same features reference.
+ */
+export function createCoopGameNormalizer() {
+  let cached: { source: unknown; features: GameFeatures } | null = null;
+  return (game: unknown, sound: boolean): GameState => {
+    const source = game && typeof game === "object" && !Array.isArray(game) ? (game as { features?: unknown }).features : undefined;
+    if (!cached || cached.source !== source || source === undefined) cached = { source, features: normalizeGameFeatures(source) };
+    return normalizeRuntimeGame(game, sound, cached.features);
+  };
 }

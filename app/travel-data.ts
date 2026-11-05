@@ -227,3 +227,13 @@ export function consumeTravel(features:GameFeatures,fixture:TravelFixture) {
  // Kick-off: whoever stands in the lineup and on the bench now is the matchday squad.
  if(features.squadLock)features.squadLock={...features.squadLock,playerIds:[...new Set([...features.starXI.lineupIds,...features.starXI.benchIds].filter(Boolean))]}; features.cup.careerMatchId=`career:${fixture.id}`; features.cup.fixture={id:fixture.id,away:fixture.away,neutral:fixture.neutral,venue:fixture.venue,opponentId:fixture.opponentId}; if(features.travel.journey?.fixture.id===fixture.id)features.travel.journey.consumed=true; }
 export {HOME_VENUE,REGION_LABELS};
+
+/**
+ * The stored plan of a journey never changes (one row per fixture, written once). A poll from a client that already
+ * holds the plan of this journey (same start) gets the journey without it, marked `planOmitted`.
+ */
+export function statusJourney(journey:Journey|null,planStartedAt:unknown):{journey:Journey|null;planOmitted?:true} {
+ if(!journey?.plan||typeof planStartedAt!=='number'||planStartedAt!==journey.startedAt)return {journey};
+ const {plan:_plan,...rest}=journey;void _plan;
+ return {journey:rest as Journey,planOmitted:true};
+}

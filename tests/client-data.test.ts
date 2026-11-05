@@ -40,3 +40,14 @@ test('browser builds resolve the slim and lazy copies through package.json impor
   assert.equal(pkg.imports['#travel-route-cache'].browser, './app/travel-route-cache-lazy.ts');
   for (const file of ['../app/scrap-pack.ts', '../app/journey-routing.ts']) assert.match(await readFile(new URL(file, import.meta.url), 'utf8'), /from '#(fc27-india-source|travel-route-cache)'/);
 });
+
+test('the page only loads the route cache once the Spiele tab is open (P12)', async () => {
+  const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  const effects = page.split('\n').filter((line) => line.includes('loadRouteCache()'));
+  assert.equal(effects.length, 1);
+  assert.match(effects[0], /if \(!routesWanted\) return;/);
+  assert.match(effects[0], /\[routesWanted\]\);/);
+  assert.match(page, /const routesWanted = featureTab === "cup";/);
+  // The travel map still loads it itself wherever it is shown.
+  assert.match(await readFile(new URL('../app/travel-map.tsx', import.meta.url), 'utf8'), /loadRouteCache\(\)/);
+});

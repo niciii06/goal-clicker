@@ -86,3 +86,15 @@ test('every kick-off action refuses a squad with a yellow card ban',async()=>{
   const r=await action(name,extra);assert.equal(r.status,409,name);assert.match(r.data.error??'',/Gelben Karten/);assert.equal(JSON.parse(row.sharedFeaturesJson).cup.active,false);
  }
 });
+test('solo status poll leaves out the unchanged route plan only for a client that holds it (P17)',async t=>{
+ ledger.clear();const f=setup();const clock=Date.now();t.mock.method(Date,'now',()=>clock);
+ const j=(await soloAction('depart',{features:f,mode:'season'})).data.journey;assert.ok(j.plan);
+ const full=await soloAction('status',{fixtureId:j.fixture.id});assert.deepEqual(full.data.journey,j);assert.equal((full.data as {planOmitted?:boolean}).planOmitted,undefined);
+ const slim=await soloAction('status',{fixtureId:j.fixture.id,planStartedAt:j.startedAt});
+ assert.equal((slim.data as {planOmitted?:boolean}).planOmitted,true);assert.equal(slim.data.journey.plan,undefined);
+ const {plan,...rest}=j;assert.deepEqual(slim.data.journey,rest);assert.ok(plan);
+ assert.ok(JSON.stringify(slim.data).length*2<JSON.stringify(full.data).length,'the slim answer is much smaller');
+ // Another start (another journey) or a client without the plan gets the whole journey.
+ assert.deepEqual((await soloAction('status',{fixtureId:j.fixture.id,planStartedAt:j.startedAt-1})).data.journey,j);
+ assert.deepEqual((await soloAction('status',{fixtureId:j.fixture.id,planStartedAt:String(j.startedAt)})).data.journey,j);
+});
