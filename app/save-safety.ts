@@ -31,8 +31,16 @@ export function parseStoredGame(raw: string | null): StoredGameLike | null {
   }
 }
 
+/** Prestiges started in this save. A Prestige lowers squad and upgrades on purpose, so it ranks right after the goals. */
+function prestigeCountOf(features: Record<string, unknown>) {
+  const seasonMode = features.seasonMode && typeof features.seasonMode === "object" && !Array.isArray(features.seasonMode)
+    ? features.seasonMode as Record<string, unknown>
+    : {};
+  return Math.floor(nonNegative(seasonMode.prestigeCount));
+}
+
 export function getStoredGameProgress(value: StoredGameLike | null): readonly number[] {
-  if (!value) return [0, 0, 0, 0, 0, 0, 0, 0] as const;
+  if (!value) return [0, 0, 0, 0, 0, 0, 0, 0, 0] as const;
   const upgrades = value.upgrades && typeof value.upgrades === "object" && !Array.isArray(value.upgrades)
     ? Object.values(value.upgrades as Record<string, unknown>).reduce<number>((sum, level) => sum + nonNegative(level), 0)
     : 0;
@@ -51,6 +59,7 @@ export function getStoredGameProgress(value: StoredGameLike | null): readonly nu
     : 0;
   return [
     nonNegative(value.totalGoals),
+    prestigeCountOf(features),
     nonNegative(value.seasons),
     nonNegative(value.stars),
     ownedPlayers,
@@ -95,8 +104,8 @@ function hasStoredProgress(value: StoredGameLike) {
 }
 
 /**
- * A write is stale when it has fewer lifetime goals, or the same goals but an older save time (a tab that fell
- * behind). With equal goals the newer write wins even if it owns fewer players or upgrades: a free transfer or
+ * A write is stale when it has fewer lifetime goals, fewer Prestiges, or the same goals but an older save time (a
+ * tab that fell behind). With equal goals the newer write wins even if it owns fewer players or upgrades: a free transfer or
  * a departure is a real change, not lost progress.
  */
 export function shouldRejectRegressedSave(current: StoredGameLike | null, next: StoredGameLike | null) {
@@ -104,5 +113,7 @@ export function shouldRejectRegressedSave(current: StoredGameLike | null, next: 
   const currentProgress = getStoredGameProgress(current);
   const nextProgress = getStoredGameProgress(next);
   if (currentProgress[0] > nextProgress[0]) return true;
+  // A save from before a Prestige (a tab that fell behind) must not bring back the old squad and upgrade levels.
+  if (currentProgress[1] > nextProgress[1]) return true;
   return currentProgress[0] === nextProgress[0] && nonNegative(current.lastSaved) > nonNegative(next.lastSaved);
 }

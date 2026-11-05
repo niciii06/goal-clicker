@@ -1079,7 +1079,9 @@ export function getPrestigeBlockReason(features: GameFeatures) {
 /**
  * Prestige: back to Season 1 with every special card and at most one chosen normal card. The album keeps every
  * card ever collected, the season unlocks (highest league) stay, the starter squad is never handed out again.
- * The caller sets the goal balance to 0 in the same state update, so everything is saved together.
+ * Retained cards keep their milestones and growth; every other card loses them (rebaseCareerForPrestige) and leaves
+ * no injury, ban or lineup reference behind. Callers use applyGamePrestige (app/game/prestige.ts), which also sets
+ * the goal balance and every upgrade level to 0 in the same state update, so everything is saved together.
  */
 export function applySeasonPrestige(value: GameFeatures, keepNormalId: string | null, now = Date.now(), requestId = ""): { features: GameFeatures; error: string; duplicate?: boolean } {
   // One confirmed Prestige counts once: a retried or repeated request with the same id changes nothing.
@@ -1137,7 +1139,7 @@ export function applySeasonPrestige(value: GameFeatures, keepNormalId: string | 
   if (receipt) features.purchaseReceipts = [...features.purchaseReceipts, receipt].slice(-PURCHASE_RECEIPT_LIMIT);
   features.seasonMode = startSeasonPrestige(features.seasonMode, features.club.name, now);
   const keptNormal = keepNormalId ? getStarXIPlayer(keepNormalId)?.name : null;
-  addHistory(features, { title: `Prestige ${features.seasonMode.prestigeCount} gestartet`, detail: `Zurück in Saison 1 · ${retained.size} Karten bleiben im Kader${keptNormal ? ` (mit ${keptNormal})` : ""} · +${Math.round(features.seasonMode.prestigeCount * PRESTIGE_GOAL_BONUS_PER_LEVEL * 100)} % Tore`, tone: "positive" }, now);
+  addHistory(features, { title: `Prestige ${features.seasonMode.prestigeCount} gestartet`, detail: `Zurück in Saison 1 · Upgrades auf Stufe 0 · ${retained.size} Karten bleiben im Kader${keptNormal ? ` (mit ${keptNormal})` : ""} · +${Math.round(features.seasonMode.prestigeCount * PRESTIGE_GOAL_BONUS_PER_LEVEL * 100)} % Tore`, tone: "positive" }, now);
   return { features, error: "" };
 }
 
