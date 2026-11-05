@@ -168,7 +168,8 @@ test('5 old career statistics do not reapply discarded bonuses, not even the for
   for (const id of NORMALS) match.starXI = addStarXIPlayer(match.starXI, id);
   match.starXI = setBestStarXI(match.starXI, []);
   prepareCareerMatch(match);
-  assert.equal(match.cup.careerBonuses?.[ALEXIA], 0);
+  // A bonus of 0 is not stored (every reader reads a missing entry as 0).
+  assert.equal(match.cup.careerBonuses?.[ALEXIA] ?? 0, 0);
   // Discarded specials with history (none here) and normals alike: no injuries or bans come back with the card.
   assert.equal(again.cup.injuredPlayerIds[ALEXIA], undefined);
   assert.equal(again.discipline.league[ALEXIA], undefined);
