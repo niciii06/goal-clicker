@@ -73,19 +73,33 @@ export function replaceLocalSave(storage: ReplaceStorage, keys: CloudSaveKeys) {
   const incoming = cleanCloudSaveKeys(keys);
   if (!incoming) throw new Error("Der Spielstand ist unvollständig.");
   const touched = [...SYNCED_SAVE_KEYS, BACKUP_STORAGE_KEY, RECOVERY_STORAGE_KEY, ...LEGACY_STORAGE_KEYS];
-  const previous = touched.flatMap((key) => { const value = storage.getItem(key); return value === null ? [] : [[key, value] as const]; });
-  const previousGame = storage.getItem(STORAGE_KEY);
-  const previousBackup = storage.getItem(BACKUP_STORAGE_KEY);
+  const previous = new Map(touched.map((key) => [key, storage.getItem(key)] as const));
+  const previousGame = previous.get(STORAGE_KEY) ?? null;
+  const previousBackup = previous.get(BACKUP_STORAGE_KEY) ?? null;
+  // Nothing is removed before the new values are in: a write the storage refuses leaves that key as it was, and
+  // the main game is written last, so a failure part way never loses the previous game.
+  const writes: [string, string | null][] = [
+    ...(previousBackup !== null ? [[RECOVERY_STORAGE_KEY, previousBackup] as [string, string]] : []),
+    ...(previousGame !== null ? [[BACKUP_STORAGE_KEY, previousGame] as [string, string]] : []),
+    ...SYNCED_SAVE_KEYS.filter((key) => key !== STORAGE_KEY).map((key) => [key, incoming[key] ?? null] as [string, string | null]),
+    [STORAGE_KEY, incoming[STORAGE_KEY]!],
+  ];
   try {
-    for (const key of touched) storage.removeItem(key);
-    if (previousBackup !== null) storage.setItem(RECOVERY_STORAGE_KEY, previousBackup);
-    if (previousGame !== null) storage.setItem(BACKUP_STORAGE_KEY, previousGame);
-    for (const [key, value] of Object.entries(incoming)) if (value !== undefined) storage.setItem(key, value);
+    for (const [key, value] of writes) {
+      if (value === null) storage.removeItem(key);
+      else storage.setItem(key, value);
+    }
+    // Old save versions could look more advanced than an imported game with less progress; they go.
+    for (const key of LEGACY_STORAGE_KEYS) storage.removeItem(key);
     // Other open tabs still hold the replaced game and must not save it back.
     bumpSaveRevision(storage);
   } catch (error) {
-    for (const key of touched) storage.removeItem(key);
-    for (const [key, value] of previous) { try { storage.setItem(key, value); } catch { /* keep restoring the rest */ } }
+    for (const [key, value] of previous) {
+      try {
+        if (value === null) storage.removeItem(key);
+        else if (storage.getItem(key) !== value) storage.setItem(key, value);
+      } catch { /* keep restoring the rest */ }
+    }
     throw error;
   }
 }
