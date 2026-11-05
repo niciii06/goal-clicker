@@ -30,8 +30,16 @@ export type CareerState = {
   milestoneCategories: Record<string, MilestoneCategory>;
   /** Special cards: their statistics when growth started (the update of 2 November 2026); only what comes after counts. */
   growthBase: Record<string, GrowthStats>;
+  /**
+   * Prestige: the lifetime statistics a card had when it left the squad in a Prestige. Milestones count only what
+   * comes after, so a card obtained again starts at its base rating; `players` keeps the full history. Cards without
+   * an entry (every save before the prestige update of 5 November 2026) count from 0 as before.
+   */
+  milestoneBase: Record<string, MilestoneStats>;
 };
 export type GrowthStats = { points: number };
+export const MILESTONE_METRICS = ['appearances', 'minutes', 'goals', 'assists', 'motm'] as const;
+export type MilestoneStats = Record<(typeof MILESTONE_METRICS)[number], number>;
 
 /** Growth of special cards from 80 to their potential: the match points of the club while the card played, by the
  * result after 90 minutes (win 3, draw 1, loss 0; extra time and shoot-outs count as a draw for both sides), +1 rating
@@ -80,6 +88,11 @@ export function getMilestoneCategory(player: StarXIPlayer): MilestoneCategory {
   if (['LM','RM','LF','RF','LW','RW'].includes(player.position ?? '')) return 'winger';
   return 'striker';
 }
+/** The statistics milestones count: the lifetime statistics minus what a card had when a Prestige discarded it. */
+export function getMilestoneStats(career: CareerState, playerId: string): MilestoneStats {
+  const stats = career.players[playerId] ?? emptyPlayerStats(), base = career.milestoneBase?.[playerId];
+  return Object.fromEntries(MILESTONE_METRICS.map((metric) => [metric, Math.max(0, stats[metric] - (base?.[metric] ?? 0))])) as MilestoneStats;
+}
 export function getPlayerMilestones(career: CareerState, player: StarXIPlayer): readonly CareerMilestone[] {
   return POSITION_MILESTONES[career.milestoneCategories[player.id] ?? getMilestoneCategory(player)];
 }
@@ -87,13 +100,13 @@ function unlockPlayerMilestones(career: CareerState, player: StarXIPlayer) {
   career.milestoneCategories[player.id] ??= getMilestoneCategory(player);
   // Special cards grow through their potential only, they collect no milestones.
   if (hasPotential(player)) { delete career.milestoneCards[player.id]; return; }
-  const stats = career.players[player.id] ?? emptyPlayerStats();
+  const stats = getMilestoneStats(career, player.id);
   const ids = new Set(career.milestoneCards[player.id] ?? []);
   for (const milestone of getPlayerMilestones(career, player)) if (stats[milestone.metric] >= milestone.target) ids.add(milestone.id);
   if (ids.size) career.milestoneCards[player.id] = [...ids];
 }
 export function emptyPlayerStats(): PlayerCareerStats { return { appearances: 0, minutes: 0, goals: 0, assists: 0, ratingTotal: 0, ratedMatches: 0, motm: 0, subAppearances: 0, subRatingTotal: 0, subMinutes: 0, points: 0, recent: [] }; }
-export function initialCareerState(): CareerState { return { version: 3, players: {}, seasonPlayers: {}, seasonNumber: 1, seasonMatches: 0, awards: [], reports: [], processedMatchIds: [], rivals: {}, collectedIds: [], claimedAlbumRewards: [], milestoneCards: {}, milestoneCategories: {}, growthBase: {} }; }
+export function initialCareerState(): CareerState { return { version: 3, players: {}, seasonPlayers: {}, seasonNumber: 1, seasonMatches: 0, awards: [], reports: [], processedMatchIds: [], rivals: {}, collectedIds: [], claimedAlbumRewards: [], milestoneCards: {}, milestoneCategories: {}, growthBase: {}, milestoneBase: {} }; }
 function object(value: unknown): Record<string, unknown> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}; }
 function number(value: unknown, max = 1e9) { const n = Number(value); return Number.isFinite(n) ? Math.max(0, Math.min(max, n)) : 0; }
 function integer(value: unknown, max = 1e9) { return Math.floor(number(value, max)); }
@@ -127,6 +140,11 @@ export function normalizeCareerState(value: unknown, knownIds: readonly string[]
       if (!next.collectedIds.includes(id)) next.collectedIds.push(id);
     }
   }
+  // Read before the milestones: a card discarded by a Prestige must not unlock them again from its old statistics.
+  next.milestoneBase = Object.fromEntries(Object.entries(object(source.milestoneBase)).filter(([id]) => getStarXIPlayer(id)).map(([id, raw]) => {
+    const base = object(raw);
+    return [id, Object.fromEntries(MILESTONE_METRICS.map((metric) => [metric, integer(base[metric])])) as MilestoneStats];
+  }));
   next.milestoneCards = Object.fromEntries(Object.entries(object(source.milestoneCards)).filter(([id]) => getStarXIPlayer(id)).map(([id, ids]) => [id, Array.isArray(ids) ? [...new Set(ids.filter((m): m is string => CAREER_MILESTONES.some(def => def.id === m)))] : []]));
   for (const id of new Set([...next.collectedIds, ...Object.keys(next.players), ...Object.keys(next.milestoneCards)])) {
     const player = getStarXIPlayer(id)!;
@@ -316,7 +334,8 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
       if (grown.levels > grownBefore) addHistory(features, { title: `${card.name} wächst auf ${grown.rating}`, detail: grown.nextLevelPoints === null ? `Potenzial ${grown.potential} erreicht.` : `Potenzial ${grown.potential} · noch ${grown.pointsToNext} ${grown.pointsToNext === 1 ? 'Punkt' : 'Punkte'} bis ${grown.rating + 1}.`, tone: 'positive' });
       continue;
     }
-    for (const m of getPlayerMilestones(career, getStarXIPlayer(p.playerId)!)) if (career.players[p.playerId][m.metric] >= m.target && !(career.milestoneCards[p.playerId] || []).includes(m.id)) {
+    const milestoneStats = getMilestoneStats(career, p.playerId);
+    for (const m of getPlayerMilestones(career, getStarXIPlayer(p.playerId)!)) if (milestoneStats[m.metric] >= m.target && !(career.milestoneCards[p.playerId] || []).includes(m.id)) {
       career.milestoneCards[p.playerId] = [...(career.milestoneCards[p.playerId] || []),m.id];
       addHistory(features, { title: `${m.label}-Karte freigeschaltet`, detail: `${getStarXIPlayer(p.playerId)?.name} · ${m.target} ${MILESTONE_METRIC_LABELS[m.metric]}. Die stärkste Version ist automatisch aktiv.`, tone: 'positive' });
     }
@@ -381,4 +400,29 @@ export function claimAllAlbumRewards(features: GameFeatures) {
   const available = getAlbumGroups(features.career).filter(group => !group.claimed && group.collected === group.total);
   for (const group of available) claimAlbumReward(features, group.id);
   return available.length;
+}
+
+/**
+ * Prestige: every card that does not stay loses what it earned. Its milestones go, and the statistics it has now
+ * become its milestone and growth baseline, so a copy obtained later starts at its base rating and earns everything
+ * again. The history (`players`, reports, awards) and the album stay; retained cards keep everything.
+ */
+export function rebaseCareerForPrestige(career: CareerState, retainedIds: ReadonlySet<string>): CareerState {
+  const next: CareerState = { ...career, players: { ...career.players }, milestoneCards: { ...career.milestoneCards }, milestoneCategories: { ...career.milestoneCategories }, growthBase: { ...career.growthBase }, milestoneBase: { ...(career.milestoneBase ?? {}) } };
+  const ids = new Set([...career.collectedIds, ...Object.keys(career.players), ...Object.keys(career.milestoneCards), ...Object.keys(career.milestoneCategories), ...Object.keys(career.growthBase)]);
+  for (const id of ids) {
+    if (retainedIds.has(id)) continue;
+    const player = getStarXIPlayer(id);
+    const stats = career.players[id];
+    delete next.milestoneCards[id];
+    // The category follows the catalogue again, like for a card that was never owned.
+    if (player) next.milestoneCategories[id] = getMilestoneCategory(player);
+    else delete next.milestoneCategories[id];
+    if (!stats) continue;
+    next.milestoneBase[id] = Object.fromEntries(MILESTONE_METRICS.map((metric) => [metric, Math.floor(stats[metric])])) as MilestoneStats;
+    if (player && hasPotential(player)) next.growthBase[id] = { points: Math.floor(stats.points) };
+    // The form of the last five matches is a rating bonus as well; the totals stay.
+    next.players[id] = { ...stats, recent: [] };
+  }
+  return next;
 }

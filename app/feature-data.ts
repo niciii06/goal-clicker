@@ -20,7 +20,7 @@ import { HOME_VENUE, LEAGUE_LABELS, seasonGeography, venueForClubName } from "./
 import { addBroadcastSubstitution, advanceMatchBroadcast, chooseGoalPattern, createMatchBroadcast, normalizeMatchBroadcast, recordedActionRating } from "./match-broadcast";
 import { advanceInteractive, normalizeInteractive, resumeInteractive } from "./interactive-match";
 import { emptyTravel, normalizeTravel } from "./travel-data";
-import { getCareerCard, getPlayerForm, initialCareerState, normalizeCareerState } from "./career-data";
+import { getCareerCard, getPlayerForm, initialCareerState, normalizeCareerState, rebaseCareerForPrestige } from "./career-data";
 import { getPackUnlockLeague, hasReachedLeague, leagueForTier } from "./season-progression";
 import { getFunnyPlayerName } from "./funny-player-names";
 import { normalizeDailyRewards } from "./daily-reward";
@@ -1079,7 +1079,9 @@ export function getPrestigeBlockReason(features: GameFeatures) {
 /**
  * Prestige: back to Season 1 with every special card and at most one chosen normal card. The album keeps every
  * card ever collected, the season unlocks (highest league) stay, the starter squad is never handed out again.
- * The caller sets the goal balance to 0 in the same state update, so everything is saved together.
+ * Retained cards keep their milestones and growth; every other card loses them (rebaseCareerForPrestige) and leaves
+ * no injury, ban or lineup reference behind. Callers use applyGamePrestige (app/game/prestige.ts), which also sets
+ * the goal balance and every upgrade level to 0 in the same state update, so everything is saved together.
  */
 export function applySeasonPrestige(value: GameFeatures, keepNormalId: string | null, now = Date.now(), requestId = ""): { features: GameFeatures; error: string; duplicate?: boolean } {
   // One confirmed Prestige counts once: a retried or repeated request with the same id changes nothing.
@@ -1112,12 +1114,32 @@ export function applySeasonPrestige(value: GameFeatures, keepNormalId: string | 
     // The squad is rebuilt from scratch; slots left open by sales no longer apply.
     vacancies: [],
   };
-  features.cup = { ...features.cup, suspendedPlayerIds: features.cup.suspendedPlayerIds.filter((id) => retained.has(id)) };
+  // Discarded cards leave no injury, red card, yellow card count, ban or prepared match bonus behind: a copy
+  // obtained later is fit, eligible and at its base rating.
+  const keepIds = <T,>(record: Record<string, T> | undefined) => Object.fromEntries(Object.entries(record ?? {}).filter(([id]) => retained.has(id)));
+  features.cup = {
+    ...features.cup,
+    suspendedPlayerIds: features.cup.suspendedPlayerIds.filter((id) => retained.has(id)),
+    sentOffPlayerIds: features.cup.sentOffPlayerIds.filter((id) => retained.has(id)),
+    injuredPlayerIds: keepIds(features.cup.injuredPlayerIds),
+    careerBonuses: keepIds(features.cup.careerBonuses),
+    careerGrowth: keepIds(features.cup.careerGrowth),
+  };
+  features.discipline = {
+    ...features.discipline,
+    league: keepIds(features.discipline.league),
+    tournaments: Object.fromEntries(Object.entries(features.discipline.tournaments).map(([id, counts]) => [id, keepIds(counts)]).filter(([, counts]) => Object.keys(counts).length)),
+    bans: features.discipline.bans.filter((ban) => retained.has(ban.playerId)),
+  };
+  // Retained cards keep every improvement; all others lose theirs (history and album stay).
+  features.career = rebaseCareerForPrestige(features.career, retained);
+  // The retained cards fill the starting eleven and the bench right away (an unavailable one stays out).
+  features.starXI = setBestStarXI(features.starXI, getBestXIUnavailablePlayerIds(features), { career: features.career, cup: features.cup });
   features.starterSquadGranted = true;
   if (receipt) features.purchaseReceipts = [...features.purchaseReceipts, receipt].slice(-PURCHASE_RECEIPT_LIMIT);
   features.seasonMode = startSeasonPrestige(features.seasonMode, features.club.name, now);
   const keptNormal = keepNormalId ? getStarXIPlayer(keepNormalId)?.name : null;
-  addHistory(features, { title: `Prestige ${features.seasonMode.prestigeCount} gestartet`, detail: `Zurück in Saison 1 · ${retained.size} Karten bleiben im Kader${keptNormal ? ` (mit ${keptNormal})` : ""} · +${Math.round(features.seasonMode.prestigeCount * PRESTIGE_GOAL_BONUS_PER_LEVEL * 100)} % Tore`, tone: "positive" }, now);
+  addHistory(features, { title: `Prestige ${features.seasonMode.prestigeCount} gestartet`, detail: `Zurück in Saison 1 · Upgrades auf Stufe 0 · ${retained.size} Karten bleiben im Kader${keptNormal ? ` (mit ${keptNormal})` : ""} · +${Math.round(features.seasonMode.prestigeCount * PRESTIGE_GOAL_BONUS_PER_LEVEL * 100)} % Tore`, tone: "positive" }, now);
   return { features, error: "" };
 }
 
