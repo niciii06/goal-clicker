@@ -6,6 +6,7 @@ import { useDialogFocus } from "./confirm-dialog";
 import { PRESTIGE_GOAL_BONUS_PER_LEVEL, getPrestigeKeepCandidates, getPrestigeRetainedSpecials, getStarXIPositions } from "./feature-data";
 import type { GameFeatures } from "./feature-data";
 import { formatNumber } from "./game/format";
+import { UPGRADES } from "./game/upgrades";
 import { getCareerCard } from "./career-data";
 
 /** Goal income bonus in percent after `count` Prestiges: 20, 40, 60, … */
@@ -35,7 +36,7 @@ export function PrestigeDialog({ features, goals, upgradeLevels, busy, error, on
   return createPortal(<div className="account-overlay" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) onCancel(); }}>
     <div ref={dialogRef} className="account-dialog confirm-dialog prestige-dialog" role="dialog" aria-modal="true" aria-labelledby="prestige-dialog-title">
       <h2 id="prestige-dialog-title">Prestige {next} starten?</h2>
-      <p>Der Aufstiegslauf beginnt wieder in Saison 1. Alle 27 Upgrades im Club Office starten wieder bei Stufe 0. Freischaltungen, Fragmente, ungeöffnete Packs und Vereinssterne bleiben.</p>
+      <p>Der Aufstiegslauf beginnt wieder in Saison 1. Alle {UPGRADES.length} Upgrades im Club Office starten wieder bei Stufe 0. Freischaltungen, Fragmente, ungeöffnete Packs und Vereinssterne bleiben.</p>
       <dl className="prestige-summary">
         <div><dt>Torbonus</dt><dd>+{percent(next - 1)} % → <strong>+{percent(next)} % Tore</strong> auf Klicks und passives Einkommen</dd></div>
         <div><dt>Torkontostand</dt><dd>{formatNumber(goals)} → <strong>0</strong></dd></div>

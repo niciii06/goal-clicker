@@ -370,7 +370,8 @@ test('older saves (no schema version, or below the current one) still sync norma
     assert.equal(await sync.upload(), true);
     sync.stop();
     assert.equal(sent.length, 1);
-    assert.equal(sent[0].schemaVersion, features?.schemaVersion ?? 0);
+    // The upload announces the schema this client writes (at least), never 0: the server would refuse it for good otherwise.
+    assert.equal(sent[0].schemaVersion, Math.max(GAME_FEATURES_SCHEMA_VERSION, features?.schemaVersion ?? 0));
     assert.equal(goalsIn(sent[0].keys[STORAGE_KEY]), 42);
   }
 });

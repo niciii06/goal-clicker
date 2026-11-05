@@ -427,5 +427,7 @@ export function rebaseCareerForPrestige(career: CareerState, retainedIds: Readon
     // The form of the last five matches is a rating bonus as well; the totals stay.
     next.players[id] = { ...stats, recent: [] };
   }
+  // Season awards only consider cards still in the club: a discarded card cannot win an award after the Prestige.
+  next.seasonPlayers = Object.fromEntries(Object.entries(career.seasonPlayers).filter(([id]) => retainedIds.has(id)));
   return next;
 }

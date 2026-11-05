@@ -16,3 +16,12 @@ export function isGameFromNewerVersion(game: string | null | undefined, supporte
 export function isSaveFromNewerVersion(keys: CloudSaveKeys | null | undefined, supported = GAME_FEATURES_SCHEMA_VERSION) {
   return readSaveSchemaVersion(keys) > supported;
 }
+
+/**
+ * The schema version an upload announces: the game version of this client, or the save's own when that is higher.
+ * A save without features.schemaVersion would otherwise announce 0, and the server would refuse every upload
+ * (SAVE_SCHEMA_NEWER) and stop the sync for good.
+ */
+export function uploadSchemaVersion(keys: CloudSaveKeys | null | undefined, own = GAME_FEATURES_SCHEMA_VERSION) {
+  return Math.max(own, readSaveSchemaVersion(keys));
+}
