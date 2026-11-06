@@ -4,7 +4,7 @@ import { UPGRADES } from "../app/game/upgrades.ts";
 import { CLICK_PASSIVE_SHARE_CAP, MAX_MULTIPLIER_LEVEL, MINI_GAME_IDS } from "../app/game/constants.ts";
 import { roundPrice } from "../app/upgrade-purchase.ts";
 import { MINI_GAME_BASE_MAX_REWARD, MINI_GAME_MAX_REWARD_SECONDS, getBulkPurchase, getCostAtLevel, getBaseClickPower, getBasePassivePower, getClickPassiveShare, getMiniGameMaxReward, scaleMiniGameReward } from "../app/game/economy.ts";
-import { ALBUM_MILESTONES, claimAlbumReward, getAlbumGroups } from "../app/career-data.ts";
+import { ALBUM_MILESTONES, ALBUM_REWARD_SECONDS, claimAlbumReward, claimAlbumRewards, claimAllAlbumRewards, getAlbumGoalReward, getAlbumGroups } from "../app/career-data.ts";
 import { DAILY_REWARD_DAYS, WORLD_DAILY_KEY, claimDailyReward, getDailyRewardStatus, getPreviousRewardDay, getRewardDay, mergeDailyRewardsForWorld } from "../app/daily-reward.ts";
 import type { RewardPackId, StarXIPlayer } from "../app/feature-data.ts";
 import { MATCH_PACK_STAMP_TARGET, MIN_DRAWABLE_RATING, REWARD_PACKS, cardPackRating, getRewardPackOdds, resolveRandomEvent, resolveVarEvent, SCRAP_PACK_PLAYERS, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STARTER_SQUAD_UNLOCK_CLICKS, awardMatchStamp, canStarXIPlayerFillSlot, getSeasonOpponentRating, getStarXIPlayer, grantWelcomePack, initialGameFeatures, maybeGrantStarterSquad, normalizeGameFeatures, openEarnedPack, openEarnedPackDraw, openStarPack } from "../app/feature-data.ts";
@@ -248,6 +248,34 @@ test("album goals pay fragments once for 10, 25 and 50 different cards", () => {
   assert.equal(claimAlbumReward(features, "collect-50"), false);
   assert.equal(claimAlbumReward(features, "collect-10"), false);
   assert.equal(features.starXI.fragments, 350);
+});
+
+test("album groups also pay seconds of income in goals, once, at the income of the claim", () => {
+  const features = initialGameFeatures();
+  features.starXI.ownedIds = SCRAP_PACK_PLAYERS.map((player) => player.id);
+  const groups = getAlbumGroups({ ...features.career, collectedIds: features.starXI.ownedIds });
+  const india = groups.find((group) => group.id === "nation-IN")!, scrap = groups.find((group) => group.id === "scrap")!;
+  assert.equal(india.rewardSeconds, ALBUM_REWARD_SECONDS.nation);
+  assert.equal(getAlbumGoalReward(india, 2_000_000), 240_000_000);
+  // Nothing without income, never negative.
+  assert.equal(getAlbumGoalReward(india, 0), 0);
+  assert.equal(getAlbumGoalReward(india, -5), 0);
+  const single = claimAlbumRewards(features, "nation-IN", 1000);
+  assert.deepEqual(single, { claimed: 1, fragments: 500, goals: 120_000 });
+  assert.match(features.history.at(-1)!.detail, /\+500 Fragmente und \+120.000 Tore/);
+  assert.deepEqual(claimAlbumRewards(features, "nation-IN", 1000), { claimed: 0, fragments: 0, goals: 0 });
+  // "all" claims every other complete group: the milestones up to 50 cards and the scrap page.
+  const all = claimAlbumRewards(features, "all", 1000);
+  assert.equal(all.claimed, 4);
+  assert.equal(all.fragments, 100 + 250 + 500 + scrap.reward);
+  assert.equal(all.goals, (60 + 120 + 300 + ALBUM_REWARD_SECONDS.scrap) * 1000);
+  assert.equal(claimAlbumRewards(features, "all", 1000).claimed, 0);
+  // The old fragment-only helpers still work and pay no goals.
+  const old = initialGameFeatures();
+  old.starXI.ownedIds = SCRAP_PACK_PLAYERS.map((player) => player.id);
+  assert.equal(claimAlbumReward(old, "all"), false);
+  assert.equal(claimAlbumReward(old, "scrap"), true);
+  assert.equal(claimAllAlbumRewards(old), 4);
 });
 
 test("old per seat daily rewards merge into one world entry without an extra claim", () => {

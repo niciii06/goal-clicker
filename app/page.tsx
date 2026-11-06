@@ -40,7 +40,7 @@ import { advanceLocalGameWhileOpen, claimLocalSave, getMiniGameCooldownUntil, in
 import type { LocalSaveResult } from "./game/storage";
 import { answerPressConference, getPressReward } from "./press-conference";
 import { canVibrate, readVibrationSetting, setVibrationOn, vibrate, vibrationOn } from "./game/device";
-import { albumMilestonesFromStorage, claimAlbumReward, claimAllAlbumRewards, getCareerCard, prepareCareerMatch, recordCareerMatch, rivalryKey } from "./career-data";
+import { albumMilestonesFromStorage, claimAlbumRewards, getCareerCard, prepareCareerMatch, recordCareerMatch, rivalryKey } from "./career-data";
 import { competitionFor, competitionOfCup, getBannedPlayerIds, nextCompetition, squadBanError, suspensionLabel } from "./discipline";
 import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "./daily-reward";
 import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
@@ -2273,7 +2273,9 @@ function App() {
     }
     setGame((current) => {
       const features = normalizeGameFeatures(current.features);
-      return (groupId === "all" ? claimAllAlbumRewards(features) > 0 : claimAlbumReward(features, groupId)) ? { ...current, features } : current;
+      // Fragments plus seconds of income in goals (claimAlbumRewards).
+      const claim = claimAlbumRewards(features, groupId, getBasePassivePower(current.upgrades, current.stars, current.features));
+      return claim.claimed ? { ...current, features, goals: current.goals + claim.goals, seasonGoals: current.seasonGoals + claim.goals, totalGoals: current.totalGoals + claim.goals } : current;
     });
   }
 

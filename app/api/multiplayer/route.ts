@@ -5,7 +5,7 @@ import { withGzip } from "../compression";
 import { requestMatchEdit, confirmMatchDraft } from '../../match-commands';
 import type { MatchDraft } from '../../match-commands';
 import { fixtureFor, travelGate, consumeTravel, eligibilityError, payTravelFines, settleTravel } from '../../travel-data';
-import { claimAllAlbumRewards, claimAlbumReward, prepareCareerMatch, recordCareerMatch } from "../../career-data";
+import { claimAlbumRewards, prepareCareerMatch, recordCareerMatch } from "../../career-data";
 import { competitionFor, getBannedPlayerIds, nextCompetition, squadBanError } from "../../discipline";
 import { getDb } from "../../../db";
 import { nameRecoveryAllowed, resolvePlayer } from "../../auth/player";
@@ -1378,7 +1378,11 @@ async function handlePost(request: Request) {
 
     if (action === "album-claim") {
       const groupId = typeof payload.groupId === "string" ? payload.groupId : "";
-      if (!(groupId === "all" ? claimAllAlbumRewards(game.features) > 0 : claimAlbumReward(game.features, groupId))) return jsonError("Diese Sammlung ist noch nicht vollständig oder ihre Prämie wurde bereits abgeholt.", 409);
+      const claim = claimAlbumRewards(game.features, groupId, getBasePassivePower(game.upgrades, game.stars, game.features));
+      if (!claim.claimed) return jsonError("Diese Sammlung ist noch nicht vollständig oder ihre Prämie wurde bereits abgeholt.", 409);
+      game.goals += claim.goals;
+      game.seasonGoals += claim.goals;
+      game.totalGoals += claim.goals;
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 
