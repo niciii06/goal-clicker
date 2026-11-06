@@ -44,12 +44,17 @@ test("holding Enter or Space cannot repeat ball clicks", async () => {
     pageSource.indexOf("function handleBallKeyDown"),
     pageSource.indexOf("function awardMiniGame"),
   );
-  const ballButton = pageSource.match(/<button type="button" className=\{`ball-button[^\n]+<\/button>/)?.[0] ?? "";
+  // The ball button renders in its own component (render isolation) and gets both handlers from the page.
+  const ballUse = pageSource.match(/<ClickBallButton [^\n]+?\/>/)?.[0] ?? "";
+  const displaySource = await readFile(new URL("../app/game/live-display.tsx", import.meta.url), "utf8");
+  const ballButton = displaySource.match(/<button type="button" className=\{`ball-button[^\n]+<\/button>/)?.[0] ?? "";
 
   assert.match(keyboardHandler, /event\.key === "Enter"/);
   assert.match(keyboardHandler, /event\.key === " "/);
   assert.match(keyboardHandler, /event\.repeat/);
   assert.match(keyboardHandler, /event\.preventDefault\(\)/);
-  assert.match(ballButton, /onClick=\{handleBallClick\}/);
-  assert.match(ballButton, /onKeyDown=\{handleBallKeyDown\}/);
+  assert.match(ballUse, /onClick=\{handleBallClick\}/);
+  assert.match(ballUse, /onKeyDown=\{handleBallKeyDown\}/);
+  assert.match(ballButton, /onClick=\{onClick\}/);
+  assert.match(ballButton, /onKeyDown=\{onKeyDown\}/);
 });

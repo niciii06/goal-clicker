@@ -2,13 +2,13 @@
 
 export const dynamic = "force-dynamic";
 
-import type { AnimationEvent, CSSProperties, DragEvent, KeyboardEvent, MouseEvent, RefObject } from "react";
-import type { AppMode, ClickEffect, CoopRole, CoopRoom, CoopSession, CrossbarGame, CrossbarHeight, DribbleGame, FeedEntry, GameState, IconName, LayoutCardId, MatchPrediction, MiniGameId, PenaltyDirection, PenaltyGame, PredictionGame, PurchaseMode, SeasonStandingsAnnouncement, SquadDragSource, SquadDropTarget, Tab, UpgradeDefinition } from "./game/types";
+import type { AnimationEvent, CSSProperties, DragEvent, KeyboardEvent, MouseEvent, RefObject, SetStateAction } from "react";
+import type { AppMode, CoopRole, CoopRoom, CoopSession, CrossbarGame, CrossbarHeight, DribbleGame, FeedEntry, GameState, IconName, LayoutCardId, MatchPrediction, MiniGameId, PenaltyDirection, PenaltyGame, PredictionGame, PurchaseMode, SeasonStandingsAnnouncement, SquadDragSource, SquadDropTarget, Tab, UpgradeDefinition } from "./game/types";
 import type { StarXIState, CupCardEvent, GameFeatures, PenaltyDirection as CupPenaltyDirection, RandomEvent, StarFormationId, StarPackId, StarPackReveal, TournamentGazetteIssue, TournamentId, TransferInsiderEvent } from "./feature-data";
 import type { Journey, TravelFixture } from "./travel-data";
 import type { MatchDraft } from "./match-commands";
 import { RESERVE_SORTS, RESERVE_STATUS_FILTERS, RESERVE_TYPES, filterAndSortReserve, reserveCardType, reserveTypeLabel } from "./game/reserve-filter";
-import { ACHIEVEMENTS, BALANCE_VERSION, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, COMBO_MAX_COUNT, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, ALBUM_MILESTONES_STORAGE_KEY, STAR_RATING_FILTERS, TUTORIAL_STORAGE_KEY, VIBRATION_STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from "./game/constants";
+import { ACHIEVEMENTS, BALANCE_VERSION, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_MAX_COUNT, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, ALBUM_MILESTONES_STORAGE_KEY, STAR_RATING_FILTERS, TUTORIAL_STORAGE_KEY, VIBRATION_STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from "./game/constants";
 import { AL, AR, AT, AU, AZ, BA, BE, BF, BG, BR, CA, CD, CH, CI, CL, CM, CN, CO, CR, CZ, DE, DK, DZ, EC, EG, ES, FI, FR, GB_ENG, GB_NIR, GB_SCT, GB_WLS, GE, GH, GM, GN, GR, GT, HR, HT, HU, IE, IL, IS, IT, JM, JP, KN, KR, MA, ME, ML, MW, MX, NG, NL, NO, NZ, PA, PH, PL, PT, PY, RO, RS, RU, SE, SI, SK, SN, SR, TR, UA, US, UY, VE, XK, ZA, ZM } from "country-flag-icons/react/3x2";
 import { AlbumPanel, CareerArea, CareerPlayerBadge, PostMatchSummary } from "./career-panels";
 import { normalizeStarXIState, removeStarXIPlayersFromSquad, toggleFavoriteCard } from "./feature-data";
@@ -47,7 +47,7 @@ import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "./
 import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
 import { consumeTravel, eligibilityError, fixtureFor, journeyView, payTravelFines, settleTravel, travelTiming } from "./travel-data";
 import { COOP_UPDATE_REQUIRED_EVENT, coopLastActiveLabel, coopRetryDelay, coopRoleLabel, createCoopGameNormalizer, isCoopRole, multiplayerUrl, newCoopActionId, notifyCoopOffline, occupiedCoopPlayers, prestigeVoteMessage, readCoopResponse, reloadForUpdate, upsertSavedRoom } from "./game/coop";
-import { capGoalsAfterRebalance, createClickResult, decayComboCount, formatComboMultiplier, getBaseClickPower, getBasePassivePower, getBulkPurchase, getClickPower, getComboLevel, getComboProgress, getCost, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades, scaleMiniGameReward } from "./game/economy";
+import { capGoalsAfterRebalance, createClickResult, decayComboCount, formatComboMultiplier, getBaseClickPower, getBasePassivePower, getBulkPurchase, getClickPower, getComboLevel, getCost, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades, scaleMiniGameReward } from "./game/economy";
 import { UPGRADES } from "./game/upgrades";
 import { applyGamePrestige } from "./game/prestige";
 import { TransferOfferActions } from "./transfer-offer-actions";
@@ -72,6 +72,8 @@ import { appBadgeCount, claimableAlbumGroups, getOpenActions, returnSummary, sec
 import type { OpenAction } from "./qol/status";
 import { NextStepsStrip } from "./qol/next-steps";
 import { SavingsGoalBar, UpgradeHints } from "./qol/shop-hints";
+import { addPassiveGoals, createPassiveGoalsStore } from "./game/live-goals";
+import { ClickBallButton, ComboMeter, FloatingClickNumbers, LiveGoalCount, createClickFeedbackStore } from "./game/live-display";
 import { bestValueUpgrade, nextLevelGain, savingsHint } from "./qol/economy-hints";
 import { parseSavingsGoal, pickStringFields, type SavingsGoal } from "./qol/prefs";
 import { bestRatingPerFormation, benchChangeCount, describeReplacements, fillStarXIGaps, formatRatingDelta, lineupChanges, movePlayerToEmptyBench, movePlayerToReserve, ratingAfterLineupMove, withBestBench } from "./game/lineup-tools";
@@ -252,7 +254,18 @@ function App() {
   const [starterSquadRetry, setStarterSquadRetry] = useState(0);
   const travelActionRef = useRef(false);
   const [travelBusy, setTravelBusy] = useState(false);
-  const [game, setGame] = useState<GameState>(initialGame);
+  const [game, setGameState] = useState<GameState>(initialGame);
+  // Passive ticks collect in this store and reach the state about once per second (audit P09); every other game
+  // update first adds them, so purchases, rewards and saves see exactly the goals the old 200 ms commits gave.
+  const [passiveGoals] = useState(() => createPassiveGoalsStore(initialGame().goals));
+  const flushPassiveGoals = useCallback(() => {
+    const amount = passiveGoals.takePending();
+    if (amount) setGameState((current) => addPassiveGoals(current, amount));
+  }, [passiveGoals]);
+  const setGame = useCallback((update: SetStateAction<GameState>) => {
+    flushPassiveGoals();
+    setGameState(update);
+  }, [flushPassiveGoals]);
   const [hydrated, setHydrated] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   // Finished until the start decides: only a brand new club gets the tutorial.
@@ -413,8 +426,8 @@ function App() {
   const [crossbarGame, setCrossbarGame] = useState<CrossbarGame | null>(null);
   const [predictionGame, setPredictionGame] = useState<PredictionGame | null>(null);
   const [countdownNow, setCountdownNow] = useState(getCurrentTime);
-  const [effects, setEffects] = useState<ClickEffect[]>([]);
-  const [pulse, setPulse] = useState(false);
+  // Ball pulse, floating numbers and combo meter re-render on their own (audit P09).
+  const [clickFeedback] = useState(createClickFeedbackStore);
   const [toastState, setToastState] = useState<ToastQueueState>({ current: null, queue: [] });
   const toast = toastState.current?.text ?? "";
   const [offline, setOffline] = useState("");
@@ -427,10 +440,6 @@ function App() {
   const streakRef = useRef(0);
   const comboRef = useRef({ count: 0, last: 0, paused: false, multiplier: 1 });
   const comboTimerRef = useRef<number | null>(null);
-  const [combo, setCombo] = useState({ count: 0, multiplier: 1 });
-  const [comboBurst, setComboBurst] = useState<{ id: number; text: string } | null>(null);
-  const comboLevel = getComboLevel(combo.count);
-  const nextComboLevel = COMBO_LEVELS.find((level) => level.clicks > combo.count);
   const [vibrationEnabled, setVibrationEnabled] = useState(readVibrationSetting);
   // Sound is split into effects (clicks, packs) and stadium (live match); the header switch turns both off.
   const [soundPrefs, setSoundPrefsState] = useState<SoundPrefs>({ effects: true, stadium: true });
@@ -590,7 +599,8 @@ function App() {
   const hasFullTestAccess = isCoopLive && Boolean(coopSession?.room.testMode);
   const hasInfiniteMoney = hasFullTestAccess;
   const spendableGoals = hasInfiniteMoney ? Number.MAX_VALUE : displayGame.goals;
-  const displayBalance = hasInfiniteMoney ? "∞" : formatNumber(displayGame.goals);
+  // The local club's counter follows every passive tick through the store; a co-op world shows its own total.
+  const displayBalance = <LiveGoalCount store={passiveGoals} fixed={hasInfiniteMoney ? "∞" : displayGame === game ? null : formatNumber(displayGame.goals)} />;
   const soloJourneyId = !isCoopLive && !game.features.travel.journey?.consumed ? game.features.travel.journey?.id : undefined;
   useEffect(() => {
     if(!hydrated||!playerId||!soloJourneyId)return;
@@ -618,7 +628,7 @@ function App() {
     const visible=()=>{if(document.visibilityState==='visible')void sync();};
     document.addEventListener('visibilitychange',visible);
     return ()=>{stopped=true;clearInterval(timer);document.removeEventListener('visibilitychange',visible);};
-  },[hydrated,playerId,soloJourneyId]);
+  },[hydrated,playerId,soloJourneyId,setGame]);
   // Fines from the journey (speeding, parking) are paid once the team has arrived.
   const soloJourney = !isCoopLive ? game.features.travel.journey : null;
   const soloFinesDue = Boolean(soloJourney && !soloJourney.finesPaid && soloJourney.events.some((event) => event.fine) && countdownNow >= soloJourney.endsAt);
@@ -631,7 +641,7 @@ function App() {
       return { ...current, features, goals: current.goals - fine, seasonGoals: Math.max(0, current.seasonGoals - fine) };
     });
     // countdownNow re-runs it each second, because the travel clock may reach the arrival a moment later.
-  }, [hydrated, soloFinesDue, countdownNow]);
+  }, [hydrated, soloFinesDue, countdownNow, setGame]);
   const sharedRandomEvent = isCoopLive ? displayGame.features.randomEvent : null;
   const visibleTransferEvent = displayGame.features.transferSaga.latestEvent;
   const visibleGazetteIssue = displayGame.features.gazetteIssues.at(-1) ?? null;
@@ -1175,8 +1185,12 @@ function App() {
   }, [activeCoopCode, activeCoopPlayerId, hydrated]);
 
   useEffect(() => {
-    gameRef.current = game;
-  }, [game]);
+    gameRef.current = addPassiveGoals(game, passiveGoals.getPending());
+  }, [game, passiveGoals]);
+  // Before paint, so the counter never shows a committed state without the ticks collected since.
+  useLayoutEffect(() => {
+    passiveGoals.setDisplay(game.goals + passiveGoals.getPending());
+  }, [game.goals, passiveGoals]);
 
   useEffect(() => {
     const nextClub = { name: displayClubName, badge: displayClubBadge, color: displayClubColor };
@@ -1186,9 +1200,23 @@ function App() {
 
   useEffect(() => {
     if (!hydrated) return;
-    const timer = window.setInterval(() => setCountdownNow(getCurrentTime()), 1000);
+    // One render per second: the countdowns and the passive goals collected since the last commit.
+    const timer = window.setInterval(() => { flushPassiveGoals(); setCountdownNow(getCurrentTime()); }, 1000);
     return () => window.clearInterval(timer);
-  }, [hydrated]);
+  }, [hydrated, flushPassiveGoals]);
+  // A press first commits the collected goals, so the handler that follows renders with exact goals (affordable
+  // buttons, bulk counts, pack checks). The ball adds its goals through setGame, which commits them anyway.
+  useEffect(() => {
+    if (!hydrated) return;
+    const commit = (event: Event) => {
+      if (!passiveGoals.getPending()) return;
+      if (event.target instanceof Element && event.target.closest(".ball-button")) return;
+      flushPassiveGoals();
+    };
+    window.addEventListener("pointerdown", commit, { capture: true, passive: true });
+    window.addEventListener("keydown", commit, { capture: true, passive: true });
+    return () => { window.removeEventListener("pointerdown", commit, { capture: true }); window.removeEventListener("keydown", commit, { capture: true }); };
+  }, [hydrated, flushPassiveGoals, passiveGoals]);
 
   const showToastRef = useRef(showToast);
   showToastRef.current = showToast;
@@ -1627,8 +1655,8 @@ function App() {
       const state = comboRef.current;
       const count = decayComboCount(state.count, Date.now() - state.last);
       const { multiplier } = getComboLevel(count);
-      if (state.multiplier > 1 && multiplier === 1) setComboBurst({ id: Date.now(), text: "Combo vorbei" });
-      setCombo({ count, multiplier });
+      if (state.multiplier > 1 && multiplier === 1) clickFeedback.setBurst({ id: Date.now(), text: "Combo vorbei" });
+      clickFeedback.setCombo({ count, multiplier });
       if (count > 0) {
         state.multiplier = multiplier;
         scheduleDecay(COMBO_DECAY_MS);
@@ -1637,7 +1665,7 @@ function App() {
         comboRef.current = { count: 0, last: 0, paused: false, multiplier: 1 };
       }
     }, delay);
-  }, []);
+  }, [clickFeedback]);
   // Full screen announcements (Fabrizio Romario, gazette) pause the combo instead of ending it.
   const comboPaused = Boolean(transferAnnouncement || gazetteAnnouncement);
   useEffect(() => {
@@ -2714,7 +2742,7 @@ function App() {
       showToast(`Automatisch ersetzt: ${describeReplacements(preview.replacements).join(" · ")}`);
     }, 800);
     return () => window.clearTimeout(timer);
-  }, [soloCupActive, hydrated, isCoopLive]);
+  }, [soloCupActive, hydrated, isCoopLive, setGame]);
 
   async function collectAlbumReward(groupId: string) {
     if (coopBusy) return;
@@ -2765,7 +2793,7 @@ function App() {
     check();
     const timer = window.setInterval(check, 30000);
     return () => window.clearInterval(timer);
-  }, [hydrated, appMode]);
+  }, [hydrated, appMode, setGame]);
 
   function playTone(frequency: number, duration: number, type: OscillatorType = "sine", volume = 0.03, delay = 0) {
     if (!gameRef.current.sound || !soundPrefsRef.current.effects || typeof window === "undefined") return;
@@ -2802,10 +2830,10 @@ function App() {
     state.last = now;
     const level = getComboLevel(state.count);
     state.multiplier = level.multiplier;
-    setCombo({ count: state.count, multiplier: level.multiplier });
+    clickFeedback.setCombo({ count: state.count, multiplier: level.multiplier });
     if (level.multiplier > previous.multiplier) {
-      setComboBurst({ id: now, text: `COMBO ${formatComboMultiplier(level.multiplier)}` });
-      window.setTimeout(() => setComboBurst((current) => current?.id === now ? null : current), 900);
+      clickFeedback.setBurst({ id: now, text: `COMBO ${formatComboMultiplier(level.multiplier)}` });
+      window.setTimeout(() => clickFeedback.setBurst((current) => current?.id === now ? null : current), 900);
       playTone(level.tier === 3 ? 988 : 784, 0.12, "triangle", 0.045);
       vibrate(level.tier === 3 ? [30, 25, 45] : 30);
     }
@@ -2855,9 +2883,9 @@ function App() {
     const x = rect ? event.clientX - rect.left : 50;
     const y = rect ? event.clientY - rect.top : 50;
     const effect = { id: result.effectId, x, y, amount: result.amount, critical: result.critical, combo: getComboLevel(comboRef.current.count).tier };
-    setEffects((current) => [...current, effect]);
-    setTimeout(() => setEffects((current) => current.filter((item) => item.id !== effect.id)), 850);
-    setPulse((value) => !value);
+    clickFeedback.addEffect(effect);
+    setTimeout(() => clickFeedback.removeEffect(effect.id), 850);
+    clickFeedback.togglePulse();
     playTone(result.critical ? 720 : 350, 0.07, "triangle", result.critical ? 0.055 : 0.025);
     if (result.critical) { showToast("Kritischer Abschluss", "minor"); playTone(980, 0.13, "square", 0.04, 0.07); }
     else if (result.streak === 10) showToast("Zehn Klicks am Stück", "minor");
@@ -3332,7 +3360,7 @@ function App() {
       }, 0);
     }
     window.setTimeout(() => setHydrated(true), 0);
-  }, []);
+  }, [setGame]);
 
   // Hidden time is measured on the monotonic clock (system clock changes earn nothing), and one hidden period
   // earns at most MAX_BACKGROUND_CATCH_UP_MS of passive income in total. pageInactiveAtRef holds monotonic readings.
@@ -3366,7 +3394,10 @@ function App() {
       if (document.hidden) return;
       const power = getPassivePower(gameRef.current.upgrades, gameRef.current.stars, gameRef.current.features);
       if (power <= 0) return;
-      setGame((current) => ({ ...current, goals: current.goals + power / 5, seasonGoals: current.seasonGoals + power / 5, totalGoals: current.totalGoals + power / 5 }));
+      // Earned at once (gameRef, saves, the counter); committed to the state with the next flush.
+      passiveGoals.addPending(power / 5);
+      gameRef.current = addPassiveGoals(gameRef.current, power / 5);
+      passiveGoals.setDisplay(gameRef.current.goals);
     }, 200);
     const save = window.setInterval(() => {
       const now = Date.now();
@@ -3379,7 +3410,7 @@ function App() {
       handleLocalSave(persistLocalGame(next));
     }, 2200);
     return () => { window.clearInterval(tick); window.clearInterval(save); };
-  }, [hydrated, handleLocalSave, markPageHidden, takeHiddenTime]);
+  }, [hydrated, handleLocalSave, markPageHidden, takeHiddenTime, passiveGoals]);
 
   useEffect(() => {
     if (!hydrated || isCoopLive) return;
@@ -3394,7 +3425,7 @@ function App() {
       playTone(659, 0.12, "square", 0.035, 0.1);
       playTone(784, 0.22, "square", 0.04, 0.2);
     }, 0);
-  }, [game.totalGoals, game.achievements, hydrated, isCoopLive]);
+  }, [game.totalGoals, game.achievements, hydrated, isCoopLive, setGame]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -3437,7 +3468,7 @@ function App() {
     window.addEventListener("keydown", claim, { capture: true, passive: true });
     document.addEventListener("visibilitychange", onVisibility);
     return () => { window.removeEventListener("beforeunload", saveOnExit); window.removeEventListener("pagehide", saveOnExit); window.removeEventListener(FLUSH_SAVE_EVENT, saveOnExit); window.removeEventListener("pointerdown", claim, { capture: true }); window.removeEventListener("keydown", claim, { capture: true }); document.removeEventListener("visibilitychange", onVisibility); };
-  }, [hydrated, handleLocalSave, markPageHidden, takeHiddenTime]);
+  }, [hydrated, handleLocalSave, markPageHidden, takeHiddenTime, setGame]);
 
   // Tutorial tasks tick off from the game itself; a league match counts at kick off, before its history exists.
   const tutorialCup = game.features.cup;
@@ -3582,11 +3613,10 @@ function App() {
           <div className="score-display"><span className="score-label">{hasInfiniteMoney ? "UNBEGRENZTES TESTGUTHABEN" : isCoopLive ? "GEMEINSAME TORE" : "DEINE TORE"}</span><strong>{displayBalance}</strong><span className="per-click-label">+{formatNumber(clickPower)} {isCoopLive ? "pro Team-Klick" : "pro Klick"}</span>{savingsGoal && savingsTarget && !hasInfiniteMoney && <SavingsGoalBar goal={savingsGoal} label={savingsTarget.label} cost={savingsTarget.cost} goals={displayGame.goals} passivePerSecond={passivePower} format={formatNumber} onClear={() => setSavingsGoal(null)} onOpen={() => { if (savingsGoal.kind === "pack") openFeatureTab("packs"); else { openFeatureTab("home"); window.setTimeout(() => document.querySelector(".shop-card")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); } }} />}</div>
           <div className="ball-stage" ref={stageRef}>
             <div className="stadium-glow" /><div className="stadium-lights"><span /><span /><span /><span /><span /></div><div className="field-circle" /><div className="field-line field-line-one" /><div className="field-line field-line-two" /><div className="field-label">{isCoopLive ? "CO-OP CLICKER ARENA" : "GOAL CLICKER ARENA"}</div>
-            <button type="button" className={`ball-button${pulse ? " hit" : ""}${comboLevel.tier > 1 ? ` combo-${comboLevel.tier}` : ""}`} onClick={handleBallClick} onKeyDown={handleBallKeyDown} aria-label={isCoopLive ? "Team-Ball anklicken" : "Fussball anklicken"}><span className="ball-aura" /><FootballGraphic /></button>
+            <ClickBallButton store={clickFeedback} coop={isCoopLive} onClick={handleBallClick} onKeyDown={handleBallKeyDown} />
             <p className="click-label"><span>CLICK</span> den Ball {isCoopLive ? "fürs Team" : "für Tore"}</p>
-            <div className="floating-layer">{effects.map((effect) => <span className={`floating-number${effect.critical ? " critical" : ""}${effect.combo > 1 ? ` combo-${effect.combo}` : ""}`} key={effect.id} style={{ left: effect.x, top: effect.y }}>{effect.critical ? `CRIT! +${formatNumber(effect.amount)}` : `+${formatNumber(effect.amount)}`}</span>)}</div>
-            <div className={`combo-meter level-${comboLevel.tier}${combo.count > 1 ? " active" : ""}`}><span className="combo-label">{comboPaused && combo.count > 1 ? `Combo pausiert${combo.multiplier > 1 ? ` · ${formatComboMultiplier(combo.multiplier)}` : ""}` : combo.multiplier > 1 ? `COMBO ${formatComboMultiplier(combo.multiplier)}` : combo.count > 1 ? `${combo.count} Klicks` : "Schnell klicken für Combo"}</span><span className="combo-track"><i style={{ width: `${Math.round(getComboProgress(combo.count) * 100)}%` }} /></span><small>{nextComboLevel ? `Nächste Stufe: ${formatComboMultiplier(nextComboLevel.multiplier)}` : "Maximum erreicht"}</small></div>
-            {comboBurst && <div className={`combo-burst${comboBurst.text === "Combo vorbei" ? " ended" : ""}`} key={comboBurst.id} aria-hidden="true">{comboBurst.text}</div>}
+            <FloatingClickNumbers store={clickFeedback} />
+            <ComboMeter store={clickFeedback} paused={comboPaused} />
           </div>
           <div className="production-strip"><div className="production-item"><span className="production-icon">/s</span><div><small>PRO SEKUNDE</small><strong>{formatNumber(passivePower)}</strong></div></div><div className="production-divider" /><div className="production-item"><span className="production-icon">+1</span><div><small>PRO KLICK</small><strong>{formatNumber(clickPower)}</strong></div></div><div className="production-divider" /><div className="production-item"><span className="production-icon">#</span><div><small>KLICKS</small><strong>{formatNumber(displayGame.clicks)}</strong></div></div></div>
           {hydrated && (!isCoopLive || coopSession) && <DailyRewardCard state={isCoopLive ? mergeDailyRewardsForWorld(displayGame.features.dailyRewards) : displayGame.features.dailyRewards} claimKey={isCoopLive ? WORLD_DAILY_KEY : "solo"} now={countdownNow} passivePerSecond={getBasePassivePower(displayGame.upgrades, displayGame.stars, displayGame.features)} clickPower={getBaseClickPower(displayGame.upgrades, displayGame.stars, displayGame.features)} busy={dailyBusy || coopBusy} coop={isCoopLive} onClaim={() => { void claimDaily(); }} format={formatNumber} />}
