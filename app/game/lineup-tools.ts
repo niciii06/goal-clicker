@@ -2,9 +2,8 @@
 // two line ups, and preview what a move or a formation does to the team rating. The rules of who may play where
 // are those of feature-data (canStarXIPlayerFillSlot, getStarXIRating); nothing here changes them.
 import type { GameFeatures, StarFormationId, StarXIEvaluationContext, StarXIState } from "../feature-data";
-import { STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_SQUAD_SIZE, canStarXIPlayerFillSlot, getBestXIUnavailablePlayerIds, getStarXIPlayer, getStarXIRating, getStarXISelectionRating, normalizeStarXIState, removeStarXIPlayersFromSquad, setBestStarXI, setStarXIFormation } from "../feature-data";
-import { getBannedPlayerIds } from "../discipline";
-import { nextCompetition } from "../discipline";
+import { STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_SQUAD_SIZE, canStarXIPlayerFillSlot, getBestStarXIBenchSelection, getBestXIUnavailablePlayerIds, getStarXIPlayer, getStarXIRating, getStarXISelectionRating, normalizeStarXIState, removeStarXIPlayersFromSquad, setBestStarXI, setStarXIFormation } from "../feature-data";
+import { getBannedPlayerIds, nextCompetition } from "../discipline";
 
 export type GapReason = "verletzt" | "gesperrt" | "verliehen" | "frei";
 export type GapReplacement = { slot: number; area: "lineup" | "bench"; inId: string; outId: string | null; reason: GapReason };
@@ -36,7 +35,9 @@ export function fillStarXIGaps(features: GameFeatures, context: StarXIEvaluation
   const reserve = () => { const taken = used(); return state.ownedIds.filter((id) => !taken.has(id) && !blockedSet.has(id) && getStarXIPlayer(id) && !getStarXIPlayer(id)!.benchOnly); };
   for (let slot = 0; slot < STAR_XI_SQUAD_SIZE; slot += 1) {
     if (lineupIds[slot]) continue;
-    const outId = original.lineupIds[slot] || null;
+    // An injured or suspended player already left the lineup after the match; the kick off lineup still names him.
+    const kickoffId = features.cup.originalLineupIds?.[slot];
+    const outId = original.lineupIds[slot] || (kickoffId && !state.lineupIds.includes(kickoffId) && unavailabilityReason(features, kickoffId) ? kickoffId : null);
     const fits = (id: string) => canStarXIPlayerFillSlot(id, slot, state.formationPositions);
     const fromBench = benchIds.map((id, index) => ({ id, index })).filter((entry) => entry.id && fits(entry.id)).sort((a, b) => score(b.id) - score(a.id))[0];
     if (fromBench) {
@@ -107,6 +108,34 @@ export function ratingAfterLineupMove(state: StarXIState, playerId: string, slot
 /** "+2 OVR", "−1 OVR" or "± 0 OVR". */
 export function formatRatingDelta(delta: number) {
   return delta > 0 ? `+${delta} OVR` : delta < 0 ? `−${Math.abs(delta)} OVR` : "± 0 OVR";
+}
+
+/** A lineup or bench player goes to an empty bench place (his lineup place stays open); null when not possible. */
+export function movePlayerToEmptyBench(state: StarXIState, playerId: string, benchIndex: number): StarXIState | null {
+  const next = normalizeStarXIState(state);
+  if (!Number.isInteger(benchIndex) || benchIndex < 0 || benchIndex >= STAR_XI_BENCH_SIZE || next.benchIds[benchIndex] || !next.ownedIds.includes(playerId)) return null;
+  const lineupIndex = next.lineupIds.indexOf(playerId), oldBench = next.benchIds.indexOf(playerId);
+  if (lineupIndex < 0 && oldBench < 0) return null;
+  const lineupIds = [...next.lineupIds], benchIds = [...next.benchIds];
+  if (lineupIndex >= 0) lineupIds[lineupIndex] = "";
+  if (oldBench >= 0) benchIds[oldBench] = "";
+  benchIds[benchIndex] = playerId;
+  return { ...next, lineupIds, benchIds };
+}
+
+/** A lineup or bench player goes back to the reserve; his place stays open. null when he has no place. */
+export function movePlayerToReserve(state: StarXIState, playerId: string): StarXIState | null {
+  const next = normalizeStarXIState(state);
+  if (!next.lineupIds.includes(playerId) && !next.benchIds.includes(playerId)) return null;
+  return { ...next, lineupIds: next.lineupIds.map((id) => id === playerId ? "" : id), benchIds: next.benchIds.map((id) => id === playerId ? "" : id) };
+}
+
+/** The best bench for the current eleven (the lineup itself stays exactly as it is). */
+export function withBestBench(features: GameFeatures, context: StarXIEvaluationContext = {}): StarXIState {
+  const blocked = getBestXIUnavailablePlayerIds(features);
+  const state = removeStarXIPlayersFromSquad(normalizeStarXIState(features.starXI), blocked, false);
+  const benchIds = getBestStarXIBenchSelection(state.ownedIds, state.lineupIds, state.formationPositions, blocked, context);
+  return { ...state, benchIds };
 }
 
 /** The best team rating every formation reaches with the available players (for the formation picker). */

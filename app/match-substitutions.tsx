@@ -22,7 +22,7 @@ export function moveInMatchLineup(lineup:readonly string[],bench:readonly string
   if(source.area!=='lineup'||source.index===null||source.index===target.index)return null;
   [next[source.index],next[target.index]]=[next[target.index],next[source.index]];return next;
  }
- if(source.area!=='lineup'||source.index===null||!bench[target.index])return null;
+ if(target.area==='reserve'||source.area!=='lineup'||source.index===null||!bench[target.index])return null;
  next[source.index]=bench[target.index];return next;
 }
 

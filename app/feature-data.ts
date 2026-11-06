@@ -2962,6 +2962,8 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     detail: safeString(item.detail, ""),
     tone: item.tone === "negative" || item.tone === "positive" ? item.tone : "neutral",
     timestamp: Number(item.timestamp) || Date.now(),
+    ...(item.kind === "squad" || item.kind === "upgrade" ? { kind: item.kind } : {}),
+    ...(typeof item.actor === "string" && item.actor ? { actor: item.actor.slice(0, 24) } : {}),
   })) : [];
   const randomEventSource = asRecord(source.randomEvent);
   const randomEvent: RandomEvent | null = typeof randomEventSource.title === "string" ? {
@@ -3733,8 +3735,23 @@ export function resolveVarEvent(goals: number, passivePerSecond: number, random 
   return { id: "var", title: "VAR greift ein", message: amount > 0 ? `Abseits! Der VAR aberkennt ${amount.toLocaleString("de-CH")} Tore, so viel wie ${duration} Einkommen.` : "Der VAR prüft lange, findet aber noch kein Tor zum Aberkennen.", amount: amount > 0 ? -amount : 0, tone: amount > 0 ? "negative" : "neutral", createdAt: now };
 }
 
+/** Squad and upgrade changes of one member within this time share one history entry, so they never push results out. */
+export const HISTORY_COALESCE_MS = 10 * 60 * 1000;
+
+/** Merges back to back squad or upgrade entries of the same member within HISTORY_COALESCE_MS into the newest one. */
+export function coalesceHistory(history: readonly MatchHistoryEntry[]) {
+  const result: MatchHistoryEntry[] = [];
+  for (const entry of history) {
+    const previous = result.at(-1);
+    const gap = previous ? entry.timestamp - previous.timestamp : -1;
+    if (entry.kind && previous?.kind === entry.kind && previous.actor === entry.actor && gap >= 0 && gap < HISTORY_COALESCE_MS) result[result.length - 1] = entry;
+    else result.push(entry);
+  }
+  return result;
+}
+
 export function addHistory(features: GameFeatures, entry: Omit<MatchHistoryEntry, "id" | "timestamp">, now = Date.now()) {
-  features.history = [...features.history, { ...entry, id: `${now}-${Math.random().toString(36).slice(2, 7)}`, timestamp: now }].slice(-30);
+  features.history = coalesceHistory([...features.history, { ...entry, id: `${now}-${Math.random().toString(36).slice(2, 7)}`, timestamp: now }]).slice(-30);
 }
 
 

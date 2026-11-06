@@ -11,7 +11,7 @@ import { getDb } from "../../../db";
 import { nameRecoveryAllowed, resolvePlayer } from "../../auth/player";
 import type { LightRoomRow, RoomRow, RoomSeats, RoomUpdate } from "../../../db";
 import { createHash } from "node:crypto";
-import { SPECIAL_CARD_PACK, awardMatchStamp, maybeGrantStarterSquad, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
+import { SPECIAL_CARD_PACK, coalesceHistory, awardMatchStamp, maybeGrantStarterSquad, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
 import type { GameFeatures, PenaltyDirection, StarFormationId } from "../../feature-data";
 import { isSupportedMultiplayerProtocol, MULTIPLAYER_UPDATE_MESSAGE } from "../../multiplayer-protocol";
 import { getFormationUnlockLeague, getPackUnlockLeague, getReachedLeague, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked } from "../../season-progression";
@@ -22,6 +22,7 @@ import { claimWeeklyGoal, ensureWeeklyGoals, notePackOpened } from "../../weekly
 import { ACHIEVEMENTS, BALANCE_VERSION, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_IDS } from "../../game/constants";
 import { capGoalsAfterRebalance, getBaseClickPower, getBasePassivePower, getClickPower, getCost, getLevel, getMiniGameMaxReward, getPassiveIncomePower } from "../../game/economy";
 import { getUpgrade } from "../../game/upgrades";
+import { describeReplacements, fillStarXIGaps, movePlayerToEmptyBench, movePlayerToReserve, withBestBench } from "../../game/lineup-tools";
 import { applyGamePrestige } from "../../game/prestige";
 import { getTicketIncome, recordTicketIncome } from "../../ticket-income";
 
@@ -727,7 +728,13 @@ async function mutateWorld(context: WorldContext, initial: RoomRow, apply: (game
       const timestamp = new Date(now).toISOString();
       const game = readGame(room);
       if (options.passive) bookPassive(game, room, now, attempt === 0 ? options.presence ?? room : room);
+      const historyBefore = new Set(game.features.history.map((entry) => entry.id));
       const outcome = await apply(game, room, timestamp);
+      // Entries this member's own action wrote name the member (Q62); background ticks stay without a name.
+      if (!(outcome instanceof Response) && outcome.kind === "save" && context.action !== "tick" && context.action !== "cup-tick") {
+        const actor = roomPlayerName(room, role).slice(0, 24);
+        game.features.history = coalesceHistory(game.features.history.map((entry) => historyBefore.has(entry.id) || entry.actor ? entry : { ...entry, actor }));
+      }
       if (outcome instanceof Response) {
         if (options.touch) await touchPresence(db, room, role, timestamp);
         return outcome;
@@ -1428,6 +1435,8 @@ async function handlePost(request: Request) {
       }
       if (!testMode) game.goals -= purchase.totalCost;
       game.upgrades[upgradeId] = getLevel(game.upgrades, upgradeId) + purchase.count;
+      // Who bought what (Q62); purchases of one member within a few minutes share one entry (addHistory).
+      addHistory(game.features, { title: "Upgrade gekauft", detail: `${getUpgrade(upgradeId)!.name} auf Level ${game.upgrades[upgradeId]}${purchase.count > 1 ? ` (+${purchase.count})` : ""}.`, tone: "neutral", kind: "upgrade" });
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 
@@ -1453,7 +1462,7 @@ async function handlePost(request: Request) {
       if (!isLeagueContentUnlocked(formationUnlockLeague, reachedLeagueOf(game), testMode)) return jsonError(`Diese Formation wird ab Liga ${formationUnlockLeague} freigeschaltet.`, 409);
       const formation = getStarFormation(formationId);
       game.features.starXI = setStarXIFormation(game.features.starXI, formationId, getUnavailableStarXIPlayerIds(game.features));
-      addHistory(game.features, { title: "Formation angepasst", detail: `Die Startelf spielt jetzt im ${formation.label}.`, tone: "neutral" });
+      addHistory(game.features, { title: "Formation angepasst", detail: `Die Startelf spielt jetzt im ${formation.label}.`, tone: "neutral", kind: "squad" });
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 
@@ -1500,7 +1509,7 @@ async function handlePost(request: Request) {
         game.features.cup.playerMatchPositions[starPlayerId] = game.features.starXI.formationPositions[lineupIndex] ?? starPlayer.position;
         game.features.cup.substitutionsUsed += 1;
       }
-      addHistory(game.features, { title: game.features.cup.active ? `${starPlayer.name} eingewechselt` : "Star XI umgestellt", detail: `${starPlayer.name} spielt jetzt auf Platz ${lineupIndex + 1}.`, tone: "neutral" });
+      addHistory(game.features, { title: game.features.cup.active ? `${starPlayer.name} eingewechselt` : "Star XI umgestellt", detail: `${starPlayer.name} spielt jetzt auf Platz ${lineupIndex + 1}.`, tone: "neutral", ...(game.features.cup.active ? {} : { kind: "squad" as const }) });
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 
@@ -1509,7 +1518,36 @@ async function handlePost(request: Request) {
       game.features.starXI = setBestStarXI(game.features.starXI, getBestXIUnavailablePlayerIds(game.features), { career: game.features.career, cup: game.features.cup });
       const selectedCount = game.features.starXI.lineupIds.filter(Boolean).length;
       if (!selectedCount) return jsonError("Du hast noch keine passenden Spieler im Kader.", 409);
-      addHistory(game.features, { title: "Beste Startelf aufgestellt", detail: `${selectedCount} von ${STAR_XI_SQUAD_SIZE} Positionen mit den stärksten passenden Spielern besetzt.`, tone: "positive" });
+      addHistory(game.features, { title: "Beste Startelf aufgestellt", detail: `${selectedCount} von ${STAR_XI_SQUAD_SIZE} Positionen mit den stärksten passenden Spielern besetzt.`, tone: "positive", kind: "squad" });
+      return persistGameResponse(db, room, game, timestamp, playerId, role);
+    }
+
+    // "Lücken füllen": only empty and unavailable places change; every other choice of the players stays.
+    if (action === "star-fill-gaps") {
+      if (game.features.cup.active) return jsonError("Während eines Spiels füllst du Lücken über die Wechsel.", 409);
+      const { starXI, replacements } = fillStarXIGaps(game.features, { career: game.features.career, cup: game.features.cup });
+      if (!replacements.length) return jsonError("Es gibt keine Lücke, die ein passender Spieler füllen kann.", 409);
+      game.features.starXI = starXI;
+      addHistory(game.features, { title: "Lücken gefüllt", detail: describeReplacements(replacements).join(" · "), tone: "neutral", kind: "squad" });
+      return persistGameResponse(db, room, game, timestamp, playerId, role, {}, { replacements: describeReplacements(replacements) });
+    }
+
+    if (action === "star-best-bench") {
+      if (game.features.cup.active) return jsonError("Während des Spiels kann die Bank nicht neu zusammengestellt werden.", 409);
+      game.features.starXI = withBestBench(game.features, { career: game.features.career, cup: game.features.cup });
+      addHistory(game.features, { title: "Beste Bank aufgestellt", detail: `${game.features.starXI.benchIds.filter(Boolean).length} Bankplätze mit den stärksten passenden Spielern besetzt.`, tone: "neutral", kind: "squad" });
+      return persistGameResponse(db, room, game, timestamp, playerId, role);
+    }
+
+    // A player leaves his place without a replacement: onto an empty bench place, or back to the reserve.
+    if (action === "star-unassign") {
+      if (game.features.cup.active) return jsonError("Während des Spiels wechselst du nur über die Wechsel.", 409);
+      const starPlayerId = typeof payload.starPlayerId === "string" ? payload.starPlayerId : "";
+      const toBench = payload.benchIndex !== undefined && payload.benchIndex !== null;
+      const next = toBench ? movePlayerToEmptyBench(game.features.starXI, starPlayerId, Number(payload.benchIndex)) : movePlayerToReserve(game.features.starXI, starPlayerId);
+      if (!next) return jsonError("Dieser Spieler kann dort nicht abgelegt werden.", 409);
+      game.features.starXI = next;
+      addHistory(game.features, { title: "Kader umgestellt", detail: `${getStarXIPlayer(starPlayerId)?.name ?? "Spieler"} ${toBench ? "sitzt jetzt auf der Bank" : "ist jetzt in der Reserve"}.`, tone: "neutral", kind: "squad" });
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 
@@ -1525,7 +1563,7 @@ async function handlePost(request: Request) {
       if (!game.features.starXI.lineupIds.includes(starPlayerId) && !game.features.starXI.benchIds.includes(starPlayerId) && getBannedPlayerIds(game.features, nextCompetition(game.features)).includes(starPlayerId)) return jsonError(`${starPlayer.name} ist ${banCause(game.features, nextCompetition(game.features), [starPlayerId])} für das nächste Spiel gesperrt.`, 409);
       if (game.features.cup.active) return jsonError("Während des Spiels kann die Bank nicht neu zusammengestellt werden.", 409);
       game.features.starXI = setStarXIBenchPlayer(game.features.starXI, benchIndex, starPlayerId, getUnavailableStarXIPlayerIds(game.features));
-      addHistory(game.features, { title: "Bank umgestellt", detail: `${starPlayer.name} sitzt jetzt auf Bankplatz ${benchIndex + 1}.`, tone: "neutral" });
+      addHistory(game.features, { title: "Bank umgestellt", detail: `${starPlayer.name} sitzt jetzt auf Bankplatz ${benchIndex + 1}.`, tone: "neutral", kind: "squad" });
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 

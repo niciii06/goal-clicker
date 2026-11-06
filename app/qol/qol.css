@@ -50,3 +50,25 @@
 .savings-goal-clear { min-width: 44px; border: 1px solid var(--line); border-radius: 14px; color: var(--soft); background: var(--surface-raised); font-size: 18px; cursor: pointer; }
 .earned-packs-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .star-reveal-lineup { margin: 10px auto 0; }
+
+/* Squad helpers: gaps, best bench, undo, move preview, bans, loaned players, reserve drop zone */
+.starxi-squad-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.starxi-squad-tools .mode-secondary { min-height: 36px; padding: 6px 12px; font-size: var(--text-caption2); }
+.squad-move-preview { color: var(--accent); }
+.reserve-drag-grip { display: none; align-self: stretch; align-items: center; justify-content: center; width: 28px; margin: -6px 0 -6px -6px; color: var(--soft); font-size: 18px; touch-action: none; cursor: grab; }
+@media (pointer: coarse) { .reserve-drag-grip { display: inline-flex; } .starxi-player-card.reserve:has(.reserve-drag-grip) { grid-template-columns: 28px minmax(29px, max-content) minmax(0, 1fr) auto; } }
+.starxi-pitch-slot.banned, .starxi-player-card.banned { outline: 2px dashed #e6a800; outline-offset: -2px; }
+.starxi-loaned-list { display: grid; gap: 6px; margin-top: 12px; }
+.starxi-player-card.loaned { opacity: .55; filter: grayscale(.6); cursor: default; }
+.starxi-reserve-drop-hint { margin: 10px 0 0; color: var(--soft); font-size: var(--text-caption2); }
+.starxi-reserve-panel.squad-drop-ready { outline: 2px dashed rgba(52,199,89,.8); outline-offset: 4px; border-radius: 18px; }
+.best-xi-changes { display: grid; gap: 4px; max-height: 40vh; margin: 8px 0; padding-left: 18px; overflow-y: auto; }
+.best-xi-changes b { display: inline-block; min-width: 38px; color: var(--accent); }
+
+/* "Vor dem Anpfiff" checklist */
+.kickoff-checklist { margin: 12px 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, #e6a800 40%, transparent); border-radius: 16px; background: color-mix(in srgb, #e6a800 7%, var(--surface-raised)); }
+.kickoff-checklist ul { display: grid; gap: 8px; margin: 6px 0 0; padding: 0; list-style: none; }
+.kickoff-checklist li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.kickoff-checklist li.hint { opacity: .9; }
+.kickoff-text { flex: 1 1 200px; min-width: 0; font-size: var(--text-footnote, 13px); }
+.kickoff-checklist .mode-secondary { min-height: 36px; padding: 6px 12px; font-size: var(--text-caption2); }

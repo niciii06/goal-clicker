@@ -4,13 +4,14 @@ export const dynamic = "force-dynamic";
 
 import type { AnimationEvent, CSSProperties, DragEvent, KeyboardEvent, MouseEvent, RefObject } from "react";
 import type { AppMode, ClickEffect, CoopRole, CoopRoom, CoopSession, CrossbarGame, CrossbarHeight, DribbleGame, FeedEntry, GameState, IconName, LayoutCardId, MatchPrediction, MiniGameId, PenaltyDirection, PenaltyGame, PredictionGame, PurchaseMode, SeasonStandingsAnnouncement, SquadDragSource, SquadDropTarget, Tab, UpgradeDefinition } from "./game/types";
-import type { CupCardEvent, GameFeatures, PenaltyDirection as CupPenaltyDirection, RandomEvent, StarFormationId, StarPackId, StarPackReveal, TournamentGazetteIssue, TournamentId, TransferInsiderEvent } from "./feature-data";
+import type { StarXIState, CupCardEvent, GameFeatures, PenaltyDirection as CupPenaltyDirection, RandomEvent, StarFormationId, StarPackId, StarPackReveal, TournamentGazetteIssue, TournamentId, TransferInsiderEvent } from "./feature-data";
 import type { Journey, TravelFixture } from "./travel-data";
 import type { MatchDraft } from "./match-commands";
 import { filterAndSortReserve } from "./game/reserve-filter";
 import { ACHIEVEMENTS, BALANCE_VERSION, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, COMBO_MAX_COUNT, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, ALBUM_MILESTONES_STORAGE_KEY, STAR_RATING_FILTERS, TUTORIAL_STORAGE_KEY, VIBRATION_STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from "./game/constants";
 import { AL, AR, AT, AU, AZ, BA, BE, BF, BG, BR, CA, CD, CH, CI, CL, CM, CN, CO, CR, CZ, DE, DK, DZ, EC, EG, ES, FI, FR, GB_ENG, GB_NIR, GB_SCT, GB_WLS, GE, GH, GM, GN, GR, GT, HR, HT, HU, IE, IL, IS, IT, JM, JP, KN, KR, MA, ME, ML, MW, MX, NG, NL, NO, NZ, PA, PH, PL, PT, PY, RO, RS, RU, SE, SI, SK, SN, SR, TR, UA, US, UY, VE, XK, ZA, ZM } from "country-flag-icons/react/3x2";
 import { AlbumPanel, CareerArea, CareerPlayerBadge, PostMatchSummary } from "./career-panels";
+import { normalizeStarXIState, removeStarXIPlayersFromSquad } from "./feature-data";
 import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, SPECIAL_CARD_PACK, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_SQUAD_SIZE, STAR_XI_TOTAL_CARD_COUNT, TOURNAMENTS, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, applyPendingMatchChanges, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, getSpecialCardPackOdds, purchaseSpecialCardPack, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostMultiplier, getOpenTransferSquadVacancies, getRandomEventDelay, getRewardPackOdds, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXIRating, getStarXISelection, getTournament, getTournamentRewardPack, getBestXIUnavailablePlayerIds, grantWelcomePack, awardMatchStamp, canDrawHundredSpecialCards, maybeGrantStarterSquad, STARTER_SQUAD_UNLOCK_CLICKS, getUnavailableStarXIPlayerIds, initialGameFeatures, isRewardPack, isTransferDeadlineDay, normalizeGameFeatures, openEarnedPack, openStarPack, pauseGameFeatureTimers, queueMatchChanges, recordSeasonModeMatch, releaseMatchSquad, resolveCupPenalty, getCupPenaltyStep, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, TRANSFER_UNHAPPY_MATCHES, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, getPrestigeBlockReason, seasonMatchDuration, sortSeasonTable, tournamentMatchDuration } from "./feature-data";
 import { DailyRewardCard } from "./daily-reward-panel";
 import { FootballGraphic, GameErrorBoundary, Icon, StarXIPositionBadges } from "./game/ui";
@@ -41,7 +42,7 @@ import type { LocalSaveResult } from "./game/storage";
 import { answerPressConference, getPressReward } from "./press-conference";
 import { canVibrate, readVibrationSetting, setVibrationOn, vibrate, vibrationOn } from "./game/device";
 import { albumMilestonesFromStorage, claimAlbumRewards, getCareerCard, prepareCareerMatch, recordCareerMatch, rivalryKey } from "./career-data";
-import { competitionFor, competitionOfCup, getBannedPlayerIds, nextCompetition, squadBanError, suspensionLabel } from "./discipline";
+import { competitionFor, competitionLabel, competitionOfCup, getBannedPlayerIds, nextCompetition, squadBanError, suspensionLabel } from "./discipline";
 import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "./daily-reward";
 import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
 import { consumeTravel, eligibilityError, fixtureFor, journeyView, payTravelFines, settleTravel, travelTiming } from "./travel-data";
@@ -73,7 +74,9 @@ import { NextStepsStrip } from "./qol/next-steps";
 import { SavingsGoalBar, UpgradeHints } from "./qol/shop-hints";
 import { bestValueUpgrade, nextLevelGain, savingsHint } from "./qol/economy-hints";
 import { parseSavingsGoal, type SavingsGoal } from "./qol/prefs";
-import { formatRatingDelta, ratingAfterLineupMove } from "./game/lineup-tools";
+import { bestRatingPerFormation, benchChangeCount, describeReplacements, fillStarXIGaps, formatRatingDelta, lineupChanges, movePlayerToEmptyBench, movePlayerToReserve, ratingAfterLineupMove, withBestBench } from "./game/lineup-tools";
+import type { LineupChange } from "./game/lineup-tools";
+import { KickoffChecklist, type KickoffItem } from "./qol/kickoff-checklist";
 import { newNotifiableActions, setAppBadge, showLocalNotification } from "./qol/notifications";
 import { DeviceSettingsPanel, type SoundPrefs } from "./qol/device-settings";
 import { nextToast, pushToast, toastDuration, type ToastPriority, type ToastQueueState } from "./qol/toast-queue";
@@ -318,6 +321,10 @@ function App() {
   const [selectedLineupSlot, setSelectedLineupSlot] = useState<number | null>(null);
   const [selectedBenchSlot, setSelectedBenchSlot] = useState<number | null>(null);
   const [selectedReserveId, setSelectedReserveId] = useState<string | null>(null);
+  // "Beste Startelf" shows its changes first (Q22); after applying, one step back is possible (single player).
+  const [bestXIPreview, setBestXIPreview] = useState<{ after: StarXIState; changes: LineupChange[]; bench: number; before: number; rating: number } | null>(null);
+  const [squadUndo, setSquadUndo] = useState<{ lineupIds: string[]; benchIds: string[]; formationId: string; signature: string } | null>(null);
+  const [formationRatings, setFormationRatings] = useState<Partial<Record<StarFormationId, number>>>({});
   const [starRatingFilter, setStarRatingFilter] = useState("all");
   const [starPositionFilter, setStarPositionFilter] = useState("all");
   const [starSearch, setStarSearch] = useState("");
@@ -725,6 +732,41 @@ function App() {
     const start = activeReservePage * RESERVE_PAGE_SIZE;
     return filteredReserveStarXIPlayers.slice(start, start + RESERVE_PAGE_SIZE);
   }, [activeReservePage, filteredReserveStarXIPlayers]);
+  // Squad helpers (app/game/lineup-tools.ts): bans for the coming match, open gaps, rating preview while dragging.
+  const nextSquadCompetition = nextCompetition(displayGame.features);
+  const bannedForNext = useMemo(() => new Set(displayGame.features.cup.active ? [] : getBannedPlayerIds(displayGame.features, nextSquadCompetition)), [displayGame.features, nextSquadCompetition]);
+  const banLabelFor = (playerId: string | undefined) => playerId && bannedForNext.has(playerId) ? `GESPERRT · ${competitionLabel(nextSquadCompetition).toUpperCase()}` : undefined;
+  const squadGapCount = useMemo(() => featureTab === "squad" && !displayGame.features.cup.active ? fillStarXIGaps(displayGame.features, { career: displayGame.features.career, cup: displayGame.features.cup }).replacements.length : 0, [featureTab, displayGame.features]);
+  const squadMovePreview = (() => {
+    const source = squadDrag.dragging, target = squadDrag.dropTarget, squad = displayGame.features.starXI;
+    if (!source || !target || displayGame.features.cup.active) return "";
+    const before = getStarXIRating(squad.ownedIds, squad.lineupIds);
+    const without = (id: string) => squad.lineupIds.map((item) => item === id ? "" : item);
+    let after = before;
+    if (target.area === "lineup") after = ratingAfterLineupMove(squad, source.playerId, target.index);
+    else if (source.area === "lineup" && source.index !== null && target.area === "bench") { const incoming = squad.benchIds[target.index]; after = incoming ? ratingAfterLineupMove(squad, incoming, source.index) : getStarXIRating(squad.ownedIds, without(source.playerId)); }
+    else if (source.area === "lineup" && target.area === "reserve") after = getStarXIRating(squad.ownedIds, without(source.playerId));
+    return formatRatingDelta(after - before);
+  })();
+  const undoAvailable = Boolean(squadUndo && !isCoopLive && `${lineupStarIds.join()}|${benchStarIds.join()}` === squadUndo.signature);
+  // OVR per formation (Q23): the best eleven of every formation, computed one formation per idle step.
+  const formationRatingKey = featureTab === "squad" && !displayGame.features.cup.active ? `${ownedStarIds.join(",")}|${getBestXIUnavailablePlayerIds(displayGame.features).join(",")}|${displayGame.features.seasonMode.highestDivision}|${displayGame.seasons}` : "";
+  useEffect(() => {
+    if (!formationRatingKey) return;
+    const features = displayGame.features, ids = pickerFormations.filter(isFormationAvailable).map((formation) => formation.id), result: Partial<Record<StarFormationId, number>> = {};
+    let index = 0, stopped = false, timer = 0;
+    const step = () => {
+      if (stopped) return;
+      const id = ids[index++];
+      if (!id) { setFormationRatings(result); return; }
+      Object.assign(result, bestRatingPerFormation(features, [id], { career: features.career, cup: features.cup }));
+      timer = window.setTimeout(step, 0);
+    };
+    timer = window.setTimeout(step, 120);
+    return () => { stopped = true; window.clearTimeout(timer); };
+    // One run per squad and availability, not per render of the features object.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formationRatingKey]);
   const currentRank = useMemo(() => getRank(displayGame.totalGoals), [displayGame.totalGoals]);
   const nextRank = useMemo(() => RANKS.find((rank) => rank.minimum > displayGame.totalGoals), [displayGame.totalGoals]);
   // Take over overlays: focus moves into them and stays there; Escape closes only what may close.
@@ -2029,7 +2071,7 @@ function App() {
     setGame((current) => {
       const features = normalizeGameFeatures(current.features);
       features.starXI = setStarXIFormation(features.starXI, formationId, getUnavailableStarXIPlayerIds(features));
-      addHistory(features, { title: "Formation angepasst", detail: `Die Startelf spielt jetzt im ${formation.label}.`, tone: "neutral" });
+      addHistory(features, { title: "Formation angepasst", detail: `Die Startelf spielt jetzt im ${formation.label}.`, tone: "neutral", kind: "squad" });
       return { ...current, features };
     });
     setSelectedLineupSlot(null);
@@ -2052,6 +2094,16 @@ function App() {
       showToast("Das ist schon deine beste Startelf.");
       return;
     }
+    const before = displayGame.features.starXI;
+    setBestXIPreview({ after: preview, changes: lineupChanges(before, preview), bench: benchChangeCount(before, preview), before: getStarXIRating(before.ownedIds, before.lineupIds), rating: getStarXIRating(preview.ownedIds, preview.lineupIds) });
+  }
+
+  async function applyBestStarXI() {
+    setBestXIPreview(null);
+    if (displayGame.features.cup.active) return;
+    const preview = setBestStarXI(displayGame.features.starXI, getBestXIUnavailablePlayerIds(displayGame.features), { career: displayGame.features.career, cup: displayGame.features.cup });
+    const selectedCount = preview.lineupIds.filter(Boolean).length;
+    if (!selectedCount) return;
     if (isCoopLive) {
       setCoopBusy(true);
       const data = await sendCoopAction("star-best-lineup");
@@ -2065,6 +2117,7 @@ function App() {
       return;
     }
     const shown = displayGame.features;
+    setSquadUndo({ lineupIds: [...shown.starXI.lineupIds], benchIds: [...shown.starXI.benchIds], formationId: shown.starXI.formationId, signature: `${preview.lineupIds.join()}|${preview.benchIds.join()}` });
     setGame((current) => {
       // The preview was computed from exactly these features: reuse it instead of normalizing and searching again.
       let features: GameFeatures;
@@ -2074,12 +2127,94 @@ function App() {
         features.starXI = setBestStarXI(features.starXI, getBestXIUnavailablePlayerIds(features), { career: features.career, cup: features.cup });
       }
       const count = features.starXI.lineupIds.filter(Boolean).length;
-      addHistory(features, { title: "Beste Startelf aufgestellt", detail: `${count} von ${STAR_XI_SQUAD_SIZE} Positionen mit den stärksten passenden Spielern besetzt.`, tone: "positive" });
+      addHistory(features, { title: "Beste Startelf aufgestellt", detail: `${count} von ${STAR_XI_SQUAD_SIZE} Positionen mit den stärksten passenden Spielern besetzt.`, tone: "positive", kind: "squad" });
       return { ...current, features };
     });
     setSelectedLineupSlot(null);
     setSelectedBenchSlot(null);
     showToast(`Beste Startelf · ${selectedCount} von ${STAR_XI_SQUAD_SIZE}`);
+  }
+
+  /** One step back after "Beste Startelf" (single player), as long as nobody changed the squad since. */
+  function undoBestStarXI() {
+    const undo = squadUndo;
+    setSquadUndo(null);
+    if (!undo || isCoopLive || displayGame.features.cup.active) return;
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      if (`${features.starXI.lineupIds.join()}|${features.starXI.benchIds.join()}` !== undo.signature || features.starXI.formationId !== undo.formationId) return current;
+      features.starXI = removeStarXIPlayersFromSquad(normalizeStarXIState({ ...features.starXI, lineupIds: undo.lineupIds, benchIds: undo.benchIds }), getBestXIUnavailablePlayerIds(features));
+      return { ...current, features };
+    });
+    showToast("Aufstellung zurückgesetzt");
+  }
+
+  /** "Lücken füllen" (Q21): only empty or unavailable places change; everything else stays as the player set it. */
+  async function fillSquadGaps() {
+    if (displayGame.features.cup.active) { showToast("Während eines Spiels füllst du Lücken über die Wechsel."); return; }
+    const preview = fillStarXIGaps(displayGame.features, { career: displayGame.features.career, cup: displayGame.features.cup });
+    if (!preview.replacements.length) { showToast(startingStarXISelection.length < STAR_XI_SQUAD_SIZE ? "Kein passender Spieler für die freien Plätze. Neue Spieler gibt es in den Packs." : "Keine Lücken in Startelf und Bank."); return; }
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("star-fill-gaps");
+      setCoopBusy(false);
+      if (data) showToast(describeReplacements(preview.replacements).join(" · "));
+      return;
+    }
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      const result = fillStarXIGaps(features, { career: features.career, cup: features.cup });
+      if (!result.replacements.length) return current;
+      features.starXI = result.starXI;
+      addHistory(features, { title: "Lücken gefüllt", detail: describeReplacements(result.replacements).join(" · "), tone: "neutral", kind: "squad" });
+      return { ...current, features };
+    });
+    pickSquadSpot(null);
+    showToast(describeReplacements(preview.replacements).join(" · "));
+  }
+
+  /** "Beste Bank" (Q27): the strongest fitting substitutes behind the eleven, which stays as it is. */
+  async function pickBestBench() {
+    if (displayGame.features.cup.active) return;
+    const next = withBestBench(displayGame.features, { career: displayGame.features.career, cup: displayGame.features.cup });
+    if (next.benchIds.join() === displayGame.features.starXI.benchIds.join()) { showToast("Das ist schon deine beste Bank."); return; }
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("star-best-bench");
+      setCoopBusy(false);
+      if (data) showToast("Beste Bank aufgestellt");
+      return;
+    }
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      features.starXI = withBestBench(features, { career: features.career, cup: features.cup });
+      addHistory(features, { title: "Beste Bank aufgestellt", detail: `${features.starXI.benchIds.filter(Boolean).length} Bankplätze mit den stärksten passenden Spielern besetzt.`, tone: "neutral", kind: "squad" });
+      return { ...current, features };
+    });
+    showToast("Beste Bank aufgestellt");
+  }
+
+  /** A player leaves his place without a replacement: onto an empty bench place or back to the reserve (Q30). */
+  async function unassignSquadPlayer(playerId: string, benchIndex?: number) {
+    if (displayGame.features.cup.active) return;
+    const name = getStarXIPlayer(playerId)?.name ?? "Spieler";
+    const preview = benchIndex === undefined ? movePlayerToReserve(displayGame.features.starXI, playerId) : movePlayerToEmptyBench(displayGame.features.starXI, playerId, benchIndex);
+    if (!preview) return;
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("star-unassign", { starPlayerId: playerId, ...(benchIndex === undefined ? {} : { benchIndex }) });
+      setCoopBusy(false);
+      if (data) showToast(benchIndex === undefined ? `${name} ist jetzt in der Reserve` : `${name} sitzt jetzt auf der Bank`);
+      return;
+    }
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      const next = benchIndex === undefined ? movePlayerToReserve(features.starXI, playerId) : movePlayerToEmptyBench(features.starXI, playerId, benchIndex);
+      if (!next) return current;
+      features.starXI = next;
+      return { ...current, features };
+    });
+    showToast(benchIndex === undefined ? `${name} ist jetzt in der Reserve` : `${name} sitzt jetzt auf der Bank`);
   }
 
   // "Kaderlücke schliessen": the best eleven and bench fill the free place; without enough players the packs help.
@@ -2185,17 +2320,21 @@ function App() {
       return true;
     }
 
+    if (target.area === "reserve") return source.area !== "reserve" && !displayGame.features.cup.active;
     if (target.index < 0 || target.index >= STAR_XI_BENCH_SIZE || (source.area === "bench" && source.index === target.index)) return false;
     if (source.area !== "lineup") return !displayGame.features.cup.active;
     if (source.index === null) return false;
     const incomingPlayerId = benchStarIds[target.index];
-    if (!incomingPlayerId || !canStarXIPlayerFillSlot(incomingPlayerId, source.index, activeFormationPositions)) return false;
+    if (!incomingPlayerId) return !displayGame.features.cup.active;
+    if (!canStarXIPlayerFillSlot(incomingPlayerId, source.index, activeFormationPositions)) return false;
     if (!displayGame.features.cup.active) return true;
     return displayGame.features.cup.substitutionsUsed < STAR_XI_MAX_SUBSTITUTIONS
       && !displayGame.features.cup.playerExitedAt[incomingPlayerId];
   }
 
   async function dropSquadPlayer(source: SquadDragSource, target: SquadDropTarget) {
+    if (target.area === "reserve") { await unassignSquadPlayer(source.playerId); return; }
+    if (source.area === "lineup" && target.area === "bench" && !benchStarIds[target.index]) { await unassignSquadPlayer(source.playerId, target.index); return; }
     if (target.area === "lineup") {
       await moveStarXIPlayerToLineup(source.playerId, target.index);
       return;
@@ -2474,6 +2613,32 @@ function App() {
     // The one-second clock should stay stable while the match is live.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appMode, displayGame.features.cup.active, hydrated, isCoopLive]);
+
+  // After a single player match the places of injured, suspended or banned players are filled at once (Q21).
+  const soloCupActive = game.features.cup.active;
+  const soloCupWasActiveRef = useRef(soloCupActive);
+  useEffect(() => {
+    const was = soloCupWasActiveRef.current;
+    soloCupWasActiveRef.current = soloCupActive;
+    if (!hydrated || isCoopLive || !was || soloCupActive) return;
+    const timer = window.setTimeout(() => {
+      const current = gameRef.current;
+      if (current.features.cup.active) return;
+      const preview = fillStarXIGaps(current.features, { career: current.features.career, cup: current.features.cup });
+      if (!preview.replacements.some((entry) => entry.area === "lineup")) return;
+      setGame((latest) => {
+        if (latest.features.cup.active) return latest;
+        const features = normalizeGameFeatures(latest.features);
+        const result = fillStarXIGaps(features, { career: features.career, cup: features.cup });
+        if (!result.replacements.length) return latest;
+        features.starXI = result.starXI;
+        addHistory(features, { title: "Lücken automatisch gefüllt", detail: describeReplacements(result.replacements).join(" · "), tone: "neutral", kind: "squad" });
+        return { ...latest, features };
+      });
+      showToast(`Automatisch ersetzt: ${describeReplacements(preview.replacements).join(" · ")}`);
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [soloCupActive, hydrated, isCoopLive]);
 
   async function collectAlbumReward(groupId: string) {
     if (coopBusy) return;
@@ -3208,6 +3373,18 @@ function App() {
   const selectedTournamentUnlockLeague = getTournamentUnlockLeague(selectedTournament.id);
   const selectedTournamentLeagueUnlocked = isLeagueContentUnlocked(selectedTournamentUnlockLeague, reachedLeague, hasFullTestAccess);
   const featureHistory = [...displayGame.features.history].reverse();
+  // "Vor dem Anpfiff" (Q25, Q45): every blocker of the next match at once, each with its fix, and the open press talk.
+  const kickoffItems: KickoffItem[] = [];
+  if (!displayGame.features.cup.active) {
+    const fillFix = squadGapCount > 0 || fillStarXIGaps(displayGame.features, { career: displayGame.features.career, cup: displayGame.features.cup }).replacements.length > 0 ? { label: "Lücken füllen", run: () => void fillSquadGaps() } : { label: "Zum Kader", run: () => openFeatureTab("squad") };
+    if (hasTransferSquadVacancy) kickoffItems.push({ id: "vacancy", text: `Freier Platz ${transferSquadVacancyLabel} nach einem Transfer.`, fix: fillFix });
+    if (suspendedPlayerOnSquad) kickoffItems.push({ id: "red", text: `${suspendedStarPlayers.map((player) => player.name).join(", ")} nach Roter Karte gesperrt.`, fix: fillFix });
+    else if (!starXIComplete) kickoffItems.push({ id: "eleven", text: `Startelf: ${startingStarXISelection.length} von ${STAR_XI_SQUAD_SIZE} Plätzen besetzt.`, fix: fillFix });
+    const banError = !seasonCareerComplete && !displayGame.features.cup.pendingNextRound ? squadBanError(displayGame.features, competitionFor("season", "stadium")) : displayGame.features.cup.pendingNextRound ? squadBanError(displayGame.features, competitionFor("tournament", displayGame.features.cup.tournamentId)) : "";
+    if (banError) kickoffItems.push({ id: "ban", text: banError, fix: fillFix });
+    if (displayGame.features.cup.pendingNextRound) kickoffItems.push({ id: "pending", tone: "hint", text: `${activeTournament.label}: Runde ${displayGame.features.cup.round + 1} wartet. Liga und Prestige kommen danach.` });
+    if (openActions.some((action) => action.id === "press")) kickoffItems.push({ id: "press", tone: "hint", text: `Pressekonferenz offen: +${formatNumber(getPressReward(getBasePassivePower(displayGame.upgrades, displayGame.stars, displayGame.features), getBaseClickPower(displayGame.upgrades, displayGame.stars, displayGame.features)))} Tore. Sie verfällt mit dem nächsten Anpfiff.`, fix: { label: "Antworten", run: () => document.querySelector(".press-conference")?.scrollIntoView({ behavior: "smooth", block: "center" }) } });
+  }
   // short: the label in the phone tab bar; the button keeps the full label as its accessible name.
   const primaryTabs: { id: FeatureTab; label: string; text?: string; short: string; icon: IconName }[] = [{id:'home',label:'Home',short:'Home',icon:'home'},{id:'cup',label:displayGame.features.cup.active?'Spiele · LIVE':'Spiele',text:'Spiele',short:'Spiele',icon:'trophy'},{id:'season',label:'Saison',short:'Saison',icon:'table'},{id:'squad',label:'Kader',short:'Kader',icon:'squad'},{id:'career',label:'Karriere',short:'Karriere',icon:'career'},{id:'packs',label:'Packs & Album',short:'Packs',icon:'cards'},{id:'club',label:'Club & Mehr',short:'Club',icon:'shield'}];
   const featureTabs: {id:FeatureTab;label:string}[] = ['packs','album'].includes(featureTab) ? [{id:'packs',label:'Packshop'},{id:'album',label:'Sammelalbum'}] : ['club','fabrizio','missions','leaderboard','history'].includes(featureTab) ? [{id:'club',label:'Clubprofil'},{ id: "fabrizio", label: "Fabrizio" },{id:'missions',label:'Wochenziele'},{id:'leaderboard',label:'Rangliste'},{id:'history',label:'Verlauf'}] : [];
@@ -3238,6 +3415,11 @@ function App() {
       {seatDialog?.kind === "kick" && <ConfirmDialog title={`${seatDialog.name} entfernen?`} confirmLabel={seatDialog.inactive ? "Entfernen" : "Trotzdem entfernen"} onCancel={() => setSeatDialog(null)} onConfirm={() => void kickCoopMember(seatDialog.role, seatDialog.name, !seatDialog.inactive)}>
         <p>{seatDialog.inactive ? `${seatDialog.name} war seit mindestens ${coopSession?.room.inactiveDays ?? 7} Tagen nicht mehr aktiv (${seatDialog.activity}).` : `${seatDialog.name} war in den letzten ${coopSession?.room.inactiveDays ?? 7} Tagen aktiv (${seatDialog.activity || "kürzlich"}). Entferne nur, wenn ihr das so abgesprochen habt.`}</p>
         <p>Der Platz wird frei, der gemeinsame Spielstand bleibt unverändert. {seatDialog.name} kann mit dem Raumcode wieder beitreten, solange ein Platz frei ist.</p>
+      </ConfirmDialog>}
+      {bestXIPreview && <ConfirmDialog title="Beste Startelf übernehmen?" confirmLabel={`Übernehmen (${formatRatingDelta(bestXIPreview.rating - bestXIPreview.before)})`} onCancel={() => setBestXIPreview(null)} onConfirm={() => void applyBestStarXI()}>
+        <p>Teamwertung {bestXIPreview.before} → {bestXIPreview.rating} OVR{bestXIPreview.bench ? ` · ${bestXIPreview.bench} neue Bankspieler` : ""}.</p>
+        {bestXIPreview.changes.length > 0 ? <ul className="best-xi-changes">{bestXIPreview.changes.map((change) => <li key={change.slot}><b>{change.position}</b> {getStarXIPlayer(change.inId)?.name ?? "offen"}{change.outId ? <> für {getStarXIPlayer(change.outId)?.name ?? "Spieler"}</> : " (freier Platz)"}</li>)}</ul> : <p>Die Startelf bleibt gleich, nur die Bank ändert sich.</p>}
+        {!isCoopLive && <p>Danach kannst du einmal rückgängig machen.</p>}
       </ConfirmDialog>}
       {confirmSingle && <ConfirmDialog title="Zum Singleplayer wechseln?" confirmLabel="Wechseln" onCancel={() => setConfirmSingle(false)} onConfirm={() => { setConfirmSingle(false); notifyCoopOffline(coopSession?.code, coopSession?.playerId); setAppMode("single"); }}>
         <p>{coopSession ? `Du verlässt „${coopSession.room.roomName}“. Die Welt bleibt gespeichert und du kannst jederzeit zurück.` : "Du verlässt den Koop Multiplayer und spielst mit deinem eigenen Spielstand weiter."}</p>
@@ -3337,6 +3519,7 @@ function App() {
             {suspendedStarPlayers.length > 0 && <div className="red-card-warning" role="alert"><span>🟥</span><div><strong>{suspendedStarPlayers.map((player) => player.name).join(", ")} nach Roter Karte gesperrt</strong><small>{suspendedStarPlayers.length === 1 ? pronounText("Ersetze {den Spieler} in der Startelf. {Er} darf", suspendedStarPlayers[0]) : "Ersetze die Spieler in der Startelf. Sie dürfen"} bis zum nächsten Anpfiff nicht auf die Bank.</small></div></div>}
             {ownedDisciplineBans.length > 0 && <div className="discipline-warning" role="status"><span aria-hidden="true">{ownedDisciplineBans.some((ban) => ban.reason === "red") ? "🟥" : "🟨"}</span><div><strong>Sperren</strong>{ownedDisciplineBans.map((ban) => <span key={ban.id}>{getStarXIPlayer(ban.playerId)?.name ?? "Spieler"}: {suspensionLabel(ban)}. </span>)}<small>Gesperrte Spieler dürfen in diesem Wettbewerb weder in der Startelf noch auf der Bank stehen.</small></div></div>}
             {injuredStarPlayers.length > 0 && <div className="injury-warning" role="status"><span>🩹</span><div><strong>{injuredStarPlayers.map(({ player }) => player.name).join(", ")} verletzt</strong><small>{injuredStarPlayers.map(({ player, matches }) => `${player.name}: noch ${matches} ${matches === 1 ? "Spiel" : "Spiele"}`).join(" · ")}. Verletzungen entstehen nur im laufenden Saisonspiel.</small></div></div>}
+            {!displayGame.features.cup.active && !journeyUnderway && <KickoffChecklist items={kickoffItems} busy={coopBusy || travelBusy} />}
             {!displayGame.features.cup.active && !journeyUnderway && <section className="tournament-picker competition-picker" aria-label="Saisonspiele und Turniere">
               <div className="tournament-picker-heading"><div><p className="eyebrow">SPIELE / SAISON + TURNIERE</p><h4>Wähle deine nächste Partie.</h4></div><span>{displayGame.features.cup.pendingNextRound ? "POKALLAUF FORTSETZEN" : `LIGASPIEL · ${formatCountdown(seasonMatchDuration(displayGame.features.seasonMode.division), 0)}`}</span></div>
               <div className="tournament-grid competition-grid">
@@ -3387,10 +3570,10 @@ function App() {
           {featureTab === "squad" && <div className="feature-panel">{displayGame.features.cup.active ? <div className="career-empty"><p>Auswechslungen steuerst du im laufenden Match.</p><button className="mode-primary" onClick={()=>openFeatureTab('cup')}>Zum Live-Match</button></div> : <>
             <div className="starxi-lineup-heading"><span>DEINE ELF / {activeFormation.label}</span><small>Spieler ziehen oder zwei Spieler nacheinander antippen zum Tauschen</small></div>
             <div className="starxi-squad-layout">
-              <SquadPitchPanel status={activeLineupSlot === null ? "Startplatz wählen" : `Platz ${activeLineupSlot + 1} · ${activeLineupPosition}`} controls={<div className="starxi-formation-picker"><span><strong>FORMATION WÄHLEN</strong><small>{displayGame.features.cup.active ? "Während des Spiels gesperrt" : `${unlockedFormationCount} von ${STAR_FORMATIONS.length} Formationen freigeschaltet`}</small></span><div className="starxi-formation-actions"><select value={activeFormation.id} disabled={displayGame.features.cup.active || coopBusy} onChange={(event) => void changeStarXIFormation(event.target.value as StarFormationId)} aria-label="Formation wählen">{pickerFormations.map((formation) => { const unlockLeague = getFormationUnlockLeague(formation.id); const unlocked = isFormationAvailable(formation); return <option value={formation.id} key={formation.id} disabled={!unlocked}>{formation.label}{unlocked ? "" : ` · ab Liga ${unlockLeague}`}</option>; })}</select><button type="button" className="starxi-best-button" onClick={() => void autoPickBestStarXI()} disabled={coopBusy || ownedStarXIPlayers.length === 0} aria-disabled={displayGame.features.cup.active || undefined} title={displayGame.features.cup.active ? "Während eines Spiels gesperrt" : undefined}>★ Beste Startelf</button></div></div>} help={displayGame.features.cup.active ? `Live Wechsel: Bankspieler auf den passenden Feldspieler ziehen oder zwei Spieler nacheinander antippen. Maximal ${STAR_XI_MAX_SUBSTITUTIONS} Wechsel, ${displayGame.features.cup.substitutionsUsed} bereits genutzt.` : activeLineupSlot !== null ? `Für ${activeLineupPosition} werden nur passende Spieler angezeigt. Du kannst sie auch direkt hierher ziehen.` : selectedBenchSlot !== null ? `Bankplatz ${selectedBenchSlot + 1} gewählt. Klicke einen Spieler an oder ziehe ihn auf den Bankplatz.` : selectedReserveId !== null ? `${getStarXIPlayer(selectedReserveId)?.name ?? "Spieler"} gewählt. Tippe einen passenden Platz auf dem Feld oder der Bank an.` : `Ziehe Spieler zwischen Feld, Bank und Reserve oder tippe zwei Spieler nacheinander an, um sie zu tauschen.`}>{activeFormation.slots.map((slot, index) => {
+              <SquadPitchPanel status={squadMovePreview ? <b className="squad-move-preview">Wechsel: {squadMovePreview}</b> : activeLineupSlot === null ? "Startplatz wählen" : `Platz ${activeLineupSlot + 1} · ${activeLineupPosition}`} controls={<div className="starxi-formation-picker"><span><strong>FORMATION WÄHLEN</strong><small>{displayGame.features.cup.active ? "Während des Spiels gesperrt" : `${unlockedFormationCount} von ${STAR_FORMATIONS.length} Formationen freigeschaltet`}</small></span><div className="starxi-formation-actions"><select value={activeFormation.id} disabled={displayGame.features.cup.active || coopBusy} onChange={(event) => void changeStarXIFormation(event.target.value as StarFormationId)} aria-label="Formation wählen">{pickerFormations.map((formation) => { const unlockLeague = getFormationUnlockLeague(formation.id); const unlocked = isFormationAvailable(formation); return <option value={formation.id} key={formation.id} disabled={!unlocked}>{formation.label}{unlocked ? formationRatings[formation.id] ? ` · bis ${formationRatings[formation.id]} OVR` : "" : ` · ab Liga ${unlockLeague}`}</option>; })}</select><button type="button" className="starxi-best-button" onClick={() => void autoPickBestStarXI()} disabled={coopBusy || ownedStarXIPlayers.length === 0} aria-disabled={displayGame.features.cup.active || undefined} title={displayGame.features.cup.active ? "Während eines Spiels gesperrt" : undefined}>★ Beste Startelf</button></div><div className="starxi-squad-tools">{squadGapCount > 0 && <button type="button" className="mode-secondary" onClick={() => void fillSquadGaps()} disabled={coopBusy}>Lücken füllen ({squadGapCount})</button>}<button type="button" className="mode-secondary" onClick={() => void pickBestBench()} disabled={coopBusy || ownedStarXIPlayers.length === 0}>Beste Bank</button>{undoAvailable && <button type="button" className="mode-secondary" onClick={undoBestStarXI}>Rückgängig</button>}</div></div>} help={displayGame.features.cup.active ? `Live Wechsel: Bankspieler auf den passenden Feldspieler ziehen oder zwei Spieler nacheinander antippen. Maximal ${STAR_XI_MAX_SUBSTITUTIONS} Wechsel, ${displayGame.features.cup.substitutionsUsed} bereits genutzt.` : activeLineupSlot !== null ? `Für ${activeLineupPosition} werden nur passende Spieler angezeigt. Du kannst sie auch direkt hierher ziehen.` : selectedBenchSlot !== null ? `Bankplatz ${selectedBenchSlot + 1} gewählt. Klicke einen Spieler an oder ziehe ihn auf den Bankplatz.` : selectedReserveId !== null ? `${getStarXIPlayer(selectedReserveId)?.name ?? "Spieler"} gewählt. Tippe einen passenden Platz auf dem Feld oder der Bank an.` : `Ziehe Spieler zwischen Feld, Bank und Reserve oder tippe zwei Spieler nacheinander an, um sie zu tauschen.`}>{activeFormation.slots.map((slot, index) => {
                   const player = startingStarXIPlayers[index];
                   const liveRating = displayGame.features.cup.active && player ? getCupPlayerMatchRating(displayGame.features.cup, player.id, cupMatchMinute) : null;
-                  return <SquadPitchSlot key={`${activeFormation.id}-${index}`} features={displayGame.features} drag={squadDrag} index={index} position={activeFormationPositions[index]} x={slot.x} y={slot.y} player={player} selected={activeLineupSlot === index} liveRating={liveRating} draggable={!layoutEditMode && !coopBusy} disabled={coopBusy} onClick={() => chooseLineupSlot(index)} />;
+                  return <SquadPitchSlot key={`${activeFormation.id}-${index}`} features={displayGame.features} drag={squadDrag} index={index} position={activeFormationPositions[index]} x={slot.x} y={slot.y} player={player} selected={activeLineupSlot === index} liveRating={liveRating} draggable={!layoutEditMode && !coopBusy} disabled={coopBusy} banLabel={banLabelFor(player?.id)} onClick={() => chooseLineupSlot(index)} />;
                 })}</SquadPitchPanel>
               <div className="starxi-squad-side">
                 <SquadBenchPanel id="gc-live-bench" count={benchStarXIPlayerCount} size={STAR_XI_BENCH_SIZE}>{Array.from({ length: STAR_XI_BENCH_SIZE }, (_, index) => {
@@ -3399,13 +3582,15 @@ function App() {
                     const selected = selectedBenchSlot === index;
                     const liveRating = displayGame.features.cup.active && player ? getCupPlayerMatchRating(displayGame.features.cup, player.id, cupMatchMinute) : null;
                     const alreadySubbedOut = Boolean(player && displayGame.features.cup.active && displayGame.features.cup.playerExitedAt[player.id]);
-                    return player ? <SquadBenchCard key={player.id} features={displayGame.features} drag={squadDrag} index={index} player={player} selected={selected} incompatible={activeLineupSlot !== null && (!compatible || alreadySubbedOut)} liveRating={liveRating} status={alreadySubbedOut ? "Bereits ausgewechselt" : activeLineupSlot !== null ? compatible ? displayGame.features.cup.active ? "Nur für dieses Spiel einwechseln" : `Auf ${activeLineupPosition} einsetzen` : `Passt nicht auf ${activeLineupPosition}` : displayGame.features.cup.active ? "Auf einen Feldspieler ziehen" : `Bankplatz ${index + 1} · ziehen zum Tauschen`} draggable={!layoutEditMode && !coopBusy} disabled={coopBusy} onClick={() => chooseBenchSlot(index)} /> : <SquadBenchSlot key={`bank-empty-${index}`} drag={squadDrag} index={index} selected={selected} disabled={displayGame.features.cup.active || coopBusy} onClick={() => chooseBenchSlot(index)} />;
+                    return player ? <SquadBenchCard key={player.id} features={displayGame.features} drag={squadDrag} index={index} player={player} selected={selected} incompatible={activeLineupSlot !== null && (!compatible || alreadySubbedOut)} liveRating={liveRating} status={alreadySubbedOut ? "Bereits ausgewechselt" : activeLineupSlot !== null ? compatible ? displayGame.features.cup.active ? "Nur für dieses Spiel einwechseln" : `Auf ${activeLineupPosition} einsetzen` : `Passt nicht auf ${activeLineupPosition}` : displayGame.features.cup.active ? "Auf einen Feldspieler ziehen" : `Bankplatz ${index + 1} · ziehen zum Tauschen`} draggable={!layoutEditMode && !coopBusy} disabled={coopBusy} banLabel={banLabelFor(player.id)} onClick={() => chooseBenchSlot(index)} /> : <SquadBenchSlot key={`bank-empty-${index}`} drag={squadDrag} index={index} selected={selected} disabled={displayGame.features.cup.active || coopBusy} onClick={() => chooseBenchSlot(index)} />;
                   })}</SquadBenchPanel>
-                <section className="starxi-reserve-panel" aria-label="Reservekader">
+                <section className={`starxi-reserve-panel${squadDrag.squadDropClass("reserve", 0)}`} aria-label="Reservekader" data-squad-area="reserve" data-squad-index={0} onDragOver={(event) => squadDrag.handleSquadDragOver(event, { area: "reserve", index: 0 })} onDrop={(event) => void squadDrag.handleSquadDrop(event, { area: "reserve", index: 0 })}>
                   <div className="starxi-subheading"><div><span className="eyebrow">KADER / RESERVE</span><h4>Weitere Spieler</h4></div><strong>{reserveStarXIPlayers.length}</strong></div>
                   <div className="starxi-reserve-controls"><div className="starxi-filter-tools"><input className="starxi-search" value={starSearch} onChange={(event) => { setStarSearch(event.target.value); setReservePage(0); }} placeholder="Spieler suchen" aria-label="Spieler im Reservekader suchen" /><select className="starxi-position-filter" value={starPositionFilter} onChange={(event) => { setStarPositionFilter(event.target.value); setReservePage(0); }} aria-label="Position im Reservekader filtern"><option value="all">Alle Positionen</option>{STAR_POSITIONS.map((position) => <option value={position} key={`reserve-position-${position}`}>{position}</option>)}</select></div><div className="starxi-filter-row" role="group" aria-label="Ratingfilter">{STAR_RATING_FILTERS.map((filter) => <button type="button" className={starRatingFilter === filter.id ? "active" : ""} key={filter.id} onClick={() => { setStarRatingFilter(filter.id); setReservePage(0); }} aria-pressed={starRatingFilter === filter.id}>{filter.label}</button>)}</div></div>
-                  <div className="starxi-reserve-list">{filteredReserveStarXIPlayers.length ? visibleReserveStarXIPlayers.map((player) => { const compatible = activeLineupSlot === null || canStarXIPlayerFillSlot(player.id, activeLineupSlot, activeFormationPositions); const suspended = suspendedStarIds.includes(player.id); const injuryMatches = injuredStarPlayers.find((entry) => entry.player.id === player.id)?.matches ?? 0; const unavailable = suspended || injuryMatches > 0; const injuryText = `${injuryMatches} ${injuryMatches === 1 ? "Spiel" : "Spiele"}`; const dragSource: SquadDragSource = { playerId: player.id, area: "reserve", index: null }; return <button type="button" className={`starxi-player-card reserve${activeLineupSlot !== null && !compatible ? " incompatible" : ""}${suspended ? " red-carded" : ""}${injuryMatches > 0 ? " injured" : ""}${selectedReserveId === player.id ? " selected" : ""}${draggingSquadPlayer?.playerId === player.id ? " squad-dragging" : ""}`} key={player.id} aria-pressed={selectedReserveId === player.id} onClick={() => suspended ? showToast(`${player.name} ist für die nächste Partie gesperrt.`) : injuryMatches > 0 ? showToast(`${player.name} ist verletzt und fehlt noch ${injuryText}.`) : chooseReservePlayer(player.id)} disabled={displayGame.features.cup.active || coopBusy || unavailable} draggable={!layoutEditMode && !displayGame.features.cup.active && !coopBusy && !unavailable} onDragStart={(event) => squadDrag.handleSquadDragStart(event, dragSource)} onDragEnd={squadDrag.handleSquadDragEnd}>{suspended ? <span style={{ color: player.accent }}>🟥</span> : injuryMatches > 0 ? <span className="starxi-injury-mark" aria-hidden="true">🩹</span> : <StarXIPositionBadges player={player} variant="compact" />}<div><strong>{player.name}</strong><CareerPlayerBadge features={displayGame.features} player={player} /><small>{suspended ? "ROTE KARTE · NICHT AUF DIE BANK" : injuryMatches > 0 ? `VERLETZT · FEHLT NOCH ${injuryText.toUpperCase()}` : selectedReserveId === player.id ? "Gewählt · jetzt Platz antippen" : selectedBenchSlot !== null ? `Auf Bankplatz ${selectedBenchSlot + 1}` : activeLineupSlot !== null ? compatible ? `Auf ${activeLineupPosition} einsetzen` : `Kann nicht ${activeLineupPosition}` : "Antippen oder auf Startelf und Bank ziehen"}</small></div><b>{getCareerCard(displayGame.features.career, player).rating}</b></button>; }) : <div className="starxi-empty">Keine Spieler passen zu diesem Filter.</div>}</div>
+                  <div className="starxi-reserve-list">{filteredReserveStarXIPlayers.length ? visibleReserveStarXIPlayers.map((player) => { const compatible = activeLineupSlot === null || canStarXIPlayerFillSlot(player.id, activeLineupSlot, activeFormationPositions); const suspended = suspendedStarIds.includes(player.id); const injuryMatches = injuredStarPlayers.find((entry) => entry.player.id === player.id)?.matches ?? 0; const unavailable = suspended || injuryMatches > 0; const injuryText = `${injuryMatches} ${injuryMatches === 1 ? "Spiel" : "Spiele"}`; const dragSource: SquadDragSource = { playerId: player.id, area: "reserve", index: null }; return <button type="button" className={`starxi-player-card reserve${activeLineupSlot !== null && !compatible ? " incompatible" : ""}${suspended ? " red-carded" : ""}${injuryMatches > 0 ? " injured" : ""}${selectedReserveId === player.id ? " selected" : ""}${draggingSquadPlayer?.playerId === player.id ? " squad-dragging" : ""}`} key={player.id} aria-pressed={selectedReserveId === player.id} onClick={() => { if (squadDrag.consumeDragClick()) return; if (suspended) showToast(`${player.name} ist für die nächste Partie gesperrt.`); else if (injuryMatches > 0) showToast(`${player.name} ist verletzt und fehlt noch ${injuryText}.`); else chooseReservePlayer(player.id); }} disabled={displayGame.features.cup.active || coopBusy || unavailable} draggable={!layoutEditMode && !displayGame.features.cup.active && !coopBusy && !unavailable} onDragStart={(event) => squadDrag.handleSquadDragStart(event, dragSource)} onDragEnd={squadDrag.handleSquadDragEnd}>{!unavailable && !displayGame.features.cup.active && !coopBusy && <span className="reserve-drag-grip" aria-hidden="true" {...squadDrag.touchHandlers(dragSource)}>⠿</span>}{suspended ? <span style={{ color: player.accent }}>🟥</span> : injuryMatches > 0 ? <span className="starxi-injury-mark" aria-hidden="true">🩹</span> : <StarXIPositionBadges player={player} variant="compact" />}<div><strong>{player.name}</strong><CareerPlayerBadge features={displayGame.features} player={player} /><small>{suspended ? "ROTE KARTE · NICHT AUF DIE BANK" : banLabelFor(player.id) ? `${banLabelFor(player.id)} · NICHT IN DEN KADER` : injuryMatches > 0 ? `VERLETZT · FEHLT NOCH ${injuryText.toUpperCase()}` : selectedReserveId === player.id ? "Gewählt · jetzt Platz antippen" : selectedBenchSlot !== null ? `Auf Bankplatz ${selectedBenchSlot + 1}` : activeLineupSlot !== null ? compatible ? `Auf ${activeLineupPosition} einsetzen` : `Kann nicht ${activeLineupPosition}` : "Antippen oder auf Startelf und Bank ziehen"}</small></div><b>{getCareerCard(displayGame.features.career, player).rating}</b></button>; }) : <div className="starxi-empty">Keine Spieler passen zu diesem Filter.</div>}</div>
                   {filteredReserveStarXIPlayers.length > 0 && <nav className="starxi-pagination" aria-label="Seiten im Reservekader"><button type="button" onClick={() => setReservePage(Math.max(0, activeReservePage - 1))} disabled={activeReservePage === 0}>← Zurück</button><span><strong>Seite {activeReservePage + 1} von {reservePageCount}</strong><small>{activeReservePage * RESERVE_PAGE_SIZE + 1} bis {Math.min((activeReservePage + 1) * RESERVE_PAGE_SIZE, filteredReserveStarXIPlayers.length)} von {filteredReserveStarXIPlayers.length}</small></span><button type="button" onClick={() => setReservePage(Math.min(reservePageCount - 1, activeReservePage + 1))} disabled={activeReservePage >= reservePageCount - 1}>Weiter →</button></nav>}
+                  {currentTransferLoans.length > 0 && <div className="starxi-loaned-list" aria-label="Verliehene Spieler"><span className="eyebrow">VERLIEHEN</span>{currentTransferLoans.map(({ loan, player }) => <div className="starxi-player-card reserve loaned" key={`loaned-${player.id}`} aria-disabled="true"><StarXIPositionBadges player={player} variant="compact" /><div><strong>{player.name}</strong><small>Verliehen an {loan.club} · {loan.status === "active" ? "zurück nach dem laufenden Spiel" : "fehlt in der nächsten Partie"}</small></div><b>{getCareerCard(displayGame.features.career, player).rating}</b></div>)}</div>}
+                  <p className="starxi-reserve-drop-hint">Ziehe einen Spieler aus Startelf oder Bank hierher, um seinen Platz frei zu machen.</p>
                 </section>
               </div>
             </div>
