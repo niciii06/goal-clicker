@@ -646,7 +646,10 @@ export const STAR_PACKS: readonly StarPackDefinition[] = [
   { id: "legend", label: "Legenden Pack", price: 20000000000, description: "Das teuerste Pack mit den besten Walkout Chancen", odds: [tierBand(80, 85, 0.5499), tierBand(86, 89, 0.35), tierBand(90, 99, 0.1), tierBand(100, 100, 0.0001)] },
 ];
 
-const REWARD_BRACKETS = [[0,64],[65,70],[71,79],[80,85],[86,89],[90,99]] as const;
+/** No pack hands out a card below an empty slot (55): the Schrott-Pack and the reward packs start here. Weaker
+ * cards stay with the clubs that own them and no longer count for the album groups. */
+export const MIN_DRAWABLE_RATING = SCRAP_PACK_MIN_RATING;
+const REWARD_BRACKETS = [[MIN_DRAWABLE_RATING,64],[65,70],[71,79],[80,85],[86,89],[90,99]] as const;
 const REWARD_PERCENTAGES = [[60,30,9,1,0,0],[25,45,25,4.5,.5,0],[5,20,55,18,1.9,.1],[0,5,40,48,6.5,.5],[0,0,20,55,23,2],[0,0,5,50,40,5]] as const;
 export const REWARD_PACKS:readonly StarPackDefinition[] = ['Kleines Prämienpack','Basis-Prämienpack','Solides Prämienpack','Hochwertiges Prämienpack','Premium-Prämienpack','Top-Prämienpack'].map((label,i)=>({id:`reward-${i+1}` as RewardPackId,label,price:0,description:'Eine originale Basiskarte als Turnierprämie. Doppelte Karten geben Fragmente.',odds:REWARD_BRACKETS.map(([minRating,maxRating],b)=>tierBand(minRating,maxRating,REWARD_PERCENTAGES[i][b]/100))}));
 /** Every MATCH_PACK_STAMP_TARGET finished league matches, won or lost, earn a reward pack for the best league reached. */

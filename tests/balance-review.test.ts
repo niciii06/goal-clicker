@@ -6,7 +6,8 @@ import { roundPrice } from "../app/upgrade-purchase.ts";
 import { MINI_GAME_BASE_MAX_REWARD, MINI_GAME_MAX_REWARD_SECONDS, getBulkPurchase, getCostAtLevel, getBaseClickPower, getBasePassivePower, getClickPassiveShare, getMiniGameMaxReward, scaleMiniGameReward } from "../app/game/economy.ts";
 import { ALBUM_MILESTONES, claimAlbumReward, getAlbumGroups } from "../app/career-data.ts";
 import { DAILY_REWARD_DAYS, WORLD_DAILY_KEY, claimDailyReward, getDailyRewardStatus, getPreviousRewardDay, getRewardDay, mergeDailyRewardsForWorld } from "../app/daily-reward.ts";
-import { MATCH_PACK_STAMP_TARGET, cardPackRating, resolveRandomEvent, resolveVarEvent, SCRAP_PACK_PLAYERS, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STARTER_SQUAD_UNLOCK_CLICKS, awardMatchStamp, canStarXIPlayerFillSlot, getSeasonOpponentRating, getStarXIPlayer, grantWelcomePack, initialGameFeatures, maybeGrantStarterSquad, normalizeGameFeatures, openEarnedPack, openEarnedPackDraw, openStarPack } from "../app/feature-data.ts";
+import type { RewardPackId, StarXIPlayer } from "../app/feature-data.ts";
+import { MATCH_PACK_STAMP_TARGET, MIN_DRAWABLE_RATING, REWARD_PACKS, cardPackRating, getRewardPackOdds, resolveRandomEvent, resolveVarEvent, SCRAP_PACK_PLAYERS, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STARTER_SQUAD_UNLOCK_CLICKS, awardMatchStamp, canStarXIPlayerFillSlot, getSeasonOpponentRating, getStarXIPlayer, grantWelcomePack, initialGameFeatures, maybeGrantStarterSquad, normalizeGameFeatures, openEarnedPack, openEarnedPackDraw, openStarPack } from "../app/feature-data.ts";
 import { FULL_COMBO_FACTOR, activeClicks, clickUpgradeReport, savingMinutes, simulateEconomy } from "../scripts/balance/economy-model.ts";
 
 function seededRandom(seed = 4242) {
@@ -99,6 +100,46 @@ test("the Schrott-Pack never hands out a card below an empty slot", () => {
   assert.ok(SCRAP_PACK_PLAYERS.length > 0 && SCRAP_PACK_PLAYERS.every((player) => player.rating >= 55));
   const random = seededRandom();
   for (let index = 0; index < 3000; index++) assert.ok(openStarPack("scrap", [], random).player.rating >= 55);
+});
+
+test("reward packs never hand out a card below 55 and show the odds they draw with", () => {
+  assert.equal(MIN_DRAWABLE_RATING, 55);
+  const random = seededRandom(55);
+  for (const pack of REWARD_PACKS) {
+    const odds = getRewardPackOdds(pack.id as RewardPackId);
+    // The shown rows are the rows drawn from: all at 55 or above, every row has cards, together 100%.
+    assert.ok(odds.every((row) => row.minRating >= 55 && row.players.length > 0 && row.players.every((player) => player.rating >= row.minRating && player.rating <= row.maxRating)));
+    assert.ok(Math.abs(odds.reduce((sum, row) => sum + row.chance, 0) - 1) < 1e-9);
+    for (let index = 0; index < 1500; index++) assert.ok(openStarPack(pack.id, [], random).player.rating >= 55, pack.label);
+  }
+  // The smallest pack keeps its 60% weakest row, now from 55 to 64.
+  const small = getRewardPackOdds("reward-1");
+  assert.equal(small[0].label, "Gewöhnlich 55–64");
+  assert.ok(Math.abs(small[0].chance - 0.6) < 1e-9);
+});
+
+test("every album group can be completed, Nation IN with the cards of the Schrott-Pack", () => {
+  const scrap = new Set(SCRAP_PACK_PLAYERS.map((player) => player.id));
+  const rewardBase = (player: StarXIPlayer) => !player.isCustom && player.cardType !== "icon" && player.cardType !== "legendary";
+  const drawable = (player: StarXIPlayer) => player.isCustom || scrap.has(player.id)
+    || STAR_PACKS.some((pack) => pack.id !== "scrap" && pack.odds.some((row) => row.chance > 0 && cardPackRating(player) >= row.minRating && cardPackRating(player) <= row.maxRating))
+    || (rewardBase(player) && REWARD_PACKS.some((pack) => getRewardPackOdds(pack.id as RewardPackId).some((row) => row.players.some((candidate) => candidate.id === player.id))));
+  const features = initialGameFeatures();
+  features.career.collectedIds = STAR_XI_PLAYERS.filter((player) => !player.retired && drawable(player)).map((player) => player.id);
+  const groups = getAlbumGroups(features.career);
+  for (const group of groups) assert.equal(group.collected, group.total, `${group.label}: ${group.collected} / ${group.total}`);
+  // Nation IN: exactly the 81 cards of the Schrott-Pack, so the Schrott-Pack alone completes it.
+  const india = groups.find((group) => group.id === "nation-IN")!;
+  assert.equal(india.total, SCRAP_PACK_PLAYERS.length);
+  const onlyScrap = initialGameFeatures();
+  onlyScrap.starXI.ownedIds = SCRAP_PACK_PLAYERS.map((player) => player.id);
+  const before = onlyScrap.starXI.fragments;
+  assert.equal(claimAlbumReward(onlyScrap, "nation-IN"), true);
+  assert.equal(onlyScrap.starXI.fragments, before + 500);
+  // A club that kept weaker Indian cards loses nothing: they simply no longer count.
+  const old = initialGameFeatures();
+  old.career.collectedIds = STAR_XI_PLAYERS.filter((player) => player.countryCode === "IN").map((player) => player.id);
+  assert.equal(getAlbumGroups(old.career).find((group) => group.id === "nation-IN")!.collected, SCRAP_PACK_PLAYERS.length);
 });
 
 function welcomed() {

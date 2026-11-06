@@ -1,7 +1,7 @@
 import { createInteractiveMatch } from './interactive-match';
 import { goalLabel } from './match-goals';
 import { recordedActionRating } from './match-broadcast';
-import { addHistory, getMatchScoreImpact, TRANSFER_UNHAPPY_PENALTY, transferUnhappyMatches, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, removeStarXIPlayersFromSquad, STAR_XI_ACTIVE_PLAYERS, SCRAP_PACK_PLAYERS } from './feature-data';
+import { addHistory, getMatchScoreImpact, TRANSFER_UNHAPPY_PENALTY, transferUnhappyMatches, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, removeStarXIPlayersFromSquad, MIN_DRAWABLE_RATING, STAR_XI_ACTIVE_PLAYERS, SCRAP_PACK_PLAYERS } from './feature-data';
 import { getBannedPlayerIds, nextCompetition, processMatchDiscipline, suspensionLabel } from './discipline';
 import type { CupState, GameFeatures, SeasonMatchHistoryEntry, StarPosition, StarXIPlayer } from './feature-data';
 
@@ -383,7 +383,8 @@ export function getAlbumGroups(career: CareerState): AlbumGroup[] {
     // One group for the special cards: they are all custom and legendary, so "custom" and "legendary" were the same
     // ten cards paying twice. A save that claimed either old group counts as claimed (see ALBUM_GROUP_ALIASES).
     { id:'legendary',label:'Alle legendären Karten',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.isCustom||p.cardType==='legendary'),reward:5000 },
-    ...[...new Set(STAR_XI_ACTIVE_PLAYERS.map(p=>p.countryCode).filter(Boolean))].sort().map(code=>({ id:`nation-${code}`,label:`Nation ${code}`,players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.countryCode===code),reward:500 })),
+    // Cards below MIN_DRAWABLE_RATING come from no pack any more, so a nation counts only the cards a club can still draw.
+    ...[...new Set(STAR_XI_ACTIVE_PLAYERS.map(p=>p.countryCode).filter(Boolean))].sort().map(code=>({ id:`nation-${code}`,label:`Nation ${code}`,players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.countryCode===code&&p.rating>=MIN_DRAWABLE_RATING),reward:500 })),
   ];
   const distinct = STAR_XI_ACTIVE_PLAYERS.filter(p=>owned.has(p.id)).length;
   // Near goals on the way to the full collections: a few different cards already pay out once.
