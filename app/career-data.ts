@@ -3,6 +3,9 @@ import { goalLabel } from './match-goals';
 import { recordedActionRating } from './match-broadcast';
 import { addHistory, getMatchScoreImpact, TRANSFER_UNHAPPY_PENALTY, transferUnhappyMatches, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, removeStarXIPlayersFromSquad, STAR_XI_ACTIVE_PLAYERS, SCRAP_PACK_PLAYERS } from './feature-data';
 import { getBannedPlayerIds, nextCompetition, processMatchDiscipline, suspensionLabel } from './discipline';
+import { recordChronicleMatch, recordChronicleSeason } from './club-chronicle';
+import { ensureWeeklyGoals } from './weekly-goals';
+import { leagueForTier } from './season-progression';
 import type { CupState, GameFeatures, SeasonMatchHistoryEntry, StarPosition, StarXIPlayer } from './feature-data';
 
 /** `points`: match points of the club while this card played, by the result after 90 minutes (win 3, draw 1, loss 0). */
@@ -323,6 +326,9 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
   if (active && !old.active) addHistory(features, { title: `Neue Rivalität: ${c.opponent}`, detail: 'Die Fans haben ihren Derbygegner gefunden. Künftige Derbys bringen bis zu 400 Fragmente.', tone: 'positive' });
   if (old.active) addHistory(features, { title: won ? 'Derbysieg! Die Kurve eskaliert.' : draw ? 'Derbyremis. Die Revanche wartet.' : 'Derbyniederlage. Das vergessen die Fans nicht.', detail: `${resultLabel} gegen ${c.opponent}${derbyReward ? ` · +${derbyReward} Fragmente` : ''}`, tone: won ? 'positive' : draw ? 'neutral' : 'negative' });
   features.starXI.fragments += derbyReward;
+  // The week starts before this match counts, so a match on Monday morning belongs to the new week's goals.
+  ensureWeeklyGoals(features, now);
+  recordChronicleMatch(features, { mode: c.mode, opponent: c.opponent, homeScore: c.homeScore, awayScore: c.awayScore, penaltyScore: c.penaltyEvents.length ? `${c.penaltyHomeScore}:${c.penaltyAwayScore}` : undefined, competition: c.mode === 'season' ? `Liga ${leagueForTier(seasonEntry?.division ?? features.seasonMode.division)}` : getTournament(c.tournamentId)?.label ?? 'Turnier', at: now, prestige: features.seasonMode.prestigeCount, won, draw, derby: old.active });
   for (const p of players) {
     const card = getStarXIPlayer(p.playerId)!;
     const grownBefore = hasPotential(card) ? getSpecialGrowth(career, card).levels : 0;
@@ -359,12 +365,15 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
         return sorted[0] ? { playerId: sorted[0][0], value: display(sorted[0][1]) } : null;
       };
       const avg = (s: PlayerCareerStats) => s.ratingTotal/Math.max(1,s.ratedMatches);
-      career.awards = [...career.awards,{ id, division: seasonEntry.division, seasonNumber: career.seasonNumber, matchesTracked: career.seasonMatches, createdAt: now,
+      const award = { id, division: seasonEntry.division, seasonNumber: career.seasonNumber, matchesTracked: career.seasonMatches, createdAt: now,
         best: pick(eligible,avg,s=>`Ø ${avg(s).toFixed(2)} · ${s.motm}× Spieler des Spiels`),
         scorer: pick(Object.entries(career.seasonPlayers).filter(([,s])=>s.goals>0),s=>s.goals,s=>`${s.goals} Tore`),
         joker: pick(Object.entries(career.seasonPlayers).filter(([,s])=>s.subAppearances>=2&&s.subMinutes>=30),s=>s.subRatingTotal/s.subAppearances,s=>`Ø ${(s.subRatingTotal/s.subAppearances).toFixed(2)} · ${s.subAppearances} Einwechslungen`),
         disappointment: pick(eligible.filter(([,s])=>avg(s)<6.5),avg,s=>`Ø ${avg(s).toFixed(2)} · unter der Erwartung 6.5`,true),
-      }].slice(-20);
+      };
+      career.awards = [...career.awards, award].slice(-20);
+      const scorer = award.scorer ? career.seasonPlayers[award.scorer.playerId] : undefined;
+      recordChronicleSeason(features, { id, entry: seasonEntry, season: career.seasonNumber, topScorer: award.scorer && scorer ? { playerId: award.scorer.playerId, goals: scorer.goals } : null, bestPlayerId: award.best?.playerId ?? null, at: now, leagueLabel: `Liga ${leagueForTier(seasonEntry.division)}` });
       addHistory(features,{title:`Saisonauszeichnungen · Saison ${career.seasonNumber}`,detail:`${career.seasonMatches} erfasste Ligaspiele. Die Gewinner stehen im Karrierebereich.`,tone:'positive'});
       career.seasonPlayers = {}; career.seasonMatches = 0; career.seasonNumber += 1;
     }

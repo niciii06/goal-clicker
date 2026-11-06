@@ -11,13 +11,14 @@ import { getDb } from "../../../db";
 import { nameRecoveryAllowed, resolvePlayer } from "../../auth/player";
 import type { LightRoomRow, RoomRow, RoomSeats, RoomUpdate } from "../../../db";
 import { createHash } from "node:crypto";
-import { SPECIAL_CARD_PACK, awardMatchStamp, maybeGrantStarterSquad, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
+import { SPECIAL_CARD_PACK, awardMatchStamp, maybeGrantStarterSquad, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
 import type { GameFeatures, PenaltyDirection, StarFormationId } from "../../feature-data";
 import { isSupportedMultiplayerProtocol, MULTIPLAYER_UPDATE_MESSAGE } from "../../multiplayer-protocol";
 import { getFormationUnlockLeague, getPackUnlockLeague, getReachedLeague, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked } from "../../season-progression";
 import { calculateBulkUpgradePurchase } from "../../upgrade-purchase";
 import { MAX_MULTIPLAYER_BODY_BYTES, readJsonBody, refuseUnsafePost, RequestBodyTooLargeError } from "../request-body";
 import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "../../daily-reward";
+import { claimWeeklyGoal, ensureWeeklyGoals, notePackOpened } from "../../weekly-goals";
 import { ACHIEVEMENTS, BALANCE_VERSION, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_IDS } from "../../game/constants";
 import { capGoalsAfterRebalance, getBaseClickPower, getBasePassivePower, getClickPower, getCost, getLevel, getPassiveIncomePower } from "../../game/economy";
 import { getUpgrade } from "../../game/upgrades";
@@ -223,6 +224,8 @@ function readGame(row: RoomRow, light = false): CoopGameState {
     return game;
   }
   game.features = normalizeGameFeatures(storedFeatures);
+  // The world's week starts with the first full read in it (baseline of every counter, see app/weekly-goals.ts).
+  ensureWeeklyGoals(game.features, Date.now(), game.minigameWins);
   // The whole world shares one daily reward; older worlds still keep one entry per seat.
   game.features.dailyRewards = mergeDailyRewardsForWorld(game.features.dailyRewards);
   game.goals = capGoalsAfterRebalance(game.goals, storedFeatures, game.upgrades, game.stars, game.features);
@@ -814,6 +817,7 @@ async function handlePost(request: Request) {
       expectedPenaltyStep?: unknown;
       tournamentId?: unknown;
       missionId?: unknown;
+      goalId?: unknown;
       name?: unknown;
       badge?: unknown;
       color?: unknown;
@@ -1208,6 +1212,7 @@ async function handlePost(request: Request) {
       const reveal = { ...opening, openedAt, openedBy, troll: shouldTriggerPackTroll(opening.player) };
       if (!testMode) game.goals -= pack.price;
       game.features.starPackReveal = reveal;
+      notePackOpened(game.features, openedAt);
       if (!opening.duplicate) game.features.starXI = addStarXIPlayer(game.features.starXI, opening.player.id, getBestXIUnavailablePlayerIds(game.features));
       if (opening.fragmentCompensation > 0) {
         game.features.starXI.fragments += opening.fragmentCompensation;
@@ -1384,20 +1389,16 @@ async function handlePost(request: Request) {
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 
-    if (action === "mission-claim") {
-      const missionId = typeof payload.missionId === "string" ? payload.missionId : "";
-      const mission = game.features.missions.find((item) => item.id === missionId);
-      if (!mission) return jsonError("Diese Mission gibt es nicht.");
-      const progress = getMissionProgress(mission, { seasonGoals: game.seasonGoals, clicks: game.clicks, minigameWins: game.minigameWins, cupWins: game.features.cup.wins });
-      if (mission.claimed) return jsonError("Diese Mission wurde bereits abgeholt.", 409);
-      if (progress < mission.target) return jsonError("Die Mission ist noch nicht abgeschlossen.", 409);
-      mission.claimed = true;
-      game.goals += mission.reward;
-      game.seasonGoals += mission.reward;
-      game.totalGoals += mission.reward;
-      addHistory(game.features, { title: `${mission.title} abgeschlossen`, detail: `+${mission.reward.toLocaleString("de-CH")} Tore Teamprämie`, tone: "positive" });
+    if (action === "weekly-claim") {
+      // The week's goals belong to the whole world; the claim list (and the week inside every goal id) pays each once.
+      const goalId = typeof payload.goalId === "string" ? payload.goalId.slice(0, 80) : "";
+      const claim = claimWeeklyGoal(game.features, goalId, Date.now(), game.minigameWins);
+      if (!claim.ok) return jsonError(claim.error, claim.status);
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
+
+    // Clients from before the weekly goals: the one-time missions no longer pay anything.
+    if (action === "mission-claim") return jsonError("Die Missionen wurden durch Wochenziele ersetzt. Bitte lade die Seite neu.", 409);
 
     if (action === "season-match" || action === "season") {
       const seasonStartError = startSeasonCupMatch(game, Date.now());

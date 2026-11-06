@@ -406,6 +406,8 @@ export type SeasonMatchHistoryEntry = {
   completedSeason: boolean;
   seasonOutcome: "promoted" | "relegated" | "stayed" | "hall-of-fame" | null;
   createdAt: number;
+  /** The final table, only on the entry that completes a season (in flight to the club chronicle, never stored). */
+  finalTable?: SeasonTableRow[];
 };
 
 export type SeasonFixture = { opponentId:string; away:boolean; venue:Venue; clubId:string };
