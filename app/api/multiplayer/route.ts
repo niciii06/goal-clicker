@@ -291,10 +291,10 @@ function recordMultiplayerSeasonMatch(game: CoopGameState, now: number) {
   game.features.seasonMode = result.state;
   game.features.seasonMode.table = game.features.seasonMode.table.map((team) => team.id === "club" ? { ...team, name: game.features.club.name } : team);
   awardMatchStamp(game.features, now);
-  game.features = finishActiveTransferLoans(game.features, now).features;
+  game.features = finishActiveTransferLoans(game.features, now, { hallOfFameReached: result.entry.seasonOutcome === "hall-of-fame" }).features;
   game.seasons = Math.max(game.seasons, result.state.highestDivision - 1);
-  if (result.entry.seasonOutcome === "promoted") game.stars = Math.min(MAX_SEASON_STARS, game.stars + 1);
-  if (result.entry.seasonOutcome === "hall-of-fame") game.stars = Math.min(MAX_SEASON_STARS, game.stars + 2);
+  // Stars only for a league never reached before (getSeasonStarReward), never for promotion after relegation.
+  game.stars = Math.min(MAX_SEASON_STARS, game.stars + result.starReward);
   const outcomeLabel = result.entry.seasonOutcome === "promoted" ? "Aufstieg" : result.entry.seasonOutcome === "relegated" ? "Abstieg" : result.entry.seasonOutcome === "hall-of-fame" ? "Hall of Fame" : result.entry.completedSeason ? "Klassenerhalt" : result.entry.outcome === "win" ? "Sieg" : result.entry.outcome === "loss" ? "Niederlage" : "Remis";
   addHistory(game.features, { title: `Saisonspiel · ${outcomeLabel}`, detail: result.state.lastResult, tone: result.entry.seasonOutcome === "relegated" || result.entry.outcome === "loss" ? "negative" : result.entry.outcome === "win" || result.entry.seasonOutcome === "promoted" || result.entry.seasonOutcome === "hall-of-fame" ? "positive" : "neutral" });
 }

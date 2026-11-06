@@ -2150,14 +2150,15 @@ function App() {
     features.seasonMode = result.state;
     features.seasonMode.table = features.seasonMode.table.map((team) => team.id === "club" ? { ...team, name: features.club.name } : team);
     awardMatchStamp(features, now);
-    features = finishActiveTransferLoans(features, now).features;
+    features = finishActiveTransferLoans(features, now, { hallOfFameReached: result.entry.seasonOutcome === "hall-of-fame" }).features;
     const outcomeLabel = result.entry.seasonOutcome === "promoted" ? "Aufstieg" : result.entry.seasonOutcome === "relegated" ? "Abstieg" : result.entry.seasonOutcome === "hall-of-fame" ? "Hall of Fame" : result.entry.completedSeason ? "Klassenerhalt" : result.entry.outcome === "win" ? "Sieg" : result.entry.outcome === "loss" ? "Niederlage" : "Remis";
     addHistory(features, {
       title: `Saisonspiel · ${outcomeLabel}`,
       detail: `${result.entry.clubScore}:${result.entry.opponentScore} gegen ${result.entry.opponent} · Spieltag ${result.entry.matchday}/${SEASON_MODE_MATCHES_PER_SEASON}`,
       tone: result.entry.seasonOutcome === "relegated" || result.entry.outcome === "loss" ? "negative" : result.entry.seasonOutcome === "promoted" || result.entry.seasonOutcome === "hall-of-fame" || result.entry.outcome === "win" ? "positive" : "neutral",
     });
-    const seasonReward = result.entry.seasonOutcome === "promoted" ? 1 : result.entry.seasonOutcome === "hall-of-fame" ? 2 : 0;
+    // Stars only for a league never reached before (getSeasonStarReward), never for promotion after relegation.
+    const seasonReward = result.starReward;
     return { features, entry: result.entry, seasonReward, ticketIncome: tickets?.income ?? 0 };
   }
 

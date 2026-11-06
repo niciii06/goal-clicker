@@ -1,7 +1,7 @@
 import { competitionOfCup, emptyDiscipline, getBannedPlayerIds, nextCompetition, normalizeDiscipline } from './discipline';
 import type { DisciplineState } from './discipline';
 import type { CareerState } from "./career-data";
-import type { ClubProfile, CoopMission, CupCardEvent, CupGoalEvent, CupInjuryEvent, CupMatchMode, CupMatchPhase, CupPenaltyEvent, CupState, CupStrategyId, CupSubstitutionImpact, EarnedPack, EarnedPackId, GoalBoostState, IconSeed, MatchChange, MatchHistoryEntry, MissionProgressSource, PenaltyDirection, RandomEvent, RewardPackId, SeasonFixture, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationId, StarPackDefinition, StarPackId, StarPackOpening, StarPackReveal, StarXIEvaluationContext, StarXIPlayer, StarXIState, TournamentCompletionSummary, TournamentDefinition, TournamentGazetteIssue, TournamentId, TransferInsiderEvent, TransferInsiderOutcome, TransferMarketState, TransferOffer, TransferSagaState, TransferSquadVacancy, TransferUnhappyPlayer } from "./features/types";
+import type { ClubProfile, CoopMission, CupCardEvent, CupGoalEvent, CupInjuryEvent, CupMatchMode, CupMatchPhase, CupPenaltyEvent, CupState, CupStrategyId, CupSubstitutionImpact, EarnedPack, EarnedPackId, GoalBoostState, IconSeed, MatchChange, MatchHistoryEntry, MissionProgressSource, PenaltyDirection, RandomEvent, RewardPackId, SeasonFixture, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationId, StarPackDefinition, StarPackId, StarPackOpening, StarPackReveal, StarXIEvaluationContext, StarXIPlayer, StarXIState, TournamentCompletionSummary, TournamentDefinition, TournamentGazetteIssue, TournamentId, TransferInsiderEvent, TransferInsiderOutcome, TransferLoan, TransferMarketState, TransferOffer, TransferSagaState, TransferSquadVacancy, TransferUnhappyPlayer } from "./features/types";
 import type { DailyRewardState } from "./daily-reward";
 import type { GoalPattern } from "./match-broadcast";
 import type { PressState } from "./press-conference";
@@ -939,7 +939,7 @@ export function getSeasonModeNextOpponent(value: unknown, clubName = "FC Goal") 
 
 export function recordSeasonModeMatch(value: unknown, clubScore: number, opponentScore: number, clubName = "FC Goal", now = Date.now(), random: () => number = Math.random, opponentId?: string) {
   const state = normalizeSeasonModeState(value, clubName);
-  if (state.hallOfFame) return { state, played: false, entry: null as SeasonMatchHistoryEntry | null };
+  if (state.hallOfFame) return { state, played: false, entry: null as SeasonMatchHistoryEntry | null, starReward: 0 };
   const matchday = state.matchday + 1;
   const nextOpponent = getSeasonModeNextOpponent(state, clubName);
   const opponent = state.table.find((team) => team.id === opponentId) ?? state.table.find((team) => team.id === nextOpponent.id) ?? state.table[1];
@@ -1017,12 +1017,23 @@ export function recordSeasonModeMatch(value: unknown, clubScore: number, opponen
     history: [...state.history, entry].slice(-30),
     hallOfFame,
   };
-  return { state: nextState, played: true, entry };
+  return { state: nextState, played: true, entry, starReward: getSeasonStarReward(state, entry) };
+}
+
+/**
+ * Club stars for a league match: a promotion pays one star only when it reaches a league the club never played in
+ * before (relegation and promotion again pays nothing), the Hall of Fame pays two stars the first time, before any
+ * Prestige. Solo and co-op both use this.
+ */
+export function getSeasonStarReward(before: Pick<SeasonModeState, "division" | "highestDivision" | "prestigeCount">, entry: Pick<SeasonMatchHistoryEntry, "seasonOutcome"> | null | undefined) {
+  if (entry?.seasonOutcome === "promoted") return before.division + 1 > before.highestDivision ? 1 : 0;
+  if (entry?.seasonOutcome === "hall-of-fame") return before.prestigeCount === 0 ? 2 : 0;
+  return 0;
 }
 
 export function playSeasonModeMatch(value: unknown, starRating: number, clubName = "FC Goal", now = Date.now(), random: () => number = Math.random) {
   const state = normalizeSeasonModeState(value, clubName);
-  if (state.hallOfFame) return { state, played: false, entry: null as SeasonMatchHistoryEntry | null };
+  if (state.hallOfFame) return { state, played: false, entry: null as SeasonMatchHistoryEntry | null, starReward: 0 };
   const opponent = getSeasonModeNextOpponent(state, clubName);
   const homeAdvantage = state.matchday % 2 === 0 ? 1.5 : -1.5;
   const clubScore = rollSeasonScore((Number(starRating) || 55) - opponent.rating + homeAdvantage, random);
@@ -3282,12 +3293,17 @@ export function activatePendingTransferLoans(value: GameFeatures, tournamentId: 
   return features;
 }
 
-export function finishActiveTransferLoans(value: GameFeatures, now = Date.now()) {
+/**
+ * Ends the loans of the match that was just played. With `hallOfFameReached` (the league match that opened the
+ * Hall of Fame) the loans still waiting for their match end as well: no league match follows, so they come back now.
+ */
+export function finishActiveTransferLoans(value: GameFeatures, now = Date.now(), options: { hallOfFameReached?: boolean } = {}) {
   const features = normalizeGameFeatures(value);
-  const returnedLoans = features.transferSaga.loans.filter((loan) => loan.status === "active");
+  const ends = (loan: TransferLoan) => loan.status === "active" || (options.hallOfFameReached === true && loan.status === "pending");
+  const returnedLoans = features.transferSaga.loans.filter(ends);
   if (!returnedLoans.length) return { features, event: null as TransferInsiderEvent | null };
-  const returnCompetition = features.cup.mode === "season" ? "der Saisonpartie" : "dem Turnier";
-  features.transferSaga.loans = features.transferSaga.loans.filter((loan) => loan.status !== "active");
+  const returnCompetition = options.hallOfFameReached ? "der Hall of Fame" : features.cup.mode === "season" ? "der Saisonpartie" : "dem Turnier";
+  features.transferSaga.loans = features.transferSaga.loans.filter((loan) => !ends(loan));
   const stillLoanedIds = getLoanedStarXIPlayerIds(features);
   features.starXI = normalizeStarXIState(features.starXI, [...stillLoanedIds, ...features.cup.suspendedPlayerIds]);
   const returnedNames = returnedLoans.map((loan) => getStarXIPlayer(loan.playerId)?.name).filter((name): name is string => Boolean(name));
