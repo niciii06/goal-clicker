@@ -7,7 +7,7 @@
 .bell-button { position: relative; }
 .bell-count { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; color: #fff; background: #ff3b30; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center; box-sizing: border-box; }
 
-.header-prestige-ready { margin-left: 6px; padding: 3px 8px; border: 0; border-radius: 999px; color: #fff; background: var(--accent); font-size: var(--text-caption2); font-weight: 800; cursor: pointer; white-space: nowrap; }
+.header-prestige-ready { margin-left: 6px; padding: 3px 8px; border: 0; border-radius: 999px; color: var(--surface-raised); background: var(--accent); font-size: var(--text-caption2); font-weight: 800; cursor: pointer; white-space: nowrap; }
 
 /* "Nächste Schritte" on Home */
 .next-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 10px 0 4px; min-width: 0; }
@@ -33,7 +33,7 @@
 
 /* Shop hints: gain of the next level, best value, still to save, savings goal */
 .upgrade-hints { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 4px; color: var(--soft); font-size: var(--text-caption2); line-height: 1.35; min-width: 0; }
-.best-value-chip { padding: 1px 7px; border-radius: 999px; color: #fff; background: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: .03em; }
+.best-value-chip { padding: 1px 7px; border-radius: 999px; color: var(--surface-raised); background: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: .03em; }
 .upgrade-savings { color: var(--text); font-weight: 650; }
 .savings-pin { padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--soft); background: transparent; font-size: 10px; font-weight: 700; cursor: pointer; }
 .savings-pin.active { border-color: var(--accent); color: var(--accent); }
@@ -55,8 +55,9 @@
 .starxi-squad-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .starxi-squad-tools .mode-secondary { min-height: 36px; padding: 6px 12px; font-size: var(--text-caption2); }
 .squad-move-preview { color: var(--accent); }
-.reserve-drag-grip { display: none; align-self: stretch; align-items: center; justify-content: center; width: 28px; margin: -6px 0 -6px -6px; color: var(--soft); font-size: 18px; touch-action: none; cursor: grab; }
-@media (pointer: coarse) { .reserve-drag-grip { display: inline-flex; } .starxi-player-card.reserve:has(.reserve-drag-grip) { grid-template-columns: 28px minmax(29px, max-content) minmax(0, 1fr) auto; } }
+/* The grip sits outside the card grid, so the card layout stays as it is; only the grip blocks scrolling. */
+.reserve-drag-grip { display: none; position: absolute; top: 0; bottom: 0; left: 0; width: 26px; align-items: center; justify-content: center; color: var(--soft); font-size: 18px; touch-action: none; cursor: grab; }
+@media (pointer: coarse) { .reserve-drag-grip { display: inline-flex; } .starxi-reserve-item > .starxi-player-card.reserve:has(.reserve-drag-grip) { position: relative; padding-left: 28px; } }
 .starxi-pitch-slot.banned, .starxi-player-card.banned { outline: 2px dashed #e6a800; outline-offset: -2px; }
 .starxi-loaned-list { display: grid; gap: 6px; margin-top: 12px; }
 .starxi-player-card.loaned { opacity: .55; filter: grayscale(.6); cursor: default; }
