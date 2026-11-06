@@ -78,6 +78,8 @@ export type SeasonModeState = {
   matchday: number;
   table: SeasonTableRow[];
   lastTable: SeasonTableRow[];
+  /** The results behind `lastTable` (the whole season once it is finished), for the head-to-head tie-break. */
+  lastResults?: SeasonResult[];
   lastResult: string;
   lastMatchAt: number;
   history: SeasonMatchHistoryEntry[];
@@ -789,11 +791,46 @@ function normalizeSeasonTable(raw: unknown, division: number, clubName: string) 
   });
 }
 
-export function sortSeasonTable(table: readonly SeasonTableRow[]) {
-  return [...table].sort((first, second) => second.points - first.points
+/** Points, goal difference and goals scored, the first three steps of the ranking. */
+function compareSeasonRecord(first: SeasonTableRow, second: SeasonTableRow) {
+  return second.points - first.points
     || (second.goalsFor - second.goalsAgainst) - (first.goalsFor - first.goalsAgainst)
-    || second.goalsFor - first.goalsFor
-    || (first.id === "club" ? -1 : second.id === "club" ? 1 : first.name.localeCompare(second.name)));
+    || second.goalsFor - first.goalsFor;
+}
+
+/** Clubs level after points, goal difference and goals: the matches between them decide (points, goal difference, goals). */
+function sortByHeadToHead(group: readonly SeasonTableRow[], results: readonly SeasonResult[]) {
+  const mini = new Map(group.map((team) => [team.id, { points: 0, difference: 0, goals: 0 }]));
+  for (const result of results) {
+    const home = mini.get(result.homeId), away = mini.get(result.awayId);
+    if (!home || !away || result.homeId === result.awayId) continue;
+    home.goals += result.homeScore; away.goals += result.awayScore;
+    home.difference += result.homeScore - result.awayScore; away.difference += result.awayScore - result.homeScore;
+    if (result.homeScore > result.awayScore) home.points += 3;
+    else if (result.homeScore < result.awayScore) away.points += 3;
+    else { home.points += 1; away.points += 1; }
+  }
+  return [...group].sort((first, second) => {
+    const a = mini.get(first.id)!, b = mini.get(second.id)!;
+    return b.points - a.points || b.difference - a.difference || b.goals - a.goals
+      // Fixed last step, the same for every club: our own club has no advantage.
+      || first.name.localeCompare(second.name, "de") || first.id.localeCompare(second.id);
+  });
+}
+
+/**
+ * League ranking: points, goal difference, goals scored, then head-to-head between the clubs still level (points,
+ * goal difference and goals in their matches against each other, from `results`), then a fixed order by name.
+ */
+export function sortSeasonTable(table: readonly SeasonTableRow[], results: readonly SeasonResult[] = []) {
+  const sorted = [...table].sort(compareSeasonRecord), ranked: SeasonTableRow[] = [];
+  for (let start = 0; start < sorted.length;) {
+    let end = start + 1;
+    while (end < sorted.length && compareSeasonRecord(sorted[start], sorted[end]) === 0) end += 1;
+    ranked.push(...(end - start > 1 ? sortByHeadToHead(sorted.slice(start, end), results) : [sorted[start]]));
+    start = end;
+  }
+  return ranked;
 }
 
 export function seasonBackgroundPairings(day:number) {
@@ -876,25 +913,31 @@ export function normalizeSeasonModeState(value: unknown, clubName = "FC Goal", l
   const generated=createSeasonFixtures(table);
   const fixtures=generated.map((fallback,index)=>{const raw=asRecord((Array.isArray(source.fixtures)?source.fixtures:[])[index]);return raw.opponentId===fallback.opponentId&&typeof raw.away==='boolean'?{...fallback,away:raw.away,venue:raw.away?(table.find(t=>t.id===raw.opponentId)?.venue??fallback.venue):HOME_VENUE}:fallback;});
   const teamIds = new Set(table.map((team) => team.id));
-  const results = (Array.isArray(source.results) ? source.results : []).map(asRecord).filter((item) => typeof item.homeId === "string" && typeof item.awayId === "string" && teamIds.has(item.homeId) && teamIds.has(item.awayId) && item.homeId !== item.awayId).map((item): SeasonResult => ({
+  const readResults = (raw: unknown) => (Array.isArray(raw) ? raw : []).map(asRecord).filter((item) => typeof item.homeId === "string" && typeof item.awayId === "string" && teamIds.has(item.homeId) && teamIds.has(item.awayId) && item.homeId !== item.awayId).map((item): SeasonResult => ({
     matchday: Math.max(1, Math.min(SEASON_MODE_MATCHES_PER_SEASON, Math.floor(Number(item.matchday) || 1))),
     homeId: String(item.homeId),
     awayId: String(item.awayId),
     homeScore: Math.max(0, Math.min(20, Math.floor(Number(item.homeScore) || 0))),
     awayScore: Math.max(0, Math.min(20, Math.floor(Number(item.awayScore) || 0))),
   })).slice(-SEASON_MODE_MATCHES_PER_SEASON * 3);
+  const results = readResults(source.results);
+  const matchday = Math.max(0, Math.min(SEASON_MODE_MATCHES_PER_SEASON - 1, Math.floor(Number(source.matchday) || 0)));
+  const hallOfFame = source.hallOfFame === true || legacyHallOfFame;
+  // Saves from before lastResults: during a season (and after the Hall of Fame) lastTable is the running table.
+  const lastResults = Array.isArray(source.lastResults) ? readResults(source.lastResults) : matchday > 0 || hallOfFame ? results : [];
   return {
     fixtures,
     results,
     division,
     highestDivision,
-    matchday: Math.max(0, Math.min(SEASON_MODE_MATCHES_PER_SEASON - 1, Math.floor(Number(source.matchday) || 0))),
+    matchday,
     table,
     lastTable,
+    lastResults,
     lastResult: safeString(source.lastResult, initialSeasonMode(clubName).lastResult).slice(0, 220),
     lastMatchAt: Math.max(0, Math.floor(Number(source.lastMatchAt) || 0)),
     history,
-    hallOfFame: source.hallOfFame === true || legacyHallOfFame,
+    hallOfFame,
     prestigeCount: Math.max(0, Math.floor(Number(source.prestigeCount) || 0)),
   };
 }
@@ -960,7 +1003,8 @@ export function recordSeasonModeMatch(value: unknown, clubScore: number, opponen
     table=table.map(team=>team.id===home.id?updateSeasonTableRow(team,homeScore,awayScore):team.id===away.id?updateSeasonTableRow(team,awayScore,homeScore):team);
     results.push({matchday,homeId:home.id,awayId:away.id,homeScore,awayScore});
   }
-  const lastTable = sortSeasonTable(table);
+  const seasonResults = [...(state.results ?? []), ...results];
+  const lastTable = sortSeasonTable(table, seasonResults);
   const completedSeason = matchday >= SEASON_MODE_MATCHES_PER_SEASON;
   let seasonOutcome: SeasonMatchHistoryEntry["seasonOutcome"] = null;
   let nextDivision = state.division;
@@ -1010,8 +1054,9 @@ export function recordSeasonModeMatch(value: unknown, clubScore: number, opponen
     table: completedSeason && !hallOfFame ? createSeasonTable(nextDivision, clubName) : lastTable,
     fixtures: completedSeason && !hallOfFame ? createSeasonFixtures(createSeasonTable(nextDivision,clubName)) : state.fixtures,
     // A new season starts without results; the finished one stays visible through lastTable.
-    results: completedSeason && !hallOfFame ? [] : [...(state.results ?? []), ...results],
+    results: completedSeason && !hallOfFame ? [] : seasonResults,
     lastTable,
+    lastResults: seasonResults,
     lastResult,
     lastMatchAt: now,
     history: [...state.history, entry].slice(-30),
@@ -1054,6 +1099,7 @@ export function startSeasonPrestige(value: unknown, clubName = "FC Goal", now = 
     // The new season replays the same pairings; old scores must not show up as its results.
     results: [],
     lastTable: freshTable,
+    lastResults: [],
     lastResult: `Prestige ${state.prestigeCount + 1} gestartet. Die Jagd auf die Hall of Fame beginnt von vorn.`,
     lastMatchAt: now,
     hallOfFame: false,

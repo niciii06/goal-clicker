@@ -1,10 +1,10 @@
 "use client";
 
 import { getSeasonModeDivisionLabel, getSeasonSchedule, getTournamentRewardPack, MATCH_PACK_STAMP_TARGET, SEASON_MODE_DIVISION_COUNT, SEASON_MODE_MATCHES_PER_SEASON, sortSeasonTable } from "./feature-data";
-import type { GameFeatures, SeasonScheduleMatch, SeasonTableRow } from "./feature-data";
+import type { GameFeatures, SeasonResult, SeasonScheduleMatch, SeasonTableRow } from "./feature-data";
 
-function StandingsTable({ table, division, caption }: { table: readonly SeasonTableRow[]; division: number; caption: string }) {
-  const rows = sortSeasonTable(table), top = division >= SEASON_MODE_DIVISION_COUNT;
+function StandingsTable({ table, results, division, caption }: { table: readonly SeasonTableRow[]; results: readonly SeasonResult[]; division: number; caption: string }) {
+  const rows = sortSeasonTable(table, results), top = division >= SEASON_MODE_DIVISION_COUNT;
   return <div className="season-hub-table-wrap">
     <table className="season-hub-table">
       <caption>{caption}</caption>
@@ -17,7 +17,7 @@ function StandingsTable({ table, division, caption }: { table: readonly SeasonTa
         </tr>;
       })}</tbody>
     </table>
-    <p className="season-hub-legend"><span className={top ? "hall-of-fame" : "promotion"}>{top ? "Platz 1: Hall of Fame" : "Platz 1 und 2: Aufstieg"}</span>{division > 1 && <span className="relegation">Platz 5 und 6: Abstieg</span>}</p>
+    <p className="season-hub-legend"><span className={top ? "hall-of-fame" : "promotion"}>{top ? "Platz 1: Hall of Fame" : "Platz 1 und 2: Aufstieg"}</span>{division > 1 && <span className="relegation">Platz 5 und 6: Abstieg</span>}<small className="season-hub-tie-break">Bei gleich vielen Punkten zählen Tordifferenz, erzielte Tore und danach die direkten Begegnungen.</small></p>
   </div>;
 }
 
@@ -41,8 +41,8 @@ export function SeasonPanel({ features }: { features: GameFeatures }) {
   return <div className="feature-panel season-hub">
     <div className="feature-panel-heading"><div><p className="eyebrow">SAISON {seasonLabel} / {getSeasonModeDivisionLabel(season.division).toUpperCase()}</p><h3>{season.hallOfFame ? "Hall of Fame erreicht." : `Spieltag ${season.matchday + 1} von ${SEASON_MODE_MATCHES_PER_SEASON}`}</h3></div></div>
     {!season.hallOfFame && <p className="season-hub-stamps" aria-label="Matchstempel">Matchstempel {features.matchStamps} / {MATCH_PACK_STAMP_TARGET} · beim {MATCH_PACK_STAMP_TARGET}. Ligaspiel gibt es ein {getTournamentRewardPack("cup", season.highestDivision).label}</p>}
-    <StandingsTable table={season.table} division={season.division} caption="Tabelle" />
-    {showLastSeason && <details className="season-hub-last"><summary>Abschlusstabelle der letzten Saison</summary><StandingsTable table={season.lastTable} division={Math.max(1, season.division - (season.history.at(-1)?.seasonOutcome === "promoted" ? 1 : season.history.at(-1)?.seasonOutcome === "relegated" ? -1 : 0))} caption="Letzte Saison" /></details>}
+    <StandingsTable table={season.table} results={season.results ?? []} division={season.division} caption="Tabelle" />
+    {showLastSeason && <details className="season-hub-last"><summary>Abschlusstabelle der letzten Saison</summary><StandingsTable table={season.lastTable} results={season.lastResults ?? []} division={Math.max(1, season.division - (season.history.at(-1)?.seasonOutcome === "promoted" ? 1 : season.history.at(-1)?.seasonOutcome === "relegated" ? -1 : 0))} caption="Letzte Saison" /></details>}
     <section className="season-hub-section" aria-label="Deine nächsten Spiele">
       <h4>Deine nächsten Spiele</h4>
       {next.length && !season.hallOfFame ? <ol className="season-hub-next">{next.map((day, index) => {
