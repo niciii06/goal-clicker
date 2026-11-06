@@ -200,12 +200,19 @@ function hostSuccessor(room: AnyRoomRow, state = readClickState(room), except?: 
 }
 
 /** Whether the host has been inactive long enough and an active member can take the host seat over. */
-export function hostHandoverDue(room: AnyRoomRow, now = Date.now()) {
+export function hostHandoverDue(room: AnyRoomRow, now = Date.now(), present?: CoopRole) {
+  if (present === "host") return null;
   const state = readClickState(room);
   if (!room.hostPlayerId || !seatInactive(room, "host", now, state)) return null;
-  const successor = hostSuccessor(room, state);
-  if (!successor || seatInactive(room, successor, now, state)) return null;
+  // The member whose request is being answered is active right now.
+  const seen = present ? withPresence(room, present, new Date(now).toISOString()) : room;
+  const successor = hostSuccessor(seen, state);
+  if (!successor || seatInactive(seen, successor, now, state)) return null;
   return successor;
+}
+
+function withPresence<T extends AnyRoomRow>(room: T, role: CoopRole, at: string): T {
+  return { ...room, ...rolePresenceUpdate(role, at) };
 }
 
 /**
@@ -963,7 +970,7 @@ async function quickPoll(code: string, playerId: string, knownFeaturesKey: strin
   const role = roomRole(light, playerId);
   if (!role) return null;
   const now = Date.now();
-  if (hostHandoverDue(light, now)) return null;
+  if (hostHandoverDue(light, now, role)) return null;
   const elapsed = now - (Date.parse(light.lastPassiveAt || light.updatedAt) || now);
   // Passive income due: the full path books it with the presence as it was, and only then marks the player present.
   // Marking first would make a long absence look like presence and pay the whole gap.
@@ -985,7 +992,9 @@ async function refreshPassive(db: ReturnType<typeof getDb>, room: RoomRow, minEl
   const writeAt = worldWriteTime(room);
   const game = readGame(room);
   bookPassive(game, room, writeAt, presence);
-  const updated = await writeWorld(db, room, game, new Date(writeAt).toISOString());
+  // A Prestige vote that is over or complete is settled with this write too (the presence is the one before).
+  const settled = settlePrestigeVote(game, presence, writeAt);
+  const updated = await writeWorld(db, room, game, new Date(writeAt).toISOString(), settled ? { clickStateJson: nextClickState(room, null, settled.patch) } : {});
   if (updated) return updated;
   return (await loadRoom(room.code)).room ?? room;
 }
@@ -996,15 +1005,17 @@ async function refreshPassive(db: ReturnType<typeof getDb>, room: RoomRow, minEl
  * write like every other; it runs again on the newest state after a conflict and does nothing once it is no
  * longer due.
  */
-async function handOverInactiveHost(db: ReturnType<typeof getDb>, initial: RoomRow) {
+async function handOverInactiveHost(db: ReturnType<typeof getDb>, initial: RoomRow, playerId: string) {
   let room = initial;
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const writeAt = worldWriteTime(room);
-    const successor = hostHandoverDue(room, writeAt);
+    const present = roomRole(room, playerId) ?? undefined;
+    const successor = hostHandoverDue(room, writeAt, present);
     if (!successor) return room;
     const game = readGame(room);
     bookPassive(game, room, writeAt);
-    const change = seatChange(room, { handover: successor }, writeAt);
+    // The successor's seat moves with its presence of this moment, when it is the member asking.
+    const change = seatChange(present ? withPresence(room, present, new Date(writeAt).toISOString()) : room, { handover: successor }, writeAt);
     const timestamp = new Date(writeAt).toISOString();
     addHistory(game.features, { title: "Neuer Host", detail: `${roomPlayerName(room, "host")} war ${SEAT_INACTIVE_DAYS} Tage nicht aktiv. ${roomPlayerName(room, successor)} ist jetzt Host dieser Welt.`, tone: "neutral" }, writeAt);
     const updated = await writeWorld(db, room, game, timestamp, { ...change.columns, clickStateJson: nextClickState(room, null, change.patch) });
@@ -1046,8 +1057,9 @@ async function handleGet(request: Request) {
     if (quick) return quick;
     const { db, room } = await loadRoom(code);
     if (!room) return jsonError("Raum nicht gefunden.", 404);
-    if (!roomRole(room, playerId)) return jsonError("Du bist nicht in diesem Raum.", 403);
-    const handedOver = hostHandoverDue(room) ? await handOverInactiveHost(db, room) : room;
+    const askingRole = roomRole(room, playerId);
+    if (!askingRole) return jsonError("Du bist nicht in diesem Raum.", 403);
+    const handedOver = hostHandoverDue(room, Date.now(), askingRole) ? await handOverInactiveHost(db, room, playerId) : room;
     const role = roomRole(handedOver, playerId);
     if (!role) return jsonError("Du bist nicht in diesem Raum.", 403);
     const refreshed = await refreshPassive(db, handedOver, GET_PASSIVE_REFRESH_MIN_MS);
@@ -1195,9 +1207,10 @@ async function handlePost(request: Request) {
       return jsonError("Der Raum wurde gerade gleichzeitig betreten. Bitte erneut versuchen.", 409);
     }
 
-    if (!roomRole(room, playerId)) return jsonError("Du bist nicht in diesem Raum.", 403);
+    const askingRole = roomRole(room, playerId);
+    if (!askingRole) return jsonError("Du bist nicht in diesem Raum.", 403);
     // A host inactive for days hands the host seat over to the most recently active member first.
-    if (action !== "presence-offline" && hostHandoverDue(room)) room = await handOverInactiveHost(db, room);
+    if (action !== "presence-offline" && hostHandoverDue(room, Date.now(), askingRole)) room = await handOverInactiveHost(db, room, playerId);
     const role = roomRole(room, playerId);
     if (!role) return jsonError("Du bist nicht in diesem Raum.", 403);
     if (action === "delete") {
