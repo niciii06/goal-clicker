@@ -12,9 +12,14 @@ import { validateMatchDraft } from './match-commands';
 import { MatchSquadEditor } from './match-substitutions';
 import type { MatchDraft } from './match-commands';
 import { useReducedMotion } from './use-reduced-motion';
+import { readPref, writePref } from './qol/prefs';
+
+// The chosen view (pitch, ticker, statistics) stays on this device (Q54).
+const INTERACTIVE_VIEW_KEY = 'goal-clicker-interactive-view';
 export type InteractivePanelProps={features:GameFeatures;now:number;clubName:string;clubColor:string;disabled?:boolean;onEdit?:()=>void;onBatch?:(draft:MatchDraft)=>void;onResume?:()=>void};
 export function InteractiveMatchPanel({features,now,clubName,clubColor,disabled,onEdit,onBatch,onResume}:InteractivePanelProps){
- const [view,setView]=useState<'pitch'|'ticker'|'stats'>('pitch'),[editing,setEditing]=useState(features.cup.simulation?.status==='editing');
+ const [view,setViewState]=useState<'pitch'|'ticker'|'stats'>(()=>{const saved=readPref(INTERACTIVE_VIEW_KEY);return saved==='ticker'||saved==='stats'?saved:'pitch';}),[editing,setEditing]=useState(features.cup.simulation?.status==='editing');
+ const setView=(next:'pitch'|'ticker'|'stats')=>{setViewState(next);writePref(INTERACTIVE_VIEW_KEY,next);};
  const reducedMotion=useReducedMotion();
  const c=features.cup,s=c.simulation!,away=c.fixture?.away;
  const {wall,minute}=useMatchPresentation(c,now),events=getViewerEvents(c);

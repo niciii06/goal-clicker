@@ -94,7 +94,7 @@ async function closeWelcomePack(page: Page) {
   await page.getByRole('button', { name: 'Fussball anklicken' }).waitFor();
   const reveal = page.locator('.star-reveal');
   try { await reveal.waitFor({ timeout: 4000 }); } catch { return; }
-  const takeOver = reveal.getByRole('button', { name: 'In Star XI übernehmen' });
+  const takeOver = reveal.getByRole('button', { name: /^Weiter/ });
   await takeOver.waitFor({ timeout: 20000 });
   await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('.star-reveal .star-walkout-dismiss')?.disabled, undefined, { timeout: 20000 });
   await takeOver.click();

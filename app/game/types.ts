@@ -15,7 +15,8 @@ export type LayoutCardId = "hero" | "feature" | "shop" | "side";
 export type SquadArea = "lineup" | "bench" | "reserve";
 export type SquadDragSource = { playerId: string; area: SquadArea; index: number | null };
 
-export type SquadDropTarget = { area: "lineup" | "bench"; index: number };
+/** "reserve": the reserve list as a whole (index 0); a player dropped there leaves the eleven or the bench. */
+export type SquadDropTarget = { area: "lineup" | "bench" | "reserve"; index: number };
 
 export type SeasonStandingsAnnouncement = { entry: SeasonMatchHistoryEntry; table: SeasonTableRow[]; results?: SeasonResult[] };
 

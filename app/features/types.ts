@@ -295,6 +295,10 @@ export type MatchHistoryEntry = {
   detail: string;
   tone: HistoryTone;
   timestamp: number;
+  /** Squad or upgrade changes: one member's changes within a few minutes share one entry (addHistory). */
+  kind?: "squad" | "upgrade";
+  /** Co-op: the member whose action wrote the entry. */
+  actor?: string;
 };
 
 export type RandomEvent = {

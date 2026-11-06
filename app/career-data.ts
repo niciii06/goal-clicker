@@ -408,6 +408,31 @@ export function getAlbumGroups(career: CareerState): AlbumGroup[] {
   const milestones = ALBUM_MILESTONES.map(m=>({id:`collect-${m.cards}`,label:`${m.cards} verschiedene Karten`,total:m.cards,collected:Math.min(m.cards,distinct),reward:m.reward,rewardSeconds:m.rewardSeconds,claimed:claimed.has(`collect-${m.cards}`)}));
   return [...milestones, ...definitions.filter(d=>d.players.length).map(d=>({id:d.id,label:d.label,total:d.players.length,collected:d.players.filter(p=>owned.has(p.id)).length,reward:d.reward,rewardSeconds:d.rewardSeconds,claimed:claimed.has(d.id)||(ALBUM_GROUP_ALIASES[d.id]??[]).some(id=>claimed.has(id))}))];
 }
+/** Whether a card belongs to an album group (the same rules as getAlbumGroups), for "show the missing cards" (Q39). */
+export function albumGroupIncludes(groupId: string, player: StarXIPlayer) {
+  if (groupId === 'base') return !player.id.startsWith('scrap-') && !player.isCustom && player.cardType !== 'icon' && player.cardType !== 'legendary';
+  if (groupId === 'scrap') return player.id.startsWith('scrap-');
+  if (groupId === 'icons') return player.cardType === 'icon';
+  if (groupId === 'legendary') return Boolean(player.isCustom) || player.cardType === 'legendary';
+  if (groupId.startsWith('nation-')) return player.countryCode === groupId.slice(7) && player.rating >= MIN_DRAWABLE_RATING;
+  return false;
+}
+
+const nationScopeCache = new Map<string, string>();
+/**
+ * What a nation group really holds (Q42). Most men's cards carry no nation, so "Deutschland" is mostly women and
+ * icons: the album says so ("Frauen und Icons") instead of promising the whole country. Empty when men are in it.
+ */
+export function nationGroupScope(code: string) {
+  const cached = nationScopeCache.get(code);
+  if (cached !== undefined) return cached;
+  const cards = STAR_XI_ACTIVE_PLAYERS.filter((player) => player.countryCode === code && player.rating >= MIN_DRAWABLE_RATING);
+  const men = cards.some((player) => !player.isWomen && player.cardType !== 'icon' && player.cardType !== 'legendary' && !player.isCustom);
+  const parts = [cards.some((player) => player.isWomen) ? 'Frauen' : '', cards.some((player) => player.cardType === 'icon') ? 'Icons' : '', cards.some((player) => player.isCustom || player.cardType === 'legendary') ? 'Spezialkarten' : ''].filter(Boolean);
+  const scope = men || !parts.length ? '' : parts.length === 1 ? `nur ${parts[0]}` : `${parts.slice(0, -1).join(', ')} und ${parts.at(-1)}`;
+  nationScopeCache.set(code, scope);
+  return scope;
+}
 export const ALBUM_MILESTONES = [{ cards:10, reward:100, rewardSeconds:60 }, { cards:25, reward:250, rewardSeconds:120 }, { cards:50, reward:500, rewardSeconds:300 }] as const;
 
 /** Goals an album group pays at `passivePerSecond` (the club's base passive income). */

@@ -1,0 +1,53 @@
+// Season tab helpers (Q47 to Q49): form guide, what promotion still needs, top scorers of the running season. All
+// read the table the game itself uses (sortSeasonTable: points, goal difference, goals, then head to head).
+import type { SeasonResult, SeasonTableRow } from "../feature-data";
+import { SEASON_MODE_DIVISION_COUNT, SEASON_MODE_MATCHES_PER_SEASON, sortSeasonTable } from "../feature-data";
+
+export type FormLetter = "S" | "U" | "N";
+
+/** S/U/N of the last five matches of a team, oldest first. */
+export function formGuide(teamId: string, results: readonly SeasonResult[], count = 5): FormLetter[] {
+  return results.filter((result) => result.homeId === teamId || result.awayId === teamId)
+    .sort((a, b) => a.matchday - b.matchday)
+    .slice(-count)
+    .map((result) => {
+      const own = result.homeId === teamId ? result.homeScore : result.awayScore, other = result.homeId === teamId ? result.awayScore : result.homeScore;
+      return own > other ? "S" : own < other ? "N" : "U";
+    });
+}
+
+/**
+ * One line on the club's chances: "Aufstieg sicher", "3 Punkte Rückstand auf Platz 2 · noch 4 Spiele",
+ * "Abstiegsplatz · 2 Punkte bis Platz 4". Only points count as sure; ties are left open, because goal difference,
+ * goals and head to head can still change.
+ */
+export function promotionOutlook(table: readonly SeasonTableRow[], results: readonly SeasonResult[], division: number) {
+  const rows = sortSeasonTable(table, results);
+  const index = rows.findIndex((team) => team.id === "club");
+  if (index < 0) return "";
+  const club = rows[index];
+  const left = Math.max(0, SEASON_MODE_MATCHES_PER_SEASON - club.played);
+  const maxOf = (team: SeasonTableRow) => team.points + 3 * Math.max(0, SEASON_MODE_MATCHES_PER_SEASON - team.played);
+  const top = division >= SEASON_MODE_DIVISION_COUNT;
+  const spots = top ? 1 : 2;
+  const games = left === 1 ? "noch 1 Spiel" : `noch ${left} Spiele`;
+  const goal = top ? "Hall of Fame" : "Aufstieg";
+  // Sure: fewer than `spots` other teams can still reach the club's points.
+  const chasers = rows.filter((team) => team.id !== "club" && maxOf(team) >= club.points).length;
+  if (chasers < spots) return `${goal} sicher`;
+  if (index < spots) return `${goal}splatz · ${games}`;
+  const target = rows[spots - 1];
+  const gap = target.points - club.points;
+  if (maxOf(club) < target.points) return `${goal} nicht mehr möglich · ${games}`;
+  const relegation = division > 1 && index >= rows.length - 2;
+  const safe = rows[rows.length - 3];
+  if (relegation && safe) return `Abstiegsplatz · ${Math.max(0, safe.points - club.points)} ${safe.points - club.points === 1 ? "Punkt" : "Punkte"} bis Platz ${rows.length - 2} · ${games}`;
+  return `${gap} ${gap === 1 ? "Punkt" : "Punkte"} Rückstand auf Platz ${spots} · ${games}`;
+}
+
+/** The best scorers of the running season from the season statistics (career.seasonPlayers). */
+export function seasonTopScorers(seasonPlayers: Record<string, { goals: number; assists: number; appearances: number }>, limit = 5) {
+  return Object.entries(seasonPlayers).filter(([, stats]) => stats.goals > 0)
+    .sort(([, a], [, b]) => b.goals - a.goals || b.assists - a.assists || a.appearances - b.appearances)
+    .slice(0, limit).map(([playerId, stats]) => ({ playerId, goals: stats.goals, assists: stats.assists, appearances: stats.appearances }));
+}

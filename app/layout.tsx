@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./qol/qol.css";
 import { PwaRegister } from "./pwa-register";
 import { THEME_BOOT_SCRIPT, THEME_COLORS } from "./theme";
 
