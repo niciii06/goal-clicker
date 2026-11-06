@@ -502,11 +502,13 @@
 .starxi-pitch-toolbar, .starxi-subheading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .starxi-pitch-toolbar > span, .starxi-subheading .eyebrow { color: var(--soft); font-size: var(--text-footnote); font-weight: 850; letter-spacing: .1em; }
 .starxi-pitch-toolbar > small, .starxi-subheading > strong { color: var(--muted); font-size: var(--text-footnote); }
-.starxi-formation-picker { display: grid; grid-template-columns: minmax(0,1fr) minmax(260px,1fr); align-items: center; gap: 12px; margin-top: 10px; padding: 10px; border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent); border-radius: 13px; background: color-mix(in srgb, var(--accent) 5%, var(--surface-raised)); }
+.starxi-formation-picker { display: grid; grid-template-columns: minmax(0,1fr) minmax(min(100%,300px),1.4fr); align-items: center; gap: 12px; margin-top: 10px; padding: 10px; border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent); border-radius: 13px; background: color-mix(in srgb, var(--accent) 5%, var(--surface-raised)); }
 .starxi-formation-picker span, .starxi-formation-picker strong, .starxi-formation-picker small { display: block; }
 .starxi-formation-picker strong { color: var(--soft); font-size: var(--text-footnote); font-weight: 900; letter-spacing: .08em; }
 .starxi-formation-picker small { margin-top: 3px; color: var(--muted); font-size: var(--text-footnote); }
-.starxi-formation-actions { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 7px; }
+.starxi-formation-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.starxi-formation-actions select { flex: 1 1 280px; min-width: 0; }
+.starxi-formation-actions .starxi-best-button { flex: 0 0 auto; }
 .starxi-formation-picker select { width: 100%; min-height: 36px; padding: 7px 32px 7px 10px; border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent); border-radius: 10px; color: var(--text); cursor: pointer; background: var(--surface-raised); font: inherit; font-size: var(--text-footnote); font-weight: 800; }
 .starxi-formation-picker select:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); }
 .starxi-formation-picker select:disabled { cursor: not-allowed; opacity: .55; }
@@ -806,7 +808,7 @@
   .starxi-pitch { min-height: 400px; }
   .starxi-formation-grid { min-height: 390px; }
   .starxi-formation-picker { grid-template-columns: 1fr; }
-  .starxi-formation-actions { grid-template-columns: 1fr; }
+  .starxi-formation-actions select, .starxi-formation-actions .starxi-best-button { flex: 1 1 100%; }
   .star-pack-grid, .custom-card-grid { grid-template-columns: 1fr; }
   .star-xi-lineup { grid-template-columns: 1fr; }
   .cup-scoreboard strong { font-size: 48px; }
@@ -2385,6 +2387,18 @@ main :is(h2, h3, h4)[tabindex="-1"]:focus-visible { outline: 3px solid var(--acc
 .chronicle-table thead button { padding: 0; border: 0; color: inherit; background: none; font: inherit; cursor: pointer; }
 .chronicle-table tbody tr:last-child > * { border-bottom: 0; }
 .chronicle-table tr.in-squad th[scope="row"] span { color: var(--accent); }
+/* Very narrow phones: each archived season becomes a small card instead of a nine column row. */
+@media (max-width: 560px) {
+  .season-archive-table, .season-archive-table tbody, .season-archive-table tr { display: block; }
+  .season-archive-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .season-archive-table tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 4px 12px; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); }
+  .season-archive-table tbody tr:last-child { border-bottom: 0; }
+  .season-archive-table th[scope="row"] { grid-column: 1 / -1; padding: 0 0 2px; border: 0; white-space: normal; }
+  .season-archive-table td { padding: 0; border: 0; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+  .season-archive-table td:empty { display: none; }
+  .season-archive-table td::before { content: attr(data-label) " "; color: var(--soft); font-weight: 700; }
+  .season-archive-table td.wide { grid-column: 1 / -1; }
+}
 .chronicle-toggle { display: inline-flex; align-items: center; gap: 8px; color: var(--soft); font-size: var(--text-footnote); }
 .chronicle-more { margin-top: 12px; }
 .chronicle-hof { margin-top: 10px; }
