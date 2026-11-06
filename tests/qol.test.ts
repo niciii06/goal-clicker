@@ -8,6 +8,7 @@ import { nextToast, pushToast, toastDuration } from '../app/qol/toast-queue.ts';
 import { parsePurchaseMode, parseSavingsGoal, pickStringFields } from '../app/qol/prefs.ts';
 import { describeReplacements, fillStarXIGaps, lineupChanges, ratingAfterLineupMove, formatRatingDelta, lineupRating } from '../app/game/lineup-tools.ts';
 import { UPGRADES } from '../app/game/upgrades.ts';
+import { getUpgradeCostAtLevel } from '../app/upgrade-purchase.ts';
 import { formatNumber } from '../app/game/format.ts';
 
 const NOW = Date.parse('2026-11-06T12:00:00Z');
@@ -67,6 +68,16 @@ test('next level gain, payback and the best value upgrade', () => {
   const clickGain = nextLevelGain(click, upgrades, 0);
   assert.ok(clickGain.clickGain > 0);
   assert.equal(bestValueUpgrade([clickGain]), null, 'click upgrades have no passive payback');
+});
+
+test('upgrade hints use the shared rounded level price', () => {
+  for (const upgrade of UPGRADES.filter((item) => item.kind === 'auto').slice(0, 3)) {
+    for (const level of [0, 1, 5, 17]) {
+      const gain = nextLevelGain(upgrade, { [upgrade.id]: level }, 0);
+      assert.equal(gain.cost, getUpgradeCostAtLevel(upgrade, level), `${upgrade.id} level ${level}`);
+      assert.ok(Math.abs(gain.paybackSeconds! - gain.cost / gain.passiveGain) < 1e-9);
+    }
+  }
 });
 
 test('time until affordable', () => {
