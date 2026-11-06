@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { UPGRADES } from "../app/game/upgrades.ts";
-import { CLICK_PASSIVE_SHARE_CAP, MINI_GAME_IDS } from "../app/game/constants.ts";
-import { MINI_GAME_BASE_MAX_REWARD, MINI_GAME_MAX_REWARD_SECONDS, getBaseClickPower, getBasePassivePower, getClickPassiveShare, getMiniGameMaxReward, scaleMiniGameReward } from "../app/game/economy.ts";
+import { CLICK_PASSIVE_SHARE_CAP, MAX_MULTIPLIER_LEVEL, MINI_GAME_IDS } from "../app/game/constants.ts";
+import { roundPrice } from "../app/upgrade-purchase.ts";
+import { MINI_GAME_BASE_MAX_REWARD, MINI_GAME_MAX_REWARD_SECONDS, getBulkPurchase, getCostAtLevel, getBaseClickPower, getBasePassivePower, getClickPassiveShare, getMiniGameMaxReward, scaleMiniGameReward } from "../app/game/economy.ts";
 import { ALBUM_MILESTONES, claimAlbumReward, getAlbumGroups } from "../app/career-data.ts";
 import { DAILY_REWARD_DAYS, WORLD_DAILY_KEY, claimDailyReward, getDailyRewardStatus, getPreviousRewardDay, getRewardDay, mergeDailyRewardsForWorld } from "../app/daily-reward.ts";
 import { MATCH_PACK_STAMP_TARGET, cardPackRating, resolveRandomEvent, resolveVarEvent, SCRAP_PACK_PLAYERS, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STARTER_SQUAD_UNLOCK_CLICKS, awardMatchStamp, canStarXIPlayerFillSlot, getSeasonOpponentRating, getStarXIPlayer, grantWelcomePack, initialGameFeatures, maybeGrantStarterSquad, normalizeGameFeatures, openEarnedPack, openEarnedPackDraw, openStarPack } from "../app/feature-data.ts";
@@ -25,6 +26,31 @@ function isRound(value: number) {
 test("every pack price and every upgrade base price is a round amount", () => {
   for (const pack of STAR_PACKS) assert.ok(isRound(pack.price), `${pack.label}: ${pack.price}`);
   for (const upgrade of UPGRADES) assert.ok(isRound(upgrade.baseCost), `${upgrade.name}: ${upgrade.baseCost}`);
+});
+
+test("every upgrade level costs a round amount, never less than the level before, and bulk buys add them up", () => {
+  for (const upgrade of UPGRADES) {
+    const levels = upgrade.kind === "multiplier" ? MAX_MULTIPLIER_LEVEL : 80;
+    let previous = 0;
+    for (let level = 0; level < levels; level++) {
+      const cost = getCostAtLevel(upgrade, level);
+      assert.ok(isRound(cost), `${upgrade.name} Stufe ${level + 1}: ${cost}`);
+      assert.ok(cost >= previous, `${upgrade.name} Stufe ${level + 1} is cheaper than the level before`);
+      // Rounded to the nearest step: never more than a quarter off the exponential curve.
+      const raw = upgrade.baseCost * upgrade.scale ** level;
+      assert.ok(Math.abs(cost - raw) <= 0.25 * raw, `${upgrade.name} Stufe ${level + 1}: ${cost} for ${raw}`);
+      previous = cost;
+    }
+    // x10 and MAX charge exactly the single level prices.
+    const ten = getBulkPurchase(upgrade, { [upgrade.id]: 3 }, Number.MAX_SAFE_INTEGER, 10);
+    const expected = Array.from({ length: ten.count }, (_, index) => getCostAtLevel(upgrade, 3 + index)).reduce((sum, cost) => sum + cost, 0);
+    assert.equal(ten.totalCost, expected);
+    assert.equal(ten.count, upgrade.kind === "multiplier" ? MAX_MULTIPLIER_LEVEL - 3 : 10);
+    const budget = getCostAtLevel(upgrade, 0) + getCostAtLevel(upgrade, 1);
+    assert.deepEqual(getBulkPurchase(upgrade, {}, budget, "max"), { count: 2, totalCost: budget });
+  }
+  assert.deepEqual([12, 17.5, 26, 34, 44, 55, 69, 77, 79, 91, 1234].map(roundPrice), [10, 20, 25, 30, 40, 60, 75, 75, 80, 100, 1000]);
+  assert.equal(roundPrice(Infinity), Infinity);
 });
 
 test("income keeps growing by at least a quarter per league in the late leagues", () => {

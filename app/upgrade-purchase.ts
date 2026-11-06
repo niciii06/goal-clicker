@@ -10,13 +10,30 @@ type BulkPurchaseOptions = {
   maxBulkCount?: number;
 };
 
+/** Every price is one of these steps times a power of ten (see CLAUDE.md, Balance). */
+export const ROUND_PRICE_STEPS = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 7.5, 8] as const;
+
+/** The nearest round price (1 / 1.5 / 2 / 2.5 / 3 / 4 / 5 / 6 / 7.5 / 8 times a power of ten); a tie rounds up. */
+export function roundPrice(value: number) {
+  if (!Number.isFinite(value)) return value;
+  if (value <= 1) return 1;
+  const power = 10 ** Math.floor(Math.log10(value));
+  let best = 10 * power;
+  for (const step of [...ROUND_PRICE_STEPS].reverse()) {
+    const candidate = step * power;
+    if (Math.abs(value - candidate) < Math.abs(value - best)) best = candidate;
+  }
+  return best;
+}
+
 export function getUpgradeCostAtLevel(
   definition: UpgradeCostDefinition,
   level: number,
   maxMultiplierLevel = 8,
 ) {
   if (definition.kind === "multiplier" && level >= maxMultiplierLevel) return Infinity;
-  return Math.floor(definition.baseCost * definition.scale ** level);
+  // The exponential curve stays; every level's price is rounded to the round grid. Prices never fall with a level.
+  return roundPrice(definition.baseCost * definition.scale ** level);
 }
 
 export function calculateBulkUpgradePurchase(
