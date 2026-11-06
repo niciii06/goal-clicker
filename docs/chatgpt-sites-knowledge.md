@@ -1,5 +1,7 @@
 # Goal Clicker – ChatGPT Sites project knowledge
 
+> Historical note (2026-11-06): this describes the first ChatGPT Sites version (Vite, Cloudflare Worker, D1). Production still runs on ChatGPT Sites, now as the Next.js app with Neon and Neon Auth; see [HOSTING.md](../HOSTING.md). Rules below may be outdated in details (for example red card suspensions now count per competition).
+
 Release date: 2026-10-16.
 GitHub source release: `697b342ff57d05a764f5a5fcf538065806e4bdf7`.
 Repository: https://github.com/niciii06/goal-clicker
