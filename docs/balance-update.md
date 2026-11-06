@@ -234,3 +234,55 @@ Alle zehn Special Cards (auch Pfuschi und Mikeboy Jr.) starten mit 80 OVR und ha
 * Multiplayer Protokoll 14, damit alte Clients nach dem Update neu laden. Kein Eintrag in „Was ist neu“.
 
 Code: `app/feature-data.ts` (`SPECIAL_START_RATING`, `SPECIAL_POTENTIAL`, `cardPackRating`), `app/career-data.ts` (`getSpecialGrowth`, `MATCH_RESULT_POINTS`, `GROWTH_POINTS_PER_LEVEL`), Anzeige in `app/career-panels.tsx`. Tests: `tests/special-growth.test.ts`, `tests/career.test.ts`.
+
+
+## Nachtrag 6. November: Belohnungen am Einkommen, runde Stufenpreise, Fanstimmung
+
+Entscheid des Besitzers (Runde 2, Punkte 7 und 8). Massstab ist überall das passive Grundeinkommen `getBasePassivePower` (ohne Turnierboost und Prestige).
+
+### VAR und Ereignisse in Sekunden Einkommen
+
+Bisher bemassen sich VAR und Ereignisse am Kontostand: Wer sparte, verlor mehr, und Johhny Elefantino nahm alles. Jetzt zählen Sekunden Einkommen (`resolveVarEvent`, `resolveRandomEvent` in `app/feature-data.ts`). Die Werte treffen, was ein typischer Club vorher sah: Er hat beim Ereignis im Median etwa vier Minuten Einkommen auf dem Konto.
+
+| Ereignis | vorher | jetzt |
+|---|---|---|
+| VAR gibt frei (20%) | 50% bis 250% des Kontos | 2 bis 9 Minuten Einkommen |
+| VAR greift ein (80%) | 10% bis 70% des Kontos | 25 bis 170 Sekunden, höchstens der Kontostand |
+| Sponsor / Fans | 2,5% / 1,8% des Kontos | 6 / 4 Sekunden, mindestens 80 / 40 Tore |
+| Platzregen / Verletzung | 1,2% / 1,6% des Kontos | 3 / 4 Sekunden, mindestens 20 / 30, höchstens der Kontostand |
+| Johhny Elefantino (1%) | das ganze Konto | das Konto, höchstens 10 Minuten Einkommen |
+
+Typischer Ausschlag (Simulation): VAR Median vorher etwa minus 70 Sekunden Einkommen, jetzt minus 79; Ereignis Median vorher plus 3,7, jetzt plus 4. Der grösste Verlust fällt von 1'356 auf 600 Sekunden. Ein Club ohne passives Einkommen zählt als 1 Tor pro Sekunde.
+
+### Minigames und Album am Einkommen
+
+* **Minigames:** Der beste Lauf zahlt 10 Sekunden Einkommen (Matchday Tipp 15), ein schwächerer Lauf seinen Anteil davon. Die bisherigen festen Beträge bleiben die Untergrenze (`scaleMiniGameReward` in `app/game/economy.ts`). Wer alle vier Minigames spielt, sobald sie bereit sind, verdient etwa ein Drittel mehr, so viel wie mit 3 Klicks pro Sekunde und voller Combo. Der Koop Server deckelt mit derselben Formel (`getMiniGameMaxReward`).
+* **Album:** Jede Gruppe zahlt weiter ihre Fragmente und dazu Tore: Meilensteine 10 / 25 / 50 Karten 1 / 2 / 5 Minuten Einkommen, jede Nation 2, Schrottkarten 5, Icons und Legendäre je 15, alle Basiskarten 30 Minuten (`claimAlbumRewards` in `app/career-data.ts`). Die Tore richten sich nach dem Einkommen beim Abholen.
+* Koop Missionen bleiben unverändert, sie werden durch Wochenziele ersetzt.
+
+### Runde Preise auf jeder Stufe
+
+Jede Upgradestufe kostet den nächsten runden Betrag der bisherigen Kurve (`roundPrice` in `app/upgrade-purchase.ts`, bei Gleichstand der höhere). Ein Preis fällt nie von einer Stufe zur nächsten; folgen zwei Stufen dicht aufeinander, kosten sie gleich viel. Mehrfachkauf zählt dieselben Stufenpreise zusammen. Beispiel Kapitänsbinde: 75 / 100 / 150 / 200 / 300 / 400 / 600 / 800 Mio (vorher 75 / 106,5 / 151,2 / 214,7 / 304,9 / 433 / 614,9 / 873,1).
+
+### Prämienpacks ohne Karten unter 55
+
+Die schwächste Zeile der Prämienpacks heisst jetzt "Gewöhnlich 55–64" (vorher "bis 64"), mit denselben Chancen; die angezeigten Chancen sind genau die gezogenen. Karten unter 55 kommen damit aus keinem Pack mehr. Darum zählt eine Nationengruppe im Album nur noch Karten ab 55 (`MIN_DRAWABLE_RATING`): **Nation IN** hat jetzt die 81 Karten des Schrott-Packs statt 218 und ist mit dem Schrott-Pack allein komplett. Gesammelte schwächere Karten bleiben im Album, abgeholte Prämien bleiben.
+
+### Fanstimmung
+
+Nach jeder Partie einmal (solo und Koop, in `recordCareerMatch`): Sieg +3, Unentschieden +1, Niederlage minus 3, dazu für jede volle 10 Punkte Abstand ein Punkt zurück Richtung 50 (`applyMatchResultToFanMood` in `app/press-conference.ts`). Ein Elfmeterschiessen zählt als entschieden. Eine Siegesserie pendelt sich bei etwa 80 ein, eine Niederlagenserie bei etwa 20. Die Stimmung wirkt wie bisher auf Zuschauer und Tickets des nächsten Heimspiels.
+
+### Simulation vorher und nachher
+
+`npx tsx scripts/balance/simulate-economy.mts`, Minuten bis das Pack beim Freischalten angespart ist (passiv, Median / P90):
+
+| Pack | vorher | jetzt |
+|---|---|---|
+| Regional | 4,1 / 6,1 | 4,8 / 10,1 |
+| Scout | 5,6 / 10,6 | 6,3 / 13,2 |
+| Profi | 6,1 / 11,7 | 6,5 / 15,3 |
+| Elite | 8,6 / 20,5 | 8,0 / 18,8 |
+| Weltklasse | 9,8 / 24,4 | 9,5 / 20,6 |
+| Legenden | 13,9 / 34,0 | 13,1 / 25,4 |
+
+Die Mediane bleiben fast gleich und steigen weiter von Pack zu Pack, Legenden liegt im Ziel 12 bis 14. Die langen Wartezeiten der teuren Packs (P90) werden deutlich kürzer, weil der VAR kein grosses Konto mehr halbiert; bei den billigen Packs sind sie etwas länger, weil ein Verlust jetzt nicht mehr vom kleinen Kontostand abhängt. Im Karrieremodell (100 Karrieren) steigt die typische Wartezeit des passiven Clubs in Liga 5 bis 1 um 3 bis 7 Minuten (vorher halfen grosse VAR Gewinne auf grossen Konten), dafür fallen die P90 Werte von bis zu 47 auf höchstens 27 Minuten. Ein rein passiver Club braucht in Liga 1 im Median 210 statt 140 Minuten; mit einem aktiven Spieler bleibt es bei 140. Die Grenzen in `tests/rebalance.test.ts` sind unverändert; `tests/balance-review.test.ts` prüft zusätzlich runde Stufenpreise, Minigame und Albumprämien, Prämienpacks ab 55, Nation IN, die Ereignisse und die Fanstimmung.

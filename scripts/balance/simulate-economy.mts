@@ -39,7 +39,8 @@ console.log(`Pack                  Liga  Preis       ${modes.map((mode) => mode.
 for (const pack of STAR_PACKS.filter((item) => item.id !== "scrap")) {
   const league = getPackUnlockLeague(pack.id);
   const cells = modes.map((mode) => {
-    const stats = savingMinutes(snapshots[mode.label].find((snapshot) => snapshot.league === league)!.incomePerSecond, pack.price);
+    const snapshot = snapshots[mode.label].find((entry) => entry.league === league)!;
+    const stats = savingMinutes(snapshot.incomePerSecond, pack.price, snapshot.passivePerSecond);
     return `${minutes(stats.median)} / ${minutes(stats.p90)}`.padStart(13);
   }).join("");
   console.log(`${pack.label.padEnd(22)}${String(league).padStart(4)}  ${format(pack.price).padEnd(10)}  ${cells}`);

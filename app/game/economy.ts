@@ -1,6 +1,6 @@
 // Upgrade costs, click and passive power, ranks and the click combo.
 import type { GameFeatures } from "../feature-data";
-import type { PurchaseMode, UpgradeDefinition } from "./types";
+import type { MiniGameId, PurchaseMode, UpgradeDefinition } from "./types";
 import { CLICK_PASSIVE_SHARE_CAP, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, RANKS } from "./constants";
 import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../upgrade-purchase";
 import { addHistory, getGoalBoostMultiplier, getPrestigeGoalMultiplier, getTransferBonuses } from "../feature-data";
@@ -76,6 +76,31 @@ export function getPassivePower(upgrades: Record<string, number>, stars = 0, fea
 /** Passive goals per second before temporary boosts, with Prestige: what passive income over a period pays. */
 export function getPassiveIncomePower(upgrades: Record<string, number>, stars = 0, features?: GameFeatures) {
   return getBasePassivePower(upgrades, stars, features) * getPrestigeGoalMultiplier(features);
+}
+
+/** Best run of every mini game in goals before income scaling (see the `take*` handlers in app/page.tsx). */
+export const MINI_GAME_BASE_MAX_REWARD: Record<MiniGameId, number> = { penalty: 1000, dribble: 355, crossbar: 275, prediction: 335 };
+/**
+ * Seconds of base passive income the best run of every mini game pays once that is more than its base reward.
+ * Someone who plays all four games whenever they are ready earns about a third more, like a club that clicks
+ * three times a second with a full combo.
+ */
+export const MINI_GAME_MAX_REWARD_SECONDS: Record<MiniGameId, number> = { penalty: 10, dribble: 10, crossbar: 10, prediction: 15 };
+
+/**
+ * A mini game reward grows with the income: the run keeps its share of the best run, and the best run pays
+ * MINI_GAME_MAX_REWARD_SECONDS of base passive income. The fixed amounts of before are the floor.
+ */
+export function scaleMiniGameReward(id: MiniGameId, baseReward: number, passivePerSecond: number) {
+  const base = Math.max(0, Math.floor(Number.isFinite(baseReward) ? baseReward : 0));
+  const income = Number.isFinite(passivePerSecond) ? Math.max(0, passivePerSecond) : 0;
+  const scaled = Math.floor((Math.min(base, MINI_GAME_BASE_MAX_REWARD[id]) / MINI_GAME_BASE_MAX_REWARD[id]) * MINI_GAME_MAX_REWARD_SECONDS[id] * income);
+  return Math.max(base, scaled);
+}
+
+/** Highest reward a mini game can pay at this income: the server cap for co-op worlds. */
+export function getMiniGameMaxReward(id: MiniGameId, passivePerSecond: number) {
+  return scaleMiniGameReward(id, MINI_GAME_BASE_MAX_REWARD[id], passivePerSecond);
 }
 
 /** Feature schema of the league economy rebalance: older saves had their goals capped once on load. */

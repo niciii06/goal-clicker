@@ -19,7 +19,7 @@ export function activeClicks(perPlayer: number, players = 1) {
   return perPlayer * players * FULL_COMBO_FACTOR;
 }
 /** `incomePerSecond` at the start of the league, `averageIncomePerSecond` over the whole league. */
-export type LeagueSnapshot = { league: number; incomePerSecond: number; averageIncomePerSecond: number; goals: number; levels: Record<string, number> };
+export type LeagueSnapshot = { league: number; incomePerSecond: number; passivePerSecond: number; averageIncomePerSecond: number; goals: number; levels: Record<string, number> };
 
 export function getIncomePerSecond(levels: Record<string, number>, clicksPerSecond: number) {
   return getBasePassivePower(levels) + getBaseClickPower(levels) * clicksPerSecond;
@@ -42,7 +42,7 @@ export function simulateEconomy({ clicksPerSecond = 0, minutesPerLeague = 45, st
   const secondsPerLeague = minutesPerLeague * 60;
   for (let second = 0; second < LEAGUE_COUNT * secondsPerLeague; second += 1) {
     const league = LEAGUE_COUNT - Math.floor(second / secondsPerLeague);
-    if (second % secondsPerLeague === 0) snapshots.push({ league, incomePerSecond: income, averageIncomePerSecond: 0, goals, levels: { ...levels } });
+    if (second % secondsPerLeague === 0) snapshots.push({ league, incomePerSecond: income, passivePerSecond: getBasePassivePower(levels), averageIncomePerSecond: 0, goals, levels: { ...levels } });
     goals += income;
     snapshots[snapshots.length - 1].averageIncomePerSecond += income / secondsPerLeague;
     for (;;) {
@@ -75,10 +75,11 @@ export function seededRandom(seed: number) {
 
 /**
  * Minutes to save `price` at `incomePerSecond` over `runs` seeded runs, with the VAR and the random events
- * hitting the balance every 1 to 3 minutes as in the game (`resolveVarEvent`, `resolveRandomEvent`).
+ * hitting the balance every 1 to 3 minutes as in the game (`resolveVarEvent`, `resolveRandomEvent`). The events
+ * are measured in seconds of `passivePerSecond`, the base passive income without clicks.
  * `median` is the typical wait, `p90` the wait that one run in ten exceeds.
  */
-export function savingMinutes(incomePerSecond: number, price: number, runs = 301, seed = 7) {
+export function savingMinutes(incomePerSecond: number, price: number, passivePerSecond = incomePerSecond, runs = 301, seed = 7) {
   if (!(incomePerSecond > 0)) return { median: Infinity, p90: Infinity };
   const random = seededRandom(seed);
   const minutes = Array.from({ length: runs }, () => {
@@ -86,8 +87,8 @@ export function savingMinutes(incomePerSecond: number, price: number, runs = 301
     while (goals < price && second < 24 * 3600) {
       second += 1;
       goals += incomePerSecond;
-      if (second >= nextVar) { goals = Math.max(0, goals + resolveVarEvent(goals, random()).amount); nextVar = second + 60 + random() * 120; }
-      if (second >= nextEvent) { goals = Math.max(0, goals + resolveRandomEvent(goals, random()).amount); nextEvent = second + 60 + random() * 120; }
+      if (second >= nextVar) { goals = Math.max(0, goals + resolveVarEvent(goals, passivePerSecond, random()).amount); nextVar = second + 60 + random() * 120; }
+      if (second >= nextEvent) { goals = Math.max(0, goals + resolveRandomEvent(goals, passivePerSecond, random()).amount); nextEvent = second + 60 + random() * 120; }
     }
     return second / 60;
   }).sort((first, second) => first - second);
@@ -95,8 +96,8 @@ export function savingMinutes(incomePerSecond: number, price: number, runs = 301
 }
 
 /** Typical minutes (median) to save `price`, see `savingMinutes`. */
-export function medianSavingMinutes(incomePerSecond: number, price: number, runs = 301, seed = 7) {
-  return savingMinutes(incomePerSecond, price, runs, seed).median;
+export function medianSavingMinutes(incomePerSecond: number, price: number, passivePerSecond = incomePerSecond, runs = 301, seed = 7) {
+  return savingMinutes(incomePerSecond, price, passivePerSecond, runs, seed).median;
 }
 
 export type ClickLevelReport = { level: number; cost: number; gainOneClick: number; gainThreeClicks: number; payback: number };

@@ -648,7 +648,10 @@ export const STAR_PACKS: readonly StarPackDefinition[] = [
   { id: "legend", label: "Legenden Pack", price: 20000000000, description: "Das teuerste Pack mit den besten Walkout Chancen", odds: [tierBand(80, 85, 0.5499), tierBand(86, 89, 0.35), tierBand(90, 99, 0.1), tierBand(100, 100, 0.0001)] },
 ];
 
-const REWARD_BRACKETS = [[0,64],[65,70],[71,79],[80,85],[86,89],[90,99]] as const;
+/** No pack hands out a card below an empty slot (55): the Schrott-Pack and the reward packs start here. Weaker
+ * cards stay with the clubs that own them and no longer count for the album groups. */
+export const MIN_DRAWABLE_RATING = SCRAP_PACK_MIN_RATING;
+const REWARD_BRACKETS = [[MIN_DRAWABLE_RATING,64],[65,70],[71,79],[80,85],[86,89],[90,99]] as const;
 const REWARD_PERCENTAGES = [[60,30,9,1,0,0],[25,45,25,4.5,.5,0],[5,20,55,18,1.9,.1],[0,5,40,48,6.5,.5],[0,0,20,55,23,2],[0,0,5,50,40,5]] as const;
 export const REWARD_PACKS:readonly StarPackDefinition[] = ['Kleines Prämienpack','Basis-Prämienpack','Solides Prämienpack','Hochwertiges Prämienpack','Premium-Prämienpack','Top-Prämienpack'].map((label,i)=>({id:`reward-${i+1}` as RewardPackId,label,price:0,description:'Eine originale Basiskarte als Turnierprämie. Doppelte Karten geben Fragmente.',odds:REWARD_BRACKETS.map(([minRating,maxRating],b)=>tierBand(minRating,maxRating,REWARD_PERCENTAGES[i][b]/100))}));
 /** Every MATCH_PACK_STAMP_TARGET finished league matches, won or lost, earn a reward pack for the best league reached. */
@@ -3623,49 +3626,87 @@ export function getMissionProgress(mission: CoopMission, source: MissionProgress
   return Math.floor(source.cupWins);
 }
 
-export function resolveRandomEvent(goals: number, random = Math.random(), now = Date.now()): RandomEvent {
-  const safeGoals = Math.max(0, goals);
+/**
+ * Random events and the VAR are measured in seconds of the club's base passive income (`getBasePassivePower`),
+ * not in shares of the balance: saving up no longer changes what they pay or take. The values keep what a typical
+ * club saw before: it meets an event with about four minutes of income in the bank (`scripts/balance`).
+ */
+export const RANDOM_EVENT_INCOME_SECONDS = { sponsor: 6, fans: 4, weather: 3, injury: 4 } as const;
+/** Johhny Elefantino takes the balance, but never more than this much income. */
+export const ELEFANTINO_MAX_INCOME_SECONDS = 600;
+/** VAR: 20% of reviews give 2 to 9 minutes of income, 80% take 25 to 170 seconds (never more than the balance). On
+ * average a review costs about 12 seconds of income; before it cost 2% of the balance, which hit the dear packs hardest. */
+export const VAR_INCOME_SECONDS = { gainMin: 120, gainMax: 540, lossMin: 25, lossMax: 170 } as const;
+/** Income a club without passive income yet is treated as having for events and the VAR. */
+const EVENT_MIN_INCOME_PER_SECOND = 1;
+
+function eventIncome(passivePerSecond: number) {
+  return Number.isFinite(passivePerSecond) ? Math.max(EVENT_MIN_INCOME_PER_SECOND, passivePerSecond) : EVENT_MIN_INCOME_PER_SECOND;
+}
+
+/** "45 Sekunden", "4 Minuten": how long the club needs to earn `seconds` worth of income. */
+export function formatIncomeDuration(seconds: number) {
+  if (seconds < 90) {
+    const rounded = Math.max(1, Math.round(seconds));
+    return `${rounded} ${rounded === 1 ? "Sekunde" : "Sekunden"}`;
+  }
+  const minutes = Math.round(seconds / 30) / 2;
+  return `${minutes.toLocaleString("de-CH")} Minuten`;
+}
+
+/** `passivePerSecond`: the club's base passive income (`getBasePassivePower`). */
+export function resolveRandomEvent(goals: number, passivePerSecond: number, random = Math.random(), now = Date.now()): RandomEvent {
+  const safeGoals = Math.max(0, Number.isFinite(goals) ? goals : 0);
+  const income = eventIncome(passivePerSecond);
   const eventRoll = Math.max(0, Math.min(0.999999, random));
   if (eventRoll < 0.01) {
-    const amount = Math.ceil(safeGoals);
+    const balance = Math.ceil(safeGoals);
+    const amount = Math.min(balance, Math.floor(income * ELEFANTINO_MAX_INCOME_SECONDS));
     return {
       id: "elefantino",
       title: "Johhny Elefantino",
-      message: amount > 0
-        ? `Johhny Elefantino erklärt dein gesamtes Guthaben von ${amount.toLocaleString("de-CH")} Toren zur offiziellen Fussballabgabe. Dein Konto steht auf 0.`
-        : "Johhny Elefantino wollte dir alles wegnehmen, aber dein Konto war bereits leer.",
-      amount: -amount,
+      message: amount <= 0
+        ? "Johhny Elefantino wollte dir alles wegnehmen, aber dein Konto war bereits leer."
+        : amount >= balance
+          ? `Johhny Elefantino erklärt dein gesamtes Guthaben von ${amount.toLocaleString("de-CH")} Toren zur offiziellen Fussballabgabe. Dein Konto steht auf 0.`
+          : `Johhny Elefantino erklärt ${amount.toLocaleString("de-CH")} Tore zur offiziellen Fussballabgabe, so viel wie ${formatIncomeDuration(ELEFANTINO_MAX_INCOME_SECONDS)} Einkommen. Mehr darf er nicht nehmen.`,
+      amount: amount > 0 ? -amount : 0,
       tone: amount > 0 ? "negative" : "neutral",
       createdAt: now,
     };
   }
   const regularRoll = (eventRoll - 0.01) / 0.99;
   if (regularRoll < 0.48) {
-    const amount = Math.max(80, Math.floor(safeGoals * 0.025));
+    const amount = Math.max(80, Math.floor(income * RANDOM_EVENT_INCOME_SECONDS.sponsor));
     return { id: "sponsor", title: "Sponsor im Stadion", message: `Ein Sponsor überrascht den Club mit ${amount.toLocaleString("de-CH")} Toren.`, amount, tone: "positive", createdAt: now };
   }
   if (regularRoll < 0.78) {
-    const amount = Math.max(40, Math.floor(safeGoals * 0.018));
+    const amount = Math.max(40, Math.floor(income * RANDOM_EVENT_INCOME_SECONDS.fans));
     return { id: "fans", title: "Fans drehen auf", message: `Die Kurve pusht das Team mit ${amount.toLocaleString("de-CH")} Extra Toren.`, amount, tone: "positive", createdAt: now };
   }
   if (regularRoll < 0.9) {
-    const amount = Math.min(safeGoals, Math.max(20, Math.floor(safeGoals * 0.012)));
-    return { id: "weather", title: "Platzregen", message: amount > 0 ? `Der Rasen ist unbespielbar. ${amount.toLocaleString("de-CH")} Tore gehen verloren.` : "Der Regen kommt, aber der Club hat noch keine Tore zu verlieren.", amount: -amount, tone: amount > 0 ? "negative" : "neutral", createdAt: now };
+    const amount = Math.floor(Math.min(safeGoals, Math.max(20, income * RANDOM_EVENT_INCOME_SECONDS.weather)));
+    return { id: "weather", title: "Platzregen", message: amount > 0 ? `Der Rasen ist unbespielbar. ${amount.toLocaleString("de-CH")} Tore gehen verloren.` : "Der Regen kommt, aber der Club hat noch keine Tore zu verlieren.", amount: amount > 0 ? -amount : 0, tone: amount > 0 ? "negative" : "neutral", createdAt: now };
   }
-  const amount = Math.min(safeGoals, Math.max(30, Math.floor(safeGoals * 0.016)));
-  return { id: "injury", title: "Verletzungspech", message: amount > 0 ? `Die medizinische Abteilung kostet den Club ${amount.toLocaleString("de-CH")} Tore.` : "Die medizinische Abteilung meldet Entwarnung.", amount: -amount, tone: amount > 0 ? "negative" : "neutral", createdAt: now };
+  const amount = Math.floor(Math.min(safeGoals, Math.max(30, income * RANDOM_EVENT_INCOME_SECONDS.injury)));
+  return { id: "injury", title: "Verletzungspech", message: amount > 0 ? `Die medizinische Abteilung kostet den Club ${amount.toLocaleString("de-CH")} Tore.` : "Die medizinische Abteilung meldet Entwarnung.", amount: amount > 0 ? -amount : 0, tone: amount > 0 ? "negative" : "neutral", createdAt: now };
 }
 
-export function resolveVarEvent(goals: number, random = Math.random(), now = Date.now()): RandomEvent {
-  const safeGoals = Math.max(0, goals);
+/** `passivePerSecond`: the club's base passive income (`getBasePassivePower`). */
+export function resolveVarEvent(goals: number, passivePerSecond: number, random = Math.random(), now = Date.now()): RandomEvent {
+  const safeGoals = Math.max(0, Number.isFinite(goals) ? goals : 0);
+  const income = eventIncome(passivePerSecond);
   const varRoll = Math.max(0, Math.min(0.999999, random));
   const positive = varRoll < 0.2;
   const magnitudeRoll = positive ? varRoll / 0.2 : (varRoll - 0.2) / 0.8;
-  const share = positive ? 0.50 + magnitudeRoll * 2 : 0.10 + magnitudeRoll * 0.60;
-  const amount = positive ? Math.floor(safeGoals * share) : Math.min(safeGoals, Math.floor(safeGoals * share));
-  const percent = safeGoals > 0 ? Math.round((amount / safeGoals) * 100) : 0;
-  if (positive) return { id: "var", title: "VAR gibt Tor frei", message: amount > 0 ? `Nach langer Prüfung werden ${amount.toLocaleString("de-CH")} Tore, also ${percent}% deines aktuellen Guthabens, nachträglich anerkannt.` : "Der VAR erkennt noch kein zusätzliches Tor an.", amount, tone: amount > 0 ? "positive" : "neutral", createdAt: now };
-  return { id: "var", title: "VAR greift ein", message: amount > 0 ? `Abseits! Der VAR aberkennt ${amount.toLocaleString("de-CH")} Tore, also ${percent}% deines aktuellen Guthabens.` : "Der VAR prüft lange, findet aber noch kein Tor zum Aberkennen.", amount: -amount, tone: amount > 0 ? "negative" : "neutral", createdAt: now };
+  const seconds = positive
+    ? VAR_INCOME_SECONDS.gainMin + magnitudeRoll * (VAR_INCOME_SECONDS.gainMax - VAR_INCOME_SECONDS.gainMin)
+    : VAR_INCOME_SECONDS.lossMin + magnitudeRoll * (VAR_INCOME_SECONDS.lossMax - VAR_INCOME_SECONDS.lossMin);
+  const raw = Math.floor(income * seconds);
+  const amount = positive ? raw : Math.floor(Math.min(safeGoals, raw));
+  const duration = formatIncomeDuration(amount / income);
+  if (positive) return { id: "var", title: "VAR gibt Tor frei", message: `Nach langer Prüfung werden ${amount.toLocaleString("de-CH")} Tore nachträglich anerkannt, so viel wie ${duration} Einkommen.`, amount, tone: "positive", createdAt: now };
+  return { id: "var", title: "VAR greift ein", message: amount > 0 ? `Abseits! Der VAR aberkennt ${amount.toLocaleString("de-CH")} Tore, so viel wie ${duration} Einkommen.` : "Der VAR prüft lange, findet aber noch kein Tor zum Aberkennen.", amount: amount > 0 ? -amount : 0, tone: amount > 0 ? "negative" : "neutral", createdAt: now };
 }
 
 export function addHistory(features: GameFeatures, entry: Omit<MatchHistoryEntry, "id" | "timestamp">, now = Date.now()) {

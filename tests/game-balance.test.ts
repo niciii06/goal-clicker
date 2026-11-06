@@ -977,24 +977,51 @@ test("failed Fabrizio Romario reports never repeat the previous reason", () => {
   assert.match(second.event!.message, /Fabrizio Romario/);
 });
 
-test("VAR keeps its exact timing, probability and payout rules", () => {
+// Balance update 2026-11-06 (owner decision 7): the VAR pays in seconds of base passive income, not in shares of
+// the balance. Timing and the 20% chance stay.
+test("VAR keeps its timing and probability and pays in seconds of income", () => {
   assert.equal(getRandomEventDelay(0), 60000);
   assert.equal(getRandomEventDelay(0.999999), 179999);
-  assert.equal(resolveVarEvent(1000, 0).amount, 500);
-  assert.ok(resolveVarEvent(1000, 0.199999).amount >= 2499);
-  assert.equal(resolveVarEvent(1000, 0.2).amount, -100);
-  assert.ok(resolveVarEvent(1000, 0.999999).amount <= -699);
+  // 1'000 goals per second: a good review gives 2 to 9 minutes, a bad one takes 25 to 170 seconds.
+  assert.equal(resolveVarEvent(1e9, 1000, 0).amount, 120_000);
+  assert.ok(resolveVarEvent(1e9, 1000, 0.199999).amount >= 539_000);
+  assert.equal(resolveVarEvent(1e9, 1000, 0.2).amount, -25_000);
+  assert.ok(resolveVarEvent(1e9, 1000, 0.999999).amount <= -169_000);
+  // The balance no longer matters for what the VAR pays, only as the limit of a loss.
+  assert.equal(resolveVarEvent(0, 1000, 0).amount, 120_000);
+  assert.equal(resolveVarEvent(10_000, 1000, 0.999999).amount, -10_000);
+  assert.equal(resolveVarEvent(0, 1000, 0.5).amount, 0);
+  assert.match(resolveVarEvent(1e9, 1000, 0).message, /2 Minuten Einkommen/);
+  assert.doesNotMatch(resolveVarEvent(1e9, 1000, 0.5).message, /%/);
 
   const random = seededRandom(20260808);
   let positive = 0;
   const samples = 20000;
-  for (let index = 0; index < samples; index += 1) if (resolveVarEvent(1000, random()).amount > 0) positive += 1;
+  for (let index = 0; index < samples; index += 1) if (resolveVarEvent(1000, 50, random()).amount > 0) positive += 1;
   assert.ok(positive / samples > 0.19 && positive / samples < 0.21);
 });
 
-test("Johhny Elefantino remains a one-percent random-event risk", () => {
-  assert.equal(resolveRandomEvent(1000, 0.009).id, "elefantino");
-  assert.equal(resolveRandomEvent(1000, 0.01).id === "elefantino", false);
+test("random events pay seconds of income and keep their floors", () => {
+  const roll = (share: number) => 0.01 + share * 0.99;
+  assert.deepEqual([roll(0.2), roll(0.6), roll(0.85), roll(0.95)].map((value) => [resolveRandomEvent(1e9, 1000, value).id, resolveRandomEvent(1e9, 1000, value).amount]), [["sponsor", 6000], ["fans", 4000], ["weather", -3000], ["injury", -4000]]);
+  // A club without passive income still gets the old fixed amounts, and a loss never exceeds the balance.
+  assert.equal(resolveRandomEvent(0, 0, roll(0.2)).amount, 80);
+  assert.equal(resolveRandomEvent(0, 0, roll(0.6)).amount, 40);
+  assert.equal(resolveRandomEvent(10, 0, roll(0.85)).amount, -10);
+  assert.equal(resolveRandomEvent(1500, 1000, roll(0.95)).amount, -1500);
+});
+
+test("Johhny Elefantino remains a one-percent risk but takes at most ten minutes of income", () => {
+  assert.equal(resolveRandomEvent(1000, 10, 0.009).id, "elefantino");
+  assert.equal(resolveRandomEvent(1000, 10, 0.01).id === "elefantino", false);
+  // A small balance still goes completely, a big one loses ten minutes of income and keeps the rest.
+  assert.equal(resolveRandomEvent(1000, 10, 0).amount, -1000);
+  assert.match(resolveRandomEvent(1000, 10, 0).message, /Konto steht auf 0/);
+  const big = resolveRandomEvent(5_000_000, 1000, 0);
+  assert.equal(big.amount, -600_000);
+  assert.match(big.message, /10 Minuten Einkommen/);
+  assert.ok(resolveRandomEvent(0, 1000, 0).amount === 0);
+  assert.equal(resolveRandomEvent(0, 1000, 0).tone, "neutral");
 });
 
 test("Romario only links a player with clubs that would really sign that rating", () => {

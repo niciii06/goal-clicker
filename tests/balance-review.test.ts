@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { UPGRADES } from "../app/game/upgrades.ts";
-import { CLICK_PASSIVE_SHARE_CAP } from "../app/game/constants.ts";
-import { getBaseClickPower, getBasePassivePower, getClickPassiveShare } from "../app/game/economy.ts";
-import { ALBUM_MILESTONES, claimAlbumReward, getAlbumGroups } from "../app/career-data.ts";
+import { CLICK_PASSIVE_SHARE_CAP, MAX_MULTIPLIER_LEVEL, MINI_GAME_IDS } from "../app/game/constants.ts";
+import { roundPrice } from "../app/upgrade-purchase.ts";
+import { MINI_GAME_BASE_MAX_REWARD, MINI_GAME_MAX_REWARD_SECONDS, getBulkPurchase, getCostAtLevel, getBaseClickPower, getBasePassivePower, getClickPassiveShare, getMiniGameMaxReward, scaleMiniGameReward } from "../app/game/economy.ts";
+import { ALBUM_MILESTONES, ALBUM_REWARD_SECONDS, claimAlbumReward, claimAlbumRewards, claimAllAlbumRewards, getAlbumGoalReward, getAlbumGroups } from "../app/career-data.ts";
 import { DAILY_REWARD_DAYS, WORLD_DAILY_KEY, claimDailyReward, getDailyRewardStatus, getPreviousRewardDay, getRewardDay, mergeDailyRewardsForWorld } from "../app/daily-reward.ts";
-import { MATCH_PACK_STAMP_TARGET, cardPackRating, SCRAP_PACK_PLAYERS, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STARTER_SQUAD_UNLOCK_CLICKS, awardMatchStamp, canStarXIPlayerFillSlot, getSeasonOpponentRating, getStarXIPlayer, grantWelcomePack, initialGameFeatures, maybeGrantStarterSquad, normalizeGameFeatures, openEarnedPack, openEarnedPackDraw, openStarPack } from "../app/feature-data.ts";
-import { FULL_COMBO_FACTOR, activeClicks, clickUpgradeReport, simulateEconomy } from "../scripts/balance/economy-model.ts";
+import type { RewardPackId, StarXIPlayer } from "../app/feature-data.ts";
+import { MATCH_PACK_STAMP_TARGET, beginSeasonCupMatch, getStarXISelection, pauseGameFeatureTimers, setBestStarXI, MIN_DRAWABLE_RATING, REWARD_PACKS, cardPackRating, getRewardPackOdds, resolveRandomEvent, resolveVarEvent, SCRAP_PACK_PLAYERS, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STARTER_SQUAD_UNLOCK_CLICKS, awardMatchStamp, canStarXIPlayerFillSlot, getSeasonOpponentRating, getStarXIPlayer, grantWelcomePack, initialGameFeatures, maybeGrantStarterSquad, normalizeGameFeatures, openEarnedPack, openEarnedPackDraw, openStarPack } from "../app/feature-data.ts";
+import { prepareCareerMatch, recordCareerMatch } from "../app/career-data.ts";
+import { DEFAULT_FAN_MOOD, FAN_MOOD_RESULT_CHANGE, applyMatchResultToFanMood } from "../app/press-conference.ts";
+import { expectedHomeCrowd } from "../app/ticket-income.ts";
+import { FULL_COMBO_FACTOR, activeClicks, clickUpgradeReport, savingMinutes, simulateEconomy } from "../scripts/balance/economy-model.ts";
 
 function seededRandom(seed = 4242) {
   let state = seed >>> 0;
@@ -25,6 +30,31 @@ function isRound(value: number) {
 test("every pack price and every upgrade base price is a round amount", () => {
   for (const pack of STAR_PACKS) assert.ok(isRound(pack.price), `${pack.label}: ${pack.price}`);
   for (const upgrade of UPGRADES) assert.ok(isRound(upgrade.baseCost), `${upgrade.name}: ${upgrade.baseCost}`);
+});
+
+test("every upgrade level costs a round amount, never less than the level before, and bulk buys add them up", () => {
+  for (const upgrade of UPGRADES) {
+    const levels = upgrade.kind === "multiplier" ? MAX_MULTIPLIER_LEVEL : 80;
+    let previous = 0;
+    for (let level = 0; level < levels; level++) {
+      const cost = getCostAtLevel(upgrade, level);
+      assert.ok(isRound(cost), `${upgrade.name} Stufe ${level + 1}: ${cost}`);
+      assert.ok(cost >= previous, `${upgrade.name} Stufe ${level + 1} is cheaper than the level before`);
+      // Rounded to the nearest step: never more than a quarter off the exponential curve.
+      const raw = upgrade.baseCost * upgrade.scale ** level;
+      assert.ok(Math.abs(cost - raw) <= 0.25 * raw, `${upgrade.name} Stufe ${level + 1}: ${cost} for ${raw}`);
+      previous = cost;
+    }
+    // x10 and MAX charge exactly the single level prices.
+    const ten = getBulkPurchase(upgrade, { [upgrade.id]: 3 }, Number.MAX_SAFE_INTEGER, 10);
+    const expected = Array.from({ length: ten.count }, (_, index) => getCostAtLevel(upgrade, 3 + index)).reduce((sum, cost) => sum + cost, 0);
+    assert.equal(ten.totalCost, expected);
+    assert.equal(ten.count, upgrade.kind === "multiplier" ? MAX_MULTIPLIER_LEVEL - 3 : 10);
+    const budget = getCostAtLevel(upgrade, 0) + getCostAtLevel(upgrade, 1);
+    assert.deepEqual(getBulkPurchase(upgrade, {}, budget, "max"), { count: 2, totalCost: budget });
+  }
+  assert.deepEqual([12, 17.5, 26, 34, 44, 55, 69, 77, 79, 91, 1234].map(roundPrice), [10, 20, 25, 30, 40, 60, 75, 75, 80, 100, 1000]);
+  assert.equal(roundPrice(Infinity), Infinity);
 });
 
 test("income keeps growing by at least a quarter per league in the late leagues", () => {
@@ -73,6 +103,46 @@ test("the Schrott-Pack never hands out a card below an empty slot", () => {
   assert.ok(SCRAP_PACK_PLAYERS.length > 0 && SCRAP_PACK_PLAYERS.every((player) => player.rating >= 55));
   const random = seededRandom();
   for (let index = 0; index < 3000; index++) assert.ok(openStarPack("scrap", [], random).player.rating >= 55);
+});
+
+test("reward packs never hand out a card below 55 and show the odds they draw with", () => {
+  assert.equal(MIN_DRAWABLE_RATING, 55);
+  const random = seededRandom(55);
+  for (const pack of REWARD_PACKS) {
+    const odds = getRewardPackOdds(pack.id as RewardPackId);
+    // The shown rows are the rows drawn from: all at 55 or above, every row has cards, together 100%.
+    assert.ok(odds.every((row) => row.minRating >= 55 && row.players.length > 0 && row.players.every((player) => player.rating >= row.minRating && player.rating <= row.maxRating)));
+    assert.ok(Math.abs(odds.reduce((sum, row) => sum + row.chance, 0) - 1) < 1e-9);
+    for (let index = 0; index < 1500; index++) assert.ok(openStarPack(pack.id, [], random).player.rating >= 55, pack.label);
+  }
+  // The smallest pack keeps its 60% weakest row, now from 55 to 64.
+  const small = getRewardPackOdds("reward-1");
+  assert.equal(small[0].label, "Gewöhnlich 55–64");
+  assert.ok(Math.abs(small[0].chance - 0.6) < 1e-9);
+});
+
+test("every album group can be completed, Nation IN with the cards of the Schrott-Pack", () => {
+  const scrap = new Set(SCRAP_PACK_PLAYERS.map((player) => player.id));
+  const rewardBase = (player: StarXIPlayer) => !player.isCustom && player.cardType !== "icon" && player.cardType !== "legendary";
+  const drawable = (player: StarXIPlayer) => player.isCustom || scrap.has(player.id)
+    || STAR_PACKS.some((pack) => pack.id !== "scrap" && pack.odds.some((row) => row.chance > 0 && cardPackRating(player) >= row.minRating && cardPackRating(player) <= row.maxRating))
+    || (rewardBase(player) && REWARD_PACKS.some((pack) => getRewardPackOdds(pack.id as RewardPackId).some((row) => row.players.some((candidate) => candidate.id === player.id))));
+  const features = initialGameFeatures();
+  features.career.collectedIds = STAR_XI_PLAYERS.filter((player) => !player.retired && drawable(player)).map((player) => player.id);
+  const groups = getAlbumGroups(features.career);
+  for (const group of groups) assert.equal(group.collected, group.total, `${group.label}: ${group.collected} / ${group.total}`);
+  // Nation IN: exactly the 81 cards of the Schrott-Pack, so the Schrott-Pack alone completes it.
+  const india = groups.find((group) => group.id === "nation-IN")!;
+  assert.equal(india.total, SCRAP_PACK_PLAYERS.length);
+  const onlyScrap = initialGameFeatures();
+  onlyScrap.starXI.ownedIds = SCRAP_PACK_PLAYERS.map((player) => player.id);
+  const before = onlyScrap.starXI.fragments;
+  assert.equal(claimAlbumReward(onlyScrap, "nation-IN"), true);
+  assert.equal(onlyScrap.starXI.fragments, before + 500);
+  // A club that kept weaker Indian cards loses nothing: they simply no longer count.
+  const old = initialGameFeatures();
+  old.career.collectedIds = STAR_XI_PLAYERS.filter((player) => player.countryCode === "IN").map((player) => player.id);
+  assert.equal(getAlbumGroups(old.career).find((group) => group.id === "nation-IN")!.collected, SCRAP_PACK_PLAYERS.length);
 });
 
 function welcomed() {
@@ -183,6 +253,34 @@ test("album goals pay fragments once for 10, 25 and 50 different cards", () => {
   assert.equal(features.starXI.fragments, 350);
 });
 
+test("album groups also pay seconds of income in goals, once, at the income of the claim", () => {
+  const features = initialGameFeatures();
+  features.starXI.ownedIds = SCRAP_PACK_PLAYERS.map((player) => player.id);
+  const groups = getAlbumGroups({ ...features.career, collectedIds: features.starXI.ownedIds });
+  const india = groups.find((group) => group.id === "nation-IN")!, scrap = groups.find((group) => group.id === "scrap")!;
+  assert.equal(india.rewardSeconds, ALBUM_REWARD_SECONDS.nation);
+  assert.equal(getAlbumGoalReward(india, 2_000_000), 240_000_000);
+  // Nothing without income, never negative.
+  assert.equal(getAlbumGoalReward(india, 0), 0);
+  assert.equal(getAlbumGoalReward(india, -5), 0);
+  const single = claimAlbumRewards(features, "nation-IN", 1000);
+  assert.deepEqual(single, { claimed: 1, fragments: 500, goals: 120_000 });
+  assert.match(features.history.at(-1)!.detail, /\+500 Fragmente und \+120.000 Tore/);
+  assert.deepEqual(claimAlbumRewards(features, "nation-IN", 1000), { claimed: 0, fragments: 0, goals: 0 });
+  // "all" claims every other complete group: the milestones up to 50 cards and the scrap page.
+  const all = claimAlbumRewards(features, "all", 1000);
+  assert.equal(all.claimed, 4);
+  assert.equal(all.fragments, 100 + 250 + 500 + scrap.reward);
+  assert.equal(all.goals, (60 + 120 + 300 + ALBUM_REWARD_SECONDS.scrap) * 1000);
+  assert.equal(claimAlbumRewards(features, "all", 1000).claimed, 0);
+  // The old fragment-only helpers still work and pay no goals.
+  const old = initialGameFeatures();
+  old.starXI.ownedIds = SCRAP_PACK_PLAYERS.map((player) => player.id);
+  assert.equal(claimAlbumReward(old, "all"), false);
+  assert.equal(claimAlbumReward(old, "scrap"), true);
+  assert.equal(claimAllAlbumRewards(old), 4);
+});
+
 test("old per seat daily rewards merge into one world entry without an extra claim", () => {
   const now = Date.now(), today = getRewardDay(now), yesterday = getPreviousRewardDay(today), before = getPreviousRewardDay(yesterday);
   // The host claimed today on a short streak, the guest yesterday on a long one: today stays claimed, the long streak lives on.
@@ -201,4 +299,130 @@ test("old per seat daily rewards merge into one world entry without an extra cla
   assert.deepEqual(mergeDailyRewardsForWorld({ world: { day: yesterday, streak: 3 }, host: { day: today, streak: 1 } }), { world: { day: yesterday, streak: 3 } });
   assert.deepEqual(mergeDailyRewardsForWorld({}), {});
   assert.ok(getStarXIPlayer(STAR_XI_CUSTOM_PLAYERS[0].id));
+});
+
+test("mini game rewards grow with the income and keep the old amounts as the floor", () => {
+  // A new club: the fixed amounts of before.
+  assert.equal(scaleMiniGameReward("penalty", 1000, 0), 1000);
+  assert.equal(scaleMiniGameReward("dribble", 60, 5), 60);
+  // 1 Mio per second: the best run pays its seconds of income, a weaker run its share of the best run.
+  for (const id of MINI_GAME_IDS) {
+    assert.equal(getMiniGameMaxReward(id, 1_000_000), MINI_GAME_MAX_REWARD_SECONDS[id] * 1_000_000);
+    assert.equal(getMiniGameMaxReward(id, 0), MINI_GAME_BASE_MAX_REWARD[id]);
+  }
+  assert.equal(scaleMiniGameReward("penalty", 250, 1_000_000), 2_500_000);
+  assert.equal(scaleMiniGameReward("prediction", 335, 1_000_000), 15_000_000);
+  // The server cap holds every reward an honest client computes.
+  for (const id of MINI_GAME_IDS) for (const income of [0, 50, 3e4, 9e7]) {
+    for (let base = 0; base <= MINI_GAME_BASE_MAX_REWARD[id]; base += 5) assert.ok(scaleMiniGameReward(id, base, income) <= getMiniGameMaxReward(id, income));
+  }
+  // From Liga 13 on a perfect penalty run is worth ten seconds of passive income instead of under one second.
+  const liga13 = simulateEconomy().find((snapshot) => snapshot.league === 13)!.passivePerSecond;
+  assert.ok(liga13 > 1000);
+  assert.equal(getMiniGameMaxReward("penalty", liga13), Math.floor(10 * liga13));
+});
+
+test("VAR and random events hit a saving club like before: the same typical swing, no total loss", () => {
+  const random = seededRandom(31);
+  const income = 1000;
+  const vars: number[] = [], events: number[] = [];
+  for (let run = 0; run < 3000; run++) {
+    // A club meets an event with zero to eight minutes of income in the bank.
+    const goals = random() * 480 * income;
+    vars.push(resolveVarEvent(goals, income, random()).amount / income);
+    events.push(resolveRandomEvent(goals, income, random()).amount / income);
+  }
+  const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+  const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+  // Before: a typical VAR took about 70 seconds of income, a typical event gave about 4.
+  assert.ok(median(vars) <= -60 && median(vars) >= -100, `VAR median ${median(vars)}`);
+  assert.ok(mean(vars) < 0 && mean(vars) > -30, `VAR mean ${mean(vars)}`);
+  assert.ok(median(events) >= 3 && median(events) <= 6, `event median ${median(events)}`);
+  // Nothing takes more than ten minutes of income.
+  assert.ok(Math.min(...vars, ...events) >= -600);
+  // The dearest pack: the wait one run in ten exceeds stays well below the 34 minutes of the balance based VAR.
+  const legend = simulateEconomy().find((snapshot) => snapshot.league === 4)!;
+  const stats = savingMinutes(legend.incomePerSecond, STAR_PACKS.find((pack) => pack.id === "legend")!.price, legend.passivePerSecond);
+  assert.ok(stats.p90 <= 28, `Legenden P90 ${stats.p90}`);
+});
+
+function finishedMatch(home: number, away: number, now = 1_000_000, penalties?: [number, number]) {
+  let f = initialGameFeatures(now);
+  f.starXI = setBestStarXI({ ...f.starXI, ownedIds: STAR_XI_PLAYERS.filter((p) => cardPackRating(p) < 95).slice(0, 200).map((p) => p.id) });
+  f = normalizeGameFeatures(f);
+  f.cup = beginSeasonCupMatch(f.cup, f.seasonMode, now, getStarXISelection(f.starXI.ownedIds, f.starXI.lineupIds), f.starXI.formationPositions, f.starXI.lineupIds, f.starXI.benchIds);
+  prepareCareerMatch(f);
+  f.cup.homeScore = home;
+  f.cup.awayScore = away;
+  if (penalties) {
+    f.cup.penaltyHomeScore = penalties[0];
+    f.cup.penaltyAwayScore = penalties[1];
+    f.cup.penaltyEvents = [{ id: 'p1', side: 'home', taker: 'A', scored: penalties[0] > 0, homeScore: penalties[0], awayScore: penalties[1], createdAt: now } as never];
+  }
+  f.cup.active = false;
+  return f;
+}
+
+test('a result moves the fan mood: win up, draw a little, loss down, with a drift to the middle', () => {
+  assert.deepEqual(FAN_MOOD_RESULT_CHANGE, { win: 3, draw: 1, loss: -3 });
+  assert.equal(applyMatchResultToFanMood(50, 'win'), 53);
+  assert.equal(applyMatchResultToFanMood(50, 'draw'), 51);
+  assert.equal(applyMatchResultToFanMood(50, 'loss'), 47);
+  // One point back toward 50 for every full ten points away.
+  assert.equal(applyMatchResultToFanMood(60, 'win'), 62);
+  assert.equal(applyMatchResultToFanMood(95, 'draw'), 92);
+  assert.equal(applyMatchResultToFanMood(20, 'loss'), 20);
+  // Never outside 0 to 100, also from broken values.
+  assert.equal(applyMatchResultToFanMood(100, 'win'), 98);
+  assert.equal(applyMatchResultToFanMood(0, 'loss'), 2);
+  assert.equal(applyMatchResultToFanMood(Number.NaN, 'win'), DEFAULT_FAN_MOOD + 2);
+  // Long runs settle: wins around 80, losses around 20, draws a little above the middle.
+  const run = (outcome: 'win' | 'draw' | 'loss') => Array.from({ length: 60 }).reduce<number>((mood) => applyMatchResultToFanMood(mood, outcome), 50);
+  assert.ok(run('win') >= 78 && run('win') <= 82, `wins ${run('win')}`);
+  assert.ok(run('loss') >= 18 && run('loss') <= 22, `losses ${run('loss')}`);
+  assert.ok(run('draw') >= 50 && run('draw') <= 60, `draws ${run('draw')}`);
+});
+
+test('every finished match changes the fan mood exactly once', () => {
+  const win = finishedMatch(2, 0);
+  assert.equal(win.press.fanMood, DEFAULT_FAN_MOOD);
+  recordCareerMatch(win, 1_200_000);
+  assert.equal(win.press.fanMood, applyMatchResultToFanMood(DEFAULT_FAN_MOOD, 'win'));
+  // Recording the same match again, also after a reload, changes nothing.
+  recordCareerMatch(win, 1_300_000);
+  const reloaded = normalizeGameFeatures(JSON.parse(JSON.stringify(win)));
+  recordCareerMatch(reloaded, 1_400_000);
+  const restored = pauseGameFeatureTimers(JSON.parse(JSON.stringify(win)), 20_000, 1_500_000);
+  recordCareerMatch(restored, 1_600_000);
+  assert.equal(win.press.fanMood, reloaded.press.fanMood);
+  assert.equal(restored.press.fanMood, win.press.fanMood);
+
+  const draw = finishedMatch(1, 1);
+  recordCareerMatch(draw, 1_200_000);
+  assert.equal(draw.press.fanMood, applyMatchResultToFanMood(DEFAULT_FAN_MOOD, 'draw'));
+  const loss = finishedMatch(0, 3);
+  recordCareerMatch(loss, 1_200_000);
+  assert.equal(loss.press.fanMood, applyMatchResultToFanMood(DEFAULT_FAN_MOOD, 'loss'));
+  // A shoot-out decides the match for the fans.
+  const shootoutWin = finishedMatch(1, 1, 1_000_000, [5, 4]);
+  recordCareerMatch(shootoutWin, 1_200_000);
+  assert.equal(shootoutWin.press.fanMood, applyMatchResultToFanMood(DEFAULT_FAN_MOOD, 'win'));
+  const shootoutLoss = finishedMatch(1, 1, 1_000_000, [3, 4]);
+  recordCareerMatch(shootoutLoss, 1_200_000);
+  assert.equal(shootoutLoss.press.fanMood, applyMatchResultToFanMood(DEFAULT_FAN_MOOD, 'loss'));
+  // A running match changes nothing yet.
+  const running = finishedMatch(3, 0);
+  running.cup.active = true;
+  recordCareerMatch(running, 1_200_000);
+  assert.equal(running.press.fanMood, DEFAULT_FAN_MOOD);
+});
+
+test('the fan mood after a run of results fills or empties the home crowd', () => {
+  const happy = initialGameFeatures(), angry = initialGameFeatures();
+  for (let match = 0; match < 15; match++) {
+    happy.press.fanMood = applyMatchResultToFanMood(happy.press.fanMood, 'win');
+    angry.press.fanMood = applyMatchResultToFanMood(angry.press.fanMood, 'loss');
+  }
+  assert.ok(happy.press.fanMood > angry.press.fanMood + 40);
+  assert.ok(expectedHomeCrowd(happy) > expectedHomeCrowd(angry));
 });

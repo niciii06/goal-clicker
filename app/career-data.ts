@@ -1,8 +1,9 @@
 import { createInteractiveMatch } from './interactive-match';
 import { goalLabel } from './match-goals';
 import { recordedActionRating } from './match-broadcast';
-import { addHistory, getMatchScoreImpact, TRANSFER_UNHAPPY_PENALTY, transferUnhappyMatches, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, removeStarXIPlayersFromSquad, STAR_XI_ACTIVE_PLAYERS, SCRAP_PACK_PLAYERS } from './feature-data';
+import { addHistory, getMatchScoreImpact, TRANSFER_UNHAPPY_PENALTY, transferUnhappyMatches, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, removeStarXIPlayersFromSquad, MIN_DRAWABLE_RATING, STAR_XI_ACTIVE_PLAYERS, SCRAP_PACK_PLAYERS } from './feature-data';
 import { getBannedPlayerIds, nextCompetition, processMatchDiscipline, suspensionLabel } from './discipline';
+import { applyMatchResultToFanMood } from './press-conference';
 import type { CupState, GameFeatures, SeasonMatchHistoryEntry, StarPosition, StarXIPlayer } from './feature-data';
 
 /** `points`: match points of the club while this card played, by the result after 90 minutes (win 3, draw 1, loss 0). */
@@ -306,6 +307,8 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
   const old = career.rivals[key] ?? { opponent: c.opponent, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, closeGames: 0, active: false, lastResults: [], lastPlayedAt: 0 };
   const draw = c.homeScore === c.awayScore && !c.penaltyEvents.length;
   const won = c.homeScore > c.awayScore || (c.homeScore === c.awayScore && c.penaltyHomeScore > c.penaltyAwayScore);
+  // The fans react to every result once (this point runs once per match, solo and co-op): a shoot-out counts as decided.
+  features.press = { ...features.press, fanMood: applyMatchResultToFanMood(features.press.fanMood, won ? 'win' : draw ? 'draw' : 'loss') };
   // Points of every card that played, by the result after 90 minutes: win 3, draw 1, loss 0. Extra time and a
   // shoot-out only happen after a draw at 90 minutes, so such a match is a draw (1) whoever goes through.
   const decidedAfter90 = c.phase === 'extra-time' || c.phase === 'penalties' || c.penaltyEvents.length > 0;
@@ -373,38 +376,61 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
 }
 /** Old album group ids that now belong to a merged group; claiming any of them claimed the group. */
 const ALBUM_GROUP_ALIASES: Record<string, readonly string[]> = { legendary: ['custom'] };
-export type AlbumGroup = { id: string; label: string; total: number; collected: number; reward: number; claimed: boolean };
+/**
+ * Every album group pays fragments and, on top, seconds of the club's base passive income in goals
+ * (`getBasePassivePower` when it is claimed), so a completed page is worth something in every league.
+ */
+export type AlbumGroup = { id: string; label: string; total: number; collected: number; reward: number; rewardSeconds: number; claimed: boolean };
+export const ALBUM_REWARD_SECONDS = { base: 1800, scrap: 300, icons: 900, legendary: 900, nation: 120 } as const;
 export function getAlbumGroups(career: CareerState): AlbumGroup[] {
   const owned = new Set(career.collectedIds), claimed = new Set(career.claimedAlbumRewards);
   const definitions = [
-    { id:'base',label:'Alle Basiskarten',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>!p.id.startsWith('scrap-')&&!p.isCustom&&p.cardType!=='icon'&&p.cardType!=='legendary'),reward:10000 },
-    { id:'scrap',label:'Alle Schrottkarten',players:SCRAP_PACK_PLAYERS,reward:500 },
-    { id:'icons',label:'Alle Icons',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.cardType==='icon'),reward:5000 },
+    { id:'base',label:'Alle Basiskarten',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>!p.id.startsWith('scrap-')&&!p.isCustom&&p.cardType!=='icon'&&p.cardType!=='legendary'),reward:10000,rewardSeconds:ALBUM_REWARD_SECONDS.base },
+    { id:'scrap',label:'Alle Schrottkarten',players:SCRAP_PACK_PLAYERS,reward:500,rewardSeconds:ALBUM_REWARD_SECONDS.scrap },
+    { id:'icons',label:'Alle Icons',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.cardType==='icon'),reward:5000,rewardSeconds:ALBUM_REWARD_SECONDS.icons },
     // One group for the special cards: they are all custom and legendary, so "custom" and "legendary" were the same
     // ten cards paying twice. A save that claimed either old group counts as claimed (see ALBUM_GROUP_ALIASES).
-    { id:'legendary',label:'Alle legendären Karten',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.isCustom||p.cardType==='legendary'),reward:5000 },
-    ...[...new Set(STAR_XI_ACTIVE_PLAYERS.map(p=>p.countryCode).filter(Boolean))].sort().map(code=>({ id:`nation-${code}`,label:`Nation ${code}`,players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.countryCode===code),reward:500 })),
+    { id:'legendary',label:'Alle legendären Karten',players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.isCustom||p.cardType==='legendary'),reward:5000,rewardSeconds:ALBUM_REWARD_SECONDS.legendary },
+    // Cards below MIN_DRAWABLE_RATING come from no pack any more, so a nation counts only the cards a club can still draw.
+    ...[...new Set(STAR_XI_ACTIVE_PLAYERS.map(p=>p.countryCode).filter(Boolean))].sort().map(code=>({ id:`nation-${code}`,label:`Nation ${code}`,players:STAR_XI_ACTIVE_PLAYERS.filter(p=>p.countryCode===code&&p.rating>=MIN_DRAWABLE_RATING),reward:500,rewardSeconds:ALBUM_REWARD_SECONDS.nation })),
   ];
   const distinct = STAR_XI_ACTIVE_PLAYERS.filter(p=>owned.has(p.id)).length;
   // Near goals on the way to the full collections: a few different cards already pay out once.
-  const milestones = ALBUM_MILESTONES.map(m=>({id:`collect-${m.cards}`,label:`${m.cards} verschiedene Karten`,total:m.cards,collected:Math.min(m.cards,distinct),reward:m.reward,claimed:claimed.has(`collect-${m.cards}`)}));
-  return [...milestones, ...definitions.filter(d=>d.players.length).map(d=>({id:d.id,label:d.label,total:d.players.length,collected:d.players.filter(p=>owned.has(p.id)).length,reward:d.reward,claimed:claimed.has(d.id)||(ALBUM_GROUP_ALIASES[d.id]??[]).some(id=>claimed.has(id))}))];
+  const milestones = ALBUM_MILESTONES.map(m=>({id:`collect-${m.cards}`,label:`${m.cards} verschiedene Karten`,total:m.cards,collected:Math.min(m.cards,distinct),reward:m.reward,rewardSeconds:m.rewardSeconds,claimed:claimed.has(`collect-${m.cards}`)}));
+  return [...milestones, ...definitions.filter(d=>d.players.length).map(d=>({id:d.id,label:d.label,total:d.players.length,collected:d.players.filter(p=>owned.has(p.id)).length,reward:d.reward,rewardSeconds:d.rewardSeconds,claimed:claimed.has(d.id)||(ALBUM_GROUP_ALIASES[d.id]??[]).some(id=>claimed.has(id))}))];
 }
-export const ALBUM_MILESTONES = [{ cards:10, reward:100 }, { cards:25, reward:250 }, { cards:50, reward:500 }] as const;
-export function claimAlbumReward(features: GameFeatures, groupId: string) {
+export const ALBUM_MILESTONES = [{ cards:10, reward:100, rewardSeconds:60 }, { cards:25, reward:250, rewardSeconds:120 }, { cards:50, reward:500, rewardSeconds:300 }] as const;
+
+/** Goals an album group pays at `passivePerSecond` (the club's base passive income). */
+export function getAlbumGoalReward(group: Pick<AlbumGroup, 'rewardSeconds'>, passivePerSecond: number) {
+  return Math.floor(group.rewardSeconds * (Number.isFinite(passivePerSecond) ? Math.max(0, passivePerSecond) : 0));
+}
+
+export type AlbumClaim = { claimed: number; fragments: number; goals: number };
+/**
+ * Claims one album group, or every complete one with `"all"`. Fragments go to the club here; the goals
+ * (`getAlbumGoalReward` at `passivePerSecond`) are returned for the caller to add to the balance.
+ */
+export function claimAlbumRewards(features: GameFeatures, groupId: string, passivePerSecond = 0): AlbumClaim {
   features.career.collectedIds = [...new Set([...features.career.collectedIds,...features.starXI.ownedIds])];
-  const group = getAlbumGroups(features.career).find(g=>g.id===groupId);
-  if (!group || group.claimed || group.collected < group.total) return false;
-  features.career.claimedAlbumRewards.push(group.id); features.starXI.fragments += group.reward;
-  addHistory(features,{title:group.id.startsWith('collect-')?`Sammelalbum: ${group.label}`:`Sammelalbum: ${group.label} komplett`,detail:`+${group.reward} Fragmente. Einmalige Sammlungsprämie.`,tone:'positive'});
-  return true;
+  const groups = getAlbumGroups(features.career).filter(group => (groupId === 'all' || group.id === groupId) && !group.claimed && group.collected >= group.total);
+  const result: AlbumClaim = { claimed: 0, fragments: 0, goals: 0 };
+  for (const group of groups) {
+    const goals = getAlbumGoalReward(group, passivePerSecond);
+    features.career.claimedAlbumRewards.push(group.id); features.starXI.fragments += group.reward;
+    addHistory(features,{title:group.id.startsWith('collect-')?`Sammelalbum: ${group.label}`:`Sammelalbum: ${group.label} komplett`,detail:`+${group.reward} Fragmente${goals > 0 ? ` und +${goals.toLocaleString('de-CH')} Tore` : ''}. Einmalige Sammlungsprämie.`,tone:'positive'});
+    result.claimed += 1; result.fragments += group.reward; result.goals += goals;
+  }
+  return result;
+}
+
+/** Fragments only; see claimAlbumRewards for the goals. */
+export function claimAlbumReward(features: GameFeatures, groupId: string) {
+  return groupId !== 'all' && claimAlbumRewards(features, groupId).claimed > 0;
 }
 
 export function claimAllAlbumRewards(features: GameFeatures) {
-  features.career.collectedIds = [...new Set([...features.career.collectedIds, ...features.starXI.ownedIds])];
-  const available = getAlbumGroups(features.career).filter(group => !group.claimed && group.collected === group.total);
-  for (const group of available) claimAlbumReward(features, group.id);
-  return available.length;
+  return claimAlbumRewards(features, 'all').claimed;
 }
 
 /**
