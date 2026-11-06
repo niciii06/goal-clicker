@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { UPGRADES } from "../app/game/upgrades.ts";
-import { CLICK_PASSIVE_SHARE_CAP } from "../app/game/constants.ts";
-import { getBaseClickPower, getBasePassivePower, getClickPassiveShare } from "../app/game/economy.ts";
+import { CLICK_PASSIVE_SHARE_CAP, MINI_GAME_IDS } from "../app/game/constants.ts";
+import { MINI_GAME_BASE_MAX_REWARD, MINI_GAME_MAX_REWARD_SECONDS, getBaseClickPower, getBasePassivePower, getClickPassiveShare, getMiniGameMaxReward, scaleMiniGameReward } from "../app/game/economy.ts";
 import { ALBUM_MILESTONES, claimAlbumReward, getAlbumGroups } from "../app/career-data.ts";
 import { DAILY_REWARD_DAYS, WORLD_DAILY_KEY, claimDailyReward, getDailyRewardStatus, getPreviousRewardDay, getRewardDay, mergeDailyRewardsForWorld } from "../app/daily-reward.ts";
-import { MATCH_PACK_STAMP_TARGET, cardPackRating, SCRAP_PACK_PLAYERS, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STARTER_SQUAD_UNLOCK_CLICKS, awardMatchStamp, canStarXIPlayerFillSlot, getSeasonOpponentRating, getStarXIPlayer, grantWelcomePack, initialGameFeatures, maybeGrantStarterSquad, normalizeGameFeatures, openEarnedPack, openEarnedPackDraw, openStarPack } from "../app/feature-data.ts";
-import { FULL_COMBO_FACTOR, activeClicks, clickUpgradeReport, simulateEconomy } from "../scripts/balance/economy-model.ts";
+import { MATCH_PACK_STAMP_TARGET, cardPackRating, resolveRandomEvent, resolveVarEvent, SCRAP_PACK_PLAYERS, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STARTER_SQUAD_UNLOCK_CLICKS, awardMatchStamp, canStarXIPlayerFillSlot, getSeasonOpponentRating, getStarXIPlayer, grantWelcomePack, initialGameFeatures, maybeGrantStarterSquad, normalizeGameFeatures, openEarnedPack, openEarnedPackDraw, openStarPack } from "../app/feature-data.ts";
+import { FULL_COMBO_FACTOR, activeClicks, clickUpgradeReport, savingMinutes, simulateEconomy } from "../scripts/balance/economy-model.ts";
 
 function seededRandom(seed = 4242) {
   let state = seed >>> 0;
@@ -201,4 +201,49 @@ test("old per seat daily rewards merge into one world entry without an extra cla
   assert.deepEqual(mergeDailyRewardsForWorld({ world: { day: yesterday, streak: 3 }, host: { day: today, streak: 1 } }), { world: { day: yesterday, streak: 3 } });
   assert.deepEqual(mergeDailyRewardsForWorld({}), {});
   assert.ok(getStarXIPlayer(STAR_XI_CUSTOM_PLAYERS[0].id));
+});
+
+test("mini game rewards grow with the income and keep the old amounts as the floor", () => {
+  // A new club: the fixed amounts of before.
+  assert.equal(scaleMiniGameReward("penalty", 1000, 0), 1000);
+  assert.equal(scaleMiniGameReward("dribble", 60, 5), 60);
+  // 1 Mio per second: the best run pays its seconds of income, a weaker run its share of the best run.
+  for (const id of MINI_GAME_IDS) {
+    assert.equal(getMiniGameMaxReward(id, 1_000_000), MINI_GAME_MAX_REWARD_SECONDS[id] * 1_000_000);
+    assert.equal(getMiniGameMaxReward(id, 0), MINI_GAME_BASE_MAX_REWARD[id]);
+  }
+  assert.equal(scaleMiniGameReward("penalty", 250, 1_000_000), 2_500_000);
+  assert.equal(scaleMiniGameReward("prediction", 335, 1_000_000), 15_000_000);
+  // The server cap holds every reward an honest client computes.
+  for (const id of MINI_GAME_IDS) for (const income of [0, 50, 3e4, 9e7]) {
+    for (let base = 0; base <= MINI_GAME_BASE_MAX_REWARD[id]; base += 5) assert.ok(scaleMiniGameReward(id, base, income) <= getMiniGameMaxReward(id, income));
+  }
+  // From Liga 13 on a perfect penalty run is worth ten seconds of passive income instead of under one second.
+  const liga13 = simulateEconomy().find((snapshot) => snapshot.league === 13)!.passivePerSecond;
+  assert.ok(liga13 > 1000);
+  assert.equal(getMiniGameMaxReward("penalty", liga13), Math.floor(10 * liga13));
+});
+
+test("VAR and random events hit a saving club like before: the same typical swing, no total loss", () => {
+  const random = seededRandom(31);
+  const income = 1000;
+  const vars: number[] = [], events: number[] = [];
+  for (let run = 0; run < 3000; run++) {
+    // A club meets an event with zero to eight minutes of income in the bank.
+    const goals = random() * 480 * income;
+    vars.push(resolveVarEvent(goals, income, random()).amount / income);
+    events.push(resolveRandomEvent(goals, income, random()).amount / income);
+  }
+  const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+  const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+  // Before: a typical VAR took about 70 seconds of income, a typical event gave about 4.
+  assert.ok(median(vars) <= -60 && median(vars) >= -100, `VAR median ${median(vars)}`);
+  assert.ok(mean(vars) < 0 && mean(vars) > -30, `VAR mean ${mean(vars)}`);
+  assert.ok(median(events) >= 3 && median(events) <= 6, `event median ${median(events)}`);
+  // Nothing takes more than ten minutes of income.
+  assert.ok(Math.min(...vars, ...events) >= -600);
+  // The dearest pack: the wait one run in ten exceeds stays well below the 34 minutes of the balance based VAR.
+  const legend = simulateEconomy().find((snapshot) => snapshot.league === 4)!;
+  const stats = savingMinutes(legend.incomePerSecond, STAR_PACKS.find((pack) => pack.id === "legend")!.price, legend.passivePerSecond);
+  assert.ok(stats.p90 <= 28, `Legenden P90 ${stats.p90}`);
 });

@@ -46,7 +46,7 @@ import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "./
 import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
 import { consumeTravel, eligibilityError, fixtureFor, journeyView, payTravelFines, settleTravel, travelTiming } from "./travel-data";
 import { COOP_UPDATE_REQUIRED_EVENT, coopRetryDelay, coopRoleLabel, createCoopGameNormalizer, isCoopRole, multiplayerUrl, newCoopActionId, notifyCoopOffline, occupiedCoopPlayers, readCoopResponse, reloadForUpdate, upsertSavedRoom } from "./game/coop";
-import { capGoalsAfterRebalance, createClickResult, decayComboCount, formatComboMultiplier, getBaseClickPower, getBasePassivePower, getBulkPurchase, getClickPower, getComboLevel, getComboProgress, getCost, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades } from "./game/economy";
+import { capGoalsAfterRebalance, createClickResult, decayComboCount, formatComboMultiplier, getBaseClickPower, getBasePassivePower, getBulkPurchase, getClickPower, getComboLevel, getComboProgress, getCost, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades, scaleMiniGameReward } from "./game/economy";
 import { UPGRADES } from "./game/upgrades";
 import { applyGamePrestige } from "./game/prestige";
 import { TransferOfferActions } from "./transfer-offer-actions";
@@ -1500,7 +1500,7 @@ function App() {
   function triggerRandomEvent() {
     if (gameRef.current.features.squadLock || eventLockRef.current || gameRef.current.features.nextEventAt > getCurrentTime()) return;
     eventLockRef.current = true;
-    const event = resolveRandomEvent(gameRef.current.goals);
+    const event = resolveRandomEvent(gameRef.current.goals, getBasePassivePower(gameRef.current.upgrades, gameRef.current.stars, gameRef.current.features));
     applyLocalEvent(event);
     window.setTimeout(() => { eventLockRef.current = false; }, 1200);
   }
@@ -1508,7 +1508,7 @@ function App() {
   function triggerVarEvent() {
     if (gameRef.current.features.squadLock || eventLockRef.current || gameRef.current.features.nextVarAt > getCurrentTime()) return;
     eventLockRef.current = true;
-    const event = resolveVarEvent(gameRef.current.goals);
+    const event = resolveVarEvent(gameRef.current.goals, getBasePassivePower(gameRef.current.upgrades, gameRef.current.stars, gameRef.current.features));
     applyLocalEvent(event);
     window.setTimeout(() => { eventLockRef.current = false; }, 1200);
   }
@@ -2386,6 +2386,11 @@ function App() {
     if ((event.key === "Enter" || event.key === " ") && event.repeat) event.preventDefault();
   }
 
+  /** A mini game reward at the club's current income (fixed amounts are the floor). */
+  function miniGameReward(id: MiniGameId, baseReward: number) {
+    return scaleMiniGameReward(id, baseReward, getBasePassivePower(displayGame.upgrades, displayGame.stars, displayGame.features));
+  }
+
   function awardMiniGame(reward: number, name: string, id: MiniGameId, icon: IconName = "star") {
     const safeReward = Math.max(0, Math.floor(reward));
     const celebrate = () => {
@@ -2433,7 +2438,7 @@ function App() {
     const shots = penaltyGame.shots + 1;
     const goals = penaltyGame.goals + (scored ? 1 : 0);
     if (shots >= 5) {
-      const reward = 250 + goals * 150;
+      const reward = miniGameReward("penalty", 250 + goals * 150);
       setPenaltyGame({ shots, goals, message: `${goals} von 5 Elfmetern drin. ${formatNumber(reward)} Tore Prämie.`, finished: true, reward });
       awardMiniGame(reward, `Penalty Challenge ${goals}/5`, "penalty", scored ? "ball" : "screen");
       return;
@@ -2461,13 +2466,13 @@ function App() {
     const attempts = dribbleGame.attempts + 1;
     const misses = dribbleGame.misses + (correct ? 0 : 1);
     if (correct && step >= dribbleGame.sequence.length) {
-      const reward = 220 + Math.max(0, 3 - misses) * 45;
+      const reward = miniGameReward("dribble", 220 + Math.max(0, 3 - misses) * 45);
       setDribbleGame({ ...dribbleGame, step, attempts, misses, message: `Perfekte Ballführung in ${attempts} Moves.`, finished: true, reward });
       awardMiniGame(reward, "Dribble Run", "dribble", "striker");
       return;
     }
     if (!correct && misses >= 3) {
-      const reward = 60 + dribbleGame.step * 15;
+      const reward = miniGameReward("dribble", 60 + dribbleGame.step * 15);
       setDribbleGame({ ...dribbleGame, step, attempts, misses, message: `Dreimal den Ball verloren. ${formatNumber(reward)} Tore Trostpreis.`, finished: true, reward });
       awardMiniGame(reward, "Dribble Run", "dribble", "boot");
       return;
@@ -2493,7 +2498,7 @@ function App() {
     const shots = crossbarGame.shots + 1;
     const hits = crossbarGame.hits + (hit ? 1 : 0);
     if (shots >= 5) {
-      const reward = 50 + hits * 45;
+      const reward = miniGameReward("crossbar", 50 + hits * 45);
       setCrossbarGame({ shots, hits, message: `${hits} von 5 Latten getroffen. ${formatNumber(reward)} Tore Prämie.`, finished: true, reward });
       awardMiniGame(reward, `Latten Challenge ${hits}/5`, "crossbar", hit ? "star" : "screen");
       return;
@@ -2518,7 +2523,7 @@ function App() {
     const round = predictionGame.round + 1;
     const wins = predictionGame.wins + (prediction === outcome ? 1 : 0);
     if (round >= 3) {
-      const reward = 70 + wins * 55 + (wins === 3 ? 100 : 0);
+      const reward = miniGameReward("prediction", 70 + wins * 55 + (wins === 3 ? 100 : 0));
       setPredictionGame({ round, wins, message: `${wins} von 3 Tipps richtig. ${formatNumber(reward)} Tore Prämie.`, finished: true, reward });
       awardMiniGame(reward, `Matchday Tipp ${wins}/3`, "prediction", "broadcast");
       return;

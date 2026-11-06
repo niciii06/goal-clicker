@@ -19,7 +19,7 @@ import { calculateBulkUpgradePurchase } from "../../upgrade-purchase";
 import { MAX_MULTIPLAYER_BODY_BYTES, readJsonBody, refuseUnsafePost, RequestBodyTooLargeError } from "../request-body";
 import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "../../daily-reward";
 import { ACHIEVEMENTS, BALANCE_VERSION, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_IDS } from "../../game/constants";
-import { capGoalsAfterRebalance, getBaseClickPower, getBasePassivePower, getClickPower, getCost, getLevel, getPassiveIncomePower } from "../../game/economy";
+import { capGoalsAfterRebalance, getBaseClickPower, getBasePassivePower, getClickPower, getCost, getLevel, getMiniGameMaxReward, getPassiveIncomePower } from "../../game/economy";
 import { getUpgrade } from "../../game/upgrades";
 import { applyGamePrestige } from "../../game/prestige";
 import { getTicketIncome, recordTicketIncome } from "../../ticket-income";
@@ -31,8 +31,6 @@ import { rateLimited } from "../rate-limit";
 const MAX_NAME_LENGTH = 18;
 const MAX_ROOM_NAME_LENGTH = 28;
 const MAX_PLAYER_ID_LENGTH = 80;
-// Highest reward each client minigame can legitimately produce (see awardMiniGame callers in app/page.tsx).
-const MINI_GAME_MAX_REWARD: Record<string, number> = { penalty: 1000, dribble: 355, crossbar: 275, prediction: 335 };
 // A mini game takes several taps; a reward claimed within a second of the start, or long after it, was not played.
 const MINI_GAME_MIN_RUN_MS = 1000;
 const MINI_GAME_MAX_RUN_MS = 30 * 60 * 1000;
@@ -1049,7 +1047,7 @@ async function handlePost(request: Request) {
     if (action === "event") {
       if (game.features.squadLock) return unchanged();
       if (game.features.nextEventAt > Date.now()) return unchanged();
-      const event = resolveRandomEvent(game.goals);
+      const event = resolveRandomEvent(game.goals, getBasePassivePower(game.upgrades, game.stars, game.features));
       game.goals = Math.max(0, game.goals + event.amount);
       game.seasonGoals = Math.max(0, game.seasonGoals + event.amount);
       game.totalGoals = Math.max(0, game.totalGoals + Math.max(0, event.amount));
@@ -1062,7 +1060,7 @@ async function handlePost(request: Request) {
     if (action === "var-event") {
       if (game.features.squadLock) return unchanged();
       if (game.features.nextVarAt > Date.now()) return unchanged();
-      const event = resolveVarEvent(game.goals);
+      const event = resolveVarEvent(game.goals, getBasePassivePower(game.upgrades, game.stars, game.features));
       game.goals = Math.max(0, game.goals + event.amount);
       game.seasonGoals = Math.max(0, game.seasonGoals + event.amount);
       game.totalGoals = Math.max(0, game.totalGoals + Math.max(0, event.amount));
@@ -1442,7 +1440,8 @@ async function handlePost(request: Request) {
       const { [runKey]: _finished, ...openRuns } = game.features.miniGameRuns ?? {};
       void _finished;
       game.features.miniGameRuns = openRuns;
-      const reward = Math.max(0, Math.min(MINI_GAME_MAX_REWARD[minigameId] ?? 0, Math.floor(finite(payload.reward))));
+      // Highest reward the client can legitimately compute: the best run at the world's income (see miniGameReward in app/page.tsx).
+      const reward = Math.max(0, Math.min(getMiniGameMaxReward(minigameId, getBasePassivePower(game.upgrades, game.stars, game.features)), Math.floor(finite(payload.reward))));
       game.goals += reward;
       game.seasonGoals += reward;
       game.totalGoals += reward;

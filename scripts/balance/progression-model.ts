@@ -2,7 +2,7 @@
 // VAR and the random events while the team travels and plays. Card ratings stand in for the squad: the best
 // eleven ratings (an empty slot counts 55) against the opponents of the league decide promotion.
 import { UPGRADES } from "../../app/game/upgrades";
-import { getCostAtLevel } from "../../app/game/economy";
+import { getBasePassivePower, getCostAtLevel } from "../../app/game/economy";
 import { getPackUnlockLeague, getTournamentUnlockLeague, getUpgradeUnlockLeague, LEAGUE_COUNT } from "../../app/season-progression";
 import { MATCH_PACK_STAMP_TARGET, STAR_PACKS, getSeasonOpponentRating, getTournamentRewardPack, openEarnedPackDraw, resolveRandomEvent, resolveVarEvent } from "../../app/feature-data";
 import type { StarPackDefinition, TournamentId } from "../../app/feature-data";
@@ -89,8 +89,8 @@ export function simulateCareer({ clicksPerSecond = 0, seed = 1, maxHours = 30 }:
         dailyIndex += 1;
         nextDaily = second + PLAY_MINUTES_PER_DAY * 60;
       }
-      if (events && second >= nextVar) { goals = Math.max(0, goals + resolveVarEvent(goals, random()).amount); nextVar = second + 60 + random() * 120; }
-      if (events && second >= nextEvent) { goals = Math.max(0, goals + resolveRandomEvent(goals, random()).amount); nextEvent = second + 60 + random() * 120; }
+      if (events && second >= nextVar) { goals = Math.max(0, goals + resolveVarEvent(goals, getBasePassivePower(levels), random()).amount); nextVar = second + 60 + random() * 120; }
+      if (events && second >= nextEvent) { goals = Math.max(0, goals + resolveRandomEvent(goals, getBasePassivePower(levels), random()).amount); nextEvent = second + 60 + random() * 120; }
       if (!events) { nextVar = Math.max(nextVar, second + 1); nextEvent = Math.max(nextEvent, second + 1); }
       if (index % 15 === 0) spend();
     }
