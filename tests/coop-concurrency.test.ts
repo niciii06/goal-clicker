@@ -52,7 +52,9 @@ installLightRoomMocks(GoalClickerDatabase);
 
 const HOST = 'host-player-123', GUEST = 'guest-player-123';
 function setup(features = initialGameFeatures(), extra: Partial<RoomRow> = {}) {
-  const iso = new Date().toISOString();
+  // Date.now, not `new Date()`: tests mock Date.now, and the stored timestamps must be on that clock. A real-clock
+  // lastPassiveAt a millisecond after the mocked one made the first booked interval a little shorter.
+  const iso = new Date(Date.now()).toISOString();
   const defaults = Object.fromEntries(Object.entries(getTableColumns(coopRooms)).map(([key, column]) => [key, column.default ?? null]));
   // Stored as the server stores it (normalised), so an unchanged game really serialises to the same text.
   row = { ...defaults, code: 'CONCUR', hostPlayerId: HOST, hostName: 'Nicolas', guestPlayerId: GUEST, guestName: 'Silvan', hostLastSeenAt: iso, guestLastSeenAt: iso, lastPassiveAt: iso, updatedAt: iso, sharedCoins: 1_000_000, sharedTotalGoals: 1_000_000, sharedSeasonGoals: 1_000_000, sharedFeaturesJson: JSON.stringify(normalizeGameFeatures(features)), ...extra } as RoomRow;
