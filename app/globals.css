@@ -2325,6 +2325,13 @@ button { font: inherit; }
 .prestige-choices span { color: var(--text); font-weight: 750; }
 .prestige-choices small { grid-column: 3; color: var(--soft); }
 .prestige-error { margin-top: 12px !important; color: var(--danger, #c0392b) !important; font-weight: 750; }
+.prestige-vote-note, .prestige-vote-timer { margin-top: 12px !important; font-weight: 650; }
+.coop-members { display: grid; gap: 8px; }
+.coop-members ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.coop-members li { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.coop-members li > span { display: grid; min-width: 0; overflow-wrap: anywhere; }
+.coop-members small { color: var(--soft); font-size: var(--text-footnote); }
+.coop-members > button { justify-self: start; }
 @media (max-width: 540px) {
   .header-prestige { padding-left: 7px; }
   .header-prestige-long { display: none; }

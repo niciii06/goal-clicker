@@ -37,7 +37,14 @@ export type CoopRoom = {
     occupied: boolean;
     goals: number;
     clicks: number;
+    /** Last activity in ms (rounded to minutes); older servers and cached rooms leave it out. */
+    lastActiveAt?: number | null;
+    /** Inactive for `inactiveDays` or more: the host may remove the member without a second confirmation. */
+    inactive?: boolean;
   }>;
+  inactiveDays?: number;
+  prestigeVote?: CoopPrestigeVote | null;
+  prestigeVoteResult?: CoopPrestigeVoteResult | null;
   viewerRole?: CoopRole;
   canDelete?: boolean;
   sharedCoins: number;
@@ -54,9 +61,28 @@ export type CoopRoom = {
   game: GameState;
 };
 
+/** An open Prestige vote of a co-op world, as the viewer sees it (roles and names, no player IDs). */
+export type CoopPrestigeVote = {
+  id: string;
+  proposerRole: CoopRole | null;
+  proposerName: string;
+  keepNormalId: string | null;
+  keepName: string | null;
+  prestigeCount: number;
+  expiresAt: number;
+  expiresInMs: number;
+  approvedRoles: CoopRole[];
+  waitingRoles: CoopRole[];
+  viewerIsProposer: boolean;
+  viewerMustVote: boolean;
+  viewerApproved: boolean;
+};
+export type CoopPrestigeVoteOutcome = "approved" | "declined" | "cancelled" | "expired" | "failed";
+export type CoopPrestigeVoteResult = { id: string; outcome: CoopPrestigeVoteOutcome; by?: string; reason?: string; prestigeCount: number; at: number; ageMs: number };
+
 export type CoopSession = { code: string; role: CoopRole; playerId: string; room: CoopRoom };
 
-export type CoopApiResponse = { room?: CoopRoom; rooms?: CoopRoom[]; role?: CoopRole; deleted?: boolean; error?: string; errorCode?: string; packReveal?: StarPackReveal; dailyReward?: { amount: number; dayIndex: number; streak: number; pack: boolean }; starterSquad?: { added: number; complete: boolean }; press?: { reward: number; mood: number; fanMood: number } };
+export type CoopApiResponse = { room?: CoopRoom; rooms?: CoopRoom[]; role?: CoopRole; deleted?: boolean; error?: string; errorCode?: string; packReveal?: StarPackReveal; dailyReward?: { amount: number; dayIndex: number; streak: number; pack: boolean }; starterSquad?: { added: number; complete: boolean }; press?: { reward: number; mood: number; fanMood: number }; prestigeVote?: "pending"; prestigeVoteResult?: CoopPrestigeVoteOutcome; left?: CoopRole; newHost?: CoopRole | null; duplicate?: boolean };
 
 export type UpgradeDefinition = {
   id: string;

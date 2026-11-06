@@ -10,6 +10,8 @@ import { SEASON_MODE_DIVISION_COUNT, STAR_XI_PLAYERS, getPrestigeKeepCandidates,
 import type { GameFeatures } from '../app/feature-data.ts';
 import { MULTIPLAYER_PROTOCOL_VERSION } from '../app/multiplayer-protocol.ts';
 import { leaderboardEntry } from '../app/leaderboard-api.ts';
+import { coopLastActiveLabel, prestigeVoteMessage } from '../app/game/coop.ts';
+import { PRESTIGE_VOTE_SECONDS, prestigeVoteSecondsLeft } from '../app/prestige-dialog.tsx';
 import { installLightRoomMocks } from './helpers/light-room-mock.ts';
 
 const { GoalClickerDatabase } = await import('../db/index.ts');
@@ -398,4 +400,21 @@ test('a vote whose proposer leaves is cancelled, and a Prestige that became impo
   assert.equal(failed.data.prestigeVoteResult, 'failed');
   assert.equal(features().seasonMode.prestigeCount, 0);
   assert.equal(clickState()._prestigeVote, undefined);
+});
+
+test('the client texts: last activity of a member, the end of a vote, the seconds left; the vote window matches the server', () => {
+  const now = Date.parse('2026-11-06T12:00:00.000Z');
+  assert.equal(coopLastActiveLabel({ occupied: true, online: true, lastActiveAt: now }, now), 'online');
+  assert.equal(coopLastActiveLabel({ occupied: true, online: false, lastActiveAt: now - 3 * 60 * 60_000 }, now), 'heute aktiv');
+  assert.equal(coopLastActiveLabel({ occupied: true, online: false, lastActiveAt: now - DAY - 1 }, now), 'vor 1 Tag aktiv');
+  assert.equal(coopLastActiveLabel({ occupied: true, online: false, lastActiveAt: now - 9 * DAY }, now), 'vor 9 Tagen aktiv');
+  assert.equal(coopLastActiveLabel({ occupied: false, online: false, lastActiveAt: null }, now), '');
+  assert.match(prestigeVoteMessage({ outcome: 'approved', prestigeCount: 1 }), /Prestige 2 ist gestartet/);
+  assert.match(prestigeVoteMessage({ outcome: 'declined', by: 'Lara', prestigeCount: 0 }), /^Lara hat Prestige abgelehnt/);
+  assert.match(prestigeVoteMessage({ outcome: 'expired', prestigeCount: 0 }), /abgelaufen/);
+  assert.match(prestigeVoteMessage({ outcome: 'failed', reason: 'Eine laufende Partie.', prestigeCount: 0 }), /laufende Partie/);
+  for (const outcome of ['approved', 'declined', 'cancelled', 'expired', 'failed']) assert.doesNotMatch(prestigeVoteMessage({ outcome, prestigeCount: 0 }), /[ß–—]/);
+  assert.equal(PRESTIGE_VOTE_SECONDS * 1000, PRESTIGE_VOTE_MS);
+  assert.equal(prestigeVoteSecondsLeft({ expiresAt: now + 59_100 }, now), 60);
+  assert.equal(prestigeVoteSecondsLeft({ expiresAt: now - 5 }, now), 0);
 });
