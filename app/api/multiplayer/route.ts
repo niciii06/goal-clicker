@@ -6,7 +6,7 @@ import { requestMatchEdit, confirmMatchDraft } from '../../match-commands';
 import type { MatchDraft } from '../../match-commands';
 import { fixtureFor, travelGate, consumeTravel, eligibilityError, payTravelFines, settleTravel } from '../../travel-data';
 import { claimAllAlbumRewards, claimAlbumReward, prepareCareerMatch, recordCareerMatch } from "../../career-data";
-import { competitionFor, getBannedPlayerIds, nextCompetition, squadBanError } from "../../discipline";
+import { banCause, competitionFor, getBannedPlayerIds, nextCompetition, squadBanError } from "../../discipline";
 import { getDb } from "../../../db";
 import { nameRecoveryAllowed, resolvePlayer } from "../../auth/player";
 import type { LightRoomRow, RoomRow, RoomSeats, RoomUpdate } from "../../../db";
@@ -291,10 +291,10 @@ function recordMultiplayerSeasonMatch(game: CoopGameState, now: number) {
   game.features.seasonMode = result.state;
   game.features.seasonMode.table = game.features.seasonMode.table.map((team) => team.id === "club" ? { ...team, name: game.features.club.name } : team);
   awardMatchStamp(game.features, now);
-  game.features = finishActiveTransferLoans(game.features, now).features;
+  game.features = finishActiveTransferLoans(game.features, now, { hallOfFameReached: result.entry.seasonOutcome === "hall-of-fame" }).features;
   game.seasons = Math.max(game.seasons, result.state.highestDivision - 1);
-  if (result.entry.seasonOutcome === "promoted") game.stars = Math.min(MAX_SEASON_STARS, game.stars + 1);
-  if (result.entry.seasonOutcome === "hall-of-fame") game.stars = Math.min(MAX_SEASON_STARS, game.stars + 2);
+  // Stars only for a league never reached before (getSeasonStarReward), never for promotion after relegation.
+  game.stars = Math.min(MAX_SEASON_STARS, game.stars + result.starReward);
   const outcomeLabel = result.entry.seasonOutcome === "promoted" ? "Aufstieg" : result.entry.seasonOutcome === "relegated" ? "Abstieg" : result.entry.seasonOutcome === "hall-of-fame" ? "Hall of Fame" : result.entry.completedSeason ? "Klassenerhalt" : result.entry.outcome === "win" ? "Sieg" : result.entry.outcome === "loss" ? "Niederlage" : "Remis";
   addHistory(game.features, { title: `Saisonspiel · ${outcomeLabel}`, detail: result.state.lastResult, tone: result.entry.seasonOutcome === "relegated" || result.entry.outcome === "loss" ? "negative" : result.entry.outcome === "win" || result.entry.seasonOutcome === "promoted" || result.entry.seasonOutcome === "hall-of-fame" ? "positive" : "neutral" });
 }
@@ -1138,7 +1138,7 @@ async function handlePost(request: Request) {
       if (!starPlayer || !game.features.starXI.ownedIds.includes(starPlayerId)) return jsonError("Dieser Spieler gehört noch nicht zum Kader.", 409);
       if (game.features.transferSaga.loans.some((loan) => loan.playerId === starPlayerId)) return jsonError(`${starPlayer.name} ist ausgeliehen und aktuell nicht im Team.`, 409);
       if (game.features.cup.suspendedPlayerIds.includes(starPlayerId)) return jsonError(`${starPlayer.name} ist nach der Roten Karte für die nächste Partie gesperrt.`, 409);
-      if (!game.features.starXI.lineupIds.includes(starPlayerId) && !game.features.starXI.benchIds.includes(starPlayerId) && getBannedPlayerIds(game.features, nextCompetition(game.features)).includes(starPlayerId)) return jsonError(`${starPlayer.name} ist nach Gelben Karten für das nächste Spiel gesperrt.`, 409);
+      if (!game.features.starXI.lineupIds.includes(starPlayerId) && !game.features.starXI.benchIds.includes(starPlayerId) && getBannedPlayerIds(game.features, nextCompetition(game.features)).includes(starPlayerId)) return jsonError(`${starPlayer.name} ist ${banCause(game.features, nextCompetition(game.features), [starPlayerId])} für das nächste Spiel gesperrt.`, 409);
       if (!canStarXIPlayerFillSlot(starPlayerId, lineupIndex, game.features.starXI.formationPositions)) return jsonError(`${starPlayer.name} kann auf dieser Position nicht spielen.`, 409);
       const comesFromBench = game.features.starXI.benchIds.includes(starPlayerId);
       if (game.features.cup.active && !comesFromBench) return jsonError("Im laufenden Spiel darf nur von der Bank gewechselt werden.", 409);
@@ -1180,7 +1180,7 @@ async function handlePost(request: Request) {
       if (!starPlayer || !game.features.starXI.ownedIds.includes(starPlayerId) || game.features.starXI.lineupIds.includes(starPlayerId)) return jsonError("Dieser Spieler kann nicht auf die Bank verschoben werden.", 409);
       if (game.features.transferSaga.loans.some((loan) => loan.playerId === starPlayerId)) return jsonError(`${starPlayer.name} ist ausgeliehen und aktuell nicht im Team.`, 409);
       if (game.features.cup.suspendedPlayerIds.includes(starPlayerId)) return jsonError(`${starPlayer.name} darf nach einer Roten Karte nicht auf die Bank.`, 409);
-      if (!game.features.starXI.lineupIds.includes(starPlayerId) && !game.features.starXI.benchIds.includes(starPlayerId) && getBannedPlayerIds(game.features, nextCompetition(game.features)).includes(starPlayerId)) return jsonError(`${starPlayer.name} ist nach Gelben Karten für das nächste Spiel gesperrt.`, 409);
+      if (!game.features.starXI.lineupIds.includes(starPlayerId) && !game.features.starXI.benchIds.includes(starPlayerId) && getBannedPlayerIds(game.features, nextCompetition(game.features)).includes(starPlayerId)) return jsonError(`${starPlayer.name} ist ${banCause(game.features, nextCompetition(game.features), [starPlayerId])} für das nächste Spiel gesperrt.`, 409);
       if (game.features.cup.active) return jsonError("Während des Spiels kann die Bank nicht neu zusammengestellt werden.", 409);
       game.features.starXI = setStarXIBenchPlayer(game.features.starXI, benchIndex, starPlayerId, getUnavailableStarXIPlayerIds(game.features));
       addHistory(game.features, { title: "Bank umgestellt", detail: `${starPlayer.name} sitzt jetzt auf Bankplatz ${benchIndex + 1}.`, tone: "neutral" });

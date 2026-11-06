@@ -1,12 +1,16 @@
-# Goal Clicker hosten: Netlify, Neon und Login
+# Goal Clicker hosten: ChatGPT Sites, Neon und Login
 
-Die App ist eine normale Next.js 16 Anwendung auf Node.js 24. Netlify baut sie mit `next build` und dem Next.js Adapter (`@netlify/plugin-nextjs`). Die Daten liegen in PostgreSQL bei Neon, angemeldet wird über Neon Auth mit Google oder mit Benutzername und Passwort (ohne Mails). Ohne Login startet das Spiel nicht; jedes Konto hat ein Profil mit eindeutigem Benutzernamen, und der Einzelspieler Spielstand liegt im Profil (gleich auf allen Geräten).
+**Produktion (Stand 6. November 2026, Aussage des Besitzers):** Die Live Seite läuft **nur auf ChatGPT Sites**, mit den Daten in Neon (PostgreSQL) und dem Login über Neon Auth. Netlify und Vercel werden für die Produktion nicht mehr verwendet; ihre Abschnitte in [docs/neon-netlify-migration.md](docs/neon-netlify-migration.md) sind Geschichte.
 
-Der Umzug von Vercel und Supabase ist in [docs/neon-netlify-migration.md](docs/neon-netlify-migration.md) beschrieben, mit Übernahme der Originalkonten, Freigabe, Umstellung und Rückweg. Bis zur Freigabe durch den Besitzer gilt: **keine Umstellung der Produktion.**
+**Veröffentlichen:** ChatGPT Sites übernimmt den Stand des GitHub Branches `main` erst, wenn der Besitzer die Site anweist, `main` zu übernehmen. Ein Push nach GitHub (auch nach `main`) veröffentlicht nichts. Live ist also der zuletzt übernommene Stand von `main`, nicht automatisch der neueste Commit.
+
+Die App ist eine normale Next.js 16 Anwendung auf Node.js 24 (`next build`, `next start`). Die Daten liegen in PostgreSQL bei Neon, angemeldet wird über Neon Auth mit Google oder mit Benutzername und Passwort (ohne Mails). Ohne Login startet das Spiel nicht; jedes Konto hat ein Profil mit eindeutigem Benutzernamen, und der Einzelspieler Spielstand liegt im Profil (gleich auf allen Geräten).
+
+Der Umzug von Vercel und Supabase nach Neon ist in [docs/neon-netlify-migration.md](docs/neon-netlify-migration.md) beschrieben (Übernahme der Originalkonten, Login, Datenbank, Sicherheit). Die dortigen Angaben zu Netlify als Produktion, zum Status «NO GO» und zu Netlify Deploys gelten nicht mehr.
 
 Weiterführend:
 
-* [Umzug auf Neon Auth, Neon und Netlify](docs/neon-netlify-migration.md)
+* [Umzug auf Neon Auth und Neon (Netlify Teile historisch)](docs/neon-netlify-migration.md)
 * [Login einrichten (Google oder Benutzername), Profil und Cloud Spielstand](docs/google-login.md)
 * [Datenbank und Datenübernahme](docs/supabase-datenbank.md) (Schema und Regeln, Abschnitte zu Supabase sind historisch)
 
@@ -23,7 +27,7 @@ npm run db:migrate           # Tabellen in einer LEEREN lokalen Datenbank anlege
 npm run dev                  # http://localhost:3000
 ```
 
-Ohne `NEON_AUTH_BASE_URL` und `NEON_AUTH_COOKIE_SECRET` läuft die App lokal ohne Login und ohne Profil, wie bisher mit der Spieler ID des Browsers. Auf Netlify oder Vercel geht das nie: dort verweigert der Server ohne vollständige Werte alles, was eine Identität braucht.
+Ohne `NEON_AUTH_BASE_URL` und `NEON_AUTH_COOKIE_SECRET` läuft die App lokal ohne Login und ohne Profil, wie bisher mit der Spieler ID des Browsers. Ein gehosteter Server darf das nie: Er verweigert ohne vollständige Werte alles, was eine Identität braucht. Erkannt wird ein gehosteter Server an den Variablen von Netlify, Vercel oder AWS Lambda oder an `AUTH_REQUIRED=1` (`hostedRuntime` in `app/auth/config.ts`, `next.config.ts`). **ChatGPT Sites setzt keine dieser Anbieter Variablen; dort muss `AUTH_REQUIRED=1` gesetzt sein** (beim Build und zur Laufzeit), sonst würde ein Server mit fehlenden Auth Werten anonym starten (Audit R19).
 
 | Befehl | Zweck |
 | :--- | :--- |
@@ -39,7 +43,7 @@ Ohne `NEON_AUTH_BASE_URL` und `NEON_AUTH_COOKIE_SECRET` läuft die App lokal ohn
 
 ## Umgebungsvariablen
 
-Nur Namen, keine Werte. Werte gehören in `.env.local` (lokal, von Git ignoriert) und in die Netlify Einstellungen, **pro Kontext** (Produktion und Staging zeigen auf verschiedene Neon Branches). Liste mit Zweck: [docs/neon-netlify-migration.md](docs/neon-netlify-migration.md#umgebungsvariablen-nur-namen). Keine Variable beginnt mit `NEXT_PUBLIC_`; das Google Client Secret gehört nur in Neon Auth.
+Nur Namen, keine Werte. Werte gehören in `.env.local` (lokal, von Git ignoriert) und in die Einstellungen der ChatGPT Site (Produktion). Eine Testumgebung bekommt eigene Werte und einen eigenen Neon Branch, nie die Produktionsdatenbank. Zusätzlich zur Liste: `AUTH_REQUIRED=1` auf ChatGPT Sites. Liste mit Zweck: [docs/neon-netlify-migration.md](docs/neon-netlify-migration.md#umgebungsvariablen-nur-namen). Keine Variable beginnt mit `NEXT_PUBLIC_`; das Google Client Secret gehört nur in Neon Auth.
 
 ## Datenbank auf Neon
 
@@ -48,12 +52,16 @@ Nur Namen, keine Werte. Werte gehören in `.env.local` (lokal, von Git ignoriert
 * Auf den Neon Branches fehlt das Drizzle Journal. Neue Migrationen dort direkt mit `psql -f` einspielen; sie sind dafür idempotent geschrieben (`IF NOT EXISTS`).
 * Alle Tabellen haben Row Level Security. Data API, Realtime und Object Storage bleiben aus.
 
-## Netlify
+## ChatGPT Sites (Produktion)
 
-* Framework Next.js, Build `next build`, Node.js 24, Funktionen in `us-east-2` (gleiche Region wie Neon).
-* Der Netlify Zugangsschutz schützt alle Deployments, bis der Besitzer ihn entfernt.
-* Ein Deploy Preview, das auf die Produktionsdatenbank zeigt, ist **kein** Staging. Für Staging einen Branch Deploy mit eigenen Variablen auf `migration-staging` verwenden und prüfen, dass der Kontext sie bekommt.
-* Jedes Produktionsdeploy kostet im Free Plan 15 Credits; nicht für Kleinigkeiten deployen.
+* Die Site baut die Next.js App aus dem übernommenen Stand von `main`. Neue Versionen gehen nur live, wenn der Besitzer die Site anweist, `main` zu übernehmen; ein Push allein veröffentlicht nichts.
+* Vor dem Übernehmen: `npm run typecheck`, `npm run lint`, `npm test` auf `main`. Datenbank Migrationen spielt niemand automatisch ein; neue Migrationen von Hand (siehe oben) und nur, wenn der Code mit und ohne sie läuft.
+* Welcher Neon Branch die Live Daten hält, steht in den Variablen der Site (`DATABASE_URL`). Am 2. November 2026 lief die Live Seite auf dem Neon Branch `migration-staging` (Nachtrag in [docs/neon-netlify-migration.md](docs/neon-netlify-migration.md)); vor jeder Arbeit an der Datenbank den Branch in den Site Einstellungen prüfen.
+* Rückweg: die Site wieder einen früheren Stand von `main` übernehmen lassen. Daten in Neon bleiben davon unberührt; Spielstände, die ein neuerer Stand geschrieben hat, muss der ältere Code lesen können.
+
+## Netlify und Vercel (nicht mehr für die Produktion)
+
+Netlify und Vercel werden für die Produktion nicht mehr verwendet. Der Code erkennt ihre Umgebungen weiterhin (ohne Auth Werte verweigert der Server), und die Hinweise zu Netlify in [docs/neon-netlify-migration.md](docs/neon-netlify-migration.md) bleiben als Geschichte stehen.
 
 ## Spielstand sichern (für Spieler)
 
@@ -61,4 +69,4 @@ Der Spielstand liegt im Profil, sobald man angemeldet ist, und ist auf allen Ger
 
 ## Was entfernt wurde
 
-`@supabase/ssr` und `@supabase/supabase-js`, der Supabase Browser Client, die Datenbankfunktionen `goal_clicker_private.create_password_user` und `delete_user` als Abhängigkeit, und die Auslieferung der Login Adresse über `/api/login`. Früher entfernt: die ChatGPT Sites und Cloudflare Teile (Vite, vinext, Wrangler, D1, Worker).
+`@supabase/ssr` und `@supabase/supabase-js`, der Supabase Browser Client, die Datenbankfunktionen `goal_clicker_private.create_password_user` und `delete_user` als Abhängigkeit, und die Auslieferung der Login Adresse über `/api/login`. Früher entfernt: die Cloudflare Teile der ersten ChatGPT Sites Version (Vite, vinext, Wrangler, D1, Worker); die heutige ChatGPT Site läuft mit der Next.js App und Neon.

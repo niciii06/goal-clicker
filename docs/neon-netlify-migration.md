@@ -1,4 +1,12 @@
-# Aktueller Stand: Offline-Passwortübernahme
+# Stand der Produktion (6. November 2026)
+
+Aussage des Besitzers: Die Live Seite läuft **nur auf ChatGPT Sites** mit Neon (PostgreSQL) und Neon Auth. Netlify und Vercel werden für die Produktion nicht mehr verwendet. Die ChatGPT Site übernimmt den Stand von `main` erst auf Anweisung des Besitzers; ein GitHub Push veröffentlicht nichts. Aktuelle Anleitung: [HOSTING.md](../HOSTING.md).
+
+Damit sind in diesem Dokument überholt: der Status «NO GO für die Produktion» und die Freigabe und Umstellung auf Netlify (die Seite ist live), alle Schritte mit Netlify (Kontexte, Deploy Previews, Zugangsschutz, Credits, *Publish deploy* als Rückweg, `x-nf-client-connection-ip`) und die Adresse `goalglicker.netlify.app` als Produktion. Weiter gültig sind die Teile zu Neon Auth, Konten, Übernahme, Datenbank, Sicherheit und Sessions. Auf ChatGPT Sites muss `AUTH_REQUIRED=1` gesetzt sein, damit der Server ohne Auth Werte verweigert statt anonym zu laufen (siehe HOSTING.md). Die Kostenrechnung unten gilt für Netlify und ist für ChatGPT Sites nicht gemessen.
+
+---
+
+# Stand vom 2. bis 5. November: Offline-Passwortübernahme
 
 Die Passwortübernahme benötigt keinen laufenden Supabase-Auth-Dienst mehr. `app/auth/legacy-bridge.ts` prüft das alte bcrypt-Passwort lokal mit `bcryptjs` 3.0.3. Die anschliessende Erstellung und Bindung des Neon-Logins nutzt weiterhin die bestehenden unterstützten Auth-APIs und Transaktionen.
 
@@ -10,13 +18,13 @@ Lokale Prüfung: Produktionsbuild und vollständiger Testlauf mit 492 bestandene
 
 Die Code-Option wurde aus der Anmeldemaske entfernt; `/api/recovery` antwortet mit 410. Historische interne Hilfsfunktionen bleiben vorläufig für rückwärtsgerichtete Regressionstests bestehen und sind kein aktiver Wiederherstellungsweg.
 
-Der aktuelle Release bleibt **NO-GO**, solange Verifier-Zugang, Netlify-Umgebung, echte Google-Anmeldung, alte Passwortkonten und Multiplayer nicht auf Staging erfolgreich geprüft sind. Die nachfolgenden bisherigen Architektur- und Testnachweise beziehen sich auf die frühere PR-Version; Angaben zur Supabase-Auth-Brücke und Besitzercodes sind überholt.
+(Historisch, vor dem Livegang:) Der Release war **NO-GO**, solange Verifier-Zugang, Netlify-Umgebung, echte Google-Anmeldung, alte Passwortkonten und Multiplayer nicht auf Staging erfolgreich geprüft waren. Die nachfolgenden bisherigen Architektur- und Testnachweise beziehen sich auf die frühere PR-Version; Angaben zur Supabase-Auth-Brücke und Besitzercodes sind überholt.
 
 ---
 
 # Umzug auf Neon Auth, Neon PostgreSQL und Netlify
 
-Stand: 2. November 2026. Status: **NO-GO für die Produktion.** Der Code ist ein Release Kandidat, die Umstellung der Produktion braucht die Punkte unter [Freigabe](#freigabe-für-die-produktion) und die ausdrückliche Zustimmung des Besitzers.
+Stand: 2. November 2026 (historisch, siehe «Stand der Produktion» oben). Damals: **NO-GO für die Produktion**, Umstellung nur nach den Punkten unter [Freigabe](#freigabe-für-die-produktion) und ausdrücklicher Zustimmung des Besitzers. Die Live Seite läuft heute auf ChatGPT Sites, nicht auf Netlify.
 
 ## Kurzfassung
 

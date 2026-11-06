@@ -2,6 +2,7 @@
 // the ball carrier. Everything here is pure and deterministic: the caller passes the checkpoint and
 // its seeded random numbers, so a match replays identically after a reload.
 import type { SimCheckpoint, SimPlayer, SimPoint } from './interactive-match';
+import { keeperGoalFactor, keeperSkill } from './football-rules';
 
 /** Simulated match seconds that one second of on-screen play stands for. Plays are compressed:
  * a league match shows 90 minutes in about 3.5 to 4 minutes, so the screen runs a little faster
@@ -91,7 +92,8 @@ export function shotQuality(c: SimCheckpoint, shooter: SimPlayer, from: SimPoint
     if (dist(q2, from) < 1.8) q *= .88;
   }
   const keeper = c.players.find(p => p.active && p.side !== shooter.side && roleOf(p) === 'keeper');
-  q *= (.72 + shooter.shooting / 160) * (.8 + shooter.fitness / 500) * (keeper ? 1.38 - keeper.keeping / 280 : 1.5);
+  // The keeper counts: his rating against the shooter's level (an outfield player in goal keeps badly).
+  q *= (.72 + shooter.shooting / 160) * (.8 + shooter.fitness / 500) * keeperGoalFactor(keeper ? keeperSkill(keeper) : undefined, shooter.rating);
   return clamp(q, .008, .82);
 }
 

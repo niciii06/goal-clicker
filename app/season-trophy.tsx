@@ -5,14 +5,15 @@ import { createPortal } from "react-dom";
 import { useDialogFocus } from "./confirm-dialog";
 import { GOAL_CONFETTI, GOLD_CONFETTI } from "./game/constants";
 import { SEASON_MODE_DIVISION_COUNT, getSeasonModeDivisionLabel, sortSeasonTable } from "./feature-data";
-import type { SeasonMatchHistoryEntry, SeasonTableRow } from "./feature-data";
+import type { SeasonMatchHistoryEntry, SeasonResult, SeasonTableRow } from "./feature-data";
 
 export type SeasonTitle = { id: string; division: number; club: SeasonTableRow; runnerUpPoints: number };
 
 /** The league title of a finished season: the club ended first in the final table. Null for any other place. */
-export function getSeasonTitle(entry: SeasonMatchHistoryEntry | null, finalTable: readonly SeasonTableRow[]): SeasonTitle | null {
+export function getSeasonTitle(entry: SeasonMatchHistoryEntry | null, finalTable: readonly SeasonTableRow[], results: readonly SeasonResult[] = []): SeasonTitle | null {
   if (!entry?.completedSeason) return null;
-  const rows = sortSeasonTable(finalTable);
+  // The same ranking as the table, head-to-head included, so the title matches the promotion.
+  const rows = sortSeasonTable(finalTable, results);
   if (rows[0]?.id !== "club") return null;
   return { id: entry.id, division: entry.division, club: rows[0], runnerUpPoints: rows[1]?.points ?? 0 };
 }

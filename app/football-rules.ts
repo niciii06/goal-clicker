@@ -39,3 +39,23 @@ export function restartPoint(kind:RestartKind,right:boolean,lane=34):PitchPoint 
  if(kind==='throw-in')return {x:right?70:35,y:lane<34?0:68};
  return {x:right?78:27,y:Math.max(8,Math.min(60,lane))};
 }
+/** Keeping of an outfield player who has to go in goal: whatever his card says, never more than this. */
+export const STAND_IN_KEEPING_CAP=35;
+/** Goal chance multiplier with nobody in goal at all. */
+export const EMPTY_GOAL_FACTOR=1.5;
+/** Change of the goal chance per rating point the keeper is better (or worse) than the shooter's level. */
+export const KEEPER_SKILL_WEIGHT=.012;
+/**
+ * How the goalkeeper changes the chance that a shot goes in (multiplies the shot quality). A keeper of the
+ * shooter's level gives the same value as the engine always did (1.38 minus rating/280, so the average number of
+ * goals stays); every point he is better lowers it, every point worse raises it. The same rule for both sides.
+ */
+export function keeperGoalFactor(keeperSkill:number|undefined,shooterRating:number){
+ if(keeperSkill===undefined||!Number.isFinite(keeperSkill))return EMPTY_GOAL_FACTOR;
+ const neutral=1.38-shooterRating/280;
+ return Math.max(.7,Math.min(EMPTY_GOAL_FACTOR-.05,neutral+(shooterRating-keeperSkill)*KEEPER_SKILL_WEIGHT));
+}
+/** Goalkeeping strength: a real keeper plays at his rating, an outfield player in goal at his weak keeping. */
+export function keeperSkill(p:{rating:number;keeping:number;standInRole?:string}){
+ return p.standInRole?Math.min(p.keeping,STAND_IN_KEEPING_CAP):p.rating;
+}

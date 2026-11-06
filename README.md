@@ -6,14 +6,14 @@ Aktueller Spielcode mit Spielerpool, Saisons, Walkouts und Multiplayer. Release 
 * [Balance Update vom 29. Oktober 2026: Packs nach Liga, seltene 100er, Upgrades](docs/balance-update.md)
 * [Gameplay-, Reise- und Stadionupdate vom 19. Oktober 2026](docs/gameplay-travel-stadium-update.md)
 * [Releasebericht und vollständige Prüfevidenz](docs/release-match-realism.md)
-* [Projektwissen und Spielregeln (aus der ChatGPT Sites Zeit)](docs/chatgpt-sites-knowledge.md)
+* [Projektwissen und Spielregeln (erste ChatGPT Sites Version mit Cloudflare)](docs/chatgpt-sites-knowledge.md)
 * [Konfigurationsreparatur und Sicherheitsprüfung](docs/config-security-repair.md)
-* [Hosting auf Netlify mit Neon und Login](HOSTING.md)
-* [Umzug auf Neon Auth, Neon und Netlify (Status, Übernahme der Konten, Freigabe)](docs/neon-netlify-migration.md)
+* [Hosting auf ChatGPT Sites mit Neon und Login](HOSTING.md)
+* [Umzug auf Neon Auth und Neon (Übernahme der Konten; Netlify Teile historisch)](docs/neon-netlify-migration.md)
 * [Datenbank und Datenübernahme](docs/supabase-datenbank.md)
 * [Login einrichten (Google oder Benutzername), Profil und Cloud Spielstand](docs/google-login.md)
 
-Verifikation: `npm run typecheck`, `npm run lint`, `npm test` (inklusive `next build`), `npm run test:db` mit einer Testdatenbank; ergänzend `npm run verify:physics`. Die frühere ChatGPT Sites Version hat eine eigene Historie; ein GitHub Push veröffentlicht keine neue Site Version.
+Verifikation: `npm run typecheck`, `npm run lint`, `npm test` (inklusive `next build`), `npm run test:db` mit einer Testdatenbank; ergänzend `npm run verify:physics`. Ein GitHub Push veröffentlicht nichts: Die ChatGPT Site übernimmt den Stand von `main` erst, wenn der Besitzer sie dazu anweist (siehe [HOSTING.md](HOSTING.md)).
 
 Browser Prüfung: `npm run test:browser` startet den Produktionsbuild mit `next start` und prüft mit Chromium alle Tabs auf Desktop und Handy (Fehler, Überlauf, überlappender oder schwer lesbarer Text) sowie Combo, tägliche Prämie, Live Spiel und Pressekonferenz. Der GitHub Workflow führt sie nach `npm test` aus. `npm run test:account` spielt zusätzlich Login, Übernahme der Originalkonten, Profil, Cloud Spielstand mit zwei Geräten und Multiplayer mit zwei Konten durch (Nachbau von Neon Auth, braucht eine Testdatenbank).
 
@@ -27,4 +27,4 @@ Browser Prüfung: `npm run test:browser` startet den Produktionsbuild mit `next 
 
 **Reisen:** Die Mannschaft nimmt die schnellste Verbindung von Tür zu Tür: unter 80 km immer den Teambus, sonst Bus, Zug (Intercity ab Bern, EuroCity nach Mailand, TGV Lyria nach Paris) oder Flugzeug ab Zürich bzw. Genf. Busse fahren auf echten Strassen (OSRM), Züge auf echten Gleisen (BRouter, Fahrzeiten gerundet nach Fahrplan). `npx tsx scripts/travel/fetch-real-routes.mts` ergänzt fehlende Strecken im Routencache und teilt ihn neu auf; die Heimadresse wird dabei nie an einen Routingdienst geschickt.
 
-**Hosting:** Next.js 16 auf Netlify, Daten in Neon (PostgreSQL), Login mit Google oder Benutzername über Neon Auth. Der Umzug von Vercel und Supabase ist vorbereitet, die Produktion wird erst nach Freigabe des Besitzers umgestellt. Anleitung: [HOSTING.md](HOSTING.md). Laufende Datenbankinhalte und Browser Spielstände sind nicht Teil dieses Repositories.
+**Hosting:** Die Produktion läuft nur auf ChatGPT Sites (Next.js 16), Daten in Neon (PostgreSQL), Login mit Google oder Benutzername über Neon Auth. Netlify und Vercel werden für die Produktion nicht mehr verwendet. Veröffentlicht wird der Stand von `main`, wenn der Besitzer die Site anweist, ihn zu übernehmen. Anleitung: [HOSTING.md](HOSTING.md). Laufende Datenbankinhalte und Browser Spielstände sind nicht Teil dieses Repositories.

@@ -292,7 +292,7 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
   const id = c.careerMatchId || `career-${c.matchStartedAt}-${c.mode}-${c.opponent}`;
   // Discipline keeps its own receipt list, so it is applied exactly once per match as well.
   const bans = processMatchDiscipline(features, id, now, { seasonCompleted: Boolean(seasonEntry?.completedSeason) });
-  for (const ban of bans) addHistory(features, { title: `Gelbsperre: ${getStarXIPlayer(ban.playerId)?.name ?? 'Spieler'}`, detail: suspensionLabel(ban), tone: 'negative' });
+  for (const ban of bans) addHistory(features, { title: `${ban.reason === 'red' ? 'Rotsperre' : 'Gelbsperre'}: ${getStarXIPlayer(ban.playerId)?.name ?? 'Spieler'}`, detail: suspensionLabel(ban), tone: 'negative' });
   // Like after a red card, a player banned for the next match leaves the matchday squad.
   const bannedNext = getBannedPlayerIds(features, nextCompetition(features));
   if (bannedNext.length) features.starXI = removeStarXIPlayersFromSquad(features.starXI, bannedNext);
