@@ -339,7 +339,7 @@ test('the "Was ist neu" window opens once for an existing game and stays closed 
 async function closeWelcomePack(page: Page) {
   const reveal = page.locator('.star-reveal');
   await reveal.waitFor({ timeout: 10000 });
-  const takeOver = reveal.getByRole('button', { name: 'In Star XI übernehmen' });
+  const takeOver = reveal.getByRole('button', { name: /^Weiter/ });
   await takeOver.waitFor({ timeout: 20000 });
   await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('.star-reveal .star-walkout-dismiss')?.disabled, undefined, { timeout: 20000 });
   await takeOver.click();
