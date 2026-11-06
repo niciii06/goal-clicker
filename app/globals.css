@@ -2355,3 +2355,31 @@ button { font: inherit; }
 .feature-tab-offer-dot { display: inline-block; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%; background: #b37f00; vertical-align: middle; }
 main :is(h2, h3, h4)[tabindex="-1"]:focus { outline: none; }
 main :is(h2, h3, h4)[tabindex="-1"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* Weekly goals and club chronicle (6 November 2026) */
+.weekly-goals-note { margin: 10px 0 14px; color: var(--soft); font-size: var(--text-footnote); line-height: 1.55; }
+.career-view-switch { display: inline-flex; gap: 4px; margin: 0 0 14px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); max-width: 100%; flex-wrap: wrap; }
+.career-view-switch button { padding: 8px 14px; border: 0; border-radius: 9px; color: var(--soft); background: transparent; font: inherit; font-size: var(--text-footnote); font-weight: 700; cursor: pointer; }
+.career-view-switch button[aria-pressed="true"] { color: var(--text); background: var(--surface-raised); box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 14%, transparent); }
+.chronicle-totals { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.chronicle-totals div { padding: 10px; border-radius: 12px; background: var(--surface-soft); min-width: 0; }
+.chronicle-totals dt { color: var(--soft); font-size: var(--text-footnote); }
+.chronicle-totals dd { margin: 4px 0 0; color: var(--text); font-size: 18px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.chronicle-titles { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
+.chronicle-titles li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--surface-soft); }
+.chronicle-titles small { color: var(--soft); font-size: var(--text-footnote); }
+.chronicle-table-wrap { margin-top: 12px; overflow-x: auto; border: 1px solid var(--line-soft); border-radius: 12px; }
+.chronicle-table { width: 100%; border-collapse: collapse; font-size: var(--text-footnote); font-variant-numeric: tabular-nums; }
+.chronicle-table th, .chronicle-table td { padding: 8px 10px; border-bottom: 1px solid var(--line-soft); text-align: right; white-space: nowrap; }
+.chronicle-table th[scope="row"], .chronicle-table thead th:nth-child(-n+2) { text-align: left; }
+.chronicle-table th[scope="row"] span, .chronicle-table th[scope="row"] small { display: block; }
+.chronicle-table th[scope="row"] small { color: var(--soft); font-weight: 500; }
+.chronicle-table thead th { color: var(--soft); font-weight: 700; background: var(--surface-soft); }
+.chronicle-table thead button { padding: 0; border: 0; color: inherit; background: none; font: inherit; cursor: pointer; }
+.chronicle-table tbody tr:last-child > * { border-bottom: 0; }
+.chronicle-table tr.in-squad th[scope="row"] span { color: var(--accent); }
+.chronicle-toggle { display: inline-flex; align-items: center; gap: 8px; color: var(--soft); font-size: var(--text-footnote); }
+.chronicle-more { margin-top: 12px; }
+.chronicle-hof { margin-top: 10px; }
+@media (max-width: 1000px) { .chronicle-totals { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .chronicle-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); } .chronicle-records { grid-template-columns: 1fr; } }

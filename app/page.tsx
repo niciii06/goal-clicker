@@ -4,14 +4,14 @@ export const dynamic = "force-dynamic";
 
 import type { AnimationEvent, CSSProperties, DragEvent, KeyboardEvent, MouseEvent, RefObject } from "react";
 import type { AppMode, ClickEffect, CoopRole, CoopRoom, CoopSession, CrossbarGame, CrossbarHeight, DribbleGame, FeedEntry, GameState, IconName, LayoutCardId, MatchPrediction, MiniGameId, PenaltyDirection, PenaltyGame, PredictionGame, PurchaseMode, SeasonStandingsAnnouncement, SquadDragSource, SquadDropTarget, Tab, UpgradeDefinition } from "./game/types";
-import type { CoopMission, CupCardEvent, GameFeatures, PenaltyDirection as CupPenaltyDirection, RandomEvent, StarFormationId, StarPackId, StarPackReveal, TournamentGazetteIssue, TournamentId, TransferInsiderEvent } from "./feature-data";
+import type { CupCardEvent, GameFeatures, PenaltyDirection as CupPenaltyDirection, RandomEvent, StarFormationId, StarPackId, StarPackReveal, TournamentGazetteIssue, TournamentId, TransferInsiderEvent } from "./feature-data";
 import type { Journey, TravelFixture } from "./travel-data";
 import type { MatchDraft } from "./match-commands";
 import { filterAndSortReserve } from "./game/reserve-filter";
 import { ACHIEVEMENTS, BALANCE_VERSION, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, COMBO_MAX_COUNT, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, ALBUM_MILESTONES_STORAGE_KEY, STAR_RATING_FILTERS, TUTORIAL_STORAGE_KEY, VIBRATION_STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from "./game/constants";
 import { AL, AR, AT, AU, AZ, BA, BE, BF, BG, BR, CA, CD, CH, CI, CL, CM, CN, CO, CR, CZ, DE, DK, DZ, EC, EG, ES, FI, FR, GB_ENG, GB_NIR, GB_SCT, GB_WLS, GE, GH, GM, GN, GR, GT, HR, HT, HU, IE, IL, IS, IT, JM, JP, KN, KR, MA, ME, ML, MW, MX, NG, NL, NO, NZ, PA, PH, PL, PT, PY, RO, RS, RU, SE, SI, SK, SN, SR, TR, UA, US, UY, VE, XK, ZA, ZM } from "country-flag-icons/react/3x2";
-import { AlbumPanel, CareerPanel, CareerPlayerBadge, MatchRatingsPanel, PostMatchSummary } from "./career-panels";
-import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, SPECIAL_CARD_PACK, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_SQUAD_SIZE, STAR_XI_TOTAL_CARD_COUNT, TOURNAMENTS, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, applyPendingMatchChanges, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, getSpecialCardPackOdds, purchaseSpecialCardPack, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostMultiplier, getMissionProgress, getOpenTransferSquadVacancies, getRandomEventDelay, getRewardPackOdds, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXIRating, getStarXISelection, getTournament, getTournamentRewardPack, getBestXIUnavailablePlayerIds, grantWelcomePack, awardMatchStamp, canDrawHundredSpecialCards, maybeGrantStarterSquad, STARTER_SQUAD_UNLOCK_CLICKS, getUnavailableStarXIPlayerIds, initialGameFeatures, isRewardPack, isTransferDeadlineDay, normalizeGameFeatures, openEarnedPack, openStarPack, pauseGameFeatureTimers, queueMatchChanges, recordSeasonModeMatch, releaseMatchSquad, resolveCupPenalty, getCupPenaltyStep, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, TRANSFER_UNHAPPY_MATCHES, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, getPrestigeBlockReason, seasonMatchDuration, tournamentMatchDuration } from "./feature-data";
+import { AlbumPanel, CareerArea, CareerPlayerBadge, PostMatchSummary } from "./career-panels";
+import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, SPECIAL_CARD_PACK, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_SQUAD_SIZE, STAR_XI_TOTAL_CARD_COUNT, TOURNAMENTS, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, applyPendingMatchChanges, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, getSpecialCardPackOdds, purchaseSpecialCardPack, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostMultiplier, getOpenTransferSquadVacancies, getRandomEventDelay, getRewardPackOdds, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXIRating, getStarXISelection, getTournament, getTournamentRewardPack, getBestXIUnavailablePlayerIds, grantWelcomePack, awardMatchStamp, canDrawHundredSpecialCards, maybeGrantStarterSquad, STARTER_SQUAD_UNLOCK_CLICKS, getUnavailableStarXIPlayerIds, initialGameFeatures, isRewardPack, isTransferDeadlineDay, normalizeGameFeatures, openEarnedPack, openStarPack, pauseGameFeatureTimers, queueMatchChanges, recordSeasonModeMatch, releaseMatchSquad, resolveCupPenalty, getCupPenaltyStep, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, TRANSFER_UNHAPPY_MATCHES, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, getPrestigeBlockReason, seasonMatchDuration, tournamentMatchDuration } from "./feature-data";
 import { DailyRewardCard } from "./daily-reward-panel";
 import { FootballGraphic, GameErrorBoundary, Icon, StarXIPositionBadges } from "./game/ui";
 import { LiveMatchViewer } from "./match-viewer";
@@ -65,6 +65,8 @@ import { monotonicNow } from "./game/clock";
 import { NEWER_VERSION_MESSAGE } from "./game/save-schema";
 import { exportCurrentSave, SaveFileControls } from "./save-file-controls";
 import { MATCH_RAN_WHILE_AWAY, matchRanWhileAway, missedMatchCaughtUp, summarizeMissedMatch } from "./match-missed";
+import { claimWeeklyGoal, ensureWeeklyGoals, notePackOpened, weeklyGoalsNeedUpdate } from "./weekly-goals";
+import { WeeklyGoalsPanel } from "./weekly-goals-panel";
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 
@@ -124,7 +126,7 @@ function useAnnouncementHold(ref: RefObject<HTMLElement | null>, open: boolean) 
   return held;
 }
 
-const TAB_TITLES: Partial<Record<FeatureTab, string>> = { home: "Home", cup: "Spiele", season: "Saison", squad: "Kader", career: "Karriere", packs: "Packshop", album: "Sammelalbum", club: "Clubprofil", fabrizio: "Fabrizio", missions: "Missionen", leaderboard: "Rangliste", history: "Verlauf" };
+const TAB_TITLES: Partial<Record<FeatureTab, string>> = { home: "Home", cup: "Spiele", season: "Saison", squad: "Kader", career: "Karriere", packs: "Packshop", album: "Sammelalbum", club: "Clubprofil", fabrizio: "Fabrizio", missions: "Wochenziele", leaderboard: "Rangliste", history: "Verlauf" };
 
 function primarySectionOf(tab: FeatureTab) {
   return tab === "album" ? "packs" : ["fabrizio", "missions", "leaderboard", "history"].includes(tab) ? "club" : tab;
@@ -1672,6 +1674,7 @@ function App() {
       if (current.goals < pack.price || features.cup.active) { settle(false); return current; }
       settle(true);
       features.starPackReveal = reveal;
+      notePackOpened(features, reveal.openedAt);
       if (!opening.duplicate) features.starXI = addStarXIPlayer(features.starXI, opening.player.id, getBestXIUnavailablePlayerIds(features));
       if (opening.duplicate) {
         features.starXI.fragments += opening.fragmentCompensation;
@@ -2277,14 +2280,40 @@ function App() {
     });
   }
 
-  async function claimMission(mission: CoopMission) {
-    const progress = getMissionProgress(mission, { seasonGoals: displayGame.seasonGoals, clicks: displayGame.clicks, minigameWins: displayGame.minigameWins, cupWins: displayGame.features.cup.wins });
-    if (mission.claimed || progress < mission.target || !isCoopLive) return;
-    setCoopBusy(true);
-    const data = await sendCoopAction("mission-claim", { missionId: mission.id });
-    if (data) setCoopMessage(`${mission.title} abgeschlossen. +${formatNumber(mission.reward)} Tore für das Team.`);
-    setCoopBusy(false);
+  async function claimWeeklyGoalReward(goalId: string) {
+    if (coopBusy) return;
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("weekly-claim", { goalId });
+      if (data) setCoopMessage("Wochenziel abgeholt. Die Prämie gehört dem ganzen Team.");
+      setCoopBusy(false);
+      return;
+    }
+    let message = "";
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      const claim = claimWeeklyGoal(features, goalId, Date.now(), current.minigameWins);
+      message = claim.ok ? `${claim.goal.title} geschafft · ${claim.goal.reward.kind === "pack" ? `${claim.label} liegt bei den Packs bereit` : `+${claim.label}`}` : claim.error;
+      return claim.ok ? { ...current, features } : current;
+    });
+    if (message) showToast(message);
   }
+
+  // Single player: a new Zurich week starts its goals (and the baseline of every counter) as soon as it begins.
+  useEffect(() => {
+    if (!hydrated || appMode !== "single") return;
+    const check = () => {
+      const now = Date.now(), current = gameRef.current;
+      if (!weeklyGoalsNeedUpdate(current.features, now, current.minigameWins)) return;
+      setGame((latest) => {
+        const features = { ...latest.features };
+        return ensureWeeklyGoals(features, now, latest.minigameWins) ? { ...latest, features } : latest;
+      });
+    };
+    check();
+    const timer = window.setInterval(check, 30000);
+    return () => window.clearInterval(timer);
+  }, [hydrated, appMode]);
 
   function playTone(frequency: number, duration: number, type: OscillatorType = "sine", volume = 0.03, delay = 0) {
     if (!gameRef.current.sound || typeof window === "undefined") return;
@@ -2954,11 +2983,10 @@ function App() {
   const selectedTournament = displayGame.features.cup.pendingNextRound ? activeTournament : (getTournament(selectedTournamentId) ?? TOURNAMENTS[0]);
   const selectedTournamentUnlockLeague = getTournamentUnlockLeague(selectedTournament.id);
   const selectedTournamentLeagueUnlocked = isLeagueContentUnlocked(selectedTournamentUnlockLeague, reachedLeague, hasFullTestAccess);
-  const featureMissions = displayGame.features.missions;
   const featureHistory = [...displayGame.features.history].reverse();
   // short: the label in the phone tab bar; the button keeps the full label as its accessible name.
   const primaryTabs: { id: FeatureTab; label: string; text?: string; short: string; icon: IconName }[] = [{id:'home',label:'Home',short:'Home',icon:'home'},{id:'cup',label:displayGame.features.cup.active?'Spiele · LIVE':'Spiele',text:'Spiele',short:'Spiele',icon:'trophy'},{id:'season',label:'Saison',short:'Saison',icon:'table'},{id:'squad',label:'Kader',short:'Kader',icon:'squad'},{id:'career',label:'Karriere',short:'Karriere',icon:'career'},{id:'packs',label:'Packs & Album',short:'Packs',icon:'cards'},{id:'club',label:'Club & Mehr',short:'Club',icon:'shield'}];
-  const featureTabs: {id:FeatureTab;label:string}[] = ['packs','album'].includes(featureTab) ? [{id:'packs',label:'Packshop'},{id:'album',label:'Sammelalbum'}] : ['club','fabrizio','missions','leaderboard','history'].includes(featureTab) ? [{id:'club',label:'Clubprofil'},{ id: "fabrizio", label: "Fabrizio" },{id:'missions',label:'Missionen'},{id:'leaderboard',label:'Rangliste'},{id:'history',label:'Verlauf'}] : [];
+  const featureTabs: {id:FeatureTab;label:string}[] = ['packs','album'].includes(featureTab) ? [{id:'packs',label:'Packshop'},{id:'album',label:'Sammelalbum'}] : ['club','fabrizio','missions','leaderboard','history'].includes(featureTab) ? [{id:'club',label:'Clubprofil'},{ id: "fabrizio", label: "Fabrizio" },{id:'missions',label:'Wochenziele'},{id:'leaderboard',label:'Rangliste'},{id:'history',label:'Verlauf'}] : [];
   const primarySection = primarySectionOf(featureTab);
 
 
@@ -3032,7 +3060,7 @@ function App() {
           {featureTabs.length>0 && <div className="feature-tabs" role="tablist" aria-label="Club World"><div>{featureTabs.map((tab) => <button key={tab.id} className={featureTab === tab.id ? "active" : ""} onClick={() => openFeatureTab(tab.id)} role="tab" aria-selected={featureTab === tab.id}>{tab.label}{tab.id === "fabrizio" && pendingTransferOffer && <><i className="feature-tab-offer-dot" aria-hidden="true" /><span className="sr-only"> (offenes Angebot)</span></>}</button>)}</div></div>}
 
           {featureTab === "cup" && <TravelPanel features={displayGame.features} travel={displayGame.features.travel} serverNow={getTravelTime} busy={coopBusy || travelBusy} onStart={()=>{const f=displayGame.features.travel.journey?.fixture;if(f)void(f.mode==='season'?startSeasonCupMatch():startCup(f.tournamentId));}} />}
-          {featureTab === "career" && <><CareerPanel features={displayGame.features} /><MatchRatingsPanel features={displayGame.features} /></>}
+          {featureTab === "career" && <CareerArea features={displayGame.features} />}
           {featureTab === "album" && <AlbumPanel features={displayGame.features} busy={coopBusy} onClaim={(id) => void collectAlbumReward(id)} showMilestones={albumMilestones} onShowMilestones={setAlbumMilestones} />}
 
           {featureTab === "fabrizio" && <div className="transfer-saga-dashboard">
@@ -3155,7 +3183,7 @@ function App() {
             <section className="tutorial-restart" aria-label="Spielstand als Datei"><div><p className="eyebrow">SPIELSTAND / DATEI</p><strong>Deinen Spielstand sichern.</strong><small>Speichert deinen Einzelspieler Spielstand als Datei auf diesem Gerät. Aus der Datei kannst du ihn später wieder laden; vorher wird nachgefragt.</small></div><SaveFileControls getGame={() => gameRef.current} onMessage={showToast} /></section>
 <div className="feature-panel-heading"><div><p className="eyebrow">CLUBIDENTITÄT / DEIN VEREIN</p><h3>Mach ihn zu deinem Club.</h3></div><span className="club-preview" style={{ color: clubDraft.color, borderColor: clubDraft.color }}>{clubDraft.badge}</span></div><div className="club-form"><label htmlFor="club-name">Clubname</label><input id="club-name" className="mode-input" value={clubDraft.name} maxLength={22} onChange={(event) => setClubDraft((current) => ({ ...current, name: event.target.value }))} /><div><span className="club-form-label">Wappen</span><div className="club-choice-row">{CLUB_BADGES.map((badge) => <button key={badge} className={clubDraft.badge === badge ? "selected" : ""} onClick={() => setClubDraft((current) => ({ ...current, badge }))}>{badge}</button>)}</div></div><div><span className="club-form-label">Clubfarbe</span><div className="club-choice-row colors">{CLUB_COLORS.map((color) => <button key={color} className={clubDraft.color === color ? "selected" : ""} style={{ background: color }} aria-label={`Clubfarbe ${color}`} onClick={() => setClubDraft((current) => ({ ...current, color }))} />)}</div></div><button className="mode-primary" onClick={() => void saveClubProfile()} disabled={coopBusy}>Clubprofil speichern</button></div></div>}
 
-          {featureTab === "missions" && <div className="feature-panel">{!isCoopLive ? <div className="feature-empty"><Icon name="stadium" size={25} /><strong>Koop Missionen</strong><p>{guest ? "Koop Missionen brauchen ein Konto. Melde dich an, um mit Freunden zu spielen." : "Starte ein Koop Match, um gemeinsame Ziele mit deinem Team freizuschalten."}</p><button type="button" className="mode-primary" onClick={() => guest ? setGuestCoopPrompt(true) : setAppMode("coop")}>{guest ? "Anmelden für Koop" : "Zu Koop wechseln"}</button></div> : <><div className="feature-panel-heading"><div><p className="eyebrow">KOOP / GEMEINSAME ZIELE</p><h3>Missionen für euer Team.</h3></div><span className="feature-stat">SAISON {currentSeason}</span></div><div className="mission-list">{featureMissions.map((mission) => { const progress = getMissionProgress(mission, { seasonGoals: displayGame.seasonGoals, clicks: displayGame.clicks, minigameWins: displayGame.minigameWins, cupWins: displayGame.features.cup.wins }); const complete = progress >= mission.target; return <div className={`mission-row${mission.claimed ? " claimed" : ""}`} key={mission.id}><div className="mission-copy"><strong>{mission.title}</strong><small>{mission.description}</small><div className="mission-progress"><span style={{ width: `${Math.min(100, (progress / mission.target) * 100)}%` }} /></div><em>{formatNumber(Math.min(progress, mission.target))} / {formatNumber(mission.target)}</em></div><button className="feature-buy-button" onClick={() => void claimMission(mission)} disabled={mission.claimed || !complete || coopBusy}>{mission.claimed ? "Abgeholt" : complete ? `+${formatNumber(mission.reward)}` : "offen"}</button></div>; })}</div></>}</div>}
+          {featureTab === "missions" && <WeeklyGoalsPanel features={displayGame.features} minigameWins={displayGame.minigameWins} coop={isCoopLive} busy={coopBusy} now={getTravelTime()} onClaim={(goalId) => void claimWeeklyGoalReward(goalId)} />}
 
           {featureTab === "leaderboard" && <LeaderboardPanel playerId={playerId} />}
           {featureTab === "history" && <div className="feature-panel"><div className="feature-panel-heading"><div><p className="eyebrow">MATCH CENTER / VERLAUF</p><h3>Was im Club passiert.</h3></div><span className="feature-stat">{featureHistory.length} EINTRÄGE</span></div><div className="history-list">{featureHistory.length ? featureHistory.map((entry) => <div className={`history-row ${entry.tone}`} key={entry.id}><span><Icon name={entry.tone === "negative" ? "screen" : entry.title.includes("Pokal") ? "crown" : "star"} size={15} /></span><div><strong>{entry.title}</strong><small>{entry.detail}</small></div><em>{formatHistoryTime(entry.timestamp)}</em></div>) : <div className="feature-empty"><Icon name="broadcast" size={25} /><p>Noch keine Einträge. Das Stadion wartet auf seine erste Geschichte.</p></div>}</div></div>}
