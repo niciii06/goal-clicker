@@ -76,6 +76,10 @@ function seatPlayerColumn(role: RoomSeatRole) {
   return coopRooms.player4PlayerId;
 }
 
+function isSeatRole(role: string): role is RoomSeatRole {
+  return role === "host" || role === "guest" || role === "player3" || role === "player4";
+}
+
 let connection: postgres.Sql | null = null;
 
 /** Connections per server instance: DATABASE_POOL_MAX, default 3, never more than 10 (serverless instances multiply it). */
@@ -564,9 +568,10 @@ export class GoalClickerDatabase {
   /**
    * Books a batch of clicks the server counted. Clicks change only counters, so the world comes back without its
    * features (with their key). `previousClickState` is the seat's click state the amount was computed from; when
-   * another request of the same seat changed it meanwhile, nothing is written (null).
+   * another request of the same seat changed it meanwhile, nothing is written (null). `seatPlayerId`: the clicking
+   * player; when the seat no longer belongs to them (left, removed, handed over), nothing is written either.
    */
-  async applyClick(code: string, role: string, amount: number, clickCount: number, timestamp: string, previousClickState: unknown = null, nextClickState: unknown = null, presence: RoomUpdate = {}): Promise<LightRoomRow | null> {
+  async applyClick(code: string, role: string, amount: number, clickCount: number, timestamp: string, previousClickState: unknown = null, nextClickState: unknown = null, presence: RoomUpdate = {}, seatPlayerId?: string): Promise<LightRoomRow | null> {
     const [room] = await this.withLightFields((fields) => this.client
       .update(coopRooms)
       .set({
@@ -587,6 +592,7 @@ export class GoalClickerDatabase {
       .where(and(
         eq(coopRooms.code, code),
         nextClickState ? sql`(${coopRooms.clickStateJson}::jsonb -> ${role}::text) is not distinct from ${previousClickState === null ? null : JSON.stringify(previousClickState)}::jsonb` : undefined,
+        seatPlayerId && isSeatRole(role) ? eq(seatPlayerColumn(role), seatPlayerId) : undefined,
       ))
       .returning(fields));
     return room ?? null;

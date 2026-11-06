@@ -303,11 +303,14 @@ GoalClickerDatabase.prototype.updateRoom = async (code, values: RoomUpdate, cond
   row = { ...row, ...values }; return structuredClone(row);
 };
 installLightRoomMocks(GoalClickerDatabase);
+const OFFLINE = new Date(Date.now() - 10 * 60_000).toISOString();
 function setupRoom(game: GameState) {
   clearRoomCacheForTests();
   const iso = new Date().toISOString();
   const defaults = Object.fromEntries(Object.entries(getTableColumns(coopRooms)).map(([key, column]) => [key, column.default ?? null]));
-  row = { ...defaults, code: 'PRESTR', hostPlayerId: 'host-player-123', hostName: 'Nicolas', guestPlayerId: 'guest-player-123', guestName: 'Silvan', hostLastSeenAt: iso, guestLastSeenAt: iso, lastPassiveAt: iso, updatedAt: iso, sharedCoins: game.goals, sharedTotalGoals: game.totalGoals, sharedSeasonGoals: game.seasonGoals, sharedStars: game.stars, sharedSeasons: game.seasons, sharedUpgradesJson: JSON.stringify(game.upgrades), sharedUpgradeLevel: Object.values(game.upgrades).reduce((sum, level) => sum + level, 0), sharedFeaturesJson: JSON.stringify(game.features) } as RoomRow;
+  // The guest is offline: an offline member does not block the Prestige vote, so the host's Prestige starts at once
+  // (the vote itself is tested in coop-seats.test.ts).
+  row = { ...defaults, code: 'PRESTR', hostPlayerId: 'host-player-123', hostName: 'Nicolas', guestPlayerId: 'guest-player-123', guestName: 'Silvan', hostLastSeenAt: iso, guestLastSeenAt: OFFLINE, lastPassiveAt: iso, updatedAt: iso, sharedCoins: game.goals, sharedTotalGoals: game.totalGoals, sharedSeasonGoals: game.seasonGoals, sharedStars: game.stars, sharedSeasons: game.seasons, sharedUpgradesJson: JSON.stringify(game.upgrades), sharedUpgradeLevel: Object.values(game.upgrades).reduce((sum, level) => sum + level, 0), sharedFeaturesJson: JSON.stringify(game.features) } as RoomRow;
 }
 async function post(action: string, extra: Record<string, unknown>, playerId = 'host-player-123') {
   const response = await POST(new Request('http://localhost/api/multiplayer', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action, code: 'PRESTR', playerId, protocol: MULTIPLAYER_PROTOCOL_VERSION, ...extra }) }));

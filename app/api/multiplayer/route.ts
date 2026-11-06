@@ -114,6 +114,236 @@ function roomPlayerName(room: AnyRoomRow, role: CoopRole) {
   return getRoomPlayer(room, role).name ?? "Mitspieler";
 }
 
+// ---- Seat management (leave, remove, host handover) ---------------------------------------------------------
+// Everything below lives in the existing click state column (JSON), next to the seats' click states and the
+// receipts: no schema change. Keys start with "_", so they never collide with a seat role.
+
+/** A member counts as inactive (may be removed by the host; a host hands over) after this many days. */
+export const SEAT_INACTIVE_DAYS = 7;
+const SEAT_INACTIVE_MS = SEAT_INACTIVE_DAYS * 24 * 60 * 60 * 1000;
+/** Clicks and goals of members who left: the shared counters are sums over the seats, so they move here. */
+const DEPARTED_KEY = "_departed";
+/** When each member was last active before an offline mark (the offline mark itself sets the seat to 1970). */
+const SEEN_KEY = "_seen";
+/** Player IDs that left or were removed: a page reload does not put them back into a free seat by itself. */
+const REMOVED_KEY = "_removed";
+const REMOVED_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const PRESTIGE_VOTE_KEY = "_prestigeVote";
+const PRESTIGE_VOTE_RESULT_KEY = "_prestigeVoteResult";
+/** How long the online members have to agree to a Prestige. */
+export const PRESTIGE_VOTE_MS = 60_000;
+/**
+ * Offline marks written before the activity was tracked carry no last activity at all; such a member counts as
+ * active on this day, so an update never hands a host seat over at once.
+ */
+const SEAT_ACTIVITY_TRACKED_SINCE = Date.parse("2026-11-06T00:00:00.000Z");
+const OFFLINE_MARK_BEFORE = Date.parse("2000-01-01T00:00:00.000Z");
+
+type ClickState = Record<string, unknown>;
+
+function readClickState(room: AnyRoomRow): ClickState {
+  const state = parseJson<unknown>(room.clickStateJson, {});
+  return state && typeof state === "object" && !Array.isArray(state) ? state as ClickState : {};
+}
+
+function readDeparted(state: ClickState) {
+  const raw = state[DEPARTED_KEY] as { goals?: unknown; clicks?: unknown } | undefined;
+  return { goals: Math.max(0, finite(raw?.goals)), clicks: Math.max(0, Math.floor(finite(raw?.clicks))) };
+}
+
+function readStringMap(state: ClickState, key: string): Record<string, string> {
+  const raw = state[key];
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return Object.fromEntries(Object.entries(raw as Record<string, unknown>).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+}
+
+/** When the member on `role` was last active (ms), or 0 for an empty seat. */
+function seatLastActiveAt(room: AnyRoomRow, role: CoopRole, state = readClickState(room)) {
+  const seat = getRoomPlayer(room, role);
+  if (!seat.playerId) return 0;
+  const seen = Date.parse(seat.lastSeenAt || "");
+  const recorded = Date.parse(readStringMap(state, SEEN_KEY)[seat.playerId] ?? "");
+  const known = Math.max(Number.isFinite(seen) ? seen : 0, Number.isFinite(recorded) ? recorded : 0);
+  return known < OFFLINE_MARK_BEFORE ? SEAT_ACTIVITY_TRACKED_SINCE : known;
+}
+
+function seatInactive(room: AnyRoomRow, role: CoopRole, now: number, state = readClickState(room)) {
+  const lastActive = seatLastActiveAt(room, role, state);
+  return lastActive > 0 && now - lastActive >= SEAT_INACTIVE_MS;
+}
+
+type SeatColumns = { playerId: string | null; name: string | null; lastSeenAt: string | null; goals: number; clicks: number };
+
+function seatValues(room: AnyRoomRow, role: CoopRole): SeatColumns {
+  const seat = getRoomPlayer(room, role);
+  return { playerId: seat.playerId ?? null, name: seat.name ?? null, lastSeenAt: seat.lastSeenAt ?? null, goals: seat.goals, clicks: seat.clicks };
+}
+
+function seatUpdate(role: CoopRole, seat: SeatColumns): CoopRoomUpdate {
+  return {
+    [`${role}PlayerId`]: seat.playerId,
+    [`${role}Name`]: seat.name,
+    [`${role}LastSeenAt`]: seat.lastSeenAt,
+    [`${role}Goals`]: seat.goals,
+    [`${role}Clicks`]: seat.clicks,
+  } as CoopRoomUpdate;
+}
+
+const EMPTY_SEAT: SeatColumns = { playerId: null, name: null, lastSeenAt: null, goals: 0, clicks: 0 };
+
+/** The member who takes over the host seat: the one active most recently (never the host itself). */
+function hostSuccessor(room: AnyRoomRow, state = readClickState(room), except?: CoopRole) {
+  return getOccupiedRoomPlayers(room)
+    .filter((player) => player.role !== "host" && player.role !== except)
+    .map((player) => ({ role: player.role, lastActive: seatLastActiveAt(room, player.role, state) }))
+    .sort((first, second) => second.lastActive - first.lastActive || COOP_ROLES.indexOf(first.role) - COOP_ROLES.indexOf(second.role))[0]?.role ?? null;
+}
+
+/** Whether the host has been inactive long enough and an active member can take the host seat over. */
+export function hostHandoverDue(room: AnyRoomRow, now = Date.now()) {
+  const state = readClickState(room);
+  if (!room.hostPlayerId || !seatInactive(room, "host", now, state)) return null;
+  const successor = hostSuccessor(room, state);
+  if (!successor || seatInactive(room, successor, now, state)) return null;
+  return successor;
+}
+
+/**
+ * The columns and click state of a seat change, computed from the current row (the write is versioned; on a
+ * conflict it is computed again). `leaving`: the seat whose member leaves or is removed; `handover`: the member
+ * who moves into the host seat. Counters of a leaving member move to the departed totals, so the shared clicks
+ * and goals stay; the seat itself is empty again.
+ */
+function seatChange(room: AnyRoomRow, change: { leaving?: CoopRole; handover?: CoopRole }, now: number) {
+  const columns: CoopRoomUpdate = {};
+  const patches: ((state: ClickState) => void)[] = [];
+  const { leaving, handover } = change;
+  if (leaving) {
+    const leaver = seatValues(room, leaving);
+    patches.push((state) => {
+      const departed = readDeparted(state);
+      state[DEPARTED_KEY] = { goals: departed.goals + leaver.goals, clicks: departed.clicks + leaver.clicks };
+      const removed = Object.fromEntries(Object.entries(readStringMap(state, REMOVED_KEY)).filter(([, at]) => now - Date.parse(at) < REMOVED_TTL_MS));
+      if (leaver.playerId) removed[leaver.playerId] = new Date(now).toISOString();
+      state[REMOVED_KEY] = Object.fromEntries(Object.entries(removed).slice(-24));
+      delete state[leaving];
+    });
+  }
+  if (handover) {
+    const successor = seatValues(room, handover);
+    const oldHost = seatValues(room, "host");
+    if (leaving === "host") {
+      Object.assign(columns, seatUpdate("host", successor), seatUpdate(handover, EMPTY_SEAT));
+      patches.push((state) => { state.host = state[handover]; delete state[handover]; });
+    } else {
+      Object.assign(columns, seatUpdate("host", successor), seatUpdate(handover, oldHost));
+      patches.push((state) => { const host = state.host; state.host = state[handover]; state[handover] = host; });
+    }
+  } else if (leaving) {
+    Object.assign(columns, seatUpdate(leaving, EMPTY_SEAT));
+  }
+  // Only members keep a last activity entry.
+  const members = new Set(getOccupiedRoomPlayers(room).map((player) => player.playerId).filter((id) => id !== (leaving ? getRoomPlayer(room, leaving).playerId : undefined)));
+  patches.push((state) => {
+    const seen = Object.fromEntries(Object.entries(readStringMap(state, SEEN_KEY)).filter(([id]) => members.has(id)));
+    state[SEEN_KEY] = seen;
+    for (const role of COOP_ROLES) if (state[role] === undefined) delete state[role];
+  });
+  return { columns, patch: (state: ClickState) => { for (const patch of patches) patch(state); } };
+}
+
+// ---- Prestige vote ----------------------------------------------------------------------------------------
+
+type PrestigeVote = { id: string; proposer: string; proposerName: string; keepNormalId: string | null; prestigeCount: number; createdAt: number; expiresAt: number; required: string[]; approvals: string[] };
+type PrestigeVoteOutcome = "approved" | "declined" | "cancelled" | "expired" | "failed";
+type PrestigeVoteResult = { id: string; outcome: PrestigeVoteOutcome; by?: string; reason?: string; prestigeCount: number; at: number };
+
+function readPrestigeVote(state: ClickState): PrestigeVote | null {
+  const raw = state[PRESTIGE_VOTE_KEY] as Partial<PrestigeVote> | undefined;
+  if (!raw || typeof raw !== "object" || typeof raw.id !== "string" || typeof raw.proposer !== "string" || !Number.isFinite(raw.expiresAt) || !Number.isFinite(raw.prestigeCount)) return null;
+  const ids = (value: unknown) => Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
+  return {
+    id: raw.id, proposer: raw.proposer, proposerName: typeof raw.proposerName === "string" ? raw.proposerName : "Mitspieler",
+    keepNormalId: typeof raw.keepNormalId === "string" ? raw.keepNormalId : null, prestigeCount: Number(raw.prestigeCount),
+    createdAt: finite(raw.createdAt), expiresAt: Number(raw.expiresAt), required: ids(raw.required), approvals: ids(raw.approvals),
+  };
+}
+
+function readPrestigeVoteResult(state: ClickState): PrestigeVoteResult | null {
+  const raw = state[PRESTIGE_VOTE_RESULT_KEY] as Partial<PrestigeVoteResult> | undefined;
+  if (!raw || typeof raw !== "object" || typeof raw.id !== "string" || typeof raw.outcome !== "string" || !Number.isFinite(raw.at)) return null;
+  return { id: raw.id, outcome: raw.outcome as PrestigeVoteOutcome, by: typeof raw.by === "string" ? raw.by : undefined, reason: typeof raw.reason === "string" ? raw.reason : undefined, prestigeCount: finite(raw.prestigeCount), at: Number(raw.at) };
+}
+
+/**
+ * Where a vote stands. Members who must still agree: those online when it was proposed, still in a seat and still
+ * online now. A member who goes offline no longer blocks; the proposer leaving cancels it.
+ */
+function prestigeVoteStatus(room: AnyRoomRow, vote: PrestigeVote, now: number) {
+  const seats = getOccupiedRoomPlayers(room);
+  const seatOf = (id: string) => seats.find((player) => player.playerId === id);
+  if (!seatOf(vote.proposer)) return { status: "cancelled" as const, waiting: [] as CoopRole[] };
+  if (now >= vote.expiresAt) return { status: "expired" as const, waiting: [] as CoopRole[] };
+  const waiting = vote.required.filter((id) => !vote.approvals.includes(id)).map(seatOf).filter((seat): seat is NonNullable<typeof seat> => Boolean(seat && isOnline(seat.lastSeenAt))).map((seat) => seat.role);
+  return { status: waiting.length ? "pending" as const : "ready" as const, waiting };
+}
+
+/** What a client sees of the vote: roles and names, never player IDs. */
+function prestigeVoteView(room: AnyRoomRow, state: ClickState, now: number, viewerId?: string) {
+  const vote = readPrestigeVote(state);
+  if (!vote) return null;
+  const { status, waiting } = prestigeVoteStatus(room, vote, now);
+  if (status !== "pending" && status !== "ready") return null;
+  const roleOf = (id: string) => getOccupiedRoomPlayers(room).find((player) => player.playerId === id)?.role;
+  const keep = vote.keepNormalId ? getStarXIPlayer(vote.keepNormalId) : null;
+  return {
+    id: vote.id,
+    proposerRole: roleOf(vote.proposer) ?? null,
+    proposerName: vote.proposerName,
+    keepNormalId: vote.keepNormalId,
+    keepName: keep?.name ?? null,
+    prestigeCount: vote.prestigeCount,
+    expiresAt: vote.expiresAt,
+    expiresInMs: Math.max(0, vote.expiresAt - now),
+    approvedRoles: vote.approvals.map(roleOf).filter((role): role is CoopRole => Boolean(role)),
+    waitingRoles: waiting,
+    viewerIsProposer: Boolean(viewerId && viewerId === vote.proposer),
+    viewerMustVote: Boolean(viewerId && waiting.includes(roleOf(viewerId) as CoopRole)),
+    viewerApproved: Boolean(viewerId && vote.approvals.includes(viewerId)),
+  };
+}
+
+/**
+ * Settles a vote that is over (expired, proposer gone) or complete (every online member agreed): a complete vote
+ * runs the Prestige of the proposer once, with the vote id as request id. Returns the click state patch and the
+ * outcome, or null when nothing changes.
+ */
+function settlePrestigeVote(game: CoopGameState, room: AnyRoomRow, now: number) {
+  const vote = readPrestigeVote(readClickState(room));
+  if (!vote) return null;
+  const { status } = prestigeVoteStatus(room, vote, now);
+  if (status === "pending") return null;
+  if (vote.prestigeCount !== game.features.seasonMode.prestigeCount) return finishPrestigeVote(vote, "cancelled", now);
+  if (status === "cancelled" || status === "expired") return finishPrestigeVote(vote, status, now);
+  const result = applyGamePrestige(game, vote.keepNormalId, now, vote.id);
+  if (result.duplicate) return finishPrestigeVote(vote, "approved", now);
+  if (result.error) return finishPrestigeVote(vote, "failed", now, undefined, result.error);
+  Object.assign(game, result.game);
+  return finishPrestigeVote(vote, "approved", now);
+}
+
+function finishPrestigeVote(vote: PrestigeVote, outcome: PrestigeVoteOutcome, now: number, by?: string, reason?: string) {
+  const result: PrestigeVoteResult = { id: vote.id, outcome, by, reason, prestigeCount: vote.prestigeCount, at: now };
+  return {
+    outcome,
+    result,
+    patch: (state: ClickState) => {
+      if (readPrestigeVote(state)?.id === vote.id) delete state[PRESTIGE_VOTE_KEY];
+      state[PRESTIGE_VOTE_RESULT_KEY] = result;
+    },
+  };
+}
+
 function cleanName(value: unknown) {
   return typeof value === "string" ? value.trim().replace(/\s+/g, " ").slice(0, MAX_NAME_LENGTH) : "";
 }
@@ -205,12 +435,14 @@ function readGame(row: RoomRow, light = false): CoopGameState {
   // The backup copy is only read when the primary features are missing.
   const storedFeatures = light ? undefined : Object.keys(primaryFeatureRecord).length ? primaryFeatures : parseJson<Partial<CoopGameState>>(row.sharedStateBackupJson, {}).features;
   const legacyRoom = row.sharedUpgradesJson === "{}" && row.sharedTotalGoals === 0 && row.sharedSeasonGoals === 0 && row.sharedCoins > 0;
-  const legacyTotal = Math.max(row.sharedCoins, row.hostGoals + row.guestGoals + row.player3Goals + row.player4Goals);
+  // Members who left keep their share of the shared counters (the seat columns are emptied for the next member).
+  const departed = readDeparted(readClickState(row));
+  const legacyTotal = Math.max(row.sharedCoins, row.hostGoals + row.guestGoals + row.player3Goals + row.player4Goals + departed.goals);
   const game = initialGame();
   game.goals = Math.max(0, finite(row.sharedCoins));
   game.totalGoals = Math.max(0, finite(row.sharedTotalGoals || (legacyRoom ? legacyTotal : 0)));
   game.seasonGoals = Math.max(0, finite(row.sharedSeasonGoals || (legacyRoom ? legacyTotal : 0)));
-  game.clicks = Math.max(0, Math.floor(row.hostClicks + row.guestClicks + row.player3Clicks + row.player4Clicks));
+  game.clicks = Math.max(0, Math.floor(row.hostClicks + row.guestClicks + row.player3Clicks + row.player4Clicks + departed.clicks));
   game.upgrades = normalizeUpgrades(storedUpgrades);
   const storedAchievements = parseJson<unknown>(row.sharedAchievementsJson, []);
   game.achievements = Array.isArray(storedAchievements) ? storedAchievements.filter((value): value is string => typeof value === "string") : [];
@@ -335,8 +567,13 @@ function gameColumns(game: CoopGameState, timestamp: string, previousRevision = 
   };
 }
 
-/** An action that wants the game saved; the shared write itself happens in mutateWorld. */
-type SaveRequest = { kind: "save"; extraColumns: CoopRoomUpdate; responseExtras: Record<string, unknown> };
+/**
+ * An action that wants the game saved; the shared write itself happens in mutateWorld. `clickStatePatch` changes
+ * the click state column (seat management, Prestige vote) on top of the row the write builds on, so a click batch
+ * of another seat that came in between is kept. `strict`: the action depends on more than the features (seats and
+ * their counters), so after any conflict it is computed again instead of being stored on top of new clicks.
+ */
+type SaveRequest = { kind: "save"; extraColumns: CoopRoomUpdate; responseExtras: Record<string, unknown>; clickStatePatch?: (state: ClickState) => void; strict?: boolean };
 /** Nothing to save; the answer is the world as it is. */
 type NoChange = { kind: "unchanged"; responseExtras: Record<string, unknown> };
 type ActionOutcome = Response | SaveRequest | NoChange;
@@ -350,8 +587,9 @@ function persistGameResponse(
   _role: CoopRole,
   extraColumns: CoopRoomUpdate = {},
   responseExtras: Record<string, unknown> = {},
+  more: Pick<SaveRequest, "clickStatePatch" | "strict"> = {},
 ): SaveRequest {
-  return { kind: "save", extraColumns, responseExtras };
+  return { kind: "save", extraColumns, responseExtras, ...more };
 }
 
 function unchanged(responseExtras: Record<string, unknown> = {}): NoChange {
@@ -409,11 +647,14 @@ function findReceipt(room: AnyRoomRow, actionId: string, role: CoopRole) {
   return actionId ? readReceipts(room).find((receipt) => receipt.id === actionId && receipt.role === role) ?? null : null;
 }
 
-/** The click state column with this receipt added; the seats' click states stay as they are. */
-function clickStateWithReceipt(room: AnyRoomRow, receipt: Receipt) {
-  const state = parseJson<Record<string, unknown>>(room.clickStateJson, {});
-  const extras = receipt.extras && JSON.stringify(receipt.extras).length <= MAX_RECEIPT_EXTRAS_BYTES ? receipt.extras : undefined;
-  state[RECEIPTS_KEY] = [...readReceipts(room, receipt.at), { ...receipt, extras }].slice(-MAX_RECEIPTS);
+/** The click state column with this receipt and patch added; the seats' click states stay as they are. */
+function nextClickState(room: AnyRoomRow, receipt: Receipt | null, patch?: (state: ClickState) => void) {
+  const state = readClickState(room);
+  patch?.(state);
+  if (receipt) {
+    const extras = receipt.extras && JSON.stringify(receipt.extras).length <= MAX_RECEIPT_EXTRAS_BYTES ? receipt.extras : undefined;
+    state[RECEIPTS_KEY] = [...readReceipts(room, receipt.at), { ...receipt, extras }].slice(-MAX_RECEIPTS);
+  }
   return JSON.stringify(state);
 }
 
@@ -499,14 +740,14 @@ async function mutateWorld(context: WorldContext, initial: RoomRow, apply: (game
     const { game, outcome, now, timestamp } = prepared;
     const extraColumns: CoopRoomUpdate = {
       ...(options.touch ? rolePresenceUpdate(role, timestamp) : {}),
-      ...(actionId ? { clickStateJson: clickStateWithReceipt(room, { id: actionId, role, action: context.action, at: now, extras: outcome.responseExtras }) } : {}),
+      ...(actionId || outcome.clickStatePatch ? { clickStateJson: nextClickState(room, actionId ? { id: actionId, role, action: context.action, at: now, extras: outcome.responseExtras } : null, outcome.clickStatePatch) } : {}),
       ...outcome.extraColumns,
     };
     const updated = await writeWorld(db, room, game, timestamp, extraColumns);
     if (updated) return respond(updated, outcome.responseExtras);
     const latest = (await loadRoom(room.code)).room;
     if (!latest) return jsonError("Dieser Raum wurde gelöscht.", 404);
-    if (onlyClicksMoved(room, latest)) {
+    if (!outcome.strict && onlyClicksMoved(room, latest)) {
       // The goals the clicks added in between stay; the action itself is unchanged.
       game.goals += latest.sharedCoins - room.sharedCoins;
       game.totalGoals += latest.sharedTotalGoals - room.sharedTotalGoals;
@@ -587,6 +828,9 @@ function shapeRoom(input: AnyRoomRow, viewerId?: string, knownFeaturesKey = "") 
   const roomPlayers = getRoomPlayers(row);
   const occupiedPlayers = roomPlayers.filter((player) => Boolean(player.playerId));
   const viewerRole = viewerId ? roomPlayers.find((player) => player.playerId === viewerId)?.role : undefined;
+  const now = Date.now();
+  const clickState = readClickState(row);
+  const voteResult = readPrestigeVoteResult(clickState);
   return {
     code: row.code,
     roomName: row.roomName,
@@ -600,7 +844,13 @@ function shapeRoom(input: AnyRoomRow, viewerId?: string, knownFeaturesKey = "") 
       occupied: Boolean(player.playerId),
       goals: player.goals,
       clicks: player.clicks,
+      // Last activity (rounded to minutes) and whether the host may remove the member without a second confirmation.
+      lastActiveAt: player.playerId ? Math.floor(seatLastActiveAt(row, player.role, clickState) / 60_000) * 60_000 : null,
+      inactive: Boolean(player.playerId && seatInactive(row, player.role, now, clickState)),
     })),
+    inactiveDays: SEAT_INACTIVE_DAYS,
+    prestigeVote: prestigeVoteView(row, clickState, now, viewerId),
+    prestigeVoteResult: voteResult && now - voteResult.at < 5 * 60_000 ? { ...voteResult, ageMs: Math.max(0, now - voteResult.at) } : null,
     hostName: row.hostName,
     guestName: row.guestName,
     hostOnline: isOnline(row.hostLastSeenAt),
@@ -713,6 +963,7 @@ async function quickPoll(code: string, playerId: string, knownFeaturesKey: strin
   const role = roomRole(light, playerId);
   if (!role) return null;
   const now = Date.now();
+  if (hostHandoverDue(light, now)) return null;
   const elapsed = now - (Date.parse(light.lastPassiveAt || light.updatedAt) || now);
   // Passive income due: the full path books it with the presence as it was, and only then marks the player present.
   // Marking first would make a long absence look like presence and pay the whole gap.
@@ -737,6 +988,32 @@ async function refreshPassive(db: ReturnType<typeof getDb>, room: RoomRow, minEl
   const updated = await writeWorld(db, room, game, new Date(writeAt).toISOString());
   if (updated) return updated;
   return (await loadRoom(room.code)).room ?? room;
+}
+
+/**
+ * Hands the host seat to the most recently active member once the host has been inactive for SEAT_INACTIVE_DAYS:
+ * the two swap seats (with their counters and click states), so the old host stays a member. A versioned world
+ * write like every other; it runs again on the newest state after a conflict and does nothing once it is no
+ * longer due.
+ */
+async function handOverInactiveHost(db: ReturnType<typeof getDb>, initial: RoomRow) {
+  let room = initial;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const writeAt = worldWriteTime(room);
+    const successor = hostHandoverDue(room, writeAt);
+    if (!successor) return room;
+    const game = readGame(room);
+    bookPassive(game, room, writeAt);
+    const change = seatChange(room, { handover: successor }, writeAt);
+    const timestamp = new Date(writeAt).toISOString();
+    addHistory(game.features, { title: "Neuer Host", detail: `${roomPlayerName(room, "host")} war ${SEAT_INACTIVE_DAYS} Tage nicht aktiv. ${roomPlayerName(room, successor)} ist jetzt Host dieser Welt.`, tone: "neutral" }, writeAt);
+    const updated = await writeWorld(db, room, game, timestamp, { ...change.columns, clickStateJson: nextClickState(room, null, change.patch) });
+    if (updated) return updated;
+    const latest = (await loadRoom(room.code)).room;
+    if (!latest) return room;
+    room = latest;
+  }
+  return room;
 }
 
 function roomRole(room: AnyRoomRow, playerId: string) {
@@ -769,9 +1046,11 @@ async function handleGet(request: Request) {
     if (quick) return quick;
     const { db, room } = await loadRoom(code);
     if (!room) return jsonError("Raum nicht gefunden.", 404);
-    const role = roomRole(room, playerId);
+    if (!roomRole(room, playerId)) return jsonError("Du bist nicht in diesem Raum.", 403);
+    const handedOver = hostHandoverDue(room) ? await handOverInactiveHost(db, room) : room;
+    const role = roomRole(handedOver, playerId);
     if (!role) return jsonError("Du bist nicht in diesem Raum.", 403);
-    const refreshed = await refreshPassive(db, room, GET_PASSIVE_REFRESH_MIN_MS);
+    const refreshed = await refreshPassive(db, handedOver, GET_PASSIVE_REFRESH_MIN_MS);
     return Response.json({ serverNow: Date.now(), room: shapeRoom(await touchPresence(db, refreshed, role), playerId, knownFeaturesKey), role });
   } catch (error) {
     return Response.json({ error: errorMessage(error) }, { status: 500 });
@@ -825,6 +1104,10 @@ async function handlePost(request: Request) {
       protocol?: unknown;
       featuresKey?: unknown;
       actionId?: unknown;
+      targetRole?: unknown;
+      force?: unknown;
+      voteId?: unknown;
+      decision?: unknown;
     }>(request, MAX_MULTIPLAYER_BODY_BYTES);
     if (!isSupportedMultiplayerProtocol(payload.protocol)) return jsonError(MULTIPLAYER_UPDATE_MESSAGE, 426);
     const action = typeof payload.action === "string" ? payload.action : "";
@@ -880,6 +1163,9 @@ async function handlePost(request: Request) {
         : matchingNameRoles.length === 1
           ? matchingNameRoles[0]
           : null;
+      // A page reload of a member who left or was removed brings the stored room back with its old role; it does not
+      // take a free seat by itself. Joining again with the code (no stored role) is allowed while a seat is free.
+      if (!directRole && requestedRole && readStringMap(readClickState(room), REMOVED_KEY)[playerId]) return jsonError("Du bist nicht mehr in dieser Welt. Mit dem Raumcode kannst du wieder beitreten, wenn ein Platz frei ist.", 403);
       const reconnectRole = directRole ?? restoredRole;
       if (reconnectRole) {
         room = await refreshPassive(db, room);
@@ -909,6 +1195,9 @@ async function handlePost(request: Request) {
       return jsonError("Der Raum wurde gerade gleichzeitig betreten. Bitte erneut versuchen.", 409);
     }
 
+    if (!roomRole(room, playerId)) return jsonError("Du bist nicht in diesem Raum.", 403);
+    // A host inactive for days hands the host seat over to the most recently active member first.
+    if (action !== "presence-offline" && hostHandoverDue(room)) room = await handOverInactiveHost(db, room);
     const role = roomRole(room, playerId);
     if (!role) return jsonError("Du bist nicht in diesem Raum.", 403);
     if (action === "delete") {
@@ -930,7 +1219,38 @@ async function handlePost(request: Request) {
     if (action === "presence-offline") {
       // The income of the time before is booked with the presence as it was, in the same write as the offline mark.
       const offlineAt = "1970-01-01T00:00:00.000Z";
-      return mutateWorld({ ...context, actionId: "" }, room, (game, current, timestamp) => persistGameResponse(db, current, game, timestamp, playerId, role, rolePresenceUpdate(role, offlineAt)), { passive: true, touch: false, settleTravel: false });
+      // The offline mark hides when the member was last active, so that time is kept for the seat management.
+      const seenPatch = (state: ClickState) => { state[SEEN_KEY] = { ...readStringMap(state, SEEN_KEY), [playerId]: new Date().toISOString() }; };
+      return mutateWorld({ ...context, actionId: "" }, room, (game, current, timestamp) => persistGameResponse(db, current, game, timestamp, playerId, role, rolePresenceUpdate(role, offlineAt), {}, { clickStatePatch: seenPatch }), { passive: true, touch: false, settleTravel: false });
+    }
+    if (action === "leave-seat" || action === "kick") {
+      // Seats change in a versioned world write; the world, its progress and the other seats stay as they are.
+      return mutateWorld(context, room, (game, current, timestamp) => {
+        const now = Date.parse(timestamp);
+        const own = roomRole(current, playerId);
+        if (!own) return jsonError("Du bist nicht in diesem Raum.", 403);
+        const members = getOccupiedRoomPlayers(current);
+        let leaving: CoopRole;
+        if (action === "leave-seat") {
+          // The last member keeps the world: leaving would leave a world nobody can open, rename or delete.
+          if (members.length <= 1) return jsonError("Du bist das letzte Mitglied dieser Welt. Lösche die Welt, wenn du sie nicht mehr brauchst.", 409);
+          leaving = own;
+        } else {
+          if (own !== "host") return jsonError("Nur der Host kann Mitspieler entfernen.", 403);
+          const target = typeof payload.targetRole === "string" && COOP_ROLES.includes(payload.targetRole as CoopRole) ? payload.targetRole as CoopRole : null;
+          if (!target || target === "host") return jsonError("Diesen Platz kannst du nicht freigeben.");
+          if (!getRoomPlayer(current, target).playerId) return jsonError("Dieser Platz ist schon frei.", 409);
+          // An inactive member can be removed at once; an active one only after the host confirmed it a second time.
+          if (!seatInactive(current, target, now) && payload.force !== true) return jsonError(`${roomPlayerName(current, target)} war in den letzten ${SEAT_INACTIVE_DAYS} Tagen aktiv. Bestätige das Entfernen ausdrücklich.`, 409);
+          leaving = target;
+        }
+        const leaverName = roomPlayerName(current, leaving);
+        const successor = leaving === "host" ? hostSuccessor(current, undefined, leaving) : null;
+        const change = seatChange(current, { leaving, handover: successor ?? undefined }, now);
+        const detail = action === "kick" ? `${leaverName} wurde vom Host aus der Welt entfernt.` : `${leaverName} hat die Welt verlassen.`;
+        addHistory(game.features, { title: action === "kick" ? "Mitspieler entfernt" : "Mitspieler gegangen", detail: successor ? `${detail} ${roomPlayerName(current, successor)} ist jetzt Host.` : detail, tone: "neutral" }, now);
+        return persistGameResponse(db, current, game, timestamp, playerId, role, change.columns, { left: leaving, newHost: successor }, { clickStatePatch: change.patch, strict: true });
+      }, { passive: true, touch: true, settleTravel: false });
     }
     let presenceBefore: AnyRoomRow | undefined;
     if (isBackgroundAction) {
@@ -943,7 +1263,12 @@ async function handlePost(request: Request) {
         // The leader books passive income every few seconds; most of the time only the counters change.
         const last = Date.parse(room.lastPassiveAt || room.updatedAt) || Date.now();
         if (Date.now() - last < TICK_PASSIVE_REFRESH_MIN_MS) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId, knownFeaturesKey), role });
-        return mutateWorld(context, room, (game, current, timestamp) => persistGameResponse(db, current, game, timestamp, playerId, role), { passive: true, presence: beforePresence, touch: false, settleTravel: false });
+        return mutateWorld(context, room, (game, current, timestamp) => {
+          // An open Prestige vote ends here when nobody answers: expired, proposer gone, or every member who still had
+          // to agree went offline (then it passes).
+          const settled = settlePrestigeVote(game, current, Date.parse(timestamp));
+          return persistGameResponse(db, current, game, timestamp, playerId, role, {}, {}, settled ? { clickStatePatch: settled.patch } : {});
+        }, { passive: true, presence: beforePresence, touch: false, settleTravel: false });
       }
     }
     // Lobby codes are switched off; worlds that redeemed AZB earlier keep their test mode.
@@ -966,11 +1291,13 @@ async function handlePost(request: Request) {
         const now = Date.now();
         const clicks = applyServerClicks(previous, requested, now, clickPower);
         if (!clicks.accepted) return jsonError("Zu viele Klicks in zu kurzer Zeit.", 429);
-        const updated = await db.applyClick(code, role, clicks.amount, clicks.accepted, new Date(now).toISOString(), previous, clicks.state, rolePresenceUpdate(role, new Date(now).toISOString()));
+        const updated = await db.applyClick(code, role, clicks.amount, clicks.accepted, new Date(now).toISOString(), previous, clicks.state, rolePresenceUpdate(role, new Date(now).toISOString()), playerId);
         if (updated) return Response.json({ serverNow: Date.now(), room: shapeRoom(updated, playerId), role, clicks: { accepted: clicks.accepted, amount: clicks.amount } });
         // Another click batch of this seat came first; count on top of it.
         const fresh = await db.getLightRoom(code);
         if (!fresh) return jsonError("Dieser Raum wurde gelöscht.", 404);
+        // The seat was given up or handed over meanwhile: the clicks belong to nobody's seat any more.
+        if (roomRole(fresh, playerId) !== role) return jsonError("Du bist nicht in diesem Raum.", 403);
         clickRoom = fresh;
       }
       return jsonError("Die Klicks konnten gerade nicht gezählt werden.", 409);
@@ -1413,13 +1740,54 @@ async function handlePost(request: Request) {
       const requestId = typeof payload.requestId === "string" ? payload.requestId.slice(0, 60) : "";
       if (!requestId) return jsonError("Lade die Seite neu, um Prestige zu starten.", 409);
       const keepNormalId = typeof payload.keepNormalId === "string" && payload.keepNormalId ? payload.keepNormalId : null;
-      const result = applyGamePrestige(game, keepNormalId, Date.now(), requestId);
+      const now = Date.parse(timestamp);
+      const clickState = readClickState(room);
+      const openVote = readPrestigeVote(clickState);
+      // The same proposal sent again (lost answer): the vote it opened is the answer.
+      if (openVote?.id === requestId && openVote.prestigeCount === game.features.seasonMode.prestigeCount) return unchanged({ prestigeVote: "pending" });
+      const result = applyGamePrestige(game, keepNormalId, now, requestId);
       if (result.duplicate) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
       // The room goes along, so the screen that asked shows the Prestige another seat already started.
       if (Number(payload.expectedPrestigeCount) !== game.features.seasonMode.prestigeCount) return Response.json({ error: "Prestige wurde in dieser Welt schon gestartet.", errorCode: "PRESTIGE_ALREADY_STARTED", serverNow: Date.now(), room: shapeRoom(room, playerId), role }, { status: 409 });
       if (result.error) return jsonError(result.error, 409);
-      Object.assign(game, result.game);
-      return persistGameResponse(db, room, game, timestamp, playerId, role);
+      const openStatus = openVote && openVote.prestigeCount === game.features.seasonMode.prestigeCount ? prestigeVoteStatus(room, openVote, now).status : null;
+      if (openStatus === "pending" || openStatus === "ready") return Response.json({ error: `${openVote!.proposerName} hat schon eine Prestige Abstimmung gestartet.`, errorCode: "PRESTIGE_VOTE_OPEN", serverNow: Date.now(), room: shapeRoom(room, playerId), role }, { status: 409 });
+      // Prestige resets the whole world, so every member who is online right now has to agree (a vote); members
+      // who are offline do not block it. Alone online, the proposal is the whole vote and Prestige starts at once.
+      const others = getOccupiedRoomPlayers(room).filter((player) => player.playerId !== playerId && isOnline(player.lastSeenAt)).map((player) => player.playerId!);
+      if (!others.length) {
+        Object.assign(game, result.game);
+        return persistGameResponse(db, room, game, timestamp, playerId, role, {}, {}, { clickStatePatch: (state) => { delete state[PRESTIGE_VOTE_KEY]; } });
+      }
+      const vote: PrestigeVote = { id: requestId, proposer: playerId, proposerName: roomPlayerName(room, role), keepNormalId, prestigeCount: game.features.seasonMode.prestigeCount, createdAt: now, expiresAt: now + PRESTIGE_VOTE_MS, required: others, approvals: [playerId] };
+      return persistGameResponse(db, room, game, timestamp, playerId, role, {}, { prestigeVote: "pending" }, { clickStatePatch: (state) => { state[PRESTIGE_VOTE_KEY] = vote; } });
+    }
+
+    if (action === "prestige-vote") {
+      // Agree to or decline the open Prestige vote. The last missing agreement runs the Prestige of the proposer
+      // once (its id is the request id of applyGamePrestige); declining or cancelling closes the vote for all.
+      const voteId = typeof payload.voteId === "string" ? payload.voteId.slice(0, 60) : "";
+      const decision = payload.decision === "approve" || payload.decision === "decline" ? payload.decision : null;
+      if (!decision) return jsonError("Unbekannte Antwort auf die Abstimmung.");
+      const now = Date.parse(timestamp);
+      const vote = readPrestigeVote(readClickState(room));
+      if (!vote || vote.id !== voteId) {
+        const finished = readPrestigeVoteResult(readClickState(room));
+        if (finished?.id === voteId) return unchanged({ prestigeVoteResult: finished.outcome });
+        return Response.json({ error: "Diese Prestige Abstimmung ist schon vorbei.", errorCode: "PRESTIGE_VOTE_CLOSED", serverNow: Date.now(), room: shapeRoom(room, playerId), role }, { status: 409 });
+      }
+      if (decision === "decline") {
+        const status = prestigeVoteStatus(room, vote, now).status;
+        const finished = status === "expired" || status === "cancelled" ? finishPrestigeVote(vote, status, now) : finishPrestigeVote(vote, playerId === vote.proposer ? "cancelled" : "declined", now, roomPlayerName(room, role));
+        return persistGameResponse(db, room, game, timestamp, playerId, role, {}, { prestigeVoteResult: finished.outcome }, { clickStatePatch: finished.patch });
+      }
+      const approved: PrestigeVote = vote.approvals.includes(playerId) ? vote : { ...vote, approvals: [...vote.approvals, playerId] };
+      // Settled against the room with this agreement in it: the presence of this request counts as online.
+      const withApproval = { ...room, clickStateJson: JSON.stringify({ ...readClickState(room), [PRESTIGE_VOTE_KEY]: approved }), ...rolePresenceUpdate(role, timestamp) };
+      const settled = settlePrestigeVote(game, withApproval, now);
+      if (!settled) return persistGameResponse(db, room, game, timestamp, playerId, role, {}, { prestigeVote: "pending" }, { clickStatePatch: (state) => { if (readPrestigeVote(state)?.id === vote.id) state[PRESTIGE_VOTE_KEY] = approved; } });
+      if (settled.outcome === "failed" || settled.outcome === "expired" || settled.outcome === "cancelled") return persistGameResponse(db, room, game, timestamp, playerId, role, {}, { prestigeVoteResult: settled.outcome, error: settled.result.reason }, { clickStatePatch: settled.patch });
+      return persistGameResponse(db, room, game, timestamp, playerId, role, {}, { prestigeVoteResult: settled.outcome }, { clickStatePatch: settled.patch });
     }
 
     if (action === "minigame-start") {
