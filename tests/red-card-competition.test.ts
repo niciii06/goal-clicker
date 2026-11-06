@@ -39,9 +39,9 @@ test('a league red card bans for the next league match only, not for a tournamen
   assert.ok(!getUnavailableStarXIPlayerIds(f).includes(player), 'not blocked for every competition');
   // Back in the squad: a tournament may start, the league match may not.
   assert.equal(squadBanError(f, competitionFor('tournament', 'stadium')), null);
-  assert.equal(eligibilityError(f, 'tournament', 'stadium'), null);
+  assert.equal(eligibilityError(f, 'tournament', 'stadium', 10000), null);
   assert.match(squadBanError(f, 'league') ?? '', /nach einer Roten Karte/);
-  assert.match(eligibilityError(f, 'season', 'stadium') ?? '', /Roten Karte/);
+  assert.match(eligibilityError(f, 'season', 'stadium', 10000) ?? '', /Roten Karte/);
   // Processing the same match again changes nothing.
   assert.deepEqual(processMatchDiscipline(f, id, 5001), []);
   assert.equal(f.discipline.bans.length, 1);
