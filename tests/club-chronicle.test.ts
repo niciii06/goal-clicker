@@ -18,7 +18,7 @@ import { AllTimePlayerTable, CareerArea, ClubChroniclePanel } from '../app/caree
 
 const START = Date.UTC(2026, 10, 9, 12);
 function club(now = START) {
-  let f = initialGameFeatures(now);
+  const f = initialGameFeatures(now);
   f.starXI = setBestStarXI({ ...f.starXI, ownedIds: STAR_XI_PLAYERS.filter((p) => cardPackRating(p) < 95).slice(0, 60).map((p) => p.id) });
   return normalizeGameFeatures(f);
 }
