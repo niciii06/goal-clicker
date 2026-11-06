@@ -139,7 +139,7 @@ Ein externes Review (ChatGPT, auf Stand `ebc083a`) hat die Balance geprüft. Üb
 
 ### Preise, alle rund
 
-Erlaubt sind nur 1 / 1,5 / 2 / 2,5 / 3 / 4 / 5 / 6 / 7,5 / 8 mal einer Zehnerpotenz.
+Packpreise und Grundpreise der Upgrades: erlaubt sind nur 1 / 1,5 / 2 / 2,5 / 3 / 4 / 5 / 6 / 7,5 / 8 mal einer Zehnerpotenz. Die weiteren Upgradestufen sind auf zwei signifikante Stellen gerundet und steigen streng an (siehe "Stufenpreise mit zwei Stellen").
 
 | Pack | vorher | neu | Liga | Median passiv / P90 | 1 aktiv | Koop 2 | Koop 4 |
 |---|---|---|---|---|---|---|---|
@@ -260,9 +260,13 @@ Typischer Ausschlag (Simulation): VAR Median vorher etwa minus 70 Sekunden Einko
 * **Album:** Jede Gruppe zahlt weiter ihre Fragmente und dazu Tore: Meilensteine 10 / 25 / 50 Karten 1 / 2 / 5 Minuten Einkommen, jede Nation 2, Schrottkarten 5, Icons und Legendäre je 15, alle Basiskarten 30 Minuten (`claimAlbumRewards` in `app/career-data.ts`). Die Tore richten sich nach dem Einkommen beim Abholen.
 * Koop Missionen bleiben unverändert, sie werden durch Wochenziele ersetzt.
 
-### Runde Preise auf jeder Stufe
+### Stufenpreise mit zwei Stellen
 
-Jede Upgradestufe kostet den nächsten runden Betrag der bisherigen Kurve (`roundPrice` in `app/upgrade-purchase.ts`, bei Gleichstand der höhere). Ein Preis fällt nie von einer Stufe zur nächsten; folgen zwei Stufen dicht aufeinander, kosten sie gleich viel. Mehrfachkauf zählt dieselben Stufenpreise zusammen. Beispiel Kapitänsbinde: 75 / 100 / 150 / 200 / 300 / 400 / 600 / 800 Mio (vorher 75 / 106,5 / 151,2 / 214,7 / 304,9 / 433 / 614,9 / 873,1).
+Stufe 0 kostet den runden Grundpreis. Jede weitere Upgradestufe kostet den Wert der bisherigen Kurve (Grundpreis mal Faktor hoch Stufe), gerundet auf zwei signifikante Stellen: 12, 150, 4'800, 1,2 Mio, 9,9 Mrd; unter 10 ganze Zahlen ab 1 (`getUpgradeCostAtLevel` in `app/upgrade-purchase.ts`). Jede Stufe kostet mehr als die vorherige; landet die Rundung auf dem Preis der Stufe davor oder darunter, gilt der nächste Wert mit zwei Stellen darüber. Die Preise entstehen aus ganzzahliger Mantisse und Exponent, auch bei 1e26 und mehr gibt es keine Rechenreste. Client, Server und Koop rechnen mit derselben Funktion, Mehrfachkauf zählt dieselben Stufenpreise zusammen.
+
+Vorher lagen alle Stufen auf dem groben Raster der Grundpreise, darum kosteten oft zwei bis drei Stufen hintereinander gleich viel. Beispiel Kapitänsbinde Stufe 0 bis 10: 75 / 110 / 150 / 210 / 300 / 430 / 610 / 870 Mio / 1,2 / 1,8 / 2,5 Mrd (vorher 75 / 100 / 150 / 200 / 300 / 400 / 600 / 800 Mio / 1 / 2 / 2,5 Mrd). Balljunge Stufe 10 bis 16: 93 / 100 / 120 / 130 / 150 / 160 / 180 (vorher 100 / 100 / 100 / 150 / 150 / 150 / 200).
+
+In der Simulation bleiben die Packwartezeiten (Median und P90, passiv) gleich, das passive Einkommen pro Liga ändert sich um höchstens etwa 1,5%.
 
 ### Prämienpacks ohne Karten unter 55
 
@@ -285,4 +289,4 @@ Nach jeder Partie einmal (solo und Koop, in `recordCareerMatch`): Sieg +3, Unent
 | Weltklasse | 9,8 / 24,4 | 9,5 / 20,6 |
 | Legenden | 13,9 / 34,0 | 13,1 / 25,4 |
 
-Die Mediane bleiben fast gleich und steigen weiter von Pack zu Pack, Legenden liegt im Ziel 12 bis 14. Die langen Wartezeiten der teuren Packs (P90) werden deutlich kürzer, weil der VAR kein grosses Konto mehr halbiert; bei den billigen Packs sind sie etwas länger, weil ein Verlust jetzt nicht mehr vom kleinen Kontostand abhängt. Im Karrieremodell (100 Karrieren) steigt die typische Wartezeit des passiven Clubs in Liga 5 bis 1 um 3 bis 7 Minuten (vorher halfen grosse VAR Gewinne auf grossen Konten), dafür fallen die P90 Werte von bis zu 47 auf höchstens 27 Minuten. Ein rein passiver Club braucht in Liga 1 im Median 210 statt 140 Minuten; mit einem aktiven Spieler bleibt es bei 140. Die Grenzen in `tests/rebalance.test.ts` sind unverändert; `tests/balance-review.test.ts` prüft zusätzlich runde Stufenpreise, Minigame und Albumprämien, Prämienpacks ab 55, Nation IN, die Ereignisse und die Fanstimmung.
+Die Mediane bleiben fast gleich und steigen weiter von Pack zu Pack, Legenden liegt im Ziel 12 bis 14. Die langen Wartezeiten der teuren Packs (P90) werden deutlich kürzer, weil der VAR kein grosses Konto mehr halbiert; bei den billigen Packs sind sie etwas länger, weil ein Verlust jetzt nicht mehr vom kleinen Kontostand abhängt. Im Karrieremodell (100 Karrieren) steigt die typische Wartezeit des passiven Clubs in Liga 5 bis 1 um 3 bis 7 Minuten (vorher halfen grosse VAR Gewinne auf grossen Konten), dafür fallen die P90 Werte von bis zu 47 auf höchstens 27 Minuten. Ein rein passiver Club braucht in Liga 1 im Median 210 statt 140 Minuten; mit einem aktiven Spieler bleibt es bei 140. Die Grenzen in `tests/rebalance.test.ts` sind unverändert; `tests/balance-review.test.ts` prüft zusätzlich die Stufenpreise (zwei Stellen, streng steigend), Minigame und Albumprämien, Prämienpacks ab 55, Nation IN, die Ereignisse und die Fanstimmung.

@@ -32,29 +32,64 @@ test("every pack price and every upgrade base price is a round amount", () => {
   for (const upgrade of UPGRADES) assert.ok(isRound(upgrade.baseCost), `${upgrade.name}: ${upgrade.baseCost}`);
 });
 
-test("every upgrade level costs a round amount, never less than the level before, and bulk buys add them up", () => {
+/** Significant digits of the shortest decimal text JavaScript prints for the price (what players see). */
+function significantDigits(value: number) {
+  const [digits] = value.toExponential().split("e");
+  return digits.replace(".", "").replace(/0+$/, "").length;
+}
+
+test("every upgrade level costs at most two significant digits, more than the level before, and bulk buys add them up", () => {
   for (const upgrade of UPGRADES) {
-    const levels = upgrade.kind === "multiplier" ? MAX_MULTIPLIER_LEVEL : 80;
+    assert.equal(getCostAtLevel(upgrade, 0), upgrade.baseCost, `${upgrade.name}: level 0 keeps the round base price`);
+    const levels = upgrade.kind === "multiplier" ? MAX_MULTIPLIER_LEVEL : 2000;
     let previous = 0;
+    let passedHuge = false;
     for (let level = 0; level < levels; level++) {
       const cost = getCostAtLevel(upgrade, level);
-      assert.ok(isRound(cost), `${upgrade.name} Stufe ${level + 1}: ${cost}`);
-      assert.ok(cost >= previous, `${upgrade.name} Stufe ${level + 1} is cheaper than the level before`);
-      // Rounded to the nearest step: never more than a quarter off the exponential curve.
+      if (!Number.isFinite(cost)) break;
+      assert.ok(Number.isInteger(cost) && cost >= 1, `${upgrade.name} Stufe ${level + 1}: ${cost}`);
+      assert.ok(significantDigits(cost) <= 2, `${upgrade.name} Stufe ${level + 1}: ${cost} has more than two significant digits`);
+      // No floating point noise such as 1.0000000000000001e26 or 9.999999999999999e25.
+      assert.equal(cost, Number(cost.toPrecision(2)), `${upgrade.name} Stufe ${level + 1}: ${cost} is not built cleanly`);
+      assert.ok(cost > previous, `${upgrade.name} Stufe ${level + 1} costs ${cost}, not more than ${previous}`);
+      // Two digits are at most 5% off the curve; the strict increase bump may add one more step.
       const raw = upgrade.baseCost * upgrade.scale ** level;
-      assert.ok(Math.abs(cost - raw) <= 0.25 * raw, `${upgrade.name} Stufe ${level + 1}: ${cost} for ${raw}`);
+      assert.ok(Math.abs(cost - raw) <= 0.1 * raw, `${upgrade.name} Stufe ${level + 1}: ${cost} for ${raw}`);
       previous = cost;
+      if (cost > 1e30) passedHuge = true;
+      if (cost > 1e32) break;
     }
-    // x10 and MAX charge exactly the single level prices.
-    const ten = getBulkPurchase(upgrade, { [upgrade.id]: 3 }, Number.MAX_SAFE_INTEGER, 10);
-    const expected = Array.from({ length: ten.count }, (_, index) => getCostAtLevel(upgrade, 3 + index)).reduce((sum, cost) => sum + cost, 0);
-    assert.equal(ten.totalCost, expected);
-    assert.equal(ten.count, upgrade.kind === "multiplier" ? MAX_MULTIPLIER_LEVEL - 3 : 10);
+    if (upgrade.kind !== "multiplier") assert.ok(passedHuge, `${upgrade.name} was not checked beyond 1e30`);
+    // x10 and MAX charge exactly the single level prices, also at high levels.
+    for (const start of [3, 150, 250]) {
+      if (upgrade.kind === "multiplier" && start > 3) continue;
+      const ten = getBulkPurchase(upgrade, { [upgrade.id]: start }, Number.MAX_VALUE, 10);
+      const expected = Array.from({ length: ten.count }, (_, index) => getCostAtLevel(upgrade, start + index)).reduce((sum, cost) => sum + cost, 0);
+      assert.equal(ten.totalCost, expected);
+      assert.equal(ten.count, upgrade.kind === "multiplier" ? MAX_MULTIPLIER_LEVEL - 3 : 10);
+    }
     const budget = getCostAtLevel(upgrade, 0) + getCostAtLevel(upgrade, 1);
     assert.deepEqual(getBulkPurchase(upgrade, {}, budget, "max"), { count: 2, totalCost: budget });
+    assert.deepEqual(getBulkPurchase(upgrade, {}, budget - 1, "max"), { count: 1, totalCost: getCostAtLevel(upgrade, 0) });
   }
+  const captain = UPGRADES.find((upgrade) => upgrade.id === "captain")!;
+  assert.deepEqual(Array.from({ length: 11 }, (_, level) => getCostAtLevel(captain, level) / 1e6), [75, 110, 150, 210, 300, 430, 610, 870, 1200, 1800, 2500]);
+  const ballboy = UPGRADES.find((upgrade) => upgrade.id === "ballboy")!;
+  assert.deepEqual(Array.from({ length: 7 }, (_, index) => getCostAtLevel(ballboy, 10 + index)), [93, 100, 120, 130, 150, 160, 180]);
+  const brand = UPGRADES.find((upgrade) => upgrade.id === "brand")!;
+  assert.deepEqual([176, 177, 178].map((level) => getCostAtLevel(brand, level)), [9.3e25, 1.2e26, 1.5e26]);
+  // Pack prices and base prices keep the coarse round grid.
   assert.deepEqual([12, 17.5, 26, 34, 44, 55, 69, 77, 79, 91, 1234].map(roundPrice), [10, 20, 25, 30, 40, 60, 75, 75, 80, 100, 1000]);
   assert.equal(roundPrice(Infinity), Infinity);
+});
+
+test("the strict increase bumps a level to the next two digit price when the curve rounds onto the level before", () => {
+  // Scale 1.04 from 10: the curve stays near 10 and 11, so levels are pushed up one whole step at a time.
+  const slow = { id: "slow", baseCost: 10, scale: 1.04, kind: "auto" } as unknown as Parameters<typeof getCostAtLevel>[0];
+  assert.deepEqual(Array.from({ length: 6 }, (_, level) => getCostAtLevel(slow, level)), [10, 11, 12, 13, 14, 15]);
+  // Around 99 the next step is 100, then 110.
+  const edge = { id: "edge", baseCost: 98, scale: 1.005, kind: "auto" } as unknown as Parameters<typeof getCostAtLevel>[0];
+  assert.deepEqual(Array.from({ length: 4 }, (_, level) => getCostAtLevel(edge, level)), [98, 99, 100, 110]);
 });
 
 test("income keeps growing by at least a quarter per league in the late leagues", () => {
