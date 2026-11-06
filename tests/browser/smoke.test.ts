@@ -270,7 +270,7 @@ test('every tab has its own address, and switching tabs or going back keeps the 
   await openTab(page, 'Spiele');
   assert.equal(new URL(page.url()).pathname, '/spiele');
   await openTab(page, 'Club & Mehr');
-  await page.getByRole('tab', { name: 'Missionen' }).click();
+  await page.getByRole('tab', { name: 'Wochenziele' }).click();
   assert.equal(new URL(page.url()).pathname, '/club/missionen');
   await page.goBack(); await page.goBack(); await page.goBack();
   await page.waitForTimeout(500);

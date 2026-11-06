@@ -25,6 +25,10 @@ import { getPackUnlockLeague, hasReachedLeague, leagueForTier } from "./season-p
 import { getFunnyPlayerName } from "./funny-player-names";
 import { normalizeDailyRewards } from "./daily-reward";
 import { normalizePress } from "./press-conference";
+import { archiveHallOfFameBeforePrestige, emptyChronicle, normalizeChronicle, recordChronicleTournamentTitle } from "./club-chronicle";
+import type { ClubChronicle } from "./club-chronicle";
+import { normalizeWeeklyGoals, notePackOpened } from "./weekly-goals";
+import type { WeeklyGoalsState } from "./weekly-goals";
 import { pronounText } from "./player-pronouns";
 export type { ClubProfile, CoopMission, CupCardEvent, CupGoalEvent, CupInjuryEvent, CupMatchMode, CupMatchPhase, CupPenaltyEvent, CupState, CupStrategyId, CupSubstitutionImpact, EarnedPack, EarnedPackId, GoalBoostState, HistoryTone, MatchChange, MatchHistoryEntry, MissionKind, MissionProgressSource, PenaltyDirection, RandomEvent, RewardPackId, SeasonFixture, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationDefinition, StarFormationId, StarFormationSlot, StarPackDefinition, StarPackId, StarPackOdds, StarPackOpening, StarPackReveal, StarXIEvaluationContext, StarXIPlayer, StarXIState, TournamentCompletionSummary, TournamentDefinition, TournamentGazetteIssue, TournamentId, TournamentOpponent, TransferInsiderEvent, TransferInsiderOutcome, TransferLoan, TransferMarketState, TransferPlayer, TransferOffer, TransferSagaState, TransferSquadVacancy, TransferUnhappyPlayer } from "./features/types";
 export { STAR_FORMATIONS, STAR_POSITIONS, STAR_POSITION_NAMES, STAR_XI_FORMATION_POSITIONS, TOURNAMENTS, TOURNAMENT_OPPONENT_MULTIPLIER, TRANSFER_PLAYERS, YB_FC26_SOURCE_IDS, getStarFormation } from "./features/catalog";
@@ -106,7 +110,12 @@ export type GameFeatures = {
   miniGameRuns?: Record<string, number>;
   seasonMode: SeasonModeState;
   goalBoost: GoalBoostState;
+  /** The one-time co-op missions before the weekly goals. Kept so older saves load unchanged; nothing pays them any more. */
   missions: CoopMission[];
+  /** Weekly goals of the current Zurich week (app/weekly-goals.ts); missing until the first week starts. */
+  weekly?: WeeklyGoalsState;
+  /** Club chronicle: lifetime totals, records, season archive, titles, Hall of Fame tables (app/club-chronicle.ts). */
+  chronicle: ClubChronicle;
   history: MatchHistoryEntry[];
   randomEvent: RandomEvent | null;
   starPackReveal: StarPackReveal | null;
@@ -168,7 +177,8 @@ export const STAR_PACK_ROLL_DURATION_MS = 8000;
 export const STAR_XI_SQUAD_SIZE = 11;
 export const STAR_XI_BENCH_SIZE = 12;
 export const STAR_XI_MAX_SUBSTITUTIONS = 5;
-export const GAME_FEATURES_SCHEMA_VERSION = 8;
+// 9 (6 November 2026): weekly goals and the club chronicle. Older clients would drop both, so they must not save over it.
+export const GAME_FEATURES_SCHEMA_VERSION = 9;
 export const SEASON_MODE_DIVISION_COUNT = 15;
 export const SEASON_MODE_MATCHES_PER_SEASON = 10;
 export const SEASON_MODE_TABLE_SIZE = 6;
@@ -714,6 +724,7 @@ export function openEarnedPack(features:GameFeatures,id:string,now=Date.now(),ra
  const player=getStarXIPlayer(opening.player.id)!,duplicate=features.starXI.ownedIds.includes(player.id);
  const result={...opening,player,duplicate,fragmentCompensation:duplicate?getStarXIFragmentCompensation(player):0};
  earned.opening=result;
+ notePackOpened(features,now);
  if(duplicate)features.starXI.fragments+=result.fragmentCompensation;else features.starXI=addStarXIPlayer(features.starXI,player.id,getBestXIUnavailablePlayerIds(features));
  features.starPackReveal={...result,openedAt:now,openedBy:'Du',troll:shouldTriggerPackTroll(player)};
  addHistory(features,{title:`${earned.packId==='special'?SPECIAL_CARD_PACK.label:getStarPack(earned.packId)?.label??earned.packId}: ${player.name}`,detail:duplicate?`+${result.fragmentCompensation} Fragmente`:`${player.positions.join(' / ')} · Rating ${player.rating}`,tone:'positive'},now);
@@ -1048,6 +1059,8 @@ export function recordSeasonModeMatch(value: unknown, clubScore: number, opponen
     completedSeason,
     seasonOutcome,
     createdAt: now,
+    // Only for the season's completion (club chronicle); the stored history does not keep it.
+    ...(completedSeason ? { finalTable: lastTable } : {}),
   };
   const nextState: SeasonModeState = {
     ...state,
@@ -1201,6 +1214,8 @@ export function applySeasonPrestige(value: GameFeatures, keepNormalId: string | 
   features.starXI = setBestStarXI(features.starXI, getBestXIUnavailablePlayerIds(features), { career: features.career, cup: features.cup });
   features.starterSquadGranted = true;
   if (receipt) features.purchaseReceipts = [...features.purchaseReceipts, receipt].slice(-PURCHASE_RECEIPT_LIMIT);
+  // History only: the final Hall of Fame table of the run that ends goes into the club chronicle.
+  archiveHallOfFameBeforePrestige(features, now);
   features.seasonMode = startSeasonPrestige(features.seasonMode, features.club.name, now);
   const keptNormal = keepNormalId ? getStarXIPlayer(keepNormalId)?.name : null;
   addHistory(features, { title: `Prestige ${features.seasonMode.prestigeCount} gestartet`, detail: `Zurück in Saison 1 · Upgrades auf Stufe 0 · ${retained.size} Karten bleiben im Kader${keptNormal ? ` (mit ${keptNormal})` : ""} · +${Math.round(features.seasonMode.prestigeCount * PRESTIGE_GOAL_BONUS_PER_LEVEL * 100)} % Tore`, tone: "positive" }, now);
@@ -1289,6 +1304,7 @@ export function purchaseSpecialCardPack(features: GameFeatures, purchaseId: stri
   features.starXI = { ...opening.state, lockedPlayerIds: features.starXI.lockedPlayerIds };
   features.starPackReveal = reveal;
   features.purchaseReceipts = [...features.purchaseReceipts, id].slice(-PURCHASE_RECEIPT_LIMIT);
+  notePackOpened(features, now);
   addHistory(features, opening.duplicate
     ? { title: `Doppelter Spezialspieler: ${opening.player.name}`, detail: `+${opening.fragmentCompensation.toLocaleString("de-CH")} Fragmente zurück.`, tone: "neutral" }
     : { title: `${opening.player.name} aus dem Spezialkarten-Pack`, detail: `${formatStarXIPositionList(opening.player)} · Rating ${opening.player.rating}`, tone: "positive" }, now);
@@ -2719,6 +2735,7 @@ export function initialGameFeatures(now = Date.now()): GameFeatures {
     seasonMode: initialSeasonMode("FC Goal"),
     goalBoost: { tournamentId: null, multiplier: 1, startedAt: 0, endsAt: 0 },
     missions: initialMissions(),
+    chronicle: emptyChronicle(),
     history: [],
     randomEvent: null,
     starPackReveal: null,
@@ -2937,6 +2954,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     const saved = asRecord(rawMissions.find((item) => asRecord(item).id === mission.id));
     return { ...mission, claimed: saved.claimed === true };
   });
+  const weekly = normalizeWeeklyGoals(source.weekly);
   const history: MatchHistoryEntry[] = Array.isArray(source.history) ? source.history.map((item) => asRecord(item)).filter((item) => typeof item.title === "string").slice(-30).map((item, index) => ({
     id: safeString(item.id, `history-${index}`),
     title: safeString(item.title, "Spielereignis"),
@@ -3151,6 +3169,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     seasonMode: normalizedSeasonMode,
     goalBoost,
     missions,
+    chronicle: emptyChronicle(),
     history,
     randomEvent,
     starPackReveal,
@@ -3162,7 +3181,10 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     press: normalizePress(source.press),
     nextEventAt: Number(source.nextEventAt) > 0 ? Number(source.nextEventAt) : defaults.nextEventAt,
     nextVarAt: Number(source.nextVarAt) > 0 ? Number(source.nextVarAt) : defaults.nextVarAt,
+    // Last: a week started later (ensureWeeklyGoals) adds the key at the end as well, so the stored JSON keeps one order.
+    ...(weekly ? { weekly } : {}),
   };
+  normalized.chronicle = normalizeChronicle(source.chronicle, normalized.career);
   if (migration.removed) addHistory(normalized, { title: "Spezialkarten neu verteilt", detail: `${migration.removed} 100er ${migration.removed === 1 ? "Karte wurde" : "Karten wurden"} entfernt. Das Spezialkarten-Pack öffnet ab Liga ${getPackUnlockLeague(SPECIAL_CARD_PACK.id)}.`, tone: "neutral" });
   if (album.cleared) addHistory(normalized, { title: "Sammelalbum bereinigt", detail: "100er Karten zählen nicht mehr als gesammelt, ihre Meilensteine sind entfernt.", tone: "neutral" });
   return normalized;
@@ -3304,6 +3326,7 @@ export function completeTournamentRun(value: GameFeatures, summary: TournamentCo
     const pack=getTournamentRewardPack(summary.tournamentId,features.seasonMode.highestDivision);
     features.earnedPacks.push({id:runId,packId:pack.id as RewardPackId,earnedAt:now});
     addHistory(features,{title:`${pack.label} gewonnen`,detail:'Deine Prämie wartet im Packbereich.',tone:'positive'},now);
+    recordChronicleTournamentTitle(features,runId,summary.tournamentId,getTournament(summary.tournamentId)?.trophyName??'Pokal',now);
   }
   features = startTransferDeadlineDay(features, now, random);
   return publishTournamentGazette(features, summary, now, random).features;

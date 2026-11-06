@@ -3,7 +3,8 @@
 import { goalLabel } from './match-goals';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { formatIncomeDuration, getStarXIPlayer, getStarXIPositions, getUnavailableStarXIPlayerIds, STAR_POSITIONS, STAR_XI_PLAYERS, TRANSFER_UNHAPPY_PENALTY, transferUnhappyMatches } from './feature-data';
+import { formatIncomeDuration, getStarXIPlayer, getStarXIPositions, getUnavailableStarXIPlayerIds, STAR_POSITIONS, STAR_XI_PLAYERS, TOURNAMENTS, TRANSFER_UNHAPPY_PENALTY, transferUnhappyMatches } from './feature-data';
+import type { ChronicleMatchRecord } from './club-chronicle';
 import type { GameFeatures, StarXIPlayer } from './feature-data';
 import { CAREER_MILESTONES, GROWTH_POINTS_PER_LEVEL, getPlayerMilestones, getMilestoneStats, MILESTONE_METRIC_LABELS, emptyPlayerStats, getAlbumGroups, getCareerCard, getPlayerForm } from './career-data';
 import type { AwardWinner, PlayerMatchReport } from './career-data';
@@ -144,4 +145,93 @@ export function PostMatchSummary({features,onCareer,onContinue}:{features:GameFe
   {report?.events?.length ? <details><summary>Tore und wichtige Ereignisse</summary><ol className="archive-events">{report.events.map(e=><li key={e.id}>{e.minute}′ · {e.label}</li>)}</ol></details> : null}
   {rewards.length>0&&<details><summary>Prämien und Karrierefortschritt</summary>{rewards.map(e=><p key={e.id}><strong>{e.title}</strong> · {e.detail}</p>)}</details>}
   <div className="summary-actions"><button className="mode-primary" onClick={onContinue}>Weiter zum Kader</button><button className="mode-secondary" onClick={onCareer}>Matchbericht</button></div></section>;
+}
+
+const dateLabel = (at: number) => at ? new Date(at).toLocaleDateString('de-CH') : 'ohne Datum';
+const runLabel = (prestige: number | null) => prestige === null ? '' : `Lauf ${prestige + 1}`;
+const SEASON_OUTCOME_LABELS: Record<string, string> = { promoted: 'Aufstieg', relegated: 'Abstieg', stayed: 'Klassenerhalt', 'hall-of-fame': 'Hall of Fame' };
+type AllTimeSort = 'name' | 'appearances' | 'minutes' | 'goals' | 'assists' | 'average' | 'motm' | 'points';
+const ALL_TIME_COLUMNS: { id: Exclude<AllTimeSort, 'name'>; label: string; short: string }[] = [
+  { id: 'appearances', label: 'Einsätze', short: 'Sp.' }, { id: 'minutes', label: 'Minuten', short: 'Min.' }, { id: 'goals', label: 'Tore', short: 'Tore' },
+  { id: 'assists', label: 'Vorlagen', short: 'Vorl.' }, { id: 'average', label: 'Durchschnittsnote', short: 'Ø' }, { id: 'motm', label: 'Spieler des Spiels', short: 'SdS' }, { id: 'points', label: 'Punkte', short: 'Pkt.' },
+];
+const ALL_TIME_PAGE = 50;
+
+/** Every card that ever played for the club, from the lifetime statistics (career.players), sortable by every column. */
+export function AllTimePlayerTable({ features }: { features: GameFeatures }) {
+  const [sort, setSort] = useState<AllTimeSort>('goals'), [ascending, setAscending] = useState(false), [squadOnly, setSquadOnly] = useState(false), [shown, setShown] = useState(ALL_TIME_PAGE);
+  const owned = useMemo(() => new Set(features.starXI.ownedIds), [features.starXI.ownedIds]);
+  const rows = useMemo(() => Object.entries(features.career.players).flatMap(([id, stats]) => {
+    const player = getStarXIPlayer(id);
+    return player && stats.appearances > 0 ? [{ id, player, stats, average: stats.ratedMatches ? stats.ratingTotal / stats.ratedMatches : 0 }] : [];
+  }), [features.career.players]);
+  const visible = useMemo(() => rows.filter((row) => !squadOnly || owned.has(row.id)).sort((a, b) => {
+    const delta = sort === 'name' ? a.player.name.localeCompare(b.player.name) : sort === 'average' ? a.average - b.average : a.stats[sort] - b.stats[sort];
+    return (ascending ? delta : -delta) || a.player.name.localeCompare(b.player.name);
+  }), [rows, squadOnly, owned, sort, ascending]);
+  const choose = (id: AllTimeSort) => { if (id === sort) setAscending(!ascending); else { setSort(id); setAscending(id === 'name'); } };
+  const header = (id: AllTimeSort, label: string, title: string) => <th scope="col" key={id} aria-sort={sort === id ? (ascending ? 'ascending' : 'descending') : 'none'}><button type="button" title={title} aria-label={title} onClick={() => choose(id)}>{label}{sort === id ? (ascending ? ' ▲' : ' ▼') : ''}</button></th>;
+  return <section className="career-section" aria-label="Ewige Spielertabelle"><div className="career-heading"><div><p className="eyebrow">EWIGE SPIELERTABELLE</p><h4>Alle, die je für den Club gespielt haben.</h4></div><span className="feature-stat">{rows.length} SPIELER</span></div>
+    <p className="career-note">Alle erfassten Pflichtspiele aus Liga und Turnieren, über jedes Prestige hinweg. Tippe auf eine Spalte, um zu sortieren.</p>
+    <label className="chronicle-toggle"><input type="checkbox" checked={squadOnly} onChange={(e) => setSquadOnly(e.target.checked)} /> Nur aktueller Kader</label>
+    {visible.length ? <div className="chronicle-table-wrap"><table className="chronicle-table all-time-table"><thead><tr><th scope="col">#</th>{header('name', 'Spieler', 'Nach Name sortieren')}{ALL_TIME_COLUMNS.map((c) => header(c.id, c.short, `Nach ${c.label} sortieren`))}</tr></thead>
+      <tbody>{visible.slice(0, shown).map((row, index) => <tr key={row.id} className={owned.has(row.id) ? 'in-squad' : ''}><td>{index + 1}</td><th scope="row"><span>{row.player.name}</span><small>{getStarXIPositions(row.player).join(' / ') || 'Bank'}{owned.has(row.id) ? ' · im Kader' : ''}</small></th><td>{row.stats.appearances}</td><td>{Math.round(row.stats.minutes).toLocaleString('de-CH')}</td><td>{row.stats.goals}</td><td>{row.stats.assists}</td><td>{row.average ? row.average.toFixed(2) : ''}</td><td>{row.stats.motm}</td><td>{row.stats.points}</td></tr>)}</tbody></table></div>
+      : <p className="career-empty">Nach dem ersten Pflichtspiel stehen hier alle Einsätze deiner Spieler.</p>}
+    {visible.length > shown && <button type="button" className="mode-secondary chronicle-more" onClick={() => setShown(shown + ALL_TIME_PAGE)}>Weitere {Math.min(ALL_TIME_PAGE, visible.length - shown)} Spieler zeigen</button>}
+  </section>;
+}
+
+function RecordCard({ label, record, value, empty }: { label: string; record: ChronicleMatchRecord | null; value: (r: ChronicleMatchRecord) => string; empty: string }) {
+  return <article className="career-award"><span>{label}</span><strong>{record ? value(record) : 'Noch offen'}</strong><small>{record ? `gegen ${record.opponent} · ${record.competition ? `${record.competition} · ` : ''}${dateLabel(record.at)}` : empty}</small></article>;
+}
+
+/** Club chronicle: totals, records, titles with dates, one row per finished season and the final Hall of Fame tables. */
+export function ClubChroniclePanel({ features }: { features: GameFeatures }) {
+  const { totals, records, seasons, titles, hallOfFame } = features.chronicle;
+  const archive = [...seasons].reverse();
+  const datedTournamentTitles = (id: string) => titles.filter((t) => t.kind === 'tournament' && t.tournamentId === id).length;
+  const undatedTitles = TOURNAMENTS.map((t) => ({ label: t.trophyName, count: Math.max(0, (features.cup.trophies[t.id] ?? 0) - datedTournamentTitles(t.id)) })).filter((t) => t.count > 0);
+  const totalCells: [string, string][] = [['Siege', totals.wins.toLocaleString('de-CH')], ['Remis', totals.draws.toLocaleString('de-CH')], ['Niederlagen', totals.losses.toLocaleString('de-CH')], ['Tore', `${totals.goalsFor}:${totals.goalsAgainst}`], ['Zu Null', totals.cleanSheets.toLocaleString('de-CH')], ['Derbysiege', totals.derbyWins.toLocaleString('de-CH')]];
+  return <div className="career-panel">
+    <section className="career-section" aria-label="Clubbilanz"><div className="career-heading"><div><p className="eyebrow">CLUBCHRONIK / BILANZ</p><h3>Die Geschichte von {features.club.name}.</h3></div><span className="feature-stat">{totals.matches} PFLICHTSPIELE</span></div>
+      <p className="career-note">Die Bilanz zählt ab dem Update vom 6. November 2026. Rekorde aus den letzten Matchberichten und frühere Saisonauszeichnungen wurden übernommen.</p>
+      <dl className="chronicle-totals">{totalCells.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+    </section>
+    <section className="career-section" aria-label="Clubrekorde"><div className="career-heading"><div><p className="eyebrow">REKORDHALLE</p><h4>Die Bestmarken des Clubs.</h4></div></div>
+      <div className="career-award-grid chronicle-records">
+        <RecordCard label="Höchster Sieg" record={records.biggestWin} value={(r) => r.score} empty="Der erste Sieg setzt die Marke." />
+        <RecordCard label="Meiste Tore in einem Spiel" record={records.mostGoals} value={(r) => `${r.value} ${r.value === 1 ? 'Tor' : 'Tore'} (${r.score})`} empty="Das erste Tor setzt die Marke." />
+        <RecordCard label="Zuschauerrekord" record={records.recordCrowd} value={(r) => `${r.value.toLocaleString('de-CH')} Zuschauer`} empty="Zählt bei Heimspielen in der Liga." />
+        <article className="career-award"><span>Serien</span><strong>{records.unbeaten.best} {records.unbeaten.best === 1 ? 'Spiel' : 'Spiele'} ungeschlagen</strong><small>Aktuell {records.unbeaten.current} ungeschlagen · längste Siegesserie {records.winning.best}, aktuell {records.winning.current}{records.unbeaten.bestAt ? ` · Rekord vom ${dateLabel(records.unbeaten.bestAt)}` : ''}</small></article>
+      </div>
+    </section>
+    <section className="career-section" aria-label="Titel"><div className="career-heading"><div><p className="eyebrow">TITEL / MIT DATUM</p><h4>Jeder Pokal, jede Meisterschaft.</h4></div><span className="feature-stat">{titles.length + undatedTitles.reduce((n, t) => n + t.count, 0)} TITEL</span></div>
+      {titles.length ? <ol className="chronicle-titles">{[...titles].reverse().map((t) => <li key={t.id}><span aria-hidden="true">{t.kind === 'hall-of-fame' ? '🏛️' : t.kind === 'league' ? '🏆' : '🥇'}</span><strong>{t.label}</strong><small>{dateLabel(t.at)} · {runLabel(t.prestige)}</small></li>)}</ol> : <p className="career-empty">Der erste Titel bekommt hier seinen Platz mit Datum.</p>}
+      {undatedTitles.length > 0 && <p className="career-note">Frühere Turniersiege ohne Datum: {undatedTitles.map((t) => `${t.count}× ${t.label}`).join(', ')}.</p>}
+    </section>
+    <section className="career-section" aria-label="Saisonarchiv"><div className="career-heading"><div><p className="eyebrow">SAISONARCHIV</p><h4>Jede abgeschlossene Saison.</h4></div><span className="feature-stat">{seasons.length} SAISONS</span></div>
+      {archive.length ? <div className="chronicle-table-wrap"><table className="chronicle-table"><thead><tr><th scope="col">Saison</th><th scope="col">Liga</th><th scope="col">Platz</th><th scope="col">Pkt.</th><th scope="col">S / U / N</th><th scope="col">Tore</th><th scope="col">Torschützenkönig</th><th scope="col">Bester Spieler</th><th scope="col">Ausgang</th></tr></thead>
+        <tbody>{archive.map((row) => <tr key={row.id}><th scope="row"><span>Saison {row.season}</span><small>{[runLabel(row.prestige), dateLabel(row.at)].filter(Boolean).join(' · ')}</small></th><td>{leagueForTier(row.division)}</td><td>{row.place ?? ''}</td><td>{row.points ?? ''}</td><td>{row.wins === null ? '' : `${row.wins} / ${row.draws} / ${row.losses}`}</td><td>{row.goalsFor === null ? '' : `${row.goalsFor}:${row.goalsAgainst}`}</td><td>{row.topScorer ? `${name(row.topScorer.playerId)} (${row.topScorer.goals})` : ''}</td><td>{row.bestPlayerId ? name(row.bestPlayerId) : ''}</td><td>{row.outcome ? SEASON_OUTCOME_LABELS[row.outcome] : ''}</td></tr>)}</tbody></table></div>
+        : <p className="career-empty">Nach dem letzten Spieltag einer Saison steht sie hier mit Platz, Punkten und Torschützenkönig.</p>}
+      {archive.some((row) => row.place === null) && <p className="career-note">Saisons vor der Chronik zeigen nur, was die Saisonauszeichnungen festgehalten haben.</p>}
+    </section>
+    <section className="career-section" aria-label="Hall of Fame Tabellen"><div className="career-heading"><div><p className="eyebrow">HALL OF FAME / SCHLUSSTABELLEN</p><h4>Die Meistertabelle jedes Laufs.</h4></div><span className="feature-stat">{hallOfFame.length} LÄUFE</span></div>
+      {hallOfFame.length ? [...hallOfFame].reverse().map((table) => <details key={`${table.prestige}-${table.at}`} className="archive-match chronicle-hof"><summary><span><strong>{runLabel(table.prestige)}</strong><small>{dateLabel(table.at)}</small></span><b>{table.rows.find((r) => r.club)?.points ?? 0} Pkt.</b><span>⌄</span></summary>
+        <div className="chronicle-table-wrap"><table className="chronicle-table"><thead><tr><th scope="col">#</th><th scope="col">Club</th><th scope="col">S / U / N</th><th scope="col">Tore</th><th scope="col">Pkt.</th></tr></thead><tbody>{table.rows.map((r, index) => <tr key={`${r.name}-${index}`} className={r.club ? 'in-squad' : ''}><td>{index + 1}</td><th scope="row">{r.name}</th><td>{r.wins} / {r.draws} / {r.losses}</td><td>{r.goalsFor}:{r.goalsAgainst}</td><td>{r.points}</td></tr>)}</tbody></table></div></details>)
+        : <p className="career-empty">Wer die Weltliga als Meister abschliesst, findet hier die Schlusstabelle, für jeden Prestige Lauf.</p>}
+    </section>
+    <AllTimePlayerTable features={features} />
+  </div>;
+}
+
+const CAREER_VIEW_KEY = 'gc-career-view';
+/** The Karriere tab: players, form and match reports, or the club chronicle with its records. */
+export function CareerArea({ features }: { features: GameFeatures }) {
+  const [view, setView] = useState<'players' | 'chronicle'>('players');
+  useEffect(() => { const timer = window.setTimeout(() => { try { if (localStorage.getItem(CAREER_VIEW_KEY) === 'chronicle') setView('chronicle'); } catch {} }, 0); return () => window.clearTimeout(timer); }, []);
+  const change = (next: 'players' | 'chronicle') => { setView(next); try { localStorage.setItem(CAREER_VIEW_KEY, next); } catch {} };
+  return <>
+    <div className="career-view-switch" role="group" aria-label="Karrierebereich">{([['players', 'Spieler und Form'], ['chronicle', 'Chronik und Rekorde']] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => change(id)}>{label}</button>)}</div>
+    {view === 'players' ? <><CareerPanel features={features} /><MatchRatingsPanel features={features} /></> : <ClubChroniclePanel features={features} />}
+  </>;
 }

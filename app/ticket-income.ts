@@ -2,6 +2,7 @@
 // weather and kick-off time) times a ticket price that grows with the club's passive income.
 import type { CareerMatchReport } from './career-data';
 import { addHistory } from './feature-data';
+import { recordChronicleCrowd } from './club-chronicle';
 import type { GameFeatures } from './feature-data';
 import { formatNumber } from './game/format';
 import { matchStadium } from './match-stadium';
@@ -27,6 +28,7 @@ export function getTicketIncome(features: GameFeatures, passivePerSecond: number
 export function recordTicketIncome(features: GameFeatures, tickets: TicketIncome, now: number) {
   const report = features.career.reports.find((entry) => entry.id === features.cup.careerMatchId);
   if (report) report.tickets = tickets;
+  recordChronicleCrowd(features, tickets.attendance, report?.opponent ?? features.cup.opponent, report?.competition ?? 'Liga', now);
   addHistory(features, { title: 'Ticketeinnahmen', detail: `${tickets.attendance.toLocaleString('de-CH')} Zuschauer · +${formatNumber(tickets.income)} Tore`, tone: 'positive' }, now);
 }
 

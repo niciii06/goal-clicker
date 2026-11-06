@@ -14,6 +14,7 @@ import { getUpgrade } from '../app/game/upgrades.ts';
 import { MULTIPLAYER_PROTOCOL_VERSION } from '../app/multiplayer-protocol.ts';
 import { coopRetryDelay, coopUpdateReloadDue, COOP_UPDATE_RELOAD_GRACE_MS } from '../app/game/coop.ts';
 import { NETWORK_RETRY_UNSAFE_COOP_ACTIONS } from '../app/game/constants.ts';
+import { ensureWeeklyGoals } from '../app/weekly-goals.ts';
 import { refuseUnsafePost } from '../app/api/request-body.ts';
 import { installLightRoomMocks, lightRow } from './helpers/light-room-mock.ts';
 
@@ -141,7 +142,10 @@ test('a star pack resent with the same id opens one card and returns the same re
 test('the leader tick books passive income as a counter write and answers slim when the features match', async (t) => {
   const clock = Date.now();
   t.mock.method(Date, 'now', () => clock);
-  setup(initialGameFeatures(), { sharedUpgradesJson: JSON.stringify({ ballboy: 3 }), lastPassiveAt: new Date(clock - 60_000).toISOString() });
+  // A world whose week has started already (the first read of a new week stores the weekly goals once).
+  const features = initialGameFeatures();
+  ensureWeeklyGoals(features, clock, 0);
+  setup(features, { sharedUpgradesJson: JSON.stringify({ ballboy: 3 }), lastPassiveAt: new Date(clock - 60_000).toISOString() });
   const key = lightRow(row).featuresKey;
   const before = row.sharedCoins;
   const tick = await post('tick', { featuresKey: key });
@@ -156,6 +160,18 @@ test('the leader tick books passive income as a counter write and answers slim w
   // A client without the features still gets them.
   const full = await post('tick');
   assert.equal(full.data.room!.featuresOmitted, false);
+});
+
+test('a new week is stored with the first tick of the week, later ticks write counters only again', async (t) => {
+  let clock = Date.now();
+  t.mock.method(Date, 'now', () => clock);
+  setup(initialGameFeatures(), { sharedUpgradesJson: JSON.stringify({ ballboy: 3 }), lastPassiveAt: new Date(clock - 60_000).toISOString() });
+  assert.equal((await post('tick')).status, 200);
+  assert.equal(writes.features, 1, 'the week starts once');
+  assert.ok(JSON.parse(row.sharedFeaturesJson).weekly?.goals.length === 3);
+  clock += 60_000;
+  assert.equal((await post('tick', { featuresKey: lightRow(row).featuresKey })).status, 200);
+  assert.equal(writes.features, 1, 'the next tick of the same week only moves counters');
 });
 
 test('a foreground action books passive income in its own write: one world write, same income', async (t) => {
