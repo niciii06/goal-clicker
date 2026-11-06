@@ -6,7 +6,9 @@ import { attackedGoal, carrierOptions, chooseOption, decisionTemperature, flight
 import type { CarrierOption, PassStyle, SetPiece } from './match-ai';
 
 export type SimPoint = { x:number; y:number };
-export type SimPlayer = SimPoint & { id:string; name:string; role:StarPosition; slot:number; side:'club'|'opponent'; number:number; rating:number; passing:number; shooting:number; pace:number; defending:number; keeping:number; control:number; stamina:number; fitness:number; active:boolean; anchor:SimPoint };
+export type SimPlayer = SimPoint & { id:string; name:string; role:StarPosition; slot:number; side:'club'|'opponent'; number:number; rating:number; passing:number; shooting:number; pace:number; defending:number; keeping:number; control:number; stamina:number; fitness:number; active:boolean; anchor:SimPoint;
+ /** Set while an outfield player stands in goal: the position he came from. */
+ standInRole?:StarPosition };
 export type SimCheckpoint = { time:number; rng:number; sequence:number; players:SimPlayer[]; ball:SimPoint; owner:string; possession:'club'|'opponent'; lastPass?:{id:string;to:string;time:number}; chain:number; restart:boolean; direction:number;
  /** Dead ball awarded to the side in possession; `setPieceReady` once the taker stands at the ball. */
  setPiece?:SetPiece; setPieceReady?:boolean; setPieceSpot?:SimPoint;
@@ -130,6 +132,30 @@ function setPieceSetup(c:SimCheckpoint,actor:SimPlayer):Play{
  c.ball={...spot};c.setPieceReady=true;c.setPieceSpot=undefined;
  return {kind:'restart',outcome:'success',to:{...spot},duration,setPiece:c.setPiece,style:'hold',fixed};
 }
+/** Chance (out of the shot roll) that a keeper brings down the shooter at a close range chance: penalty and red card. */
+export const KEEPER_FOUL_CHANCE=.02;
+/** Chance (out of the save roll) that our keeper gets hurt making a save that he cannot hold. */
+export const KEEPER_INJURY_CHANCE=.012;
+function anchorOf(c:SimCheckpoint,p:SimPlayer,formation:string,role:StarPosition):SimPoint{
+ const s=getStarFormation(formation).slots[p.slot];const x=role==='TW'?3:12+(100-s.y)*.68,y=role==='TW'?34:5+s.x*.58;
+ const right=(p.side==='club'?c.direction:-c.direction)>0;return {x:right?x:105-x,y:right?y:68-y};
+}
+/**
+ * Both sides always have someone in goal. A side whose keeper left (red card, injury without a change) puts the
+ * outfield player with the best keeping in goal; he keeps badly (keeperSkill). A real keeper coming on takes over again.
+ */
+export function ensureKeepers(sim:Pick<InteractiveMatch,'clubFormation'|'opponentFormation'>,c:SimCheckpoint){
+ for(const side of ['club','opponent'] as const){
+  const formation=side==='club'?sim.clubFormation:sim.opponentFormation,active=activeOf(c,side);
+  // A change at a break gives every player the role of his slot again: the stand-in is an outfield player again.
+  for(const p of c.players)if(p.side===side&&p.standInRole&&p.role!=='TW'){delete p.standInRole;p.anchor=anchorOf(c,p,formation,p.role);}
+  const keepers=active.filter(p=>p.role==='TW');
+  if(keepers.length>1)for(const p of keepers)if(p.standInRole&&keepers.some(k=>!k.standInRole)){p.role=p.standInRole;delete p.standInRole;p.anchor=anchorOf(c,p,formation,p.role);}
+  if(keepers.length||!active.length)continue;
+  const standIn=[...active].sort((a,b)=>b.keeping-a.keeping||(roleOf(a)==='centre-back'?-1:0)-(roleOf(b)==='centre-back'?-1:0)||a.slot-b.slot)[0];
+  standIn.standInRole=standIn.role;standIn.role='TW';standIn.anchor=anchorOf(c,standIn,formation,'TW');
+ }
+}
 function resolveShot(c:SimCheckpoint,actor:SimPlayer,quality:number,penalty:boolean):Play{
  const goal=attackedGoal(c,actor.side),keeper=keeperOf(c,other(actor.side)),distance=dist(c.ball,goal);
  const duration=simSeconds(.25+distance/27),visual=duration/SIM_SECONDS_PER_VISUAL_SECOND,goalX=goal.x>52.5?PITCH.length-.4:.4;
@@ -139,6 +165,14 @@ function resolveShot(c:SimCheckpoint,actor:SimPlayer,quality:number,penalty:bool
  const onTarget=penalty?.9:clamp(quality*1.6+.24,.24,.86);
  const blockers=penalty?[]:activeOf(c,other(actor.side)).filter(p=>roleOf(p)!=='keeper'&&dist(p,c.ball)<10&&Math.abs(Math.atan2(p.y-c.ball.y,p.x-c.ball.x)-Math.atan2(goal.y-c.ball.y,goal.x-c.ball.x))<.35);
  const blockChance=blockers.length?.16:.03;
+ // Through on goal: the keeper rushing out sometimes brings the shooter down. Taken from the roll, so other shots
+ // draw exactly the same random numbers as before.
+ if(!penalty&&keeper&&!keeper.standInRole&&distance<12&&!blockers.length&&roll>=quality&&roll<quality+KEEPER_FOUL_CHANCE){
+  keeper.active=false;const spot={x:xFromProgress(c,actor.side,PITCH.length-11),y:PITCH.goalY};
+  const taker=activeOf(c,actor.side).filter(p=>roleOf(p)!=='keeper').sort((a,b)=>b.shooting-a.shooting)[0]??actor;
+  award(c,{setPiece:'penalty',side:actor.side,ball:{...c.ball},spot,taker});moveOffBall(c,taker,visual,fixed);
+  return {kind:'red',outcome:'success',to:{...c.ball},duration,target:keeper,setPiece:'penalty',note:'Notbremse',fixed};
+ }
  if(roll<quality){
   const to={x:goalX,y:PITCH.goalY+(random(c)-.5)*6.2};
   c.restart=true;c.possession=other(actor.side);c.owner=(keeper??activeOf(c,other(actor.side))[0]).id;c.ball=to;
@@ -156,7 +190,10 @@ function resolveShot(c:SimCheckpoint,actor:SimPlayer,quality:number,penalty:bool
   const rebound=insidePitch({x:save.x+(goal.x>52.5?-1:1)*(5+random(c)*6),y:save.y+(random(c)-.5)*14},2);
   const first=collector(c,rebound,keeper.id),reach=Math.max(visual,runTime(first,rebound));first.x=rebound.x;first.y=rebound.y;fixed.add(first.id);
   c.possession=first.side;c.owner=first.id;c.ball=rebound;moveOffBall(c,first,reach,fixed);
-  return {kind:'shot',outcome:'save',to:rebound,duration:simSeconds(reach),target:keeper,fixed,style:'parry'};
+  // Like every injury in the engine, only our own players get hurt; the end of the save roll decides it.
+  const hurt=keeper.side==='club'&&!keeper.standInRole&&hold>=1-KEEPER_INJURY_CHANCE;
+  if(hurt)keeper.active=false;
+  return {kind:'shot',outcome:'save',to:rebound,duration:simSeconds(reach),target:keeper,fixed,style:'parry',...(hurt?{note:'keeper-injury'}:{})};
  }
  if(roll<onTarget+blockChance&&blockers.length){
   const blocker=blockers.sort((a,b)=>dist(a,c.ball)-dist(b,c.ball))[0],at=insidePitch({x:blocker.x+(c.ball.x-blocker.x)*.3,y:blocker.y+(c.ball.y-blocker.y)*.3});
@@ -266,7 +303,7 @@ const OPPONENT_SUB_TIMES=[3600,4200,4800];
  */
 function opponentSubstitution(c:SimCheckpoint){
  const used=c.opponentSubs??0;
- if(used>=OPPONENT_SUB_TIMES.length||c.time<OPPONENT_SUB_TIMES[used]||!c.setPiece||c.setPieceReady||c.setPiece==='penalty')return;
+ if(used>=OPPONENT_SUB_TIMES.length||c.time<=OPPONENT_SUB_TIMES[used]||!c.setPiece||c.setPieceReady||c.setPiece==='penalty')return;
  const tired=c.players.filter(p=>p.side==='opponent'&&p.active&&p.role!=='TW'&&p.id!==c.owner).sort((a,b)=>a.fitness-b.fitness||a.slot-b.slot)[0];
  if(!tired)return;
  const taken=new Set(c.players.map(p=>p.name));
@@ -279,7 +316,7 @@ function opponentSubstitution(c:SimCheckpoint){
 }
 function prepare(sim:InteractiveMatch,start:SimCheckpoint):SimAction {
  const before=structuredClone(start),c=structuredClone(start);
- opponentSubstitution(c);
+ opponentSubstitution(c);ensureKeepers(sim,c);
  let actor=activeOf(c).find(p=>p.id===c.owner)??activeOf(c,c.possession)[0];
  if(!actor)throw new Error('Kein aktiver Ballbesitzer');
  c.owner=actor.id;c.possession=actor.side;
@@ -358,7 +395,9 @@ export function advanceInteractive(cup:CupState,now:number):CupState {
    else if(taker&&(a.setPiece==='free-kick'||a.setPiece==='penalty')){own.freeKicks++;next.broadcast.events.push({id:`${a.id}:free-kick`,kind:'free-kick',side:awarded,minute,at,playerId:taker.id,player:taker.name,style:a.setPiece==='penalty'?'penalty':'ground',lane:a.to.y,seed:0});}
    else if(a.setPiece==='throw-in')own.throwIns++;
   }
-  if(a.kind==='injury'){
+  const injuredPlayer=a.kind==='injury'?actor:a.note==='keeper-injury'?a.before.players.find(p=>p.id===a.target):undefined;
+  if(injuredPlayer){
+   const actor=injuredPlayer;
    const injury={id:a.id,playerId:actor.id,player:actor.name,reason:'Muskelverletzung',matches:1+(sim.committed.rng%3),minute,createdAt:at,homeScore:next.homeScore,awayScore:next.awayScore};
    next.injuryEvents.push(injury);next.lastInjury=injury;next.injuredPlayerIds[actor.id]=injury.matches;next.playerExitedAt[actor.id]=minute;
    sim.status='editing';next.matchPaused=true;next.lastResult=`${actor.name} ist verletzt. Wechsel prüfen oder ohne Ersatz weiterspielen.`;sim.buffer=[];
