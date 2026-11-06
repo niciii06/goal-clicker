@@ -3,6 +3,7 @@ import { goalLabel } from './match-goals';
 import { recordedActionRating } from './match-broadcast';
 import { addHistory, getMatchScoreImpact, TRANSFER_UNHAPPY_PENALTY, transferUnhappyMatches, getCupPlayerMatchRating, getStarXIPlayerMatchRating, getStarXIPlayer, getTournament, removeStarXIPlayersFromSquad, MIN_DRAWABLE_RATING, STAR_XI_ACTIVE_PLAYERS, SCRAP_PACK_PLAYERS } from './feature-data';
 import { getBannedPlayerIds, nextCompetition, processMatchDiscipline, suspensionLabel } from './discipline';
+import { applyMatchResultToFanMood } from './press-conference';
 import type { CupState, GameFeatures, SeasonMatchHistoryEntry, StarPosition, StarXIPlayer } from './feature-data';
 
 /** `points`: match points of the club while this card played, by the result after 90 minutes (win 3, draw 1, loss 0). */
@@ -306,6 +307,8 @@ export function recordCareerMatch(features: GameFeatures, now = Date.now(), seas
   const old = career.rivals[key] ?? { opponent: c.opponent, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, closeGames: 0, active: false, lastResults: [], lastPlayedAt: 0 };
   const draw = c.homeScore === c.awayScore && !c.penaltyEvents.length;
   const won = c.homeScore > c.awayScore || (c.homeScore === c.awayScore && c.penaltyHomeScore > c.penaltyAwayScore);
+  // The fans react to every result once (this point runs once per match, solo and co-op): a shoot-out counts as decided.
+  features.press = { ...features.press, fanMood: applyMatchResultToFanMood(features.press.fanMood, won ? 'win' : draw ? 'draw' : 'loss') };
   // Points of every card that played, by the result after 90 minutes: win 3, draw 1, loss 0. Extra time and a
   // shoot-out only happen after a draw at 90 minutes, so such a match is a draw (1) whoever goes through.
   const decidedAfter90 = c.phase === 'extra-time' || c.phase === 'penalties' || c.penaltyEvents.length > 0;

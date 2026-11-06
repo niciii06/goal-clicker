@@ -162,6 +162,22 @@ export function getPressReward(passivePerSecond: number, clickPower: number) {
   return Math.max(250, Math.floor(Math.max(passivePerSecond * 90, clickPower * 60)));
 }
 
+/** Fan mood drifts back toward this middle after every match. */
+export const FAN_MOOD_CENTER = 50;
+/** What a result does to the fan mood, applied once per match before the press conference. */
+export const FAN_MOOD_RESULT_CHANGE = { win: 3, draw: 1, loss: -3 } as const;
+export type FanMoodOutcome = keyof typeof FAN_MOOD_RESULT_CHANGE;
+
+/**
+ * Fan mood after a match: the result moves it (win up, draw a little, loss down) and it drifts one point toward
+ * the middle for every full ten points it is away from it. A run of wins settles around 80, a run of losses around 20.
+ */
+export function applyMatchResultToFanMood(mood: number, outcome: FanMoodOutcome) {
+  const current = Math.max(0, Math.min(100, Math.round(Number.isFinite(mood) ? mood : DEFAULT_FAN_MOOD)));
+  const drift = Math.trunc((FAN_MOOD_CENTER - current) / 10);
+  return Math.max(0, Math.min(100, current + drift + FAN_MOOD_RESULT_CHANGE[outcome]));
+}
+
 export function fanMoodLabel(mood: number) {
   return mood >= 85 ? 'Euphorisch' : mood >= 70 ? 'Begeistert' : mood >= 50 ? 'Zufrieden' : mood >= 30 ? 'Skeptisch' : 'Gereizt';
 }
