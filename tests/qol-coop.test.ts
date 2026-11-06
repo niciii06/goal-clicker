@@ -125,3 +125,19 @@ test('history: squad changes of one player within ten minutes share one entry; o
   const legacy = normalizeGameFeatures({ ...JSON.parse(JSON.stringify(start)), history: [{ id: 'x', title: 'Alt', detail: 'd', tone: 'neutral', timestamp: 5 }] });
   assert.deepEqual(legacy.history, [{ id: 'x', title: 'Alt', detail: 'd', tone: 'neutral', timestamp: 5 }]);
 });
+
+test('star-favorite marks a card for the whole world; cup-abandon ends a waiting run once', async () => {
+  const start = squad();
+  start.cup = { ...start.cup, mode: 'tournament', tournamentId: 'stadium', pendingNextRound: true, round: 1, matchStartedAt: Date.now() - 600_000 };
+  setup(start);
+  const card = start.starXI.ownedIds[0];
+  assert.equal((await post('star-favorite', { actionId: 'f-1', starPlayerId: card })).status, 200);
+  assert.deepEqual(features().favoriteIds, [card]);
+  assert.equal((await post('star-favorite', { actionId: 'f-2', starPlayerId: 'not-a-card' })).status, 409);
+  const abandoned = await post('cup-abandon', { actionId: 'a-1' }, GUEST);
+  assert.equal(abandoned.status, 200, abandoned.data.error);
+  assert.equal(features().cup.pendingNextRound, false);
+  assert.equal(features().history.at(-1)?.actor, 'Silvan');
+  assert.equal((await post('cup-abandon', { actionId: 'a-1' }, GUEST)).data.duplicate, true);
+  assert.equal((await post('cup-abandon', { actionId: 'a-2' }, GUEST)).status, 409);
+});

@@ -2,18 +2,20 @@
 
 import { getSeasonModeDivisionLabel, getSeasonSchedule, getTournamentRewardPack, MATCH_PACK_STAMP_TARGET, SEASON_MODE_DIVISION_COUNT, SEASON_MODE_MATCHES_PER_SEASON, sortSeasonTable } from "./feature-data";
 import type { GameFeatures, SeasonResult, SeasonScheduleMatch, SeasonTableRow } from "./feature-data";
+import { getStarXIPlayer } from "./feature-data";
+import { formGuide, promotionOutlook, seasonTopScorers } from "./qol/season-insights";
 
 function StandingsTable({ table, results, division, caption }: { table: readonly SeasonTableRow[]; results: readonly SeasonResult[]; division: number; caption: string }) {
   const rows = sortSeasonTable(table, results), top = division >= SEASON_MODE_DIVISION_COUNT;
   return <div className="season-hub-table-wrap">
     <table className="season-hub-table">
       <caption>{caption}</caption>
-      <thead><tr><th scope="col">#</th><th scope="col">Club</th><th scope="col" title="Spiele">Sp</th><th scope="col" title="Siege">S</th><th scope="col" title="Unentschieden">U</th><th scope="col" title="Niederlagen">N</th><th scope="col">Tore</th><th scope="col" title="Tordifferenz">+/-</th><th scope="col">Pkt</th></tr></thead>
+      <thead><tr><th scope="col">#</th><th scope="col">Club</th><th scope="col" title="Spiele">Sp</th><th scope="col" title="Siege">S</th><th scope="col" title="Unentschieden">U</th><th scope="col" title="Niederlagen">N</th><th scope="col">Tore</th><th scope="col" title="Tordifferenz">+/-</th><th scope="col">Pkt</th><th scope="col" className="season-form-head">Form</th></tr></thead>
       <tbody>{rows.map((team, index) => {
         const zone = top ? (index === 0 ? "hall-of-fame" : index >= rows.length - 2 ? "relegation" : "") : index < 2 ? "promotion" : index >= rows.length - 2 && division > 1 ? "relegation" : "";
         const diff = team.goalsFor - team.goalsAgainst;
         return <tr key={team.id} className={`${zone}${team.id === "club" ? " club" : ""}`}>
-          <td>{index + 1}</td><th scope="row">{team.name}</th><td>{team.played}</td><td>{team.wins}</td><td>{team.draws}</td><td>{team.losses}</td><td>{team.goalsFor}:{team.goalsAgainst}</td><td>{diff > 0 ? `+${diff}` : diff}</td><td><b>{team.points}</b></td>
+          <td>{index + 1}</td><th scope="row">{team.name}</th><td>{team.played}</td><td>{team.wins}</td><td>{team.draws}</td><td>{team.losses}</td><td>{team.goalsFor}:{team.goalsAgainst}</td><td>{diff > 0 ? `+${diff}` : diff}</td><td><b>{team.points}</b></td><td className="season-form" aria-label={`Form: ${formGuide(team.id, results).join(" ") || "noch keine Spiele"}`}>{formGuide(team.id, results).map((letter, index) => <i key={index} className={`form-${letter}`}>{letter}</i>)}</td>
         </tr>;
       })}</tbody>
     </table>
@@ -31,7 +33,7 @@ function MatchLine({ match }: { match: SeasonScheduleMatch }) {
 }
 
 /** Season tab: the table, the club's remaining matches and every matchday of the league. */
-export function SeasonPanel({ features }: { features: GameFeatures }) {
+export function SeasonPanel({ features, action }: { features: GameFeatures; /** Q46: start the next match or Prestige right here. */ action?: { label: string; disabled: boolean; note?: string; onClick: () => void } }) {
   const season = features.seasonMode, schedule = getSeasonSchedule(season);
   const next = schedule.filter((day) => !day.played);
   const opponentRating = (id: string) => season.table.find((team) => team.id === id)?.rating;
@@ -41,7 +43,10 @@ export function SeasonPanel({ features }: { features: GameFeatures }) {
   return <div className="feature-panel season-hub">
     <div className="feature-panel-heading"><div><p className="eyebrow">SAISON {seasonLabel} / {getSeasonModeDivisionLabel(season.division).toUpperCase()}</p><h3>{season.hallOfFame ? "Hall of Fame erreicht." : `Spieltag ${season.matchday + 1} von ${SEASON_MODE_MATCHES_PER_SEASON}`}</h3></div></div>
     {!season.hallOfFame && <p className="season-hub-stamps" aria-label="Matchstempel">Matchstempel {features.matchStamps} / {MATCH_PACK_STAMP_TARGET} · beim {MATCH_PACK_STAMP_TARGET}. Ligaspiel gibt es ein {getTournamentRewardPack("cup", season.highestDivision).label}</p>}
+    {action && <div className="season-hub-action"><button type="button" className="mode-primary" disabled={action.disabled} onClick={action.onClick}>{action.label}</button>{action.note && <small>{action.note}</small>}</div>}
+    {!season.hallOfFame && season.table.some((team) => team.played > 0) && <p className="season-hub-outlook" role="status">{promotionOutlook(season.table, season.results ?? [], season.division)}</p>}
     <StandingsTable table={season.table} results={season.results ?? []} division={season.division} caption="Tabelle" />
+    {seasonTopScorers(features.career.seasonPlayers).length > 0 && <section className="season-hub-section" aria-label="Torschützen der Saison"><h4>Torschützen dieser Saison</h4><ol className="season-hub-scorers">{seasonTopScorers(features.career.seasonPlayers).map((entry) => <li key={entry.playerId}><strong>{getStarXIPlayer(entry.playerId)?.name ?? "Spieler"}</strong><span>{entry.goals} {entry.goals === 1 ? "Tor" : "Tore"} · {entry.assists} Vorl. · {entry.appearances} Sp.</span></li>)}</ol></section>}
     {showLastSeason && <details className="season-hub-last"><summary>Abschlusstabelle der letzten Saison</summary><StandingsTable table={season.lastTable} results={season.lastResults ?? []} division={Math.max(1, season.division - (season.history.at(-1)?.seasonOutcome === "promoted" ? 1 : season.history.at(-1)?.seasonOutcome === "relegated" ? -1 : 0))} caption="Letzte Saison" /></details>}
     <section className="season-hub-section" aria-label="Deine nächsten Spiele">
       <h4>Deine nächsten Spiele</h4>
@@ -57,8 +62,8 @@ export function SeasonPanel({ features }: { features: GameFeatures }) {
     </section>
     <section className="season-hub-section" aria-label="Alle Spieltage">
       <h4>Alle Spieltage</h4>
-      {/* Every matchday starts open; the next one is marked so it stands out at a glance. */}
-      <div className="season-hub-days">{schedule.map((day) => { const next = !day.played && day.matchday === season.matchday + 1; return <details key={day.matchday} className={`season-hub-day-card${next ? " next" : ""}`} open aria-current={next ? "step" : undefined}>
+      {/* Only the next and the last played matchday start open (Q50); the others are one tap away. */}
+      <div className="season-hub-days">{schedule.map((day) => { const next = !day.played && day.matchday === season.matchday + 1; const last = day.played && day.matchday === season.matchday; return <details key={day.matchday} className={`season-hub-day-card${next ? " next" : ""}`} open={next || last || undefined} aria-current={next ? "step" : undefined}>
         <summary><span>Spieltag {day.matchday}</span><small>{day.played ? "gespielt" : next ? "Nächstes Spiel" : "offen"}</small></summary>
         <ul>{day.matches.map((match) => <MatchLine key={`${match.homeId}-${match.awayId}`} match={match} />)}</ul>
       </details>; })}</div>

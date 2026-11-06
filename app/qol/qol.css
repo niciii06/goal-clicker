@@ -86,3 +86,23 @@
 .album-group-view { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
 .album-missing-link { margin-top: 4px; padding: 0; border: 0; color: var(--accent); background: none; font-size: var(--text-caption2); font-weight: 700; cursor: pointer; text-decoration: underline; }
 .prestige-search { width: 100%; margin-bottom: 8px; }
+
+/* Season tab: start button, outlook, form guide, top scorers */
+.season-hub-action { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0 12px; }
+.season-hub-action small { color: var(--soft); }
+.season-hub-outlook { margin: 4px 0 10px; font-weight: 700; }
+.season-form { white-space: nowrap; }
+.season-form i { display: inline-block; width: 16px; height: 16px; margin-right: 2px; border-radius: 4px; color: #fff; font-size: 10px; font-style: normal; font-weight: 800; line-height: 16px; text-align: center; }
+.season-form .form-S { background: #16845b; }
+.season-form .form-U { background: #8e8e93; }
+.season-form .form-N { background: #d12c54; }
+.season-hub-scorers { display: grid; gap: 4px; margin: 6px 0 0; padding-left: 20px; }
+.season-hub-scorers li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
+.season-hub-scorers span { color: var(--soft); font-size: var(--text-caption2); }
+@media (max-width: 520px) { .season-form-head, .season-form { display: none; } }
+
+.cup-penalty-rules { display: block; margin-top: 6px; opacity: .8; font-size: var(--text-caption2); }
+.coop-pending-chip { display: inline-flex; align-items: center; padding: 4px 10px; border: 0; border-radius: 999px; color: var(--text); background: var(--fill); font-size: var(--text-caption2); font-weight: 700; }
+.coop-pending-chip.failed { color: #fff; background: #d12c54; cursor: pointer; }
+.layout-toolbar.compact { justify-content: flex-end; padding-top: 0; padding-bottom: 0; border: 0; background: transparent; box-shadow: none; }
+.history-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }

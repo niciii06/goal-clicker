@@ -1,6 +1,7 @@
 "use client";
 import dynamic from 'next/dynamic';
 import { useEffect, useState, useRef } from 'react';
+import { PREF_KEYS, readPref, writePref } from './qol/prefs';
 import { getCupMatchMinute, getCupRegularDurationMs, getStarFormation, getStarXIPlayer, STAR_XI_MAX_SUBSTITUTIONS } from './feature-data';
 import type { GameFeatures } from './feature-data';
 import { matchColours } from './match-colours';
@@ -24,7 +25,9 @@ export function LegacyLiveMatchViewer({ features, now, clubName, clubColor, disa
   const [clock, setClock] = useState(now);
   const [replay, setReplay] = useState<Replay>();
   const reducedMotion = useReducedMotion();
-  const [camera,setCamera]=useState<"full"|"follow"|"highlights">("full");
+  // The camera stays as chosen on this device (Q54).
+  const [camera,setCameraState]=useState<"full"|"follow"|"highlights">(()=>{const saved=readPref(PREF_KEYS.viewer);return saved==='follow'||saved==='highlights'?saved:'full';});
+  const setCamera=(next:"full"|"follow"|"highlights")=>{setCameraState(next);writePref(PREF_KEYS.viewer,next);};
   const [fps,setFps]=useState(0);
   const [selectedPlayer,setSelectedPlayer]=useState<string>();
   const [expanded,setExpanded]=useState(false);
