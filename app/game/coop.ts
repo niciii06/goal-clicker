@@ -73,6 +73,25 @@ export async function readCoopResponse(response: Response) {
   return data;
 }
 
+/** "online", "heute aktiv", "vor 3 Tagen aktiv": the last activity of a member for the seat management. */
+export function coopLastActiveLabel(player: { online: boolean; occupied: boolean; lastActiveAt?: number | null }, now = Date.now()) {
+  if (!player.occupied) return "";
+  if (player.online) return "online";
+  if (!player.lastActiveAt) return "";
+  const days = Math.floor(Math.max(0, now - player.lastActiveAt) / (24 * 60 * 60 * 1000));
+  if (days === 0) return "heute aktiv";
+  return days === 1 ? "vor 1 Tag aktiv" : `vor ${days} Tagen aktiv`;
+}
+
+/** The note every member sees once a co-op Prestige vote is over. */
+export function prestigeVoteMessage(result: { outcome: string; by?: string; reason?: string; prestigeCount: number }) {
+  if (result.outcome === "approved") return `Alle haben zugestimmt. Prestige ${result.prestigeCount + 1} ist gestartet, alle Upgrades stehen wieder auf Stufe 0.`;
+  if (result.outcome === "declined") return `${result.by ?? "Ein Mitspieler"} hat Prestige abgelehnt. Es bleibt alles, wie es war.`;
+  if (result.outcome === "cancelled") return "Die Prestige Abstimmung wurde abgebrochen. Es bleibt alles, wie es war.";
+  if (result.outcome === "expired") return "Die Prestige Abstimmung ist abgelaufen, nicht alle haben rechtzeitig zugestimmt. Es bleibt alles, wie es war.";
+  return `Prestige konnte nicht starten${result.reason ? `: ${result.reason}` : "."}`;
+}
+
 /** One id per co-op action; a resend after a lost answer carries the same id and is answered from its receipt. */
 export function newCoopActionId() {
   const random = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;

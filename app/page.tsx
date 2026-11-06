@@ -17,7 +17,7 @@ import { FootballGraphic, GameErrorBoundary, Icon, StarXIPositionBadges } from "
 import { LiveMatchViewer } from "./match-viewer";
 import { AccountButton, AccountLink } from "./account-panel";
 import { ConfirmDialog, useDialogFocus } from "./confirm-dialog";
-import { PrestigeDialog, prestigeBonusLabel, prestigeBonusPercent } from "./prestige-dialog";
+import { PrestigeDialog, PrestigeVoteDialog, prestigeBonusLabel, prestigeBonusPercent } from "./prestige-dialog";
 import { WHATS_NEW } from "./whats-new";
 import { WhatsNewDialog } from "./whats-new-dialog";
 import { TutorialCoach, TutorialIntroDialog } from "./tutorial-panel";
@@ -45,7 +45,7 @@ import { competitionFor, competitionOfCup, getBannedPlayerIds, nextCompetition, 
 import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "./daily-reward";
 import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
 import { consumeTravel, eligibilityError, fixtureFor, journeyView, payTravelFines, settleTravel, travelTiming } from "./travel-data";
-import { COOP_UPDATE_REQUIRED_EVENT, coopRetryDelay, coopRoleLabel, createCoopGameNormalizer, isCoopRole, multiplayerUrl, newCoopActionId, notifyCoopOffline, occupiedCoopPlayers, readCoopResponse, reloadForUpdate, upsertSavedRoom } from "./game/coop";
+import { COOP_UPDATE_REQUIRED_EVENT, coopLastActiveLabel, coopRetryDelay, coopRoleLabel, createCoopGameNormalizer, isCoopRole, multiplayerUrl, newCoopActionId, notifyCoopOffline, occupiedCoopPlayers, prestigeVoteMessage, readCoopResponse, reloadForUpdate, upsertSavedRoom } from "./game/coop";
 import { capGoalsAfterRebalance, createClickResult, decayComboCount, formatComboMultiplier, getBaseClickPower, getBasePassivePower, getBulkPurchase, getClickPower, getComboLevel, getComboProgress, getCost, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades, scaleMiniGameReward } from "./game/economy";
 import { UPGRADES } from "./game/upgrades";
 import { applyGamePrestige } from "./game/prestige";
@@ -268,6 +268,11 @@ function App() {
   // `prestigeCount`: the count when the dialog opened; when it changes (another seat started Prestige), the dialog closes.
   const [prestigeDialog, setPrestigeDialog] = useState<{ requestId: string; error: string; prestigeCount: number } | null>(null);
   const prestigeConfirmedRef = useRef(new Set<string>());
+  // Seat management: leave the own seat, or (host) remove a member. Always asked in a ConfirmDialog first.
+  const [seatDialog, setSeatDialog] = useState<{ kind: "leave" } | { kind: "kick"; role: CoopRole; name: string; inactive: boolean; activity: string } | null>(null);
+  // An open co-op Prestige vote the player hid (by vote id); it comes back with the next vote.
+  const [hiddenPrestigeVote, setHiddenPrestigeVote] = useState("");
+  const shownVoteResultRef = useRef("");
   // The md5 of the shared features this client holds; polls send it so the server can leave them out.
   const coopFeaturesKeyRef = useRef("");
   const missedMatchRef = useRef<{ since: number; until: number; matchStartedAt: number } | null>(null);
@@ -464,6 +469,8 @@ function App() {
       const response = await fetch("/api/multiplayer", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "join", code, playerId, nickname, preferredRole: stored.role, protocol: MULTIPLAYER_PROTOCOL_VERSION }) });
       const data = await readCoopResponse(response);
       syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
+      // Left or removed meanwhile: the stored room is forgotten, the player rejoins with the code if they want to.
+      if (response.status === 403) { localStorage.removeItem(COOP_ROOM_KEY); if (data.error) setCoopMessage(data.error); return; }
       if (!response.ok || !data.room) return;
       coopStatusRef.current = data.room.status;
       coopPlayerCountRef.current = data.room.playerCount;
@@ -483,14 +490,18 @@ function App() {
       const data = await readCoopResponse(response);
       syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
       if (!response.ok) {
-        if (response.status === 404) {
+        // 404: the world was deleted. 403: the seat was given up or the host removed this player; the world is no
+        // longer this player's, also not after a reload (the server refuses taking a free seat back by itself).
+        if (response.status === 404 || response.status === 403) {
           localStorage.removeItem(COOP_ROOM_KEY);
           coopStatusRef.current = null;
           coopPlayerCountRef.current = 0;
           setCoopSession(null);
+          if (response.status === 403) setSavedRooms((current) => current.filter((room) => room.code !== activeCoopCode));
           void loadSavedRooms();
         }
-        if (data.error) setCoopMessage(data.error);
+        if (response.status === 403) setCoopMessage("Du bist nicht mehr in dieser Welt. Mit dem Raumcode kannst du wieder beitreten, sobald ein Platz frei ist.");
+        else if (data.error) setCoopMessage(data.error);
         return;
       }
       if (data.room) {
@@ -713,6 +724,18 @@ function App() {
     setPrestigeDialog(null);
     if (!ownRequest) setCoopMessage(`Prestige ${shownPrestigeCount} wurde in dieser Welt gestartet. Alle Upgrades stehen wieder auf Stufe 0.`);
   }, [prestigeDialog, shownPrestigeCount]);
+  // Co-op Prestige vote: every member sees the open vote, and once how it ended (a result older than half a minute
+  // when the world opens is not announced again).
+  const coopPrestigeVote = isCoopLive ? coopSession?.room.prestigeVote ?? null : null;
+  const coopVoteResult = isCoopLive ? coopSession?.room.prestigeVoteResult ?? null : null;
+  const coopVoteResultKey = coopVoteResult ? `${coopVoteResult.id}:${coopVoteResult.outcome}` : "";
+  const coopVoteResultFresh = Boolean(coopVoteResult && coopVoteResult.ageMs < 30_000);
+  const coopVoteResultText = coopVoteResult ? prestigeVoteMessage(coopVoteResult) : "";
+  useEffect(() => {
+    if (!coopVoteResultKey || shownVoteResultRef.current === coopVoteResultKey) return;
+    shownVoteResultRef.current = coopVoteResultKey;
+    if (coopVoteResultFresh) setCoopMessage(coopVoteResultText);
+  }, [coopVoteResultKey, coopVoteResultFresh, coopVoteResultText]);
   const seasonTable = [...seasonMode.table].sort((first, second) => second.points - first.points || (second.goalsFor - second.goalsAgainst) - (first.goalsFor - first.goalsAgainst) || second.goalsFor - first.goalsFor || first.name.localeCompare(second.name));
   const seasonInProgress = seasonMode.matchday > 0 || seasonMode.table.some((team) => team.played > 0);
   const seasonStandingsEntry = seasonStandingsAnnouncement?.entry ?? null;
@@ -1294,6 +1317,50 @@ function App() {
     setCoopSession(null);
     setCoopMessage("Du hast den Koop-Raum verlassen. Er bleibt gespeichert und kann später wieder geöffnet werden.");
     void loadSavedRooms();
+  }
+
+  /** Closes the co-op screen after this player's seat is gone (left on purpose); the world is no longer listed. */
+  function forgetCoopRoom(code: string, message: string) {
+    localStorage.removeItem(COOP_ROOM_KEY);
+    coopStatusRef.current = null;
+    coopPlayerCountRef.current = 0;
+    coopEventRef.current = null;
+    coopPackRevealRef.current = null;
+    clearEventAnnouncements();
+    dismissStarReveal();
+    setSavedRooms((current) => current.filter((item) => item.code !== code));
+    setCoopSession(null);
+    setCoopMessage(message);
+    void loadSavedRooms();
+  }
+
+  async function leaveCoopSeat() {
+    if (!coopSession) return;
+    const code = coopSession.code;
+    setSeatDialog(null);
+    setCoopBusy(true);
+    const data = await sendCoopAction("leave-seat");
+    setCoopBusy(false);
+    if (!data?.left) return;
+    forgetCoopRoom(code, data.newHost ? "Du hast deinen Platz freigegeben. Die Host Rolle ging an das zuletzt aktive Mitglied. Mit dem Raumcode kannst du wieder beitreten, solange ein Platz frei ist." : "Du hast deinen Platz freigegeben. Die Welt spielt ohne dich weiter. Mit dem Raumcode kannst du wieder beitreten, solange ein Platz frei ist.");
+  }
+
+  async function kickCoopMember(role: CoopRole, name: string, force: boolean) {
+    if (!coopSession || coopSession.role !== "host") return;
+    setSeatDialog(null);
+    setCoopBusy(true);
+    const data = await sendCoopAction("kick", { targetRole: role, force });
+    setCoopBusy(false);
+    if (data?.left) setCoopMessage(`${name} ist nicht mehr in dieser Welt. Der Platz ist wieder frei.`);
+  }
+
+  async function answerPrestigeVote(decision: "approve" | "decline") {
+    const vote = coopSession?.room.prestigeVote;
+    if (!vote) return;
+    setCoopBusy(true);
+    const data = await sendCoopAction("prestige-vote", { voteId: vote.id, decision });
+    setCoopBusy(false);
+    if (data?.prestigeVote === "pending") setCoopMessage("Du hast zugestimmt. Die Abstimmung wartet noch auf die anderen.");
   }
 
   async function deleteCoopRoom(code: string) {
@@ -2653,6 +2720,12 @@ function App() {
         return;
       }
       setPrestigeDialog(null);
+      // Other members are online: the proposal opened a vote; Prestige starts once they all agreed.
+      if (data.prestigeVote === "pending") {
+        setHiddenPrestigeVote("");
+        setCoopMessage("Abstimmung gestartet. Prestige startet, sobald alle Mitspieler, die online sind, zugestimmt haben.");
+        return;
+      }
       setCoopMessage("Prestige gestartet. Die Aufstiegsjagd beginnt wieder in Saison 1, alle Upgrades stehen wieder auf Stufe 0.");
     } else {
       const now = getCurrentTime();
@@ -2984,7 +3057,16 @@ function App() {
       {guestCoopPrompt && guest && <ConfirmDialog title="Koop braucht ein Konto" confirmLabel="Anmelden" onCancel={() => setGuestCoopPrompt(false)} onConfirm={() => { setGuestCoopPrompt(false); guest.signIn(); }}>
         <p>Als Gast spielst du nur Einzelspieler. Melde dich an oder erstelle ein Konto, um mit anderen in einer Koop Welt zu spielen. Hat dein Konto noch keinen Spielstand, nimmt es deinen Gast Spielstand mit.</p>
       </ConfirmDialog>}
-      {prestigeDialog && <PrestigeDialog features={displayGame.features} goals={displayGame.goals} upgradeLevels={Object.values(displayGame.upgrades).reduce((sum, level) => sum + level, 0)} busy={coopBusy} error={prestigeDialog.error} onCancel={() => setPrestigeDialog(null)} onConfirm={(keepNormalId) => void confirmSeasonPrestige(keepNormalId)} />}
+      {prestigeDialog && <PrestigeDialog features={displayGame.features} goals={displayGame.goals} upgradeLevels={Object.values(displayGame.upgrades).reduce((sum, level) => sum + level, 0)} busy={coopBusy} error={prestigeDialog.error} voteMembers={isCoopLive ? otherCoopOnlineCount : 0} onCancel={() => setPrestigeDialog(null)} onConfirm={(keepNormalId) => void confirmSeasonPrestige(keepNormalId)} />}
+      {coopPrestigeVote && coopSession && !prestigeDialog && hiddenPrestigeVote !== coopPrestigeVote.id && <PrestigeVoteDialog vote={coopPrestigeVote} room={coopSession.room} busy={coopBusy} onApprove={() => void answerPrestigeVote("approve")} onDecline={() => void answerPrestigeVote("decline")} onHide={() => setHiddenPrestigeVote(coopPrestigeVote.id)} />}
+      {seatDialog?.kind === "leave" && coopSession && <ConfirmDialog title="Platz in dieser Welt freigeben?" confirmLabel="Platz freigeben" onCancel={() => setSeatDialog(null)} onConfirm={() => void leaveCoopSeat()}>
+        <p>Du verlässt {coopSession.room.roomName} für immer. Der gemeinsame Spielstand bleibt für die anderen vollständig erhalten, auch deine bisherigen Tore und Klicks zählen weiter.</p>
+        <p>{coopSession.role === "host" ? "Die Host Rolle geht an das Mitglied, das zuletzt aktiv war. " : ""}Mit dem Raumcode {coopSession.code} kannst du später wieder beitreten, solange ein Platz frei ist.</p>
+      </ConfirmDialog>}
+      {seatDialog?.kind === "kick" && <ConfirmDialog title={`${seatDialog.name} entfernen?`} confirmLabel={seatDialog.inactive ? "Entfernen" : "Trotzdem entfernen"} onCancel={() => setSeatDialog(null)} onConfirm={() => void kickCoopMember(seatDialog.role, seatDialog.name, !seatDialog.inactive)}>
+        <p>{seatDialog.inactive ? `${seatDialog.name} war seit mindestens ${coopSession?.room.inactiveDays ?? 7} Tagen nicht mehr aktiv (${seatDialog.activity}).` : `${seatDialog.name} war in den letzten ${coopSession?.room.inactiveDays ?? 7} Tagen aktiv (${seatDialog.activity || "kürzlich"}). Entferne nur, wenn ihr das so abgesprochen habt.`}</p>
+        <p>Der Platz wird frei, der gemeinsame Spielstand bleibt unverändert. {seatDialog.name} kann mit dem Raumcode wieder beitreten, solange ein Platz frei ist.</p>
+      </ConfirmDialog>}
       {confirmSingle && <ConfirmDialog title="Zum Singleplayer wechseln?" confirmLabel="Wechseln" onCancel={() => setConfirmSingle(false)} onConfirm={() => { setConfirmSingle(false); notifyCoopOffline(coopSession?.code, coopSession?.playerId); setAppMode("single"); }}>
         <p>{coopSession ? `Du verlässt „${coopSession.room.roomName}“. Die Welt bleibt gespeichert und du kannst jederzeit zurück.` : "Du verlässt den Koop Multiplayer und spielst mit deinem eigenen Spielstand weiter."}</p>
       </ConfirmDialog>}
@@ -2997,7 +3079,7 @@ function App() {
       {hydrated && appMode === "single" && tutorial.status === "active" && <TutorialCoach state={tutorial} game={game} onShow={showTutorialStep} onEnd={endTutorial} />}
       {(appMode === 'single' || isCoopLive) && <nav className="section-navigation" aria-label="Hauptnavigation">{primaryTabs.map(tab=><button type="button" key={tab.id} aria-label={tab.label} aria-current={primarySection===tab.id?'page':undefined} className={primarySection===tab.id?'active':''} onClick={()=>{openFeatureTab(tab.id==='club'&&pendingTransferOffer&&primarySection!=='club'?'fabrizio':tab.id);setLayoutEditMode(false);}}><span className="tab-icon"><Icon name={tab.icon} size={22} />{tab.id==='cup'&&displayGame.features.cup.active&&<i className="tab-live-dot" aria-hidden="true" />}{tab.id==='club'&&pendingTransferOffer&&<i className="tab-live-dot offer" aria-hidden="true" />}</span><span className="tab-label-full">{tab.text ?? tab.label}{tab.id==='cup'&&displayGame.features.cup.active&&<span className="tab-live-badge" aria-hidden="true">LIVE</span>}</span><span className="tab-label-short" aria-hidden="true">{tab.short}</span></button>)}</nav>}
       {(appMode === "single" || isCoopLive) && <main className={`clicker-layout${isCoopLive ? " coop-clicker-layout" : ""}`}>
-        {isCoopLive && coopSession && <><div className="coop-inline-room-bar"><div><p className="eyebrow">KOOP / {coopSession.room.roomName}</p><strong>{coopSession.code}</strong><span>{occupiedCoopPlayers(coopSession.room).map((player) => player.name).join(" · ")}</span></div><div className="coop-inline-room-actions"><span className={`coop-presence${otherCoopOnline ? " online" : ""}`}><i />{otherCoopOnline ? `${otherCoopOnlineCount} ${otherCoopOnlineCount === 1 ? "MITSPIELER" : "MITSPIELER"} ONLINE` : "MITSPIELER OFFLINE"}</span><span className="coop-live-badge">{coopSession.room.playerCount} / 4 SPIELER</span><span className="coop-live-badge">{hasInfiniteMoney ? "AZB VOLLZUGRIFF" : "GEMEINSAM GESPEICHERT"}</span><button className="mode-secondary" onClick={() => void copyCoopCode()}>Code kopieren</button>{coopSession.role === "host" && <button className="mode-secondary danger" onClick={() => void deleteCoopRoom(coopSession.code)}>Raum löschen</button>}<button className="mode-secondary quiet" onClick={leaveCoopRoom}>Verlassen</button></div></div><div className="coop-world-tools"><div><p className="eyebrow">WELT VERWALTEN</p>{coopSession.role === "host" ? <div className="coop-tool-input"><input className="mode-input" value={coopRoomName} maxLength={28} onChange={(event) => setCoopRoomName(event.target.value)} aria-label="Name der Welt" /><button className="mode-secondary" onClick={() => void renameCoopRoom()} disabled={coopBusy}>Name speichern</button></div> : <strong>{coopSession.room.roomName}</strong>}</div></div></>}
+        {isCoopLive && coopSession && <><div className="coop-inline-room-bar"><div><p className="eyebrow">KOOP / {coopSession.room.roomName}</p><strong>{coopSession.code}</strong><span>{occupiedCoopPlayers(coopSession.room).map((player) => player.name).join(" · ")}</span></div><div className="coop-inline-room-actions"><span className={`coop-presence${otherCoopOnline ? " online" : ""}`}><i />{otherCoopOnline ? `${otherCoopOnlineCount} ${otherCoopOnlineCount === 1 ? "MITSPIELER" : "MITSPIELER"} ONLINE` : "MITSPIELER OFFLINE"}</span><span className="coop-live-badge">{coopSession.room.playerCount} / 4 SPIELER</span><span className="coop-live-badge">{hasInfiniteMoney ? "AZB VOLLZUGRIFF" : "GEMEINSAM GESPEICHERT"}</span><button className="mode-secondary" onClick={() => void copyCoopCode()}>Code kopieren</button>{coopSession.role === "host" && <button className="mode-secondary danger" onClick={() => void deleteCoopRoom(coopSession.code)}>Raum löschen</button>}<button className="mode-secondary quiet" onClick={leaveCoopRoom}>Verlassen</button>{coopPrestigeVote && hiddenPrestigeVote === coopPrestigeVote.id && <button className="mode-secondary" onClick={() => setHiddenPrestigeVote("")}>Prestige Abstimmung zeigen</button>}</div></div><div className="coop-world-tools"><div><p className="eyebrow">WELT VERWALTEN</p>{coopSession.role === "host" ? <div className="coop-tool-input"><input className="mode-input" value={coopRoomName} maxLength={28} onChange={(event) => setCoopRoomName(event.target.value)} aria-label="Name der Welt" /><button className="mode-secondary" onClick={() => void renameCoopRoom()} disabled={coopBusy}>Name speichern</button></div> : <strong>{coopSession.room.roomName}</strong>}</div><div className="coop-members"><p className="eyebrow">MITGLIEDER</p><ul>{occupiedCoopPlayers(coopSession.room).map((player) => { const activity = coopLastActiveLabel(player); return <li key={player.role}><span><strong>{player.name ?? coopRoleLabel(player.role)}</strong><small>{player.role === "host" ? "Host" : coopRoleLabel(player.role)}{player.role === coopSession.role ? " · du" : ""}{activity ? ` · ${activity}` : ""}{player.inactive ? " · inaktiv" : ""}</small></span>{coopSession.role === "host" && player.role !== "host" && <button className="mode-secondary quiet" disabled={coopBusy} onClick={() => setSeatDialog({ kind: "kick", role: player.role, name: player.name ?? coopRoleLabel(player.role), inactive: Boolean(player.inactive), activity })}>Entfernen</button>}</li>; })}</ul>{coopSession.room.playerCount > 1 ? <button className="mode-secondary quiet danger" disabled={coopBusy} onClick={() => setSeatDialog({ kind: "leave" })}>Platz freigeben</button> : <small>Du bist das letzte Mitglied. Lösche die Welt, wenn du sie nicht mehr brauchst.</small>}<small className="coop-members-note">Wer {coopSession.room.inactiveDays ?? 7} Tage nicht aktiv war, kann vom Host entfernt werden. Ist der Host so lange weg, übernimmt das zuletzt aktive Mitglied.</small></div></div></>}
         <div className={`layout-toolbar${layoutEditMode ? " active" : ""}`}>
           <div><p className="eyebrow">ANSICHT / LAYOUT</p><strong>{layoutEditMode ? "Karten im Raster anordnen." : "Dein Dashboard, deine Reihenfolge."}</strong><small>{layoutEditMode ? "Zieh den Griff. Beim Loslassen rastet jede Karte im nächsten Slot ein." : "Die Anordnung bleibt auf diesem Gerät gespeichert."}</small></div>
           <div className="layout-toolbar-actions">{layoutEditMode && <button className="mode-secondary" onClick={resetLayout}>Standard</button>}<button className={layoutEditMode ? "mode-primary" : "mode-secondary"} onClick={() => { setLayoutEditMode((current) => !current); setDraggingLayoutCard(null); setDragOverLayoutCard(null); }}>{layoutEditMode ? "Fertig" : "Ansicht bearbeiten"}</button></div>

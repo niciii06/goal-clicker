@@ -181,7 +181,8 @@ function setup(features: GameFeatures, goals = 5_000_000) {
   clearRoomCacheForTests();
   const iso = new Date().toISOString();
   const defaults = Object.fromEntries(Object.entries(getTableColumns(coopRooms)).map(([key, column]) => [key, column.default ?? null]));
-  row = { ...defaults, code: 'PRESTI', hostPlayerId: 'host-player-123', hostName: 'Nicolas', guestPlayerId: 'guest-player-123', guestName: 'Silvan', hostLastSeenAt: iso, guestLastSeenAt: iso, lastPassiveAt: iso, updatedAt: iso, sharedCoins: goals, sharedFeaturesJson: JSON.stringify(features) } as RoomRow;
+  // The guest is offline, so a Prestige needs no vote (an offline member never blocks it; see coop-seats.test.ts).
+  row = { ...defaults, code: 'PRESTI', hostPlayerId: 'host-player-123', hostName: 'Nicolas', guestPlayerId: 'guest-player-123', guestName: 'Silvan', hostLastSeenAt: iso, guestLastSeenAt: new Date(Date.now() - 10 * 60_000).toISOString(), lastPassiveAt: iso, updatedAt: iso, sharedCoins: goals, sharedFeaturesJson: JSON.stringify(features) } as RoomRow;
 }
 async function prestige(extra: Record<string, unknown>, playerId = 'host-player-123') {
   const response = await POST(new Request('http://localhost/api/multiplayer', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'season-prestige', code: 'PRESTI', playerId, protocol: MULTIPLAYER_PROTOCOL_VERSION, ...extra }) }));
