@@ -31,8 +31,19 @@ export function PrestigeDialog({ features, goals, upgradeLevels, busy, error, on
   const specials = getPrestigeRetainedSpecials(features);
   // The rating with milestone bonuses: exactly what the card keeps when it is chosen.
   const ratingOf = (player: Parameters<typeof getCareerCard>[1]) => getCareerCard(features.career, player).rating;
-  const candidates = [...getPrestigeKeepCandidates(features)].sort((a, b) => ratingOf(b) - ratingOf(a) || a.name.localeCompare(b.name));
-  const [keepId, setKeepId] = useState<string | null>(null);
+  // Favourites first, then by rating; the strongest one is chosen already, a search narrows long lists (Q71).
+  const favorites = new Set(features.favoriteIds ?? []);
+  const candidates = [...getPrestigeKeepCandidates(features)].sort((a, b) => Number(favorites.has(b.id)) - Number(favorites.has(a.id)) || ratingOf(b) - ratingOf(a) || a.name.localeCompare(b.name));
+  const [keepId, setKeepId] = useState<string | null>(() => candidates[0]?.id ?? null);
+  const [search, setSearch] = useState("");
+  const query = search.trim().toLocaleLowerCase("de-CH");
+  const shown = candidates.filter((player) => !query || player.name.toLocaleLowerCase("de-CH").includes(query) || player.id === keepId);
+  const statusOf = (playerId: string) => [
+    favorites.has(playerId) ? "★ Favorit" : "",
+    features.transferSaga.loans.some((loan) => loan.playerId === playerId) ? "verliehen" : "",
+    Number(features.cup.injuredPlayerIds?.[playerId]) > 0 ? "verletzt" : "",
+    features.transferSaga.pendingOffer?.playerId === playerId ? "Angebot offen" : "",
+  ].filter(Boolean);
   const next = features.seasonMode.prestigeCount + 1;
   const squadAfter = specials.length + (keepId ? 1 : 0);
   const canConfirm = !busy && (candidates.length === 0 || Boolean(keepId));
@@ -50,10 +61,11 @@ export function PrestigeDialog({ features, goals, upgradeLevels, busy, error, on
       <h3>Spezialkarten bleiben ({specials.length})</h3>
       <p className="prestige-names">{specials.length ? specials.map((player) => player.name).join(", ") : "Keine Spezialkarten im Kader."}</p>
       <h3>Eine normale Karte behalten</h3>
+      {candidates.length > 8 && <input className="mode-input prestige-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Karte suchen" aria-label="Karte zum Behalten suchen" />}
       {candidates.length ? <fieldset className="prestige-choices" aria-label="Normale Karte behalten">
-        {candidates.map((player) => <label key={player.id} className={keepId === player.id ? "selected" : ""}>
+        {shown.map((player) => <label key={player.id} className={keepId === player.id ? "selected" : ""}>
           <input type="radio" name="prestige-keep" value={player.id} checked={keepId === player.id} onChange={() => setKeepId(player.id)} />
-          <b>{ratingOf(player)}</b><span>{player.name}</span><small>{getStarXIPositions(player).join(" / ")}</small>
+          <b>{ratingOf(player)}</b><span>{player.name}</span><small>{getStarXIPositions(player).join(" / ")}{statusOf(player.id).map((status) => <em key={status} className="prestige-status-chip">{status}</em>)}</small>
         </label>)}
       </fieldset> : <p>Du hast keine normale Karte im Kader. Du startest nur mit deinen Spezialkarten.</p>}
       {voteMembers > 0 && <p className="prestige-vote-note" role="note">Koop Abstimmung: {voteMembers === 1 ? "Dein Mitspieler, der gerade online ist, muss" : `Alle ${voteMembers} Mitspieler, die gerade online sind, müssen`} innerhalb von {PRESTIGE_VOTE_SECONDS} Sekunden zustimmen. Wer offline ist, wird nicht gefragt. Alle sehen deine behaltene Karte.</p>}

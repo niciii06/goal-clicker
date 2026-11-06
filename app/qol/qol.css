@@ -72,3 +72,17 @@
 .kickoff-checklist li.hint { opacity: .9; }
 .kickoff-text { flex: 1 1 200px; min-width: 0; font-size: var(--text-footnote, 13px); }
 .kickoff-checklist .mode-secondary { min-height: 36px; padding: 6px 12px; font-size: var(--text-caption2); }
+
+/* Collection: favourites, NEU, type chips, availability chips, album group view, prestige picker */
+.starxi-reserve-item { position: relative; min-width: 0; }
+.starxi-reserve-item > .starxi-player-card { width: 100%; padding-right: 44px; }
+.card-favorite-toggle { position: absolute; top: 50%; right: 8px; width: 32px; height: 32px; transform: translateY(-50%); border: 0; border-radius: 50%; color: var(--soft); background: transparent; font-size: 18px; cursor: pointer; }
+.card-favorite-toggle.active { color: #e6a800; }
+.card-new-chip, .card-type-chip, .prestige-status-chip { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 10px; font-style: normal; font-weight: 800; letter-spacing: .03em; vertical-align: middle; }
+.card-new-chip { color: #fff; background: #ff3b30; }
+.card-type-chip { color: var(--soft); background: var(--fill); }
+.prestige-status-chip { color: var(--text); background: var(--fill); }
+.starxi-only-compatible { display: flex; align-items: center; gap: 6px; font-size: var(--text-caption2); }
+.album-group-view { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
+.album-missing-link { margin-top: 4px; padding: 0; border: 0; color: var(--accent); background: none; font-size: var(--text-caption2); font-weight: 700; cursor: pointer; text-decoration: underline; }
+.prestige-search { width: 100%; margin-bottom: 8px; }

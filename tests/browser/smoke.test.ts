@@ -480,8 +480,9 @@ test('Prestige opens from the Hall of Fame despite an incomplete squad, cancels 
     assert.match(await dialog.innerText(), /GOAT Nicu/);
     assert.match(await dialog.innerText(), /44 Stufen → Stufe 0/);
     assert.deepEqual(await layoutProblems(page), [], `${viewport.name}: Prestige dialog`);
-    // Without a chosen card it cannot be confirmed; cancelling changes nothing.
-    assert.equal(await dialog.getByRole('button', { name: 'Karte wählen' }).isDisabled(), true);
+    // The strongest normal card is chosen already (Q71); cancelling changes nothing.
+    assert.equal(await dialog.getByRole('radio', { checked: true }).count(), 1);
+    assert.equal(await dialog.getByRole('button', { name: 'Prestige 1 starten' }).isEnabled(), true);
     await dialog.getByRole('button', { name: 'Abbrechen' }).click();
     await page.waitForTimeout(2600);
     assert.equal((await stored()).features.seasonMode.prestigeCount, 0);

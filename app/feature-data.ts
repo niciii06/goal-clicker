@@ -129,7 +129,21 @@ export type GameFeatures = {
   press: PressState;
   nextEventAt: number;
   nextVarAt: number;
+  /** Cards the club marked as favourites (Q38); missing in saves without any. */
+  favoriteIds?: string[];
 };
+
+export const MAX_FAVORITE_CARDS = 200;
+
+/** Marks or unmarks a card of the club as favourite; false when the card is not the club's. */
+export function toggleFavoriteCard(features: GameFeatures, playerId: string) {
+  if (!features.starXI.ownedIds.includes(playerId)) return false;
+  const current = features.favoriteIds ?? [];
+  const next = current.includes(playerId) ? current.filter((id) => id !== playerId) : [...current, playerId].slice(-MAX_FAVORITE_CARDS);
+  if (next.length) features.favoriteIds = next;
+  else delete features.favoriteIds;
+  return true;
+}
 
 
 export const CLUB_BADGES = ["⚽", "🦅", "🔥", "🦁", "⭐", "🛡️"];
@@ -3155,6 +3169,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
   Object.keys(playerEnteredAt).forEach((playerId) => {
     if (!playerMatchPositions[playerId]) playerMatchPositions[playerId] = getStarXIPlayer(playerId)?.position ?? "ZM";
   });
+  const favoriteIds = uniqueKnownStarIds(source.favoriteIds).slice(0, MAX_FAVORITE_CARDS);
   const normalized: GameFeatures = {
     schemaVersion: GAME_FEATURES_SCHEMA_VERSION,
     // Clubs that already field eleven never need the starter squad.
@@ -3186,6 +3201,8 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     nextVarAt: Number(source.nextVarAt) > 0 ? Number(source.nextVarAt) : defaults.nextVarAt,
     // Last: a week started later (ensureWeeklyGoals) adds the key at the end as well, so the stored JSON keeps one order.
     ...(weekly ? { weekly } : {}),
+    // Favourite cards (Q38): optional, saves without them load unchanged.
+    ...(favoriteIds.length ? { favoriteIds } : {}),
   };
   normalized.chronicle = normalizeChronicle(source.chronicle, normalized.career);
   if (migration.removed) addHistory(normalized, { title: "Spezialkarten neu verteilt", detail: `${migration.removed} 100er ${migration.removed === 1 ? "Karte wurde" : "Karten wurden"} entfernt. Das Spezialkarten-Pack öffnet ab Liga ${getPackUnlockLeague(SPECIAL_CARD_PACK.id)}.`, tone: "neutral" });
