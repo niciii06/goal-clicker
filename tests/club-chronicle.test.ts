@@ -120,9 +120,9 @@ test('a Hall of Fame reached before the chronicle existed is archived from the s
 test('a won tournament is a dated title, once per run; ticket crowds set the record', () => {
   const f = club();
   f.cup.matchStartedAt = START;
-  const summary = { tournamentId: 'champions' as const, tournamentWon: true, completedRound: 4, opponent: 'Real', homeScore: 2, awayScore: 1, tieBreak: null };
-  let next = completeTournamentRun(f, summary as Parameters<typeof completeTournamentRun>[1], START + 10, () => .5);
-  next = completeTournamentRun(next, summary as Parameters<typeof completeTournamentRun>[1], START + 20, () => .5);
+  const summary = { tournamentId: 'champions' as const, tournamentWon: true, completedRound: 4, opponent: 'Real', homeScore: 2, awayScore: 1, tieBreak: false };
+  let next = completeTournamentRun(f, summary, START + 10, () => .5);
+  next = completeTournamentRun(next, summary, START + 20, () => .5);
   const titles = next.chronicle.titles.filter((t) => t.kind === 'tournament');
   assert.equal(titles.length, 1);
   assert.equal(titles[0].tournamentId, 'champions');
