@@ -106,3 +106,10 @@
 .coop-pending-chip.failed { color: #fff; background: #d12c54; cursor: pointer; }
 .layout-toolbar.compact { justify-content: flex-end; padding-top: 0; padding-bottom: 0; border: 0; background: transparent; box-shadow: none; }
 .history-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+
+/* Player compare in the Karriere tab */
+.player-compare-pickers { display: flex; flex-wrap: wrap; gap: 8px; }
+.player-compare-pickers select { flex: 1 1 160px; min-width: 0; max-width: 100%; }
+.player-compare-table { width: 100%; margin-top: 10px; border-collapse: collapse; table-layout: fixed; font-size: var(--text-footnote, 13px); }
+.player-compare-table th, .player-compare-table td { padding: 5px 6px; border-bottom: 1px solid var(--line-soft); text-align: left; overflow-wrap: anywhere; }
+.player-compare-table td.better { color: var(--accent); font-weight: 800; }
