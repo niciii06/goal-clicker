@@ -1,8 +1,12 @@
-// Yellow card accumulation and one-match suspensions.
+// Yellow card accumulation, red cards and one-match suspensions.
 // League: every third yellow card in one league season bans a player for the next league match.
 // Tournaments: every second yellow card in one tournament run bans a player for the next match of
 // that tournament. Each competition keeps its own count; nothing is ever moved between them.
-// The yellow card events of the match engine stay the only source; a match is processed once.
+// Red cards: a player sent off is banned for the next match of the same competition (league red: next
+// league match; tournament red: next match of that tournament run), stored as a ban like the yellow ones.
+// Older saves kept red cards only in `cup.suspendedPlayerIds` without a competition: such a suspension
+// stays there and is served by the next match of any competition, as before.
+// The card events of the match engine stay the only source; a match is processed once.
 import { getStarXIPlayer, getTournament } from './feature-data';
 import type { CupState, GameFeatures, TournamentId } from './feature-data';
 import { pronounText } from './player-pronouns';
@@ -13,7 +17,9 @@ const PROCESSED_LIMIT = 200;
 const TOURNAMENT_IDS: readonly TournamentId[] = ['stadium', 'champions', 'world'];
 
 export type Competition = 'league' | `tournament:${TournamentId}`;
-export type SuspensionBan = { id: string; playerId: string; competition: Competition; matches: number; yellowCards: number; createdAt: number; sourceMatchId: string };
+export type SuspensionBan = { id: string; playerId: string; competition: Competition; matches: number; yellowCards: number; createdAt: number; sourceMatchId: string;
+  /** Why the player is banned; bans saved before red cards were bans are yellow card bans. */
+  reason?: 'yellow' | 'red' };
 export type DisciplineState = {
   version: 1;
   /** Yellow cards in the current league season, per player. Reset when a league season ends. */
@@ -46,7 +52,7 @@ export function normalizeDiscipline(value: unknown): DisciplineState {
     const b = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
     const matches = Math.floor(Number(b.matches));
     if (typeof b.playerId !== 'string' || !getStarXIPlayer(b.playerId) || !isCompetition(b.competition) || !(matches >= 1)) return [];
-    return [{ id: typeof b.id === 'string' ? b.id.slice(0, 240) : `${b.competition}:${b.playerId}`, playerId: b.playerId, competition: b.competition, matches: Math.min(10, matches), yellowCards: Math.max(0, Math.floor(Number(b.yellowCards) || 0)), createdAt: Number(b.createdAt) || 0, sourceMatchId: typeof b.sourceMatchId === 'string' ? b.sourceMatchId.slice(0, 240) : '' }];
+    return [{ id: typeof b.id === 'string' ? b.id.slice(0, 240) : `${b.competition}:${b.playerId}`, playerId: b.playerId, competition: b.competition, matches: Math.min(10, matches), yellowCards: Math.max(0, Math.floor(Number(b.yellowCards) || 0)), createdAt: Number(b.createdAt) || 0, sourceMatchId: typeof b.sourceMatchId === 'string' ? b.sourceMatchId.slice(0, 240) : '', ...(b.reason === 'red' ? { reason: 'red' as const } : {}) }];
   }).slice(-100);
   const processedMatchIds = Array.isArray(source.processedMatchIds) ? [...new Set(source.processedMatchIds.filter((id): id is string => typeof id === 'string').map(id => id.slice(0, 240)))].slice(-PROCESSED_LIMIT) : [];
   return { version: 1, league: counts(source.league), tournaments, bans, processedMatchIds };
@@ -76,6 +82,12 @@ export function getBans(features: GameFeatures, playerId?: string) {
 export function getBannedPlayerIds(features: GameFeatures, competition: Competition) {
   return [...new Set(features.discipline.bans.filter(ban => ban.competition === competition).map(ban => ban.playerId))];
 }
+/** "nach Gelben Karten", "nach einer Roten Karte" or "nach Karten" (both) for the bans of these players. */
+export function banCause(features: GameFeatures, competition: Competition, playerIds: readonly string[]) {
+  const bans = features.discipline.bans.filter(ban => ban.competition === competition && playerIds.includes(ban.playerId));
+  const red = bans.some(ban => ban.reason === 'red'), yellow = bans.some(ban => ban.reason !== 'red');
+  return red && yellow ? 'nach Karten' : red ? 'nach einer Roten Karte' : 'nach Gelben Karten';
+}
 /** Players in the matchday squad (starting eleven or bench) who are banned for this competition. */
 export function getSquadBanConflicts(features: GameFeatures, competition: Competition) {
   const banned = new Set(getBannedPlayerIds(features, competition));
@@ -85,12 +97,13 @@ export function squadBanError(features: GameFeatures, competition: Competition) 
   const conflicts = getSquadBanConflicts(features, competition);
   if (!conflicts.length) return null;
   const names = conflicts.map(id => getStarXIPlayer(id)?.name ?? 'Ein Spieler').join(', ');
-  return `${names} ${conflicts.length === 1 ? 'ist' : 'sind'} nach Gelben Karten für dieses Spiel gesperrt. Ersetze ${conflicts.length === 1 ? pronounText('{ihn}', getStarXIPlayer(conflicts[0])) : 'sie'} in Startelf und Bank.`;
+  return `${names} ${conflicts.length === 1 ? 'ist' : 'sind'} ${banCause(features, competition, conflicts)} für dieses Spiel gesperrt. Ersetze ${conflicts.length === 1 ? pronounText('{ihn}', getStarXIPlayer(conflicts[0])) : 'sie'} in Startelf und Bank.`;
 }
 
-/** Short German label, for example "Gesperrt – 1 Spiel (3 Gelbe Karten) · Liga". */
+/** Short German label, for example "Gesperrt: 1 Spiel (3 Gelbe Karten) · Liga" or "Gesperrt: 1 Spiel (Rote Karte) · Liga". */
 export function suspensionLabel(ban: SuspensionBan) {
-  return `Gesperrt – ${ban.matches} ${ban.matches === 1 ? 'Spiel' : 'Spiele'} (${ban.yellowCards} Gelbe Karten) · ${competitionLabel(ban.competition)}`;
+  const cause = ban.reason === 'red' ? 'Rote Karte' : `${ban.yellowCards} Gelbe Karten`;
+  return `Gesperrt: ${ban.matches} ${ban.matches === 1 ? 'Spiel' : 'Spiele'} (${cause}) · ${competitionLabel(ban.competition)}`;
 }
 
 /** Yellow cards toward the next ban per competition, for warnings such as "2/3 Gelbe Karten". */
@@ -115,10 +128,15 @@ export function countableYellowCards(cup: CupState) {
   return perPlayer;
 }
 
+/** Our players sent off in this match (red card or second yellow). */
+export function sentOffClubPlayers(cup: CupState) {
+  return [...new Set(cup.sentOffPlayerIds ?? [])].filter(id => getStarXIPlayer(id));
+}
+
 /**
  * Applies the disciplinary consequences of one completed match. Order matters:
- * first the match serves existing bans of its competition, then its own yellow cards
- * may create new bans (which therefore apply to the following match).
+ * first the match serves existing bans of its competition, then its own red and yellow cards
+ * may create new bans (which therefore apply to the following match of the same competition).
  */
 export function processMatchDiscipline(features: GameFeatures, matchId: string, now: number, options: { seasonCompleted?: boolean } = {}) {
   const d = features.discipline, cup = features.cup;
@@ -135,6 +153,11 @@ export function processMatchDiscipline(features: GameFeatures, matchId: string, 
     const earned = Math.floor(after / limit) - Math.floor(before / limit);
     if (earned > 0) created.push({ id: `${matchId}:${playerId}`, playerId, competition, matches: earned, yellowCards: limit, createdAt: now, sourceMatchId: matchId });
   }
+  // A red card bans for the next match of this competition. The ban leaves cup.suspendedPlayerIds, which from
+  // now on only holds suspensions of older saves (served by the next match of any competition).
+  const reds = sentOffClubPlayers(cup);
+  for (const playerId of reds) created.push({ id: `${matchId}:${playerId}:red`, playerId, competition, matches: 1, yellowCards: 0, createdAt: now, sourceMatchId: matchId, reason: 'red' });
+  if (reds.length) cup.suspendedPlayerIds = (cup.suspendedPlayerIds ?? []).filter(id => !reds.includes(id));
   d.bans = [...d.bans, ...created];
   // Lifecycle: a league season resets the league count (bans still carry into the next league match).
   // A finished tournament run resets its count and its unserved bans expire with it.

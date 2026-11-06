@@ -36,7 +36,7 @@ test('three league yellows suspend for exactly one league match, two do not', ()
   const bans = playMatch(f, { mode: 'season' }, [player]);
   assert.equal(bans.length, 1);
   assert.deepEqual(getBannedPlayerIds(f, 'league'), [player]);
-  assert.equal(suspensionLabel(bans[0]), 'Gesperrt – 1 Spiel (3 Gelbe Karten) · Liga');
+  assert.equal(suspensionLabel(bans[0]), 'Gesperrt: 1 Spiel (3 Gelbe Karten) · Liga');
   assert.equal(getBannedPlayerIds(f, 'tournament:stadium').length, 0, 'a league ban does not block tournaments');
   // Served by the next completed league match he does not play.
   playMatch(f, { mode: 'season' }, [], f.starXI.lineupIds.filter(id => id && id !== player));
@@ -104,7 +104,7 @@ test('suspended players cannot start, sit on the bench, come on or be auto picke
   draft.lineup[4] = player;
   assert.match(validateMatchDraft(live, draft), /gesperrter Spieler/);
   const html = renderToStaticMarkup(createElement(DisciplineTags, { features: f, playerId: player }));
-  assert.match(html, /Gesperrt – 1 Spiel \(3 Gelbe Karten\)/);
+  assert.match(html, /Gesperrt: 1 Spiel \(3 Gelbe Karten\)/);
 });
 
 test('a new league season resets league yellows, bans still carry over', () => {
@@ -159,5 +159,7 @@ test('two yellows in one match are a red card and do not count toward accumulati
   f.cup.broadcast = { ...createMatchBroadcast(f.cup), events: [0, 1].map(i => ({ id: `${id}:${i}`, kind: 'yellow' as const, side: 'club' as const, minute: 30 + i, at: 0, playerId: a, player: a, style: 'ground' as const, lane: 34, seed: 0 })) };
   processMatchDiscipline(f, id, 1);
   assert.equal(f.discipline.league[a] ?? 0, 0);
-  assert.equal(f.discipline.bans.length, 0);
+  // No yellow card ban; the red card itself bans for the next league match (owner decision 2026-11-06).
+  assert.equal(f.discipline.bans.filter(b => b.reason !== 'red').length, 0);
+  assert.deepEqual(f.discipline.bans.map(b => [b.playerId, b.competition, b.reason]), [[a, 'league', 'red']]);
 });
