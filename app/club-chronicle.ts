@@ -210,7 +210,8 @@ export function recordChronicleSeason(host: ChronicleHost, s: ChronicleSeason) {
 /**
  * Prestige ends a run: the final Hall of Fame table still shown in the season (lastTable) is archived for this run,
  * unless the season's completion already did. This also covers a Hall of Fame reached before the chronicle existed.
+ * `rankedTable` is that table in the season's order (sortSeasonTable with the head-to-head results).
  */
-export function archiveHallOfFameBeforePrestige(host: ChronicleHost, at: number) {
-  if (host.seasonMode.hallOfFame) archiveHallOfFameTable(host, host.seasonMode.lastTable, at);
+export function archiveHallOfFameBeforePrestige(host: ChronicleHost, at: number, rankedTable: readonly SeasonTableRow[] = host.seasonMode.lastTable) {
+  if (host.seasonMode.hallOfFame) archiveHallOfFameTable(host, rankedTable, at);
 }

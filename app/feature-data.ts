@@ -1215,7 +1215,8 @@ export function applySeasonPrestige(value: GameFeatures, keepNormalId: string | 
   features.starterSquadGranted = true;
   if (receipt) features.purchaseReceipts = [...features.purchaseReceipts, receipt].slice(-PURCHASE_RECEIPT_LIMIT);
   // History only: the final Hall of Fame table of the run that ends goes into the club chronicle.
-  archiveHallOfFameBeforePrestige(features, now);
+  // Ranked like the season table (head-to-head included), also for an older save whose lastTable was stored unsorted.
+  archiveHallOfFameBeforePrestige(features, now, sortSeasonTable(features.seasonMode.lastTable, features.seasonMode.lastResults));
   features.seasonMode = startSeasonPrestige(features.seasonMode, features.club.name, now);
   const keptNormal = keepNormalId ? getStarXIPlayer(keepNormalId)?.name : null;
   addHistory(features, { title: `Prestige ${features.seasonMode.prestigeCount} gestartet`, detail: `Zurück in Saison 1 · Upgrades auf Stufe 0 · ${retained.size} Karten bleiben im Kader${keptNormal ? ` (mit ${keptNormal})` : ""} · +${Math.round(features.seasonMode.prestigeCount * PRESTIGE_GOAL_BONUS_PER_LEVEL * 100)} % Tore`, tone: "positive" }, now);

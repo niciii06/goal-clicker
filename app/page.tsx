@@ -738,7 +738,8 @@ function App() {
     shownVoteResultRef.current = coopVoteResultKey;
     if (coopVoteResultFresh) setCoopMessage(coopVoteResultText);
   }, [coopVoteResultKey, coopVoteResultFresh, coopVoteResultText]);
-  const seasonTable = [...seasonMode.table].sort((first, second) => second.points - first.points || (second.goalsFor - second.goalsAgainst) - (first.goalsFor - first.goalsAgainst) || second.goalsFor - first.goalsFor || first.name.localeCompare(second.name));
+  // The same ranking as the season itself (head-to-head before goal difference), so the live table matches promotion.
+  const seasonTable = sortSeasonTable(seasonMode.table, seasonMode.results);
   const seasonInProgress = seasonMode.matchday > 0 || seasonMode.table.some((team) => team.played > 0);
   const seasonStandingsEntry = seasonStandingsAnnouncement?.entry ?? null;
   const seasonStandingsTable = seasonStandingsAnnouncement ? sortSeasonTable(seasonStandingsAnnouncement.table, seasonStandingsAnnouncement.results) : [];

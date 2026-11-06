@@ -106,7 +106,7 @@ test('the Hall of Fame season archives its final table once per run, Prestige ke
 
 test('a Hall of Fame reached before the chronicle existed is archived from the shown table at Prestige', () => {
   const f = club();
-  f.seasonMode = { ...f.seasonMode, division: SEASON_MODE_DIVISION_COUNT, highestDivision: SEASON_MODE_DIVISION_COUNT, hallOfFame: true, prestigeCount: 2, lastTable: f.seasonMode.table.map((row) => row.id === 'club' ? { ...row, points: 25 } : row) };
+  f.seasonMode = { ...f.seasonMode, division: SEASON_MODE_DIVISION_COUNT, highestDivision: SEASON_MODE_DIVISION_COUNT, hallOfFame: true, prestigeCount: 2, lastTable: f.seasonMode.table.map((row, index) => row.id === 'club' ? { ...row, points: 25 } : { ...row, points: index * 3 }) };
   const old = JSON.parse(JSON.stringify(f)); delete old.chronicle;
   const loaded = normalizeGameFeatures(old);
   assert.equal(loaded.chronicle.hallOfFame.length, 0);
@@ -115,6 +115,11 @@ test('a Hall of Fame reached before the chronicle existed is archived from the s
   assert.equal(result.features.chronicle.hallOfFame.length, 1);
   assert.equal(result.features.chronicle.hallOfFame[0].prestige, 2);
   assert.equal(result.features.chronicle.hallOfFame[0].rows.find((r) => r.club)?.points, 25);
+  // Archived in the season's ranking (sortSeasonTable), not in the stored row order (a loaded save keeps the
+  // table in its fixed team order): the 25-point club leads, the others follow by points.
+  const points = result.features.chronicle.hallOfFame[0].rows.map((r) => r.points);
+  assert.equal(result.features.chronicle.hallOfFame[0].rows[0].club, true);
+  assert.deepEqual(points, [...points].sort((a, b) => b - a));
 });
 
 test('a won tournament is a dated title, once per run; ticket crowds set the record', () => {
