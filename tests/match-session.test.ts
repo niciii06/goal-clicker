@@ -233,7 +233,7 @@ test('a match that ran on while the app was closed lists exactly the scenes that
  assert.equal(missed.filter(e=>e.id.startsWith('yellow:')).length,(back.broadcast?.events??[]).filter(e=>e.kind==='yellow'&&e.at>since).length);
  assert.ok(summarizeMissedMatch(back,since,until).startsWith(MATCH_RAN_WHILE_AWAY));
  // Known scenes read as short lines in match order, the rest is counted.
- const cup={...back,homeScore:2,awayScore:1,opponent:'FC Test',matchEvents:[
+ const cup={...back,matchPaused:false,homeScore:2,awayScore:1,opponent:'FC Test',matchEvents:[
   {id:'g1',side:'home' as const,scorerId:null,scorer:'Muster',minute:30,createdAt:until-3000,homeScore:2,awayScore:1,ratingImpacts:{}},
   {id:'g0',side:'away' as const,scorerId:null,scorer:'Gast',minute:12,createdAt:until-9000,homeScore:1,awayScore:1,ratingImpacts:{}},
   {id:'old',side:'home' as const,scorerId:null,scorer:'Früh',minute:2,createdAt:since-1,homeScore:1,awayScore:0,ratingImpacts:{}}],
