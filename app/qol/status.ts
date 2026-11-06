@@ -25,6 +25,8 @@ export type StatusInput = {
   miniGameCooldowns?: Record<string, number>;
   /** Travel clock (server time) for the journey; defaults to `now`. */
   travelNow?: number;
+  /** Claimable album groups when the caller already counted them (the album check walks every card). */
+  albumClaimable?: number;
 };
 
 /** Album groups that are complete but not claimed yet (the same rule as claimAlbumRewards). */
@@ -45,7 +47,7 @@ export function getOpenActions(input: StatusInput): OpenAction[] {
   if (daily.available) actions.push({ id: "daily", label: "Tagesprämie bereit", tab: "home", section: "home", count: 1 });
   const unopened = features.earnedPacks.filter((pack) => !pack.opening).length;
   if (unopened) actions.push({ id: "packs", label: unopened === 1 ? "1 Pack zu öffnen" : `${unopened} Packs zu öffnen`, tab: "packs", section: "packs", count: unopened });
-  const album = claimableAlbumGroups(features).length;
+  const album = input.albumClaimable ?? claimableAlbumGroups(features).length;
   if (album) actions.push({ id: "album", label: album === 1 ? "Albumprämie abholen" : `${album} Albumprämien abholen`, tab: "album", section: "packs", count: album });
   const journey = features.travel.journey;
   if (journey && !journey.consumed && journeyView(journey, input.travelNow ?? now).arrived && !features.cup.active) actions.push({ id: "journey", label: "Mannschaft angekommen", tab: "cup", section: "cup", count: 1 });

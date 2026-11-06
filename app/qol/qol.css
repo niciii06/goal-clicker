@@ -1,0 +1,32 @@
+/* Quality of life (audit section E): status signals, shopping hints, squad helpers, collection tools. */
+
+/* Navigation dots for open actions: visible on every screen size (the LIVE dot only in the phone tab bar). */
+.section-navigation .tab-live-dot.action { display: block; background: var(--accent); }
+
+/* Bell with unread count */
+.bell-button { position: relative; }
+.bell-count { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; color: #fff; background: #ff3b30; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center; box-sizing: border-box; }
+
+.header-prestige-ready { margin-left: 6px; padding: 3px 8px; border: 0; border-radius: 999px; color: #fff; background: var(--accent); font-size: var(--text-caption2); font-weight: 800; cursor: pointer; white-space: nowrap; }
+
+/* "Nächste Schritte" on Home */
+.next-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 10px 0 4px; min-width: 0; }
+.next-steps-label { color: var(--muted, var(--soft)); font-size: var(--text-caption2); font-weight: 800; letter-spacing: .06em; }
+.next-steps-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.next-step-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 12px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 999px; color: var(--text); background: color-mix(in srgb, var(--accent) 9%, var(--surface-raised)); font-size: var(--text-footnote, 13px); font-weight: 700; cursor: pointer; max-width: 100%; }
+.next-step-chip:hover { border-color: var(--accent); }
+
+.feed-more { margin-top: 8px; padding: 6px 10px; border: 0; border-radius: 999px; color: var(--accent); background: var(--fill); font-size: var(--text-caption2); font-weight: 700; cursor: pointer; }
+
+/* Device settings in the Club tab */
+.device-settings { display: grid; gap: 12px; margin-top: 16px; padding: 16px; border: 1px solid var(--line-soft); border-radius: 18px; background: var(--surface-soft); }
+.device-settings > div:first-child { display: grid; gap: 4px; }
+.device-settings-rows { display: grid; gap: 10px; }
+.device-toggle { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.device-toggle input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--accent); flex-shrink: 0; }
+.device-toggle span { display: grid; gap: 2px; min-width: 0; }
+.device-toggle small { color: var(--soft); }
+.device-settings > button { justify-self: start; }
+
+.whats-new-archive { display: grid; gap: 14px; max-height: min(60vh, 520px); overflow-y: auto; }
+.whats-new-archive h3 { margin: 2px 0 6px; font-size: 17px; }

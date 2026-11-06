@@ -54,3 +54,12 @@ self.addEventListener("fetch", (event) => {
   if (isStatic(url.pathname)) { event.respondWith(cacheFirst(request)); return; }
   if (request.mode === "navigate") event.respondWith(networkOrOffline(request));
 });
+
+// A tap on a local notice (app/qol/notifications.ts) brings the open game to the front.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+    const client = clients.find((item) => "focus" in item);
+    return client ? client.focus() : self.clients.openWindow("/home");
+  }));
+});
