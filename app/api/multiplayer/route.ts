@@ -23,7 +23,7 @@ import { ACHIEVEMENTS, BALANCE_VERSION, MAX_MULTIPLIER_LEVEL, MAX_SEASON_STARS, 
 import { capGoalsAfterRebalance, getBaseClickPower, getBasePassivePower, getClickPower, getCost, getLevel, getMiniGameMaxReward, getPassiveIncomePower } from "../../game/economy";
 import { getUpgrade } from "../../game/upgrades";
 import { describeReplacements, fillStarXIGaps, movePlayerToEmptyBench, movePlayerToReserve, withBestBench } from "../../game/lineup-tools";
-import { abandonTournamentRun } from "../../game/tournament-abandon";
+import { abandonTournamentBlockReason, abandonTournamentRun } from "../../game/tournament-abandon";
 import { applyGamePrestige } from "../../game/prestige";
 import { getTicketIncome, recordTicketIncome } from "../../ticket-income";
 
@@ -1554,6 +1554,8 @@ async function handlePost(request: Request) {
 
     // "Turnier aufgeben" (Q51): ends a run that waits for its next round, like an elimination.
     if (action === "cup-abandon") {
+      const blocked = abandonTournamentBlockReason(game.features);
+      if (blocked) return jsonError(blocked, 409);
       const abandoned = abandonTournamentRun(game.features, Date.parse(timestamp));
       if (!abandoned) return jsonError("Es wartet kein Turnierlauf, der aufgegeben werden kann.", 409);
       game.features = abandoned;

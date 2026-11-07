@@ -77,7 +77,7 @@ import { parseSavingsGoal, pickStringFields, type SavingsGoal } from "./qol/pref
 import { bestRatingPerFormation, benchChangeCount, describeReplacements, fillStarXIGaps, formatRatingDelta, lineupChanges, movePlayerToEmptyBench, movePlayerToReserve, ratingAfterLineupMove, withBestBench } from "./game/lineup-tools";
 import type { LineupChange } from "./game/lineup-tools";
 import { KickoffChecklist, type KickoffItem } from "./qol/kickoff-checklist";
-import { abandonTournamentRun } from "./game/tournament-abandon";
+import { abandonTournamentBlockReason, abandonTournamentRun } from "./game/tournament-abandon";
 import { HISTORY_TOPICS, filterHistory, historyActors, type HistoryTopic } from "./qol/history-filter";
 import { inviteUrl, joinCodeFromSearch, shortcutFor } from "./qol/invite";
 import { newNotifiableActions, setAppBadge, showLocalNotification } from "./qol/notifications";
@@ -792,6 +792,9 @@ function App() {
   const bannedForNext = useMemo(() => new Set(displayGame.features.cup.active ? [] : getBannedPlayerIds(displayGame.features, nextSquadCompetition)), [displayGame.features, nextSquadCompetition]);
   const banLabelFor = (playerId: string | undefined) => playerId && bannedForNext.has(playerId) ? `GESPERRT · ${competitionLabel(nextSquadCompetition).toUpperCase()}` : undefined;
   const squadGapCount = useMemo(() => featureTab === "squad" && !displayGame.features.cup.active ? fillStarXIGaps(displayGame.features, { career: displayGame.features.career, cup: displayGame.features.cup }).replacements.length : 0, [featureTab, displayGame.features]);
+  // The kickoff checklist (Q25) offers "Lücken füllen" on every tab; computed once per change of the world, not per render.
+  const squadGapsFillable = useMemo(() => squadGapCount > 0 || (!displayGame.features.cup.active && fillStarXIGaps(displayGame.features, { career: displayGame.features.career, cup: displayGame.features.cup }).replacements.length > 0), [squadGapCount, displayGame.features]);
+  const abandonBlockReason = abandonTournamentBlockReason(displayGame.features);
   const squadMovePreview = (() => {
     const source = squadDrag.dragging, target = squadDrag.dropTarget, squad = displayGame.features.starXI;
     if (!source || !target || displayGame.features.cup.active) return "";
@@ -3159,7 +3162,8 @@ function App() {
 
   async function abandonTournament() {
     setAbandonDialog(false);
-    if (!displayGame.features.cup.pendingNextRound || displayGame.features.cup.active) return;
+    const blocked = abandonTournamentBlockReason(displayGame.features);
+    if (blocked) { showToast(blocked); return; }
     if (isCoopLive) {
       setCoopBusy(true);
       const data = await sendCoopAction("cup-abandon");
@@ -3478,13 +3482,13 @@ function App() {
   // "Vor dem Anpfiff" (Q25, Q45): every blocker of the next match at once, each with its fix, and the open press talk.
   const kickoffItems: KickoffItem[] = [];
   if (!displayGame.features.cup.active) {
-    const fillFix = squadGapCount > 0 || fillStarXIGaps(displayGame.features, { career: displayGame.features.career, cup: displayGame.features.cup }).replacements.length > 0 ? { label: "Lücken füllen", run: () => void fillSquadGaps() } : { label: "Zum Kader", run: () => openFeatureTab("squad") };
+    const fillFix = squadGapsFillable ? { label: "Lücken füllen", run: () => void fillSquadGaps() } : { label: "Zum Kader", run: () => openFeatureTab("squad") };
     if (hasTransferSquadVacancy) kickoffItems.push({ id: "vacancy", text: `Freier Platz ${transferSquadVacancyLabel} nach einem Transfer.`, fix: fillFix });
     if (suspendedPlayerOnSquad) kickoffItems.push({ id: "red", text: `${suspendedStarPlayers.map((player) => player.name).join(", ")} nach Roter Karte gesperrt.`, fix: fillFix });
     else if (!starXIComplete) kickoffItems.push({ id: "eleven", text: `Startelf: ${startingStarXISelection.length} von ${STAR_XI_SQUAD_SIZE} Plätzen besetzt.`, fix: fillFix });
     const banError = !seasonCareerComplete && !displayGame.features.cup.pendingNextRound ? squadBanError(displayGame.features, competitionFor("season", "stadium")) : displayGame.features.cup.pendingNextRound ? squadBanError(displayGame.features, competitionFor("tournament", displayGame.features.cup.tournamentId)) : "";
     if (banError) kickoffItems.push({ id: "ban", text: banError, fix: fillFix });
-    if (displayGame.features.cup.pendingNextRound) kickoffItems.push({ id: "pending", tone: "hint", text: `${activeTournament.label}: Runde ${displayGame.features.cup.round + 1} wartet. Liga und Prestige kommen danach.`, fix: { label: "Turnier aufgeben", run: () => setAbandonDialog(true) } });
+    if (displayGame.features.cup.pendingNextRound) kickoffItems.push({ id: "pending", tone: "hint", text: `${activeTournament.label}: Runde ${displayGame.features.cup.round + 1} wartet. Liga und Prestige kommen danach.${abandonBlockReason ? ` ${abandonBlockReason}` : ""}`, ...(abandonBlockReason ? {} : { fix: { label: "Turnier aufgeben", run: () => setAbandonDialog(true) } }) });
     if (openActions.some((action) => action.id === "press")) kickoffItems.push({ id: "press", tone: "hint", text: `Pressekonferenz offen: +${formatNumber(getPressReward(getBasePassivePower(displayGame.upgrades, displayGame.stars, displayGame.features), getBaseClickPower(displayGame.upgrades, displayGame.stars, displayGame.features)))} Tore. Sie verfällt mit dem nächsten Anpfiff.`, fix: { label: "Antworten", run: () => document.querySelector(".press-conference")?.scrollIntoView({ behavior: "smooth", block: "center" }) } });
   }
   // short: the label in the phone tab bar; the button keeps the full label as its accessible name.

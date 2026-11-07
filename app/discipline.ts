@@ -138,6 +138,12 @@ export function sentOffClubPlayers(cup: CupState) {
  * first the match serves existing bans of its competition, then its own red and yellow cards
  * may create new bans (which therefore apply to the following match of the same competition).
  */
+/** A tournament run ended (eliminated, won or given up): its yellow card count resets and its unserved bans expire. */
+export function endTournamentRunDiscipline(d: DisciplineState, tournamentId: TournamentId) {
+  delete d.tournaments[tournamentId];
+  d.bans = d.bans.filter(ban => ban.competition !== competitionFor('tournament', tournamentId));
+}
+
 export function processMatchDiscipline(features: GameFeatures, matchId: string, now: number, options: { seasonCompleted?: boolean } = {}) {
   const d = features.discipline, cup = features.cup;
   if (!matchId || d.processedMatchIds.includes(matchId)) return [] as SuspensionBan[];
@@ -162,7 +168,7 @@ export function processMatchDiscipline(features: GameFeatures, matchId: string, 
   // Lifecycle: a league season resets the league count (bans still carry into the next league match).
   // A finished tournament run resets its count and its unserved bans expire with it.
   if (competition === 'league' && options.seasonCompleted) d.league = {};
-  if (tournamentId && !cup.pendingNextRound) { delete d.tournaments[tournamentId]; d.bans = d.bans.filter(ban => ban.competition !== competition); }
+  if (tournamentId && !cup.pendingNextRound) endTournamentRunDiscipline(d, tournamentId);
   d.processedMatchIds = [...d.processedMatchIds, matchId].slice(-PROCESSED_LIMIT);
   return created.filter(ban => d.bans.some(b => b.id === ban.id));
 }

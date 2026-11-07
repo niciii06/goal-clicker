@@ -3205,6 +3205,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     ...(favoriteIds.length ? { favoriteIds } : {}),
   };
   normalized.chronicle = normalizeChronicle(source.chronicle, normalized.career);
+  repairAbandonedTournamentJourney(normalized, Date.now());
   if (migration.removed) addHistory(normalized, { title: "Spezialkarten neu verteilt", detail: `${migration.removed} 100er ${migration.removed === 1 ? "Karte wurde" : "Karten wurden"} entfernt. Das Spezialkarten-Pack öffnet ab Liga ${getPackUnlockLeague(SPECIAL_CARD_PACK.id)}.`, tone: "neutral" });
   if (album.cleared) addHistory(normalized, { title: "Sammelalbum bereinigt", detail: "100er Karten zählen nicht mehr als gesammelt, ihre Meilensteine sind entfernt.", tone: "neutral" });
   return normalized;
@@ -3795,6 +3796,30 @@ export function releaseMatchSquad(features: GameFeatures, now: number) {
   delete features.squadLock;
   delete features.starXI.lockedPlayerIds;
   if(features.travel.journey) delete features.travel.journey.squadLock;
+}
+
+/**
+ * Older builds let a waiting tournament run be given up after "Reise antreten": the journey to the next round was
+ * never consumed and its squad lock never released, which blocked every league and tournament match, Prestige and
+ * selling for good. Such a journey belongs to a run that is recorded as finished and no longer waits, so it can never
+ * be played. Clears exactly that journey and releases its squad lock; every other journey (league away matches, the
+ * current tournament round, a new tournament run) stays untouched. Returns true when something was repaired.
+ */
+export function repairAbandonedTournamentJourney(features: GameFeatures, now: number) {
+  const journey = features.travel.journey;
+  if (!journey || journey.consumed || features.cup.active || journey.fixture.mode !== 'tournament') return false;
+  // Fixture id of a waiting round: cup:<tournament>:<run start>:<round>:<trophies> (see fixtureFor in travel-data).
+  const match = /^cup:([a-z]+):(\d+):(\d+):\d+$/.exec(journey.fixture.id);
+  if (!match) return false;
+  const [, tournamentId, startedAt, round] = match;
+  if (Number(round) < 1) return false;
+  const cup = features.cup;
+  const stillWaiting = cup.pendingNextRound && cup.mode === 'tournament' && cup.tournamentId === tournamentId && String(cup.matchStartedAt) === startedAt && String(cup.round) === round;
+  if (stillWaiting || !features.completedTournamentRuns.includes(`${tournamentId}:${startedAt}`)) return false;
+  if (features.squadLock && features.squadLock.fixtureId !== journey.fixture.id) return false;
+  features.travel = { ...features.travel, journey: null };
+  if (features.squadLock) releaseMatchSquad(features, now);
+  return true;
 }
 
 function normalizePendingSubstitutions(value: unknown): CupState['pendingSubstitutions'] {
