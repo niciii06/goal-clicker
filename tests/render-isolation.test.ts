@@ -88,7 +88,7 @@ test("the counter store only notifies on a new value and the click feedback stor
 });
 
 test("the page commits passive goals through the store and flushes them before every other game update", () => {
-  const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const page = readFileSync(new URL("../app/game-app.tsx", import.meta.url), "utf8");
   // The 200 ms tick no longer sets the App state.
   const tick = page.slice(page.indexOf("const tick = window.setInterval(() => {"), page.indexOf("}, 200);"));
   assert.doesNotMatch(tick, /setGame|setGameState/);

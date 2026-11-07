@@ -16,7 +16,7 @@ const clickTiers = [
 
 test("singleplayer and multiplayer share the complete click progression", async () => {
   const [pageSource, apiSource, upgradesSource, economySource] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/game/upgrades.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/game/economy.ts", import.meta.url), "utf8"),
@@ -39,7 +39,7 @@ test("singleplayer and multiplayer share the complete click progression", async 
 });
 
 test("holding Enter or Space cannot repeat ball clicks", async () => {
-  const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const pageSource = await readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8");
   const keyboardHandler = pageSource.slice(
     pageSource.indexOf("function handleBallKeyDown"),
     pageSource.indexOf("function awardMiniGame"),

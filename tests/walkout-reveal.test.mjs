@@ -5,7 +5,7 @@ import { readStyles } from "./helpers/styles.mjs";
 
 test("walkout avatar renders the revealed player without crashing", async () => {
   const [pageSource, avatarSource] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/walkout-avatar.tsx", import.meta.url), "utf8"),
   ]);
 
@@ -16,7 +16,7 @@ test("walkout avatar renders the revealed player without crashing", async () => 
 
 test("walkout keeps only the fireworks and confetti effects", async () => {
   const [pageSource, styleSource] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
     Promise.resolve(readStyles()),
   ]);
 
@@ -34,7 +34,7 @@ test("walkout keeps only the fireworks and confetti effects", async () => {
 
 test("walkout continue action unlocks when the visible animation finishes", async () => {
   const [pageSource, styleSource] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
     Promise.resolve(readStyles()),
   ]);
 
@@ -103,7 +103,7 @@ test("every Icon and current 86+ base card has a fixed appearance", async () => 
 
 test("walkout uses real SVG flags and shortens GOAT Nicu positions", async () => {
   const [pageSource, boardSource] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/squad-board.tsx", import.meta.url), "utf8"),
   ]);
 
@@ -171,7 +171,7 @@ test("Mikeboy Jr. is a Swiss legendary centre-back (start 80, potential 100) wit
   const [featureSource, walkoutSource, pageSource] = await Promise.all([
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/walkout-data.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(featureSource, /id: "star-benxli",[\s\S]*?countryCode: "CH",[\s\S]*?name: "Mikeboy Jr\.",[\s\S]*?position: "IV",[\s\S]*?positions: \["IV"\],[\s\S]*?rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 67,[\s\S]*?cardType: "legendary",[\s\S]*?packWeight: 0\.04/);
@@ -185,7 +185,7 @@ test("Nedu Mann Yesss is a Bosnian legendary ZM and ZDM pack player (potential 1
   const [featureSource, walkoutSource, pageSource] = await Promise.all([
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/walkout-data.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(featureSource, /id: "star-nedu-mann-yesss",[\s\S]*?countryCode: "BA",[\s\S]*?name: "Nedu Mann Yesss",[\s\S]*?position: "ZM",[\s\S]*?positions: \["ZM", "ZDM"\],[\s\S]*?rating: SPECIAL_START_RATING, potential: SPECIAL_POTENTIAL, packRating: 100,[\s\S]*?cardType: "legendary",[\s\S]*?packWeight: 0\.02/);
@@ -224,7 +224,7 @@ test("Di Santo is a Dutch ST (potential 100) whose walkout borrows only the body
 test("every nation on a card has a walkout country and a real flag", async () => {
   const [walkoutSource, pageSource, womenSource, featureSource] = await Promise.all([
     readFile(new URL("../app/walkout-data.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/fc27-women-pool.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
   ]);

@@ -13,7 +13,7 @@ test("AZB bypasses season locks without changing normal progression", () => {
 
 test("AZB upgrade purchases bypass overflowed prices in client and multiplayer", async () => {
   const [pageSource, apiSource] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
   ]);
 
@@ -26,7 +26,7 @@ test("AZB upgrade purchases bypass overflowed prices in client and multiplayer",
 test("lobby codes are disabled without removing existing AZB test rooms", async () => {
   const [apiSource, pageSource] = await Promise.all([
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(apiSource, /if \(action === "redeem-lobby-code"\) return jsonError\("Lobby Codes sind deaktiviert\.", 409\);/);
@@ -37,7 +37,7 @@ test("lobby codes are disabled without removing existing AZB test rooms", async 
 
 test("client and multiplayer server apply AZB to every season gated category", async () => {
   const [pageSource, apiSource] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
   ]);
 
@@ -53,7 +53,7 @@ test("client and multiplayer server apply AZB to every season gated category", a
 
 test("lobby code history stays hidden", async () => {
   const [pageSource, apiSource] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
   ]);
 
@@ -63,7 +63,7 @@ test("lobby code history stays hidden", async () => {
 
 test("season mode uses the live match flow and table results instead of goal targets", async () => {
   const [pageSource, apiSource] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
   ]);
 
@@ -81,7 +81,7 @@ test("season mode uses the live match flow and table results instead of goal tar
 
 test("season match results use an inline expandable standings panel", async () => {
   const [pageSource, featureSource] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
   ]);
 
@@ -98,7 +98,7 @@ test("season match results use an inline expandable standings panel", async () =
 
 test("purchase surfaces always show full prices instead of missing amounts", async () => {
   const [pageSource, apiSource] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
   ]);
 
@@ -109,7 +109,7 @@ test("purchase surfaces always show full prices instead of missing amounts", asy
 
 test("progress surfaces show full targets instead of remaining amounts", async () => {
   const [pageSource, apiSource] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
   ]);
 

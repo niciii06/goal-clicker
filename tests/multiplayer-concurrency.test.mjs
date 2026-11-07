@@ -5,7 +5,7 @@ import test from "node:test";
 test("multiplayer state writes use a monotonic revision and retry stale actions", async () => {
   const [apiSource, pageSource] = await Promise.all([
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
   ]);
 
   const databaseSource = await readFile(new URL("../db/index.ts", import.meta.url), "utf8");
@@ -24,7 +24,7 @@ test("multiplayer state writes use a monotonic revision and retry stale actions"
 test("live tournament ticks yield to foreground upgrade purchases", async () => {
   const [apiSource, pageSource] = await Promise.all([
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(pageSource, /action === "tick" \|\| action === "cup-tick"/);
@@ -45,7 +45,7 @@ test("singleplayer and multiplayer tournaments never add direct goal rewards", a
   const [featureSource, apiSource, pageSource] = await Promise.all([
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.doesNotMatch(featureSource, /baseReward|rewardMultiplier/);
@@ -59,7 +59,7 @@ test("tournament cooldown stays server-safe while season matches share the game 
   const [featureSource, apiSource, pageSource] = await Promise.all([
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(featureSource, /TOURNAMENT_COOLDOWN_MS = 5 \* 60 \* 1000/);
@@ -81,7 +81,7 @@ test("multiplayer rooms preserve old slots and accept four players", async () =>
   const [schemaSource, apiSource, pageSource, protocolSource] = await Promise.all([
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/multiplayer-protocol.ts", import.meta.url), "utf8"),
   ]);
 

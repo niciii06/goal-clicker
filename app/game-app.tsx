@@ -1,0 +1,3896 @@
+"use client";
+// The game itself: app/page.tsx loads this module as its own chunk (audit P13).
+import type { AnimationEvent, CSSProperties, DragEvent, KeyboardEvent, MouseEvent, RefObject, SetStateAction } from "react";
+import type { AppMode, CoopRole, CoopRoom, CoopSession, CrossbarGame, CrossbarHeight, DribbleGame, FeedEntry, GameState, IconName, LayoutCardId, MatchPrediction, MiniGameId, PenaltyDirection, PenaltyGame, PredictionGame, PurchaseMode, SeasonStandingsAnnouncement, SquadDragSource, SquadDropTarget, Tab, UpgradeDefinition } from "./game/types";
+import type { StarXIState, CupCardEvent, GameFeatures, PenaltyDirection as CupPenaltyDirection, RandomEvent, StarFormationId, StarPackId, StarPackReveal, TournamentGazetteIssue, TournamentId, TransferInsiderEvent } from "./feature-data";
+import type { Journey, TravelFixture } from "./travel-data";
+import type { MatchDraft } from "./match-commands";
+import { RESERVE_SORTS, RESERVE_STATUS_FILTERS, RESERVE_TYPES, filterAndSortReserve, reserveCardType, reserveTypeLabel } from "./game/reserve-filter";
+import { ACHIEVEMENTS, BALANCE_VERSION, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_MAX_COUNT, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, ALBUM_MILESTONES_STORAGE_KEY, STAR_RATING_FILTERS, TUTORIAL_STORAGE_KEY, VIBRATION_STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from "./game/constants";
+import { AL, AR, AT, AU, AZ, BA, BE, BF, BG, BR, CA, CD, CH, CI, CL, CM, CN, CO, CR, CZ, DE, DK, DZ, EC, EG, ES, FI, FR, GB_ENG, GB_NIR, GB_SCT, GB_WLS, GE, GH, GM, GN, GR, GT, HR, HT, HU, IE, IL, IS, IT, JM, JP, KN, KR, MA, ME, ML, MW, MX, NG, NL, NO, NZ, PA, PH, PL, PT, PY, RO, RS, RU, SE, SI, SK, SN, SR, TR, UA, US, UY, VE, XK, ZA, ZM } from "country-flag-icons/react/3x2";
+import { AlbumPanel, CareerArea, CareerPlayerBadge, PostMatchSummary } from "./career-panels";
+import { normalizeStarXIState, removeStarXIPlayersFromSquad, toggleFavoriteCard } from "./feature-data";
+import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, SPECIAL_CARD_PACK, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_SQUAD_SIZE, STAR_XI_TOTAL_CARD_COUNT, TOURNAMENTS, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, applyPendingMatchChanges, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, getSpecialCardPackOdds, purchaseSpecialCardPack, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostMultiplier, getOpenTransferSquadVacancies, getRandomEventDelay, getRewardPackOdds, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXIRating, getStarXISelection, getTournament, getTournamentRewardPack, getBestXIUnavailablePlayerIds, grantWelcomePack, awardMatchStamp, canDrawHundredSpecialCards, maybeGrantStarterSquad, STARTER_SQUAD_UNLOCK_CLICKS, getUnavailableStarXIPlayerIds, initialGameFeatures, isRewardPack, isTransferDeadlineDay, normalizeGameFeatures, openEarnedPack, openStarPack, pauseGameFeatureTimers, queueMatchChanges, recordSeasonModeMatch, releaseMatchSquad, resolveCupPenalty, getCupPenaltyStep, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, TRANSFER_UNHAPPY_MATCHES, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, getPrestigeBlockReason, seasonMatchDuration, sortSeasonTable, tournamentMatchDuration } from "./feature-data";
+import { DailyRewardCard } from "./daily-reward-panel";
+import { FootballGraphic, Icon, StarXIPositionBadges } from "./game/ui";
+import { LiveMatchViewer } from "./match-viewer";
+import { AccountButton, AccountLink } from "./account-panel";
+import { ConfirmDialog, useDialogFocus } from "./confirm-dialog";
+import { PrestigeDialog, PrestigeVoteDialog, prestigeBonusLabel, prestigeBonusPercent } from "./prestige-dialog";
+import { WHATS_NEW } from "./whats-new";
+import { WhatsNewDialog } from "./whats-new-dialog";
+import { TutorialCoach, TutorialIntroDialog } from "./tutorial-panel";
+import { SeasonTrophyCelebration, getSeasonTitle, type SeasonTitle } from "./season-trophy";
+import { advanceTutorial, finishedTutorial, newTutorial, parseTutorialState, serializeTutorialState, type TutorialState, type TutorialStep } from "./tutorial";
+import { TAB_PATHS, tabForPath } from "./tab-routes";
+import type { RoutedTab } from "./tab-routes";
+import { gameAudioContext, playPackReveal } from "./match-audio";
+import { MatchAudio } from "./match-audio-player";
+import { AccountContext, GuestContext } from "./account-gate";
+import { FLUSH_SAVE_EVENT } from "./cloud-sync";
+import { resolveSquadTap, SquadBenchCard, SquadBenchPanel, SquadBenchSlot, SquadPitchPanel, SquadPitchSlot, formatStarXIPositions, useSquadDrag } from "./squad-board";
+import type { SquadPick } from "./squad-board";
+import { SEASON_MILESTONES, getSeasonMilestone } from "./season-roadmap";
+import { getFormationUnlockLeague, sortFormationsForPicker, getPackUnlockLeague, getReachedLeague, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked, leagueForTier } from "./season-progression";
+import { MULTIPLAYER_PROTOCOL_VERSION, MULTIPLAYER_UPDATE_MESSAGE } from "./multiplayer-protocol";
+import { PressConferencePanel } from "./press-conference-panel";
+import { TravelPanel, TravelStatsPanel, durationLabel } from "./travel-panel";
+import { advanceLocalGameWhileOpen, claimLocalSave, getMiniGameCooldownUntil, initialGame, isLocalSaveWriter, markLocalSaveLoaded, normalizeAchievements, normalizeLayoutOrder, normalizeNickname, pauseMiniGameCooldowns, persistLocalGame, readStoredGame, suspendLocalPersistence } from "./game/storage";
+import type { LocalSaveResult } from "./game/storage";
+import { answerPressConference, getPressReward } from "./press-conference";
+import { canVibrate, readVibrationSetting, setVibrationOn, vibrate, vibrationOn } from "./game/device";
+import { albumMilestonesFromStorage, claimAlbumRewards, getCareerCard, getPlayerForm, prepareCareerMatch, recordCareerMatch, rivalryKey } from "./career-data";
+import { competitionFor, competitionLabel, competitionOfCup, getBannedPlayerIds, nextCompetition, squadBanError, suspensionLabel } from "./discipline";
+import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "./daily-reward";
+import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
+import { consumeTravel, eligibilityError, fixtureFor, journeyView, payTravelFines, settleTravel, travelTiming } from "./travel-data";
+import { COOP_UPDATE_REQUIRED_EVENT, coopLastActiveLabel, coopRetryDelay, coopRoleLabel, createCoopGameNormalizer, isCoopRole, multiplayerUrl, newCoopActionId, notifyCoopOffline, occupiedCoopPlayers, prestigeVoteMessage, readCoopResponse, reloadForUpdate, upsertSavedRoom } from "./game/coop";
+import { capGoalsAfterRebalance, createClickResult, decayComboCount, formatComboMultiplier, getBaseClickPower, getBasePassivePower, getBulkPurchase, getClickPower, getComboLevel, getCost, getLevel, getPassivePower, getRank, getUpgradeEffect, normalizeUpgrades, scaleMiniGameReward } from "./game/economy";
+import { UPGRADES } from "./game/upgrades";
+import { applyGamePrestige } from "./game/prestige";
+import { TransferOfferActions } from "./transfer-offer-actions";
+import { pronounText } from "./player-pronouns";
+import { LeaderboardPanel } from "./leaderboard-panel";
+import { SeasonPanel } from "./season-panel";
+import { expectedHomeCrowd, getTicketIncome, recordTicketIncome } from "./ticket-income";
+import { directionLabel, formatCountdown, formatGoalDifference, formatHistoryTime, formatNumber, formatPackChance, getRandomCrossbarHeight, getRandomMatchPrediction, getRandomPenaltyDirection, heightLabel, predictionLabel } from "./game/format";
+import { getCurrentTime, getTravelTime, syncTravelClock } from "./game/clock";
+import { getStarCardTier, getWalkoutPresentation } from "./walkout-data";
+import { WalkoutAvatar } from "./walkout-avatar";
+import { loadRouteCache } from "./travel-route-cache-lazy";
+import { isAway, onReturn } from "./activity";
+import { MAX_BACKGROUND_CATCH_UP_MS, takeBackgroundTime } from "./game/storage";
+import { monotonicNow } from "./game/clock";
+import { NEWER_VERSION_MESSAGE } from "./game/save-schema";
+import { exportCurrentSave, SaveFileControls } from "./save-file-controls";
+import { MATCH_RAN_WHILE_AWAY, matchRanWhileAway, missedMatchCaughtUp, summarizeMissedMatch } from "./match-missed";
+import { claimWeeklyGoal, ensureWeeklyGoals, notePackOpened, weeklyGoalsNeedUpdate } from "./weekly-goals";
+import { WeeklyGoalsPanel } from "./weekly-goals-panel";
+import { appBadgeCount, claimableAlbumGroups, getOpenActions, returnSummary, sectionBadges, statusTitle } from "./qol/status";
+import type { OpenAction } from "./qol/status";
+import { NextStepsStrip } from "./qol/next-steps";
+import { SavingsGoalBar, UpgradeHints } from "./qol/shop-hints";
+import { addPassiveGoals, createPassiveGoalsStore } from "./game/live-goals";
+import { ClickBallButton, ComboMeter, FloatingClickNumbers, LiveGoalCount, createClickFeedbackStore } from "./game/live-display";
+import { bestValueUpgrade, nextLevelGain, savingsHint } from "./qol/economy-hints";
+import { parseSavingsGoal, pickStringFields, type SavingsGoal } from "./qol/prefs";
+import { bestRatingPerFormation, benchChangeCount, describeReplacements, fillStarXIGaps, formatRatingDelta, lineupChanges, movePlayerToEmptyBench, movePlayerToReserve, ratingAfterLineupMove, withBestBench } from "./game/lineup-tools";
+import type { LineupChange } from "./game/lineup-tools";
+import { KickoffChecklist, type KickoffItem } from "./qol/kickoff-checklist";
+import { abandonTournamentRun } from "./game/tournament-abandon";
+import { HISTORY_TOPICS, filterHistory, historyActors, type HistoryTopic } from "./qol/history-filter";
+import { inviteUrl, joinCodeFromSearch, shortcutFor } from "./qol/invite";
+import { newNotifiableActions, setAppBadge, showLocalNotification } from "./qol/notifications";
+import { DeviceSettingsPanel, type SoundPrefs } from "./qol/device-settings";
+import { nextToast, pushToast, toastDuration, type ToastPriority, type ToastQueueState } from "./qol/toast-queue";
+import { PREF_KEYS, parsePurchaseMode, readJsonPref, readPref, writeJsonPref, writePref } from "./qol/prefs";
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+
+
+type FeatureTab = RoutedTab;
+
+const WALKOUT_COUNTRY_FLAGS: Record<string, typeof FR> = {
+  AL, AR, AT, AU, AZ, BA, BE, BF, BG, BR, CA, CD, CH, CI, CL, CM, CN, CO, CR, CZ, DE, DK, DZ, EC, EG,
+  EN: GB_ENG, ES, FI, FR, GE, GH, GM, GN, GR, GT, HR, HT, HU, IE, IL, IS, IT, JM, JP, KN, KR, MA, ME, ML,
+  MW, MX, NG, NI: GB_NIR, NL, NO, NZ, PA, PH, PL, PT, PY, RO, RS, RU, SC: GB_SCT, SE, SI, SK, SN, SR, TR,
+  UA, US, UY, VE, WA: GB_WLS, XK, ZA, ZM,
+};
+
+function WalkoutCountryFlag({ code, country, compact = false }: { code: string; country: string; compact?: boolean }) {
+  const Flag = WALKOUT_COUNTRY_FLAGS[code] ?? CH;
+  return <Flag className={compact ? "walkout-country-flag compact" : "walkout-country-flag"} role="img" aria-label={`Flagge von ${country}`} />;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+const ANNOUNCEMENT_AUTO_CLOSE_MS = 8500;
+
+/** True while the pointer is over the element, focus is inside it or one of its <details> is open. */
+function useAnnouncementHold(ref: RefObject<HTMLElement | null>, open: boolean) {
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    const element = ref.current;
+    if (!open || !element) return;
+    let hover = false;
+    const update = () => setHeld(hover || element.contains(document.activeElement) || Boolean(element.querySelector("details[open]")));
+    const enter = () => { hover = true; update(); };
+    const leave = () => { hover = false; update(); };
+    const blur = () => window.setTimeout(update, 0);
+    element.addEventListener("pointerenter", enter);
+    element.addEventListener("pointerleave", leave);
+    element.addEventListener("focusin", update);
+    element.addEventListener("focusout", blur);
+    element.addEventListener("toggle", update, true);
+    update();
+    return () => {
+      element.removeEventListener("pointerenter", enter);
+      element.removeEventListener("pointerleave", leave);
+      element.removeEventListener("focusin", update);
+      element.removeEventListener("focusout", blur);
+      element.removeEventListener("toggle", update, true);
+      setHeld(false);
+    };
+  }, [ref, open]);
+  return held;
+}
+
+const TAB_TITLES: Partial<Record<FeatureTab, string>> = { home: "Home", cup: "Spiele", season: "Saison", squad: "Kader", career: "Karriere", packs: "Packshop", album: "Sammelalbum", club: "Clubprofil", fabrizio: "Fabrizio", missions: "Wochenziele", leaderboard: "Rangliste", history: "Verlauf" };
+
+function primarySectionOf(tab: FeatureTab) {
+  return tab === "album" ? "packs" : ["fabrizio", "missions", "leaderboard", "history"].includes(tab) ? "club" : tab;
+}
+
+const SAVE_FAILED_MESSAGE = "Speichern fehlgeschlagen: Der Browser Speicher ist voll. Sichere deinen Spielstand als Datei, bevor du die Seite schliesst.";
+/** A waiting co-op world without input for this long is polled every COOP_IDLE_POLL_MS instead of every 1.5 s. */
+const COOP_IDLE_AFTER_MS = 30_000;
+const COOP_IDLE_POLL_MS = 4000;
+const STAR_WALKOUT_ANIMATION_MS = 9500;
+const STAR_TOP_WALKOUT_ANIMATION_MS = 11500;
+const STAR_WALKOUT_READY_MS = 7500;
+const STAR_TOP_WALKOUT_READY_MS = 10900;
+
+/** With reduced motion the reveal skips its animations and is ready almost at once. */
+const STAR_REVEAL_REDUCED_MOTION_READY_MS = 700;
+/** A player who has seen one walkout may skip the next ones after this long. */
+const STAR_WALKOUT_SKIP_AFTER_MS = 2000;
+const WALKOUT_SEEN_STORAGE_KEY = "goal-clicker-walkout-seen";
+
+function prefersReducedMotion() {
+  try { return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; }
+}
+
+function getStarRevealReadyDelay(reveal: StarPackReveal) {
+  if (prefersReducedMotion() && getStarCardTier(reveal.player) !== "standard") return STAR_REVEAL_REDUCED_MOTION_READY_MS;
+  const tier = getStarCardTier(reveal.player);
+  const trollDelay = reveal.troll && (tier === "walkout" || tier === "icon" || tier === "legendary") ? PACK_TROLL_INTRO_MS : 0;
+  if (tier === "rare") return STAR_RARE_REVEAL_DURATION_MS;
+  if (tier === "walkout" || tier === "icon" || tier === "legendary") return trollDelay + (reveal.player.rating >= 90 ? STAR_TOP_WALKOUT_READY_MS : STAR_WALKOUT_READY_MS);
+  return 0;
+}
+
+
+
+function mergeCoopSessionRoom(current: CoopSession | null, room: CoopRoom, role?: CoopRole) {
+  if (!current || current.code !== room.code || room.revision < current.room.revision) return current;
+  // A slim answer keeps the features this client already has; without matching ones it waits for a full answer.
+  if (room.featuresOmitted) {
+    if (!current.room.featuresKey || current.room.featuresKey !== room.featuresKey || !current.room.game?.features) return current;
+    room = { ...room, featuresOmitted: false, game: { ...room.game, features: current.room.game.features } };
+  }
+  return { ...current, room, role: role ?? current.role };
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function formatStableInteger(value: number) {
+  return Math.max(0, Math.floor(Number(value) || 0)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "'");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+export function App() {
+  const packPurchaseRef = useRef(false);
+  const starterSquadRequestedRef = useRef(false);
+  const [starterSquadRetry, setStarterSquadRetry] = useState(0);
+  const travelActionRef = useRef(false);
+  const [travelBusy, setTravelBusy] = useState(false);
+  const [game, setGameState] = useState<GameState>(initialGame);
+  // Passive ticks collect in this store and reach the state about once per second (audit P09); every other game
+  // update first adds them, so purchases, rewards and saves see exactly the goals the old 200 ms commits gave.
+  const [passiveGoals] = useState(() => createPassiveGoalsStore(initialGame().goals));
+  const flushPassiveGoals = useCallback(() => {
+    const amount = passiveGoals.takePending();
+    if (amount) setGameState((current) => addPassiveGoals(current, amount));
+  }, [passiveGoals]);
+  const setGame = useCallback((update: SetStateAction<GameState>) => {
+    flushPassiveGoals();
+    setGameState(update);
+  }, [flushPassiveGoals]);
+  const [hydrated, setHydrated] = useState(false);
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+  // Finished until the start decides: only a brand new club gets the tutorial.
+  const [tutorial, setTutorialState] = useState<TutorialState>(finishedTutorial);
+  const [appMode, setAppMode] = useState<AppMode>("single");
+  const [playerId, setPlayerId] = useState("");
+  const [playerName, setPlayerName] = useState("");
+  const account = useContext(AccountContext);
+  // A guest plays single player only; co-op needs an account.
+  const guest = useContext(GuestContext);
+  const [guestCoopPrompt, setGuestCoopPrompt] = useState(false);
+  // Milestone bonuses in the album: remembered with the account; a guest always starts with the original ratings.
+  const [albumMilestones, setAlbumMilestonesState] = useState(false);
+  useEffect(() => {
+    let stored: string | null = null;
+    try { stored = guest ? null : localStorage.getItem(ALBUM_MILESTONES_STORAGE_KEY); } catch { /* the default applies */ }
+    const show = albumMilestonesFromStorage(stored, Boolean(guest));
+    window.setTimeout(() => setAlbumMilestonesState(show), 0);
+  }, [guest]);
+  function setAlbumMilestones(show: boolean) {
+    setAlbumMilestonesState(show);
+    if (guest) return;
+    try { localStorage.setItem(ALBUM_MILESTONES_STORAGE_KEY, show ? "on" : "off"); } catch { /* only this visit remembers it */ }
+  }
+  // With an account the display name of the profile is the nickname in every world.
+  const coopNickname = account?.profile.displayName ?? playerName;
+  const [coopCodeInput, setCoopCodeInput] = useState("");
+  const [coopRoomName, setCoopRoomName] = useState("Meine Welt");
+  const [coopSession, setCoopSession] = useState<CoopSession | null>(null);
+  const [confirmSingle, setConfirmSingle] = useState(false);
+  // Open Prestige dialog with its own request id: a double click or a retry starts one Prestige only.
+  // `prestigeCount`: the count when the dialog opened; when it changes (another seat started Prestige), the dialog closes.
+  const [prestigeDialog, setPrestigeDialog] = useState<{ requestId: string; error: string; prestigeCount: number } | null>(null);
+  const prestigeConfirmedRef = useRef(new Set<string>());
+  // Seat management: leave the own seat, or (host) remove a member. Always asked in a ConfirmDialog first.
+  const [seatDialog, setSeatDialog] = useState<{ kind: "leave" } | { kind: "kick"; role: CoopRole; name: string; inactive: boolean; activity: string } | null>(null);
+  // An open co-op Prestige vote the player hid (by vote id); it comes back with the next vote.
+  const [hiddenPrestigeVote, setHiddenPrestigeVote] = useState("");
+  const shownVoteResultRef = useRef("");
+  // The md5 of the shared features this client holds; polls send it so the server can leave them out.
+  const coopFeaturesKeyRef = useRef("");
+  const missedMatchRef = useRef<{ since: number; until: number; matchStartedAt: number } | null>(null);
+  const [savedRooms, setSavedRooms] = useState<CoopRoom[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(false);
+  const [coopMessage, setCoopMessage] = useState("");
+  // A newer server refused this client's protocol: a banner offers the reload instead of reloading mid action.
+  const [coopUpdateRequired, setCoopUpdateRequired] = useState(false);
+  useEffect(() => {
+    const onUpdateRequired = () => setCoopUpdateRequired(true);
+    window.addEventListener(COOP_UPDATE_REQUIRED_EVENT, onUpdateRequired);
+    return () => window.removeEventListener(COOP_UPDATE_REQUIRED_EVENT, onUpdateRequired);
+  }, []);
+  const [coopBusy, setCoopBusy] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>("all");
+  const [purchaseMode, setPurchaseModeState] = useState<PurchaseMode>(1);
+  const [featureTab, setFeatureTabState] = useState<FeatureTab>("home");
+  const [selectedTournamentId, setSelectedTournamentId] = useState<TournamentId>("stadium");
+  // The buy mode and the last chosen tournament stay on this device (app/qol/prefs.ts).
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setPurchaseModeState(parsePurchaseMode(readPref(PREF_KEYS.purchaseMode)));
+      const tournament = readPref(PREF_KEYS.tournament);
+      if (tournament && TOURNAMENTS.some((item) => item.id === tournament)) setSelectedTournamentId(tournament as TournamentId);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  function setPurchaseMode(mode: PurchaseMode) { setPurchaseModeState(mode); writePref(PREF_KEYS.purchaseMode, String(mode)); }
+  function chooseTournament(id: TournamentId) { setSelectedTournamentId(id); writePref(PREF_KEYS.tournament, id); }
+  const [selectedLineupSlot, setSelectedLineupSlot] = useState<number | null>(null);
+  const [selectedBenchSlot, setSelectedBenchSlot] = useState<number | null>(null);
+  const [selectedReserveId, setSelectedReserveId] = useState<string | null>(null);
+  // "Beste Startelf" shows its changes first (Q22); after applying, one step back is possible (single player).
+  const [bestXIPreview, setBestXIPreview] = useState<{ after: StarXIState; changes: LineupChange[]; bench: number; before: number; rating: number } | null>(null);
+  const [squadUndo, setSquadUndo] = useState<{ lineupIds: string[]; benchIds: string[]; formationId: string; signature: string } | null>(null);
+  const [formationRatings, setFormationRatings] = useState<Partial<Record<StarFormationId, number>>>({});
+  const [starRatingFilter, setStarRatingFilter] = useState("all");
+  const [starPositionFilter, setStarPositionFilter] = useState("all");
+  const [starSearch, setStarSearch] = useState("");
+  // Reserve sort and filters (Q32 to Q36), remembered on this device (Q35).
+  const [reserveSort, setReserveSort] = useState("ovr");
+  const [reserveType, setReserveType] = useState("all");
+  const [reserveStatus, setReserveStatus] = useState("all");
+  const [reserveOnlyCompatible, setReserveOnlyCompatible] = useState(false);
+  const reserveFiltersLoadedRef = useRef(false);
+  useEffect(() => {
+    const saved = readJsonPref(PREF_KEYS.reserveFilters, (value) => pickStringFields(value, { rating: "all", position: "all", sort: "ovr", type: "all", status: "all" }, { rating: STAR_RATING_FILTERS.map((filter) => filter.id), position: ["all", ...STAR_POSITIONS], sort: RESERVE_SORTS.map((item) => item.id), type: RESERVE_TYPES.map((item) => item.id), status: RESERVE_STATUS_FILTERS.map((item) => item.id) }));
+    const timer = window.setTimeout(() => { setStarRatingFilter(saved.rating); setStarPositionFilter(saved.position); setReserveSort(saved.sort); setReserveType(saved.type); setReserveStatus(saved.status); reserveFiltersLoadedRef.current = true; }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  // Cards that came since the last visit of the Kader tab carry "NEU" during the next visit (Q37, per device).
+  const [newCardIds, setNewCardIds] = useState<ReadonlySet<string>>(new Set());
+  const [reservePage, setReservePage] = useState(0);
+  const [layoutEditMode, setLayoutEditMode] = useState(false);
+  const [layoutOrder, setLayoutOrder] = useState<LayoutCardId[]>(DEFAULT_LAYOUT_ORDER);
+  const [layoutReady, setLayoutReady] = useState(false);
+  const [draggingLayoutCard, setDraggingLayoutCard] = useState<LayoutCardId | null>(null);
+  const [dragOverLayoutCard, setDragOverLayoutCard] = useState<LayoutCardId | null>(null);
+  const squadDrag = useSquadDrag({
+    canDrop: canDropSquadPlayer,
+    onDrop: dropSquadPlayer,
+    onBlocked: () => showToast("Dieser Wechsel ist wegen Position oder Spielstatus nicht möglich."),
+    locked: (source) => layoutEditMode || coopBusy || (source.area === "reserve" && displayGame.features.cup.active),
+    picked: () => pickedSquadSpot()?.source ?? null,
+  });
+  const draggingSquadPlayer = squadDrag.dragging;
+  // Each tab has its own address; the game page stays mounted, only the history entry changes.
+  function openFeatureTab(tab: FeatureTab) {
+    // A new main section starts at the top with focus on its heading; a sub tab of the same section keeps the place.
+    if (tab !== featureTab && primarySectionOf(tab) !== primarySectionOf(featureTab)) tabFocusPendingRef.current = true;
+    setFeatureTabState(tab);
+    const path = TAB_PATHS[tab];
+    if (typeof window !== "undefined" && tabForPath(window.location.pathname) !== tab) window.history.pushState(null, "", `${path}${window.location.search}${window.location.hash}`);
+  }
+  const tabFocusPendingRef = useRef(false);
+  useEffect(() => {
+    if (!tabFocusPendingRef.current) return;
+    tabFocusPendingRef.current = false;
+    window.scrollTo({ top: 0, behavior: "auto" });
+    const heading = [...document.querySelectorAll<HTMLElement>("main h2, main h3, main h4")].find((element) => element.getClientRects().length > 0 && getComputedStyle(element).visibility !== "hidden");
+    if (!heading) return;
+    if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
+    heading.focus({ preventScroll: true });
+  }, [featureTab]);
+  useLayoutEffect(() => {
+    const sync = () => setFeatureTabState(tabForPath(window.location.pathname));
+    sync();
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, []);
+  const [clubDraft, setClubDraft] = useState(initialGameFeatures().club);
+  const [eventAnnouncement, setEventAnnouncement] = useState<RandomEvent | null>(null);
+  const [transferAnnouncement, setTransferAnnouncement] = useState<TransferInsiderEvent | null>(null);
+  const [gazetteAnnouncement, setGazetteAnnouncement] = useState<TournamentGazetteIssue | null>(null);
+  const [cupCardAnnouncement, setCupCardAnnouncement] = useState<CupCardEvent | null>(null);
+  const [seasonStandingsAnnouncement, setSeasonStandingsAnnouncement] = useState<SeasonStandingsAnnouncement | null>(null);
+  const standingsCardRef = useRef<HTMLDivElement>(null);
+  const gazetteCardRef = useRef<HTMLDivElement>(null);
+  const [seasonTitle, setSeasonTitle] = useState<SeasonTitle | null>(null);
+  const [starReveal, setStarReveal] = useState<StarPackReveal | null>(null);
+  const [starWalkoutReady, setStarWalkoutReady] = useState(false);
+  const [walkoutSkippable, setWalkoutSkippable] = useState(false);
+  const [starRevealSkipped, setStarRevealSkipped] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  useEffect(() => {
+    let query: MediaQueryList;
+    try { query = window.matchMedia("(prefers-reduced-motion: reduce)"); } catch { return; }
+    const update = () => setReducedMotion(query.matches);
+    update();
+    query.addEventListener?.("change", update);
+    return () => query.removeEventListener?.("change", update);
+  }, []);
+  // How far the reveal had already run when it appeared (after a reload); fixed for the whole animation.
+  const [starRevealLag, setStarRevealLag] = useState(0);
+  const packSoundRef = useRef<(() => void) | null>(null);
+  const [activeMiniGame, setActiveMiniGame] = useState<MiniGameId | null>(null);
+  const [penaltyGame, setPenaltyGame] = useState<PenaltyGame | null>(null);
+  const [dribbleGame, setDribbleGame] = useState<DribbleGame | null>(null);
+  const [crossbarGame, setCrossbarGame] = useState<CrossbarGame | null>(null);
+  const [predictionGame, setPredictionGame] = useState<PredictionGame | null>(null);
+  const [countdownNow, setCountdownNow] = useState(getCurrentTime);
+  // Ball pulse, floating numbers and combo meter re-render on their own (audit P09).
+  const [clickFeedback] = useState(createClickFeedbackStore);
+  const [toastState, setToastState] = useState<ToastQueueState>({ current: null, queue: [] });
+  const toast = toastState.current?.text ?? "";
+  const [offline, setOffline] = useState("");
+  const saveFailedRef = useRef(false);
+  const [feedExpanded, setFeedExpanded] = useState(false);
+  const [feed, setFeed] = useState<FeedEntry[]>([{ id: 1, icon: "broadcast", text: "Die Fans sind da. Klaus der Torwart auch." }]);
+  const gameRef = useRef(game);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const lastClickRef = useRef(0);
+  const streakRef = useRef(0);
+  const comboRef = useRef({ count: 0, last: 0, paused: false, multiplier: 1 });
+  const comboTimerRef = useRef<number | null>(null);
+  const [vibrationEnabled, setVibrationEnabled] = useState(readVibrationSetting);
+  // Sound is split into effects (clicks, packs) and stadium (live match); the header switch turns both off.
+  const [soundPrefs, setSoundPrefsState] = useState<SoundPrefs>({ effects: true, stadium: true });
+  const soundPrefsRef = useRef(soundPrefs);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSoundPrefsState(readJsonPref(PREF_KEYS.stadiumSound, (value) => { const source = value && typeof value === "object" ? value as Partial<SoundPrefs> : {}; return { effects: source.effects !== false, stadium: source.stadium !== false }; })), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => { soundPrefsRef.current = soundPrefs; }, [soundPrefs]);
+  function setSoundPrefs(next: SoundPrefs) { setSoundPrefsState(next); writeJsonPref(PREF_KEYS.stadiumSound, next); }
+  const [whatsNewArchive, setWhatsNewArchive] = useState(false);
+  const [abandonDialog, setAbandonDialog] = useState(false);
+  const [historyTopic, setHistoryTopic] = useState<HistoryTopic>("all");
+  const [historyActor, setHistoryActor] = useState("");
+  // A co-op action that failed: the chip offers to send it again with the same action id (Q64).
+  const [coopFailed, setCoopFailed] = useState<{ action: string; extra: Record<string, unknown> } | null>(null);
+  const [dailyBusy, setDailyBusy] = useState(false);
+  const [pressBusy, setPressBusy] = useState(false);
+  const clubGoalRef = useRef<string | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+  const starRevealTimerRef = useRef<number | null>(null);
+  const walkoutSkipTimerRef = useRef<number | null>(null);
+  const cupCardTimerRef = useRef<number | null>(null);
+  const seasonHistoryRef = useRef<string | null>(null);
+  const feedIdRef = useRef(2);
+  const coopStatusRef = useRef<CoopRoom["status"] | null>(null);
+  const coopPlayerCountRef = useRef(0);
+  const coopEventRef = useRef<number | null>(null);
+  const transferEventRef = useRef<number | null>(null);
+  const gazetteIssueRef = useRef<string | null>(null);
+  const coopPackRevealRef = useRef<number | null>(null);
+  const eventAnnouncementRef = useRef<RandomEvent | null>(null);
+  const eventAnnouncementQueueRef = useRef<RandomEvent[]>([]);
+  const coopClickBatchRef = useRef({ amount: 0, count: 0 });
+  const coopClickBatchTimerRef = useRef<number | null>(null);
+  const coopClickInFlightRef = useRef(false);
+  const coopMiniGameStartingRef = useRef(false);
+  const cupGoalRef = useRef<string | null>(null);
+  const cupCardRef = useRef<string | null>(null);
+  const coopControlQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const coopBackgroundActionRef = useRef<Promise<unknown> | null>(null);
+  const coopForegroundPendingRef = useRef(0);
+  const eventLockRef = useRef(false);
+  const coopRestoreAttemptedRef = useRef(false);
+  const pageInactiveAtRef = useRef<number | null>(null);
+
+  const activeCoopCode = coopSession?.code;
+  const coopFeaturesKey = coopSession?.room.featuresKey ?? "";
+  useEffect(() => { coopFeaturesKeyRef.current = coopFeaturesKey; }, [coopFeaturesKey]);
+  const activeCoopPlayerId = coopSession?.playerId;
+
+  const loadSavedRooms = useCallback(async () => {
+    if (!playerId) return;
+    setRoomsLoading(true);
+    try {
+      const response = await fetch(multiplayerUrl({ list: "1", playerId }), { cache: "no-store" });
+      const data = await readCoopResponse(response);
+      syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
+      if (!response.ok) throw new Error(data.error ?? "Die gespeicherten Räume konnten nicht geladen werden.");
+      setSavedRooms(data.rooms ?? []);
+    } catch (error) {
+      if (appMode === "coop") setCoopMessage(error instanceof Error ? error.message : "Die gespeicherten Räume konnten nicht geladen werden.");
+    } finally {
+      setRoomsLoading(false);
+    }
+  }, [appMode, playerId]);
+
+  const restoreCoopRoom = useCallback(async () => {
+    const raw = localStorage.getItem(COOP_ROOM_KEY);
+    if (!raw || !playerId) return;
+    let stored: { code?: unknown; role?: unknown; playerId?: unknown } = {};
+    try { stored = JSON.parse(raw) as { code?: unknown; role?: unknown; playerId?: unknown }; } catch { return; }
+    const code = typeof stored.code === "string" ? stored.code.trim().toUpperCase().slice(0, 6) : "";
+    if (code.length !== 6) return;
+    try {
+      const storedPlayerId = typeof stored.playerId === "string" ? stored.playerId : "";
+      const candidateIds = [...new Set([storedPlayerId, playerId, ...LEGACY_PLAYER_ID_KEYS.map((key) => localStorage.getItem(key) ?? "")].filter((value) => value.length >= 8))];
+      for (const candidateId of candidateIds) {
+        const response = await fetch(multiplayerUrl({ code, playerId: candidateId }), { cache: "no-store" });
+        const data = await readCoopResponse(response);
+      syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
+        if (response.status === 404) {
+          localStorage.removeItem(COOP_ROOM_KEY);
+          return;
+        }
+        if (!response.ok || !data.room) continue;
+        localStorage.setItem(PLAYER_ID_KEY, candidateId);
+        if (candidateId !== playerId) setPlayerId(candidateId);
+        coopStatusRef.current = data.room.status;
+        coopPlayerCountRef.current = data.room.playerCount;
+        setSavedRooms((current) => upsertSavedRoom(current, data.room!));
+        setCoopSession({ code: data.room.code, role: data.role ?? (isCoopRole(stored.role) ? stored.role : "host"), playerId: candidateId, room: data.room });
+        setAppMode("coop");
+        setCoopMessage("Dein Koop Raum wurde wieder geöffnet.");
+        return;
+      }
+      const nickname = normalizeNickname(localStorage.getItem(PLAYER_NAME_KEY) ?? playerName);
+      if (nickname.length < 2) return;
+      const response = await fetch("/api/multiplayer", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "join", code, playerId, nickname, preferredRole: stored.role, protocol: MULTIPLAYER_PROTOCOL_VERSION }) });
+      const data = await readCoopResponse(response);
+      syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
+      // Left or removed meanwhile: the stored room is forgotten, the player rejoins with the code if they want to.
+      if (response.status === 403) { localStorage.removeItem(COOP_ROOM_KEY); if (data.error) setCoopMessage(data.error); return; }
+      if (!response.ok || !data.room) return;
+      coopStatusRef.current = data.room.status;
+      coopPlayerCountRef.current = data.room.playerCount;
+      setSavedRooms((current) => upsertSavedRoom(current, data.room!));
+      setCoopSession({ code: data.room.code, role: data.role ?? (isCoopRole(stored.role) ? stored.role : "host"), playerId, room: data.room });
+      setAppMode("coop");
+      setCoopMessage("Dein Platz im Koop Raum wurde sicher wiederhergestellt.");
+    } catch {
+      setCoopMessage("Der gespeicherte Koop-Raum ist gerade nicht erreichbar.");
+    }
+  }, [playerId, playerName]);
+
+  const syncCoopRoom = useCallback(async () => {
+    if (!activeCoopCode || !activeCoopPlayerId) return;
+    try {
+      const response = await fetch(multiplayerUrl({ code: activeCoopCode, playerId: activeCoopPlayerId, featuresKey: coopFeaturesKeyRef.current }), { cache: "no-store" });
+      const data = await readCoopResponse(response);
+      syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
+      if (!response.ok) {
+        // 404: the world was deleted. 403: the seat was given up or the host removed this player; the world is no
+        // longer this player's, also not after a reload (the server refuses taking a free seat back by itself).
+        if (response.status === 404 || response.status === 403) {
+          localStorage.removeItem(COOP_ROOM_KEY);
+          coopStatusRef.current = null;
+          coopPlayerCountRef.current = 0;
+          setCoopSession(null);
+          if (response.status === 403) setSavedRooms((current) => current.filter((room) => room.code !== activeCoopCode));
+          void loadSavedRooms();
+        }
+        if (response.status === 403) setCoopMessage("Du bist nicht mehr in dieser Welt. Mit dem Raumcode kannst du wieder beitreten, sobald ein Platz frei ist.");
+        else if (data.error) setCoopMessage(data.error);
+        return;
+      }
+      if (data.room) {
+        const previousStatus = coopStatusRef.current;
+        const previousPlayerCount = coopPlayerCountRef.current;
+        coopStatusRef.current = data.room.status;
+        coopPlayerCountRef.current = data.room.playerCount;
+        setSavedRooms((current) => upsertSavedRoom(current, data.room!));
+        if (previousStatus && previousStatus !== data.room.status) setCoopMessage(data.room.status === "live" ? "Der zweite Spieler ist verbunden. Das Koop-Match läuft." : "Das Koop-Match wartet wieder auf einen zweiten Spieler.");
+        else if (previousPlayerCount && previousPlayerCount !== data.room.playerCount) setCoopMessage(data.room.playerCount > previousPlayerCount ? `${data.room.playerCount} von 4 Spielern sind jetzt in dieser Welt.` : `Noch ${data.room.playerCount} von 4 Spielern sind in dieser Welt.`);
+        setCoopSession((current) => mergeCoopSessionRoom(current, data.room!, data.role));
+      }
+    } catch {
+      setCoopMessage("Die Verbindung zum Koop-Raum ist gerade unterbrochen.");
+    }
+  }, [activeCoopCode, activeCoopPlayerId, loadSavedRooms]);
+
+  const rawCoopGame = coopSession?.room.game;
+  const [normalizeCoopGame] = useState(createCoopGameNormalizer);
+  const normalizedCoopGame = useMemo(() => coopSession?.room.status === "live" ? normalizeCoopGame(rawCoopGame, game.sound) : null, [coopSession?.room.status, game.sound, rawCoopGame, normalizeCoopGame]);
+  const isCoopLive = appMode === "coop" && coopSession?.room.status === "live" && Boolean(normalizedCoopGame);
+  const displayGame = isCoopLive && normalizedCoopGame ? { ...normalizedCoopGame, sound: game.sound, lastSaved: game.lastSaved } : game;
+  const hasFullTestAccess = isCoopLive && Boolean(coopSession?.room.testMode);
+  const hasInfiniteMoney = hasFullTestAccess;
+  const spendableGoals = hasInfiniteMoney ? Number.MAX_VALUE : displayGame.goals;
+  // The local club's counter follows every passive tick through the store; a co-op world shows its own total.
+  const displayBalance = <LiveGoalCount store={passiveGoals} fixed={hasInfiniteMoney ? "∞" : displayGame === game ? null : formatNumber(displayGame.goals)} />;
+  const soloJourneyId = !isCoopLive && !game.features.travel.journey?.consumed ? game.features.travel.journey?.id : undefined;
+  useEffect(() => {
+    if(!hydrated||!playerId||!soloJourneyId)return;
+    let stopped=false;
+    const sync=async()=>{try{
+      // A journey that already has its route asks for the status without it (the plan of a journey never changes).
+      const local=gameRef.current.features.travel.journey,planStartedAt=local?.id===soloJourneyId&&local.plan?local.startedAt:undefined;
+      const response=await fetch('/api/travel',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'status',playerId,fixtureId:soloJourneyId,planStartedAt})});
+      const data=await response.json() as {journey?:Journey;serverNow?:number;planOmitted?:boolean};
+      const serverJourney=data.journey, serverNow=data.serverNow;
+      if(stopped||!response.ok||!serverJourney||typeof serverNow!=='number'||!Number.isFinite(serverNow))return;
+      syncTravelClock(serverNow);
+      setGame(current=>{
+        if(current.features.travel.journey?.id!==soloJourneyId)return current;
+        const old=current.features.travel;
+        const plan=data.planOmitted?old.journey!.startedAt===serverJourney.startedAt?old.journey!.plan:undefined:serverJourney.plan;
+        if(data.planOmitted&&!plan)return current;
+        const j={...serverJourney,...(plan?{plan}:{}),consumed:old.journey!.consumed};
+        const counted=(old.journey as Journey & {counted?:boolean}).counted, finesPaid=old.journey!.finesPaid;
+        const travel=settleTravel({...old,journey:{...j,counted,finesPaid} as Journey},serverNow);
+        return {...current,features:{...current.features,travel,squadLock:serverJourney.squadLock}};
+      });
+    }catch{ /* Last authoritative clock continues; kickoff always revalidates. */ }};
+    void sync();const timer=window.setInterval(()=>{const j=gameRef.current.features.travel.journey;if(j&&!isAway()&&!journeyView(j,getTravelTime()).arrived)void sync();},5000);
+    const visible=()=>{if(document.visibilityState==='visible')void sync();};
+    document.addEventListener('visibilitychange',visible);
+    return ()=>{stopped=true;clearInterval(timer);document.removeEventListener('visibilitychange',visible);};
+  },[hydrated,playerId,soloJourneyId,setGame]);
+  // Fines from the journey (speeding, parking) are paid once the team has arrived.
+  const soloJourney = !isCoopLive ? game.features.travel.journey : null;
+  const soloFinesDue = Boolean(soloJourney && !soloJourney.finesPaid && soloJourney.events.some((event) => event.fine) && countdownNow >= soloJourney.endsAt);
+  useEffect(() => {
+    if (!hydrated || !soloFinesDue) return;
+    setGame((current) => {
+      const features = { ...current.features };
+      const fine = payTravelFines(features, current.goals, getBasePassivePower(current.upgrades, current.stars, current.features), getTravelTime());
+      if (!features.travel.journey?.finesPaid) return current;
+      return { ...current, features, goals: current.goals - fine, seasonGoals: Math.max(0, current.seasonGoals - fine) };
+    });
+    // countdownNow re-runs it each second, because the travel clock may reach the arrival a moment later.
+  }, [hydrated, soloFinesDue, countdownNow, setGame]);
+  const sharedRandomEvent = isCoopLive ? displayGame.features.randomEvent : null;
+  const visibleTransferEvent = displayGame.features.transferSaga.latestEvent;
+  const visibleGazetteIssue = displayGame.features.gazetteIssues.at(-1) ?? null;
+  const sharedPackReveal = isCoopLive ? displayGame.features.starPackReveal : null;
+  const displayedCupGoal = displayGame.features.cup.lastGoal;
+  const displayedCupCard = displayGame.features.cup.cardEvents.slice(-1)[0] ?? null;
+  const cupMatchMinute = getCupMatchMinute(displayGame.features.cup, countdownNow);
+  const deadlineDayActive = isTransferDeadlineDay(displayGame.features, countdownNow);
+  const deadlineDayLabel = formatCountdown(displayGame.features.transferSaga.deadlineDayEndsAt, countdownNow);
+  const tournamentCooldownActive = !displayGame.features.cup.active && !displayGame.features.cup.pendingNextRound && displayGame.features.cup.nextTournamentAt > countdownNow;
+  const tournamentCooldownLabel = formatCountdown(displayGame.features.cup.nextTournamentAt, countdownNow);
+  const starRevealAge = starReveal ? Math.max(0, countdownNow - starReveal.openedAt) : 0;
+  const starRevealIsCustomDraw = starReveal?.source === "custom-draw";
+  const starRevealAction = starRevealIsCustomDraw ? "die Spezialkarte gezogen" : "das Pack geöffnet";
+  const starRevealKicker = starRevealIsCustomDraw ? "ZUFALLSZUG / SPEZIALKARTE" : starReveal ? `PACK GEÖFFNET / ${starReveal.packName}` : "";
+  const starRevealTier = starReveal ? getStarCardTier(starReveal.player) : "standard";
+  const starRevealIsWalkout = starRevealTier === "walkout" || starRevealTier === "icon" || starRevealTier === "legendary";
+  const starRevealIsIconic = starRevealTier === "icon";
+  const starRevealIsLegendary = starRevealTier === "legendary";
+  const starRevealIsRare = starRevealTier === "rare";
+  const starRevealTrollActive = Boolean(starReveal?.troll && starRevealIsWalkout && starRevealAge < PACK_TROLL_INTRO_MS && !reducedMotion && !starRevealSkipped);
+  useEffect(() => {
+    if (!starWalkoutReady || !starReveal || (!starRevealIsWalkout && !starRevealIsRare)) return;
+    try { window.localStorage.setItem(WALKOUT_SEEN_STORAGE_KEY, "1"); } catch { /* storage blocked */ }
+  }, [starWalkoutReady, starReveal, starRevealIsWalkout, starRevealIsRare]);
+  // Honest reveal button (Q19): where the new card is now, and whether putting it into the eleven raises the rating.
+  const revealPlacement = useMemo(() => {
+    if (!starReveal || starReveal.duplicate) return null;
+    const id = starReveal.player.id, squad = displayGame.features.starXI;
+    if (!squad.ownedIds.includes(id)) return null;
+    if (squad.lineupIds.includes(id)) return { kind: "lineup" as const, slot: -1, delta: 0 };
+    let best: { kind: "upgrade"; slot: number; delta: number } | null = null;
+    if (!displayGame.features.cup.active) {
+      const current = getStarXIRating(squad.ownedIds, squad.lineupIds);
+      for (let slot = 0; slot < STAR_XI_SQUAD_SIZE; slot += 1) {
+        if (!canStarXIPlayerFillSlot(id, slot, squad.formationPositions)) continue;
+        const delta = ratingAfterLineupMove(squad, id, slot) - current;
+        if (delta > 0 && (!best || delta > best.delta)) best = { kind: "upgrade", slot, delta };
+      }
+    }
+    return best ?? { kind: squad.benchIds.includes(id) ? "bench" as const : "reserve" as const, slot: -1, delta: 0 };
+  }, [starReveal, displayGame.features.starXI, displayGame.features.cup.active]);
+  const revealContinueLabel = starReveal?.duplicate ? "Weiter" : revealPlacement?.kind === "lineup" ? "Weiter · in der Startelf" : revealPlacement?.kind === "bench" ? "Weiter · auf der Bank" : "Weiter · im Kader";
+  const revealLineupButton = starReveal && revealPlacement?.kind === "upgrade" ? <button type="button" className="mode-primary star-reveal-lineup" disabled={coopBusy} onClick={() => { const id = starReveal.player.id, slot = revealPlacement.slot; dismissStarReveal(); void moveStarXIPlayerToLineup(id, slot); }}>In die Startelf ({formatRatingDelta(revealPlacement.delta)})</button> : null;
+  const starRevealTrollDelay = starReveal?.troll && starRevealIsWalkout ? PACK_TROLL_INTRO_MS : 0;
+  const starWalkoutIsTop = starRevealIsWalkout && (starReveal?.player.rating ?? 0) >= 90;
+  const starWalkoutConfetti = starRevealIsLegendary || starWalkoutIsTop ? GOLD_CONFETTI : starRevealIsIconic ? SILVER_CONFETTI : null;
+  const starWalkoutAnimationDuration = starWalkoutIsTop ? STAR_TOP_WALKOUT_ANIMATION_MS : STAR_WALKOUT_ANIMATION_MS;
+  // The CSS animations start once and keep their own clock. Their delay must not follow the one-second
+  // countdown tick, otherwise every tick pushes them forward and the reveal races through in a second.
+  const starWalkoutElapsed = Math.min(starWalkoutAnimationDuration, Math.max(0, starRevealLag - starRevealTrollDelay));
+  const starRareElapsed = Math.min(STAR_RARE_REVEAL_DURATION_MS, starRevealLag);
+  const starWalkoutPresentation = starReveal ? getWalkoutPresentation(starReveal.player) : null;
+  const starWalkoutStyle = starWalkoutPresentation ? {
+    "--walkout-skin": starWalkoutPresentation.skin,
+    "--walkout-hair": starWalkoutPresentation.hairColor,
+    "--walkout-primary": starWalkoutPresentation.kitPrimary,
+    "--walkout-secondary": starWalkoutPresentation.kitSecondary,
+    "--walkout-boots": starWalkoutPresentation.boots,
+    "--walkout-height": starWalkoutPresentation.height,
+    "--walkout-build": starWalkoutPresentation.build,
+    "--walkout-duration": `${starWalkoutAnimationDuration}ms`,
+    "--walkout-delay": `${-starWalkoutElapsed}ms`,
+    "--rare-delay": `${-starRareElapsed}ms`,
+  } as CSSProperties : undefined;
+  const otherCoopOnlineCount = isCoopLive && coopSession ? coopSession.room.players.filter((player) => player.occupied && player.role !== coopSession.role && player.online).length : 0;
+  const otherCoopOnline = otherCoopOnlineCount > 0;
+  const displayClubName = displayGame.features.club.name;
+  const displayClubBadge = displayGame.features.club.badge;
+  const displayClubColor = displayGame.features.club.color;
+  const starXIState = displayGame.features.starXI;
+  const ownedStarIds = starXIState.ownedIds;
+  const lineupStarIds = starXIState.lineupIds;
+  const benchStarIds = starXIState.benchIds;
+  const ownedStarXIPlayers = useMemo(() => ownedStarIds.map((id) => getStarXIPlayer(id)).filter((player): player is NonNullable<ReturnType<typeof getStarXIPlayer>> => Boolean(player)), [ownedStarIds]);
+  const startingStarXIPlayers = useMemo(() => Array.from({ length: STAR_XI_SQUAD_SIZE }, (_, index) => getStarXIPlayer(lineupStarIds[index] ?? "") ?? null), [lineupStarIds]);
+  const startingStarXISelection = startingStarXIPlayers.filter((player): player is NonNullable<typeof player> => Boolean(player));
+  const benchStarXIPlayers = useMemo(() => Array.from({ length: STAR_XI_BENCH_SIZE }, (_, index) => getStarXIPlayer(benchStarIds[index] ?? "") ?? null), [benchStarIds]);
+  const benchStarXIPlayerCount = benchStarXIPlayers.filter(Boolean).length;
+  const loanedStarIds = useMemo(() => displayGame.features.transferSaga.loans.map((loan) => loan.playerId), [displayGame.features.transferSaga.loans]);
+  const currentTransferLoans = displayGame.features.transferSaga.loans.map((loan) => ({ loan, player: getStarXIPlayer(loan.playerId) })).filter((entry): entry is { loan: typeof entry.loan; player: NonNullable<ReturnType<typeof getStarXIPlayer>> } => Boolean(entry.player));
+  const transferArchive = [...displayGame.features.transferSaga.archive].reverse();
+  const pendingTransferOffer = displayGame.features.transferSaga.pendingOffer;
+  // Only cards still in the club can be banned; older saves may list sold or discarded ones.
+  const ownedDisciplineBans = displayGame.features.discipline.bans.filter((ban) => displayGame.features.starXI.ownedIds.includes(ban.playerId));
+  const reserveStarXICount = useMemo(() => {const assigned=new Set([...lineupStarIds,...benchStarIds,...loanedStarIds]);return ownedStarIds.filter(id=>!assigned.has(id)).length;},[ownedStarIds,lineupStarIds,benchStarIds,loanedStarIds]);
+  const reserveStarXIPlayers = useMemo(() => featureTab!=="squad" || displayGame.features.cup.active ? [] : ownedStarXIPlayers.filter((player) => !lineupStarIds.includes(player.id) && !benchStarIds.includes(player.id) && !loanedStarIds.includes(player.id)), [benchStarIds, lineupStarIds, loanedStarIds, ownedStarXIPlayers, featureTab, displayGame.features.cup.active]);
+  const suspendedStarIds = displayGame.features.cup.suspendedPlayerIds;
+  const injuredStarIds = Object.entries(displayGame.features.cup.injuredPlayerIds ?? {}).filter(([, matches]) => Number(matches) > 0).map(([playerId]) => playerId);
+  const suspendedStarPlayers = suspendedStarIds.map((id) => getStarXIPlayer(id)).filter((player): player is NonNullable<ReturnType<typeof getStarXIPlayer>> => Boolean(player));
+  const injuredStarPlayers = injuredStarIds.map((id) => ({ player: getStarXIPlayer(id), matches: Math.max(0, Math.floor(Number(displayGame.features.cup.injuredPlayerIds[id]) || 0)) })).filter((entry): entry is { player: NonNullable<ReturnType<typeof getStarXIPlayer>>; matches: number } => Boolean(entry.player) && entry.matches > 0);
+  const activeMatchInjury = displayGame.features.cup.matchPaused && !displayGame.features.cup.simulation ? displayGame.features.cup.lastInjury : null;
+  const suspendedPlayerOnSquad = suspendedStarIds.some((id) => lineupStarIds.includes(id) || benchStarIds.includes(id));
+  const activeLineupSlot = selectedLineupSlot !== null && selectedLineupSlot < STAR_XI_SQUAD_SIZE ? selectedLineupSlot : null;
+  const activeFormation = getStarFormation(starXIState.formationId);
+  const activeFormationPositions = displayGame.features.starXI.formationPositions;
+  const activeLineupPosition = activeLineupSlot !== null ? activeFormationPositions[activeLineupSlot] : null;
+  const starXIRating = getStarXIRating(displayGame.features.starXI.ownedIds, displayGame.features.starXI.lineupIds);
+  const totalTrophies = TOURNAMENTS.reduce((total, tournament) => total + displayGame.features.cup.trophies[tournament.id], 0);
+  const cupPenaltyHomeEvents = displayGame.features.cup.penaltyEvents.filter((event) => event.side === "home");
+  const cupPenaltyAwayEvents = displayGame.features.cup.penaltyEvents.filter((event) => event.side === "away");
+  const cupPenaltySlotCount = Math.max(5, cupPenaltyHomeEvents.length, cupPenaltyAwayEvents.length);
+  const cupPenaltyIsSuddenDeath = displayGame.features.cup.penaltyHomeTaken >= 5 && displayGame.features.cup.penaltyAwayTaken >= 5;
+  const allTimeTopScorers = Object.entries(displayGame.features.cup.allTimeScorers).map(([starPlayerId, goals]) => ({ player: getStarXIPlayer(starPlayerId), goals, appearances: Math.max(0, Math.floor(Number(displayGame.features.cup.allTimeAppearances?.[starPlayerId]) || (goals > 0 ? 1 : 0))) })).filter((entry): entry is { player: NonNullable<ReturnType<typeof getStarXIPlayer>>; goals: number; appearances: number } => Boolean(entry.player) && entry.goals > 0).sort((first, second) => second.goals - first.goals || second.player.rating - first.player.rating || first.player.name.localeCompare(second.player.name)).slice(0, 3);
+  const starXIComplete = startingStarXISelection.length === STAR_XI_SQUAD_SIZE;
+  const openTransferSquadVacancies = getOpenTransferSquadVacancies(displayGame.features);
+  const hasTransferSquadVacancy = openTransferSquadVacancies.length > 0;
+  // While the team travels to a match (or a match runs) no other match can start, so the match choice is hidden.
+  const journeyUnderway = Boolean(displayGame.features.travel.journey && !displayGame.features.travel.journey.consumed);
+  const transferSquadVacancyLabel = startingStarXISelection.length < STAR_XI_SQUAD_SIZE ? "in der Startelf" : "auf der Bank";
+  const filteredReserveStarXIPlayers = useMemo(() => {
+    const career = displayGame.features.career;
+    const order = new Map(ownedStarIds.map((id, index) => [id, index]));
+    const injured = new Set(injuredStarIds), banned = new Set([...suspendedStarIds, ...getBannedPlayerIds(displayGame.features, nextCompetition(displayGame.features))]);
+    const favorites = new Set(displayGame.features.favoriteIds ?? []);
+    const entries = reserveStarXIPlayers.map((player) => ({ id: player.id, name: player.name, positions: getStarXIPositions(player), rating: getCareerCard(career, player).rating, compatible: activeLineupSlot !== null && canStarXIPlayerFillSlot(player.id, activeLineupSlot, activeFormationPositions), player,
+      type: reserveCardType(player), order: order.get(player.id) ?? 0, form: getPlayerForm(career, player.id).bonus, status: injured.has(player.id) ? "injured" as const : banned.has(player.id) ? "banned" as const : "available" as const, favorite: favorites.has(player.id), isNew: newCardIds.has(player.id) }));
+    return filterAndSortReserve(entries, { search: starSearch, ratingFilter: starRatingFilter, positionFilter: starPositionFilter, preferCompatible: activeLineupSlot !== null, sort: reserveSort, type: reserveType, status: reserveStatus, onlyCompatible: reserveOnlyCompatible && activeLineupSlot !== null }).map((entry) => entry.player);
+  }, [activeFormationPositions, activeLineupSlot, reserveStarXIPlayers, starPositionFilter, starRatingFilter, starSearch, displayGame.features, ownedStarIds, injuredStarIds, suspendedStarIds, reserveSort, reserveType, reserveStatus, reserveOnlyCompatible, newCardIds]);
+  useEffect(() => { if (reserveFiltersLoadedRef.current) writeJsonPref(PREF_KEYS.reserveFilters, { rating: starRatingFilter, position: starPositionFilter, sort: reserveSort, type: reserveType, status: reserveStatus }); }, [starRatingFilter, starPositionFilter, reserveSort, reserveType, reserveStatus]);
+  const squadScope = isCoopLive && coopSession ? `coop:${coopSession.code}` : "solo";
+  useEffect(() => {
+    if (featureTab !== "squad" || !hydrated) return;
+    const stored = readJsonPref(PREF_KEYS.squadSeen, (value) => value && typeof value === "object" ? value as Record<string, unknown> : {});
+    const seen = Array.isArray(stored[squadScope]) ? new Set((stored[squadScope] as unknown[]).filter((id): id is string => typeof id === "string")) : null;
+    const fresh = seen ? ownedStarIds.filter((id) => !seen.has(id)) : [];
+    writeJsonPref(PREF_KEYS.squadSeen, { ...Object.fromEntries(Object.entries(stored).slice(-5)), [squadScope]: ownedStarIds });
+    const timer = window.setTimeout(() => setNewCardIds((current) => new Set([...current, ...fresh])), 0);
+    return () => window.clearTimeout(timer);
+    // Once per visit of the Kader tab; cards added during the visit count as seen on the next one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [featureTab, hydrated, squadScope]);
+  const favoriteCardIds = useMemo(() => new Set(displayGame.features.favoriteIds ?? []), [displayGame.features.favoriteIds]);
+  async function toggleFavorite(playerId: string) {
+    const name = getStarXIPlayer(playerId)?.name ?? "Spieler";
+    const wasFavorite = favoriteCardIds.has(playerId);
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("star-favorite", { starPlayerId: playerId });
+      setCoopBusy(false);
+      if (data) showToast(wasFavorite ? `${name} ist kein Favorit mehr` : `${name} ist jetzt Favorit`);
+      return;
+    }
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      return toggleFavoriteCard(features, playerId) ? { ...current, features } : current;
+    });
+    showToast(wasFavorite ? `${name} ist kein Favorit mehr` : `${name} ist jetzt Favorit`);
+  }
+  const reservePageCount = Math.max(1, Math.ceil(filteredReserveStarXIPlayers.length / RESERVE_PAGE_SIZE));
+  const activeReservePage = Math.min(reservePage, reservePageCount - 1);
+  const visibleReserveStarXIPlayers = useMemo(() => {
+    const start = activeReservePage * RESERVE_PAGE_SIZE;
+    return filteredReserveStarXIPlayers.slice(start, start + RESERVE_PAGE_SIZE);
+  }, [activeReservePage, filteredReserveStarXIPlayers]);
+  // Squad helpers (app/game/lineup-tools.ts): bans for the coming match, open gaps, rating preview while dragging.
+  const nextSquadCompetition = nextCompetition(displayGame.features);
+  const bannedForNext = useMemo(() => new Set(displayGame.features.cup.active ? [] : getBannedPlayerIds(displayGame.features, nextSquadCompetition)), [displayGame.features, nextSquadCompetition]);
+  const banLabelFor = (playerId: string | undefined) => playerId && bannedForNext.has(playerId) ? `GESPERRT · ${competitionLabel(nextSquadCompetition).toUpperCase()}` : undefined;
+  const squadGapCount = useMemo(() => featureTab === "squad" && !displayGame.features.cup.active ? fillStarXIGaps(displayGame.features, { career: displayGame.features.career, cup: displayGame.features.cup }).replacements.length : 0, [featureTab, displayGame.features]);
+  const squadMovePreview = (() => {
+    const source = squadDrag.dragging, target = squadDrag.dropTarget, squad = displayGame.features.starXI;
+    if (!source || !target || displayGame.features.cup.active) return "";
+    const before = getStarXIRating(squad.ownedIds, squad.lineupIds);
+    const without = (id: string) => squad.lineupIds.map((item) => item === id ? "" : item);
+    let after = before;
+    if (target.area === "lineup") after = ratingAfterLineupMove(squad, source.playerId, target.index);
+    else if (source.area === "lineup" && source.index !== null && target.area === "bench") { const incoming = squad.benchIds[target.index]; after = incoming ? ratingAfterLineupMove(squad, incoming, source.index) : getStarXIRating(squad.ownedIds, without(source.playerId)); }
+    else if (source.area === "lineup" && target.area === "reserve") after = getStarXIRating(squad.ownedIds, without(source.playerId));
+    return formatRatingDelta(after - before);
+  })();
+  const undoAvailable = Boolean(squadUndo && !isCoopLive && `${lineupStarIds.join()}|${benchStarIds.join()}` === squadUndo.signature);
+  // OVR per formation (Q23): the best eleven of every formation, computed one formation per idle step.
+  const formationRatingKey = featureTab === "squad" && !displayGame.features.cup.active ? `${ownedStarIds.join(",")}|${getBestXIUnavailablePlayerIds(displayGame.features).join(",")}|${displayGame.features.seasonMode.highestDivision}|${displayGame.seasons}` : "";
+  useEffect(() => {
+    if (!formationRatingKey) return;
+    const features = displayGame.features, ids = pickerFormations.filter(isFormationAvailable).map((formation) => formation.id), result: Partial<Record<StarFormationId, number>> = {};
+    let index = 0, stopped = false, timer = 0;
+    const step = () => {
+      if (stopped) return;
+      const id = ids[index++];
+      if (!id) { setFormationRatings(result); return; }
+      Object.assign(result, bestRatingPerFormation(features, [id], { career: features.career, cup: features.cup }));
+      timer = window.setTimeout(step, 0);
+    };
+    timer = window.setTimeout(step, 120);
+    return () => { stopped = true; window.clearTimeout(timer); };
+    // One run per squad and availability, not per render of the features object.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formationRatingKey]);
+  const currentRank = useMemo(() => getRank(displayGame.totalGoals), [displayGame.totalGoals]);
+  const nextRank = useMemo(() => RANKS.find((rank) => rank.minimum > displayGame.totalGoals), [displayGame.totalGoals]);
+  // Take over overlays: focus moves into them and stays there; Escape closes only what may close.
+  const starWalkoutReadyRef = useRef(starWalkoutReady);
+  useEffect(() => { starWalkoutReadyRef.current = starWalkoutReady; }, [starWalkoutReady]);
+  const penaltyDialogRef = useRef<HTMLDivElement>(null);
+  const transferDialogRef = useRef<HTMLDivElement>(null);
+  const starRevealDialogRef = useRef<HTMLDivElement>(null);
+  const penaltyOverlayOpen = Boolean(displayGame.features.cup.active && displayGame.features.cup.phase === "penalties");
+  useDialogFocus(penaltyOverlayOpen, penaltyDialogRef, () => undefined);
+  useDialogFocus(Boolean(transferAnnouncement && !gazetteAnnouncement), transferDialogRef, () => dismissTransferAnnouncement());
+  useDialogFocus(Boolean(starReveal), starRevealDialogRef, () => { if (starWalkoutReadyRef.current) dismissStarReveal(); });
+  useEffect(() => {
+    if (!starReveal) return;
+    const dialog = starRevealDialogRef.current;
+    if (!dialog || dialog.contains(document.activeElement)) { if (starWalkoutReady) dialog?.querySelector<HTMLElement>(".star-walkout-dismiss:not([disabled]), .event-takeover-dismiss:not([disabled])")?.focus(); return; }
+    (dialog.querySelector<HTMLElement>("button:not([disabled])") ?? dialog).focus();
+  }, [starReveal, starWalkoutReady, walkoutSkippable]);
+  // One persistent live region: the goal counter and combo are not live (they change several times a second);
+  // toasts and rank milestones are announced here instead.
+  const [srAnnouncement, setSrAnnouncement] = useState("");
+  const announcedRankRef = useRef<string | null>(null);
+  useEffect(() => { if (toast) setSrAnnouncement(toast); }, [toast]);
+  useEffect(() => {
+    if (announcedRankRef.current !== null && announcedRankRef.current !== currentRank.name) setSrAnnouncement(`Neuer Rang: ${currentRank.name}`);
+    announcedRankRef.current = currentRank.name;
+  }, [currentRank.name]);
+  const goalBoostMultiplier = getGoalBoostMultiplier(displayGame.features, countdownNow);
+  const goalBoostActive = goalBoostMultiplier > 1;
+  const goalBoostLabel = String(goalBoostMultiplier).replace(".", ",");
+  const goalBoostCountdown = formatCountdown(displayGame.features.goalBoost.endsAt, countdownNow);
+  const clickPower = getClickPower(displayGame.upgrades, displayGame.stars, displayGame.features, countdownNow);
+  const passivePower = getPassivePower(displayGame.upgrades, displayGame.stars, displayGame.features, countdownNow);
+  const seasonMode = displayGame.features.seasonMode;
+  const currentSeason = seasonMode.division;
+  const currentSeasonMilestone = getSeasonMilestone(currentSeason);
+  // Unlocks follow the best league ever reached (Liga 15 entry, Liga 1 top).
+  const reachedLeague = getReachedLeague(displayGame.seasons, seasonMode.highestDivision);
+  const unlockedFormationCount = STAR_FORMATIONS.filter((formation) => isLeagueContentUnlocked(getFormationUnlockLeague(formation.id), reachedLeague, hasFullTestAccess)).length;
+  const isFormationAvailable = (formation: { id: string }) => isLeagueContentUnlocked(getFormationUnlockLeague(formation.id), reachedLeague, hasFullTestAccess) || activeFormation.id === formation.id;
+  const pickerFormations = sortFormationsForPicker(STAR_FORMATIONS, isFormationAvailable);
+  const seasonCareerComplete = seasonMode.hallOfFame;
+  // Prestige has its own rules: lineup, open slots and suspensions never block it, running operations do.
+  const prestigeBlockReason = seasonCareerComplete ? getPrestigeBlockReason(displayGame.features) : "";
+  // Another seat (or this one, after a lost response) already started Prestige: the open dialog would offer a
+  // second one, so it closes with a neutral note instead of saying nothing changed.
+  const shownPrestigeCount = displayGame.features.seasonMode.prestigeCount;
+  useEffect(() => {
+    if (!prestigeDialog || shownPrestigeCount === prestigeDialog.prestigeCount) return;
+    const ownRequest = prestigeConfirmedRef.current.has(prestigeDialog.requestId);
+    setPrestigeDialog(null);
+    if (!ownRequest) setCoopMessage(`Prestige ${shownPrestigeCount} wurde in dieser Welt gestartet. Alle Upgrades stehen wieder auf Stufe 0.`);
+  }, [prestigeDialog, shownPrestigeCount]);
+  // Co-op Prestige vote: every member sees the open vote, and once how it ended (a result older than half a minute
+  // when the world opens is not announced again).
+  const coopPrestigeVote = isCoopLive ? coopSession?.room.prestigeVote ?? null : null;
+  const coopVoteResult = isCoopLive ? coopSession?.room.prestigeVoteResult ?? null : null;
+  const coopVoteResultKey = coopVoteResult ? `${coopVoteResult.id}:${coopVoteResult.outcome}` : "";
+  const coopVoteResultFresh = Boolean(coopVoteResult && coopVoteResult.ageMs < 30_000);
+  const coopVoteResultText = coopVoteResult ? prestigeVoteMessage(coopVoteResult) : "";
+  useEffect(() => {
+    if (!coopVoteResultKey || shownVoteResultRef.current === coopVoteResultKey) return;
+    shownVoteResultRef.current = coopVoteResultKey;
+    if (coopVoteResultFresh) setCoopMessage(coopVoteResultText);
+  }, [coopVoteResultKey, coopVoteResultFresh, coopVoteResultText]);
+  // The same ranking as the season itself (head-to-head before goal difference), so the live table matches promotion.
+  const seasonTable = sortSeasonTable(seasonMode.table, seasonMode.results);
+  const seasonInProgress = seasonMode.matchday > 0 || seasonMode.table.some((team) => team.played > 0);
+  const seasonStandingsEntry = seasonStandingsAnnouncement?.entry ?? null;
+  const seasonStandingsTable = seasonStandingsAnnouncement ? sortSeasonTable(seasonStandingsAnnouncement.table, seasonStandingsAnnouncement.results) : [];
+  const seasonStandingsPosition = seasonStandingsEntry ? seasonStandingsTable.findIndex((team) => team.id === "club") + 1 : 0;
+  const seasonStandingsOutcomeLabel = seasonStandingsEntry?.seasonOutcome === "promoted" ? "AUFSTIEG" : seasonStandingsEntry?.seasonOutcome === "relegated" ? "ABSTIEG" : seasonStandingsEntry?.seasonOutcome === "hall-of-fame" ? "HALL OF FAME" : seasonStandingsEntry?.seasonOutcome === "stayed" ? "KLASSENERHALT" : seasonStandingsEntry?.outcome === "win" ? "SIEG" : seasonStandingsEntry?.outcome === "loss" ? "NIEDERLAGE" : "REMIS";
+  // Available upgrades keep their order; locked ones follow in the order they unlock (Liga 15 is the entry,
+  // so Liga 14 comes before Liga 13).
+  const upgradeUnlockRank = (upgrade: UpgradeDefinition) => getLevel(displayGame.upgrades, upgrade.id) > 0 || isLeagueContentUnlocked(getUpgradeUnlockLeague(upgrade.id), reachedLeague, hasFullTestAccess) ? 0 : 100 - getUpgradeUnlockLeague(upgrade.id);
+  const visibleUpgrades = UPGRADES.filter((upgrade) => activeTab === "all" || upgrade.kind === activeTab).map((upgrade, index) => ({ upgrade, index, rank: upgradeUnlockRank(upgrade) })).sort((first, second) => first.rank - second.rank || first.index - second.index).map((entry) => entry.upgrade);
+  // Shop hints (app/qol/economy-hints.ts): gain of the next level, payback, best value and the savings goal.
+  const upgradeGains = useMemo(() => new Map(UPGRADES.map((upgrade) => [upgrade.id, nextLevelGain(upgrade, displayGame.upgrades, displayGame.stars, displayGame.features)])), [displayGame.upgrades, displayGame.stars, displayGame.features]);
+  const bestValueUpgradeId = bestValueUpgrade(UPGRADES.filter((upgrade) => getLevel(displayGame.upgrades, upgrade.id) > 0 || isLeagueContentUnlocked(getUpgradeUnlockLeague(upgrade.id), reachedLeague, hasFullTestAccess)).map((upgrade) => upgradeGains.get(upgrade.id)!));
+  const [savingsGoal, setSavingsGoalState] = useState<SavingsGoal | null>(null);
+  useEffect(() => { const timer = window.setTimeout(() => setSavingsGoalState(readJsonPref(PREF_KEYS.savingsGoal, parseSavingsGoal)), 0); return () => window.clearTimeout(timer); }, []);
+  function setSavingsGoal(goal: SavingsGoal | null) {
+    setSavingsGoalState(goal);
+    writePref(PREF_KEYS.savingsGoal, goal ? JSON.stringify(goal) : null);
+    if (goal) showToast("Sparziel gesetzt. Der Fortschritt steht unter deinem Kontostand.");
+  }
+  function toggleSavingsGoal(goal: SavingsGoal) { setSavingsGoal(savingsGoal?.kind === goal.kind && savingsGoal.id === goal.id ? null : goal); }
+  const savingsTarget = (() => {
+    if (!savingsGoal) return null;
+    if (savingsGoal.kind === "upgrade") { const upgrade = UPGRADES.find((item) => item.id === savingsGoal.id); return upgrade ? { label: `${upgrade.name} · Level ${getLevel(displayGame.upgrades, upgrade.id) + 1}`, cost: getCost(upgrade, displayGame.upgrades) } : null; }
+    const pack = getStarPack(savingsGoal.id as StarPackId);
+    return pack && !isRewardPack(pack.id) ? { label: pack.label, cost: pack.price } : null;
+  })();
+  const isMiniGameOnCooldown = (id: MiniGameId) => displayGame.miniGameCooldowns[id] > countdownNow;
+  const miniGameCooldownLabel = (id: MiniGameId, availableLabel: string) => isMiniGameOnCooldown(id) ? `Bereit in ${formatCountdown(displayGame.miniGameCooldowns[id], countdownNow)}` : availableLabel;
+  // Open actions (app/qol/status.ts): tab title, navigation dots, "Nächste Schritte", app badge and local notices.
+  const albumClaimableCount = useMemo(() => claimableAlbumGroups(displayGame.features).length, [displayGame.features]);
+  const openActions = useMemo(() => hydrated ? getOpenActions({ features: displayGame.features, now: countdownNow, coop: isCoopLive, minigameWins: displayGame.minigameWins, miniGameCooldowns: displayGame.miniGameCooldowns, travelNow: getTravelTime(), albumClaimable: albumClaimableCount }) : [], [hydrated, displayGame.features, countdownNow, isCoopLive, displayGame.minigameWins, displayGame.miniGameCooldowns, albumClaimableCount]);
+  const navBadges = sectionBadges(openActions);
+  const pageTitle = statusTitle(TAB_TITLES[featureTab], displayGame.features, countdownNow, openActions);
+  useEffect(() => { document.title = pageTitle; }, [pageTitle]);
+  const badgeCount = appBadgeCount(openActions);
+  useEffect(() => { if (hydrated) setAppBadge(badgeCount); }, [hydrated, badgeCount]);
+  // Local notices (opt in under Club): only while this page runs in the background; nothing is sent anywhere.
+  const [notificationsOn, setNotificationsOn] = useState(false);
+  useEffect(() => { const timer = window.setTimeout(() => setNotificationsOn(readPref(PREF_KEYS.notifications) === "on"), 0); return () => window.clearTimeout(timer); }, []);
+  function changeNotifications(on: boolean) { setNotificationsOn(on); writePref(PREF_KEYS.notifications, on ? "on" : "off"); }
+  const notifiedActionsRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const previous = notifiedActionsRef.current;
+    notifiedActionsRef.current = new Set(openActions.map((action) => action.id));
+    if (!previous || !notificationsOn || !hydrated || typeof document === "undefined" || !document.hidden) return;
+    for (const action of newNotifiableActions(previous, openActions)) void showLocalNotification("Goal Clicker", action.label, `goal-clicker-${action.id}`);
+  }, [openActions, notificationsOn, hydrated]);
+  // Unread entries of the history (bell); the first visit counts everything older as read.
+  const [historySeenAt, setHistorySeenAt] = useState<number | null>(null);
+  const latestHistoryAt = displayGame.features.history.reduce((latest, entry) => Math.max(latest, entry.timestamp), 0);
+  useEffect(() => {
+    if (!hydrated) return;
+    const stored = Number(readPref(PREF_KEYS.historySeenAt));
+    const timer = window.setTimeout(() => setHistorySeenAt((current) => current ?? (Number.isFinite(stored) && stored > 0 ? stored : latestHistoryAt)), 0);
+    return () => window.clearTimeout(timer);
+  }, [hydrated, latestHistoryAt]);
+  useEffect(() => {
+    if (featureTab !== "history" || !latestHistoryAt) return;
+    writePref(PREF_KEYS.historySeenAt, String(latestHistoryAt));
+    const timer = window.setTimeout(() => setHistorySeenAt(latestHistoryAt), 0);
+    return () => window.clearTimeout(timer);
+  }, [featureTab, latestHistoryAt]);
+  const unreadHistory = historySeenAt === null ? 0 : displayGame.features.history.filter((entry) => entry.timestamp > historySeenAt).length;
+  /** A "Nächste Schritte" chip: open the place where the action is done. */
+  function openActionTarget(action: OpenAction) {
+    openFeatureTab(action.tab);
+    const selector = action.id === "daily" ? ".daily-reward" : action.id === "minigame" ? ".mini-game-hub" : action.id === "press" ? ".press-conference" : "";
+    if (selector) window.setTimeout(() => document.querySelector(selector)?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+  }
+
+  useEffect(() => {
+    const storedId = localStorage.getItem(PLAYER_ID_KEY);
+    const legacyId = LEGACY_PLAYER_ID_KEYS.map((key) => localStorage.getItem(key)).find((value) => Boolean(value));
+    const nextId = storedId || legacyId || globalThis.crypto?.randomUUID?.() || `player-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem(PLAYER_ID_KEY, nextId);
+    window.setTimeout(() => {
+      setPlayerId(nextId);
+      setPlayerName(localStorage.getItem(PLAYER_NAME_KEY) ?? "");
+    }, 0);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const saved = localStorage.getItem(LAYOUT_STORAGE_KEY);
+        if (saved) setLayoutOrder(normalizeLayoutOrder(JSON.parse(saved)));
+      } catch {
+        // Keep the standard layout when local storage contains invalid data.
+      }
+      setLayoutReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated || !layoutReady) return;
+    localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layoutOrder));
+  }, [hydrated, layoutReady, layoutOrder]);
+
+  useEffect(() => {
+    if (!coopSession) return;
+    localStorage.setItem(COOP_ROOM_KEY, JSON.stringify({ code: coopSession.code, role: coopSession.role, playerId: coopSession.playerId }));
+  }, [coopSession]);
+
+  useEffect(() => {
+    if (!coopSession?.room.roomName) return;
+    const syncName = window.setTimeout(() => setCoopRoomName(coopSession.room.roomName), 0);
+    return () => window.clearTimeout(syncName);
+  }, [coopSession?.room.roomName]);
+
+  useEffect(() => () => {
+    if (starRevealTimerRef.current) window.clearTimeout(starRevealTimerRef.current);
+    if (cupCardTimerRef.current) window.clearTimeout(cupCardTimerRef.current);
+    if (coopClickBatchTimerRef.current) window.clearTimeout(coopClickBatchTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    coopEventRef.current = null;
+    transferEventRef.current = null;
+    gazetteIssueRef.current = null;
+    coopPackRevealRef.current = null;
+    seasonHistoryRef.current = null;
+    cupGoalRef.current = null;
+    cupCardRef.current = null;
+    eventAnnouncementRef.current = null;
+    eventAnnouncementQueueRef.current = [];
+    // Clear on the next turn, but do not hide an event that the shared-event
+    // effect has already restored in the same commit.
+    const resetGoal = window.setTimeout(() => {
+      setCupCardAnnouncement(null);
+      setTransferAnnouncement(null);
+      setGazetteAnnouncement(null);
+      setSeasonStandingsAnnouncement(null);
+      if (!eventAnnouncementRef.current) setEventAnnouncement(null);
+    }, 0);
+    return () => window.clearTimeout(resetGoal);
+  }, [activeCoopCode]);
+
+  useEffect(() => {
+    if (!hydrated || (activeCoopCode && !isCoopLive)) return;
+    const latest = displayGame.features.seasonMode.history.at(-1) ?? null;
+    if (!latest) {
+      seasonHistoryRef.current = null;
+      const clearAnnouncement = window.setTimeout(() => setSeasonStandingsAnnouncement(null), 0);
+      return () => window.clearTimeout(clearAnnouncement);
+    }
+    if (seasonHistoryRef.current === null) {
+      seasonHistoryRef.current = latest.id;
+      return;
+    }
+    if (seasonHistoryRef.current === latest.id) return;
+    seasonHistoryRef.current = latest.id;
+    setSeasonStandingsAnnouncement({ entry: latest, table: displayGame.features.seasonMode.lastTable, results: displayGame.features.seasonMode.lastResults });
+    showToast("Rangliste aktualisiert");
+    // A league title gets the trophy celebration on top of the final table.
+    const title = getSeasonTitle(latest, displayGame.features.seasonMode.lastTable, displayGame.features.seasonMode.lastResults);
+    if (title) {
+      setSeasonTitle(title);
+      [523, 659, 784, 1047].forEach((frequency, index) => playTone(frequency, index === 3 ? 0.5 : 0.16, "triangle", 0.045, 0.35 + index * 0.16));
+    }
+  }, [activeCoopCode, displayGame.features.seasonMode.history, displayGame.features.seasonMode.lastTable, displayGame.features.seasonMode.lastResults, hydrated, isCoopLive]);
+
+  useEffect(() => {
+    if (!isCoopLive || !sharedRandomEvent || coopEventRef.current === sharedRandomEvent.createdAt) return;
+    coopEventRef.current = sharedRandomEvent.createdAt;
+    presentEventAnnouncement(sharedRandomEvent);
+    showToast(sharedRandomEvent.title);
+    addFeed(sharedRandomEvent.message, sharedRandomEvent.tone === "negative" ? "screen" : sharedRandomEvent.id === "var" ? "screen" : "star");
+    // Present the server-broadcast event on both devices.
+  }, [isCoopLive, sharedRandomEvent]);
+
+  useEffect(() => {
+    if (!visibleTransferEvent || transferEventRef.current === visibleTransferEvent.createdAt) return;
+    transferEventRef.current = visibleTransferEvent.createdAt;
+    if (getCurrentTime() - visibleTransferEvent.createdAt > 30000) return;
+    const presentTransfer = window.setTimeout(() => {
+      setTransferAnnouncement(visibleTransferEvent);
+      showToast("Fabrizio Romario");
+      addFeed(visibleTransferEvent.message, visibleTransferEvent.outcome === "sale" ? "screen" : "broadcast");
+    }, 0);
+    return () => window.clearTimeout(presentTransfer);
+  }, [visibleTransferEvent]);
+
+  useEffect(() => {
+    if (!visibleGazetteIssue || gazetteIssueRef.current === visibleGazetteIssue.id) return;
+    gazetteIssueRef.current = visibleGazetteIssue.id;
+    if (getCurrentTime() - visibleGazetteIssue.createdAt > 45000) return;
+    const presentGazette = window.setTimeout(() => setGazetteAnnouncement(visibleGazetteIssue), 0);
+    return () => window.clearTimeout(presentGazette);
+  }, [visibleGazetteIssue]);
+
+  useEffect(() => {
+    if (!isCoopLive || !sharedPackReveal || coopPackRevealRef.current === sharedPackReveal.openedAt) return;
+    if (getCurrentTime() - sharedPackReveal.openedAt > STAR_TOP_WALKOUT_ANIMATION_MS + 15000) {
+      coopPackRevealRef.current = sharedPackReveal.openedAt;
+      return;
+    }
+    coopPackRevealRef.current = sharedPackReveal.openedAt;
+    presentStarReveal(sharedPackReveal);
+    showToast(sharedPackReveal.duplicate ? `Doppelter Star · +${formatNumber(sharedPackReveal.fragmentCompensation)} Fragmente` : `${sharedPackReveal.player.name} gezogen`);
+    // Present the shared pack result on both devices.
+  }, [isCoopLive, sharedPackReveal]);
+
+  useEffect(() => {
+    if (!displayedCupGoal || cupGoalRef.current === displayedCupGoal.id || getCurrentTime() - displayedCupGoal.createdAt > 12000) return;
+    cupGoalRef.current = displayedCupGoal.id;
+    addFeed(`${displayedCupGoal.scorer} trifft in der ${displayedCupGoal.minute}. Minute.`, "crown");
+  }, [displayedCupGoal]);
+
+  useEffect(() => {
+    if (!displayedCupCard || cupCardRef.current === displayedCupCard.id || getCurrentTime() - displayedCupCard.createdAt > 15000) return;
+    cupCardRef.current = displayedCupCard.id;
+    setCupCardAnnouncement(displayedCupCard);
+    if (cupCardTimerRef.current) window.clearTimeout(cupCardTimerRef.current);
+    cupCardTimerRef.current = window.setTimeout(() => {
+      setCupCardAnnouncement(null);
+      cupCardTimerRef.current = null;
+    }, 5000);
+    addFeed(`${displayedCupCard.player} sieht Rot. Für die nächste Partie gesperrt.`, "screen");
+    showToast("Rote Karte");
+  }, [displayedCupCard]);
+
+  useEffect(() => {
+    if (!hydrated || !playerId || guest || coopRestoreAttemptedRef.current) return;
+    coopRestoreAttemptedRef.current = true;
+    void restoreCoopRoom();
+  }, [hydrated, playerId, guest, restoreCoopRoom]);
+
+  useEffect(() => {
+    if (!hydrated || appMode !== "coop" || !playerId || coopSession) return;
+    const initialLoad = window.setTimeout(() => void loadSavedRooms(), 0);
+    const timer = window.setInterval(() => { if (!isAway()) void loadSavedRooms(); }, 15000);
+    return () => { window.clearTimeout(initialLoad); window.clearInterval(timer); };
+  }, [appMode, coopSession, hydrated, loadSavedRooms, playerId]);
+
+  useEffect(() => {
+    if (!hydrated || appMode !== "coop" || !activeCoopCode || !activeCoopPlayerId || coopSession?.room.status === "live") return;
+    // A tab in the background does not poll; it catches up as soon as it is visible again. While nobody touches
+    // the page for a while, the waiting world is checked every 4 s instead of every 1.5 s, and not at all once the
+    // player counts as away (app/activity.ts); any tap or key press brings back the fast rhythm at once.
+    let lastInput = Date.now();
+    let timer = 0;
+    let stopped = false;
+    const syncWhileOpen = () => { if (!isAway()) void syncCoopRoom(); };
+    const schedule = () => {
+      if (stopped) return;
+      timer = window.setTimeout(() => { syncWhileOpen(); schedule(); }, Date.now() - lastInput < COOP_IDLE_AFTER_MS ? 1500 : COOP_IDLE_POLL_MS);
+    };
+    const onInput = () => {
+      const wasIdle = Date.now() - lastInput >= COOP_IDLE_AFTER_MS;
+      lastInput = Date.now();
+      if (wasIdle) { window.clearTimeout(timer); syncWhileOpen(); schedule(); }
+    };
+    const initialSync = window.setTimeout(syncWhileOpen, 0);
+    schedule();
+    document.addEventListener("visibilitychange", syncWhileOpen);
+    window.addEventListener("pointerdown", onInput, { passive: true });
+    window.addEventListener("keydown", onInput);
+    return () => { stopped = true; window.clearTimeout(initialSync); window.clearTimeout(timer); document.removeEventListener("visibilitychange", syncWhileOpen); window.removeEventListener("pointerdown", onInput); window.removeEventListener("keydown", onInput); };
+  }, [activeCoopCode, activeCoopPlayerId, appMode, coopSession?.room.status, hydrated, syncCoopRoom]);
+
+  useEffect(() => {
+    if (!hydrated || appMode !== "coop" || !activeCoopCode || !activeCoopPlayerId || coopSession?.room.status !== "live") return;
+    // Hidden or untouched for 10 minutes (app/activity.ts): no ticks, so a forgotten tab neither polls nor keeps the
+    // database awake. The other players' ticks keep the world running; coming back ticks at once.
+    const tick = () => { if (!isAway()) void sendCoopAction("tick", { featuresKey: coopFeaturesKeyRef.current }); };
+    const timer = window.setInterval(tick, 1500);
+    document.addEventListener("visibilitychange", tick);
+    const stopReturn = onReturn(tick);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", tick); stopReturn(); };
+    // Background synchronisation is coalesced by sendCoopAction and must not restart on every room update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCoopCode, activeCoopPlayerId, appMode, coopSession?.room.status, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated || !activeCoopCode || !activeCoopPlayerId) return;
+    const markOffline = () => notifyCoopOffline(activeCoopCode, activeCoopPlayerId);
+    window.addEventListener("beforeunload", markOffline);
+    window.addEventListener("pagehide", markOffline);
+    return () => {
+      window.removeEventListener("beforeunload", markOffline);
+      window.removeEventListener("pagehide", markOffline);
+    };
+  }, [activeCoopCode, activeCoopPlayerId, hydrated]);
+
+  useEffect(() => {
+    gameRef.current = addPassiveGoals(game, passiveGoals.getPending());
+  }, [game, passiveGoals]);
+  // Before paint, so the counter never shows a committed state without the ticks collected since.
+  useLayoutEffect(() => {
+    passiveGoals.setDisplay(game.goals + passiveGoals.getPending());
+  }, [game.goals, passiveGoals]);
+
+  useEffect(() => {
+    const nextClub = { name: displayClubName, badge: displayClubBadge, color: displayClubColor };
+    const syncClub = window.setTimeout(() => setClubDraft(nextClub), 0);
+    return () => window.clearTimeout(syncClub);
+  }, [displayClubBadge, displayClubColor, displayClubName]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    // One render per second: the countdowns and the passive goals collected since the last commit.
+    const timer = window.setInterval(() => { flushPassiveGoals(); setCountdownNow(getCurrentTime()); }, 1000);
+    return () => window.clearInterval(timer);
+  }, [hydrated, flushPassiveGoals]);
+  // A press first commits the collected goals, so the handler that follows renders with exact goals (affordable
+  // buttons, bulk counts, pack checks). The ball adds its goals through setGame, which commits them anyway.
+  useEffect(() => {
+    if (!hydrated) return;
+    const commit = (event: Event) => {
+      if (!passiveGoals.getPending()) return;
+      if (event.target instanceof Element && event.target.closest(".ball-button")) return;
+      flushPassiveGoals();
+    };
+    window.addEventListener("pointerdown", commit, { capture: true, passive: true });
+    window.addEventListener("keydown", commit, { capture: true, passive: true });
+    return () => { window.removeEventListener("pointerdown", commit, { capture: true }); window.removeEventListener("keydown", commit, { capture: true }); };
+  }, [hydrated, flushPassiveGoals, passiveGoals]);
+
+  const showToastRef = useRef(showToast);
+  showToastRef.current = showToast;
+  const accountMessage = useCallback((message: string) => showToastRef.current(message), []);
+  // The Google account decides the player ID, so all its devices share the same worlds.
+  const adoptAccountPlayerId = useCallback((id: string) => {
+    localStorage.setItem(PLAYER_ID_KEY, id);
+    setPlayerId(id);
+  }, []);
+
+  /** Queued toasts (app/qol/toast-queue.ts): `minor` click messages never push a real message away. */
+  function showToast(message: string, priority: ToastPriority = "info") {
+    setToastState((current) => pushToast(current, { text: message, priority }));
+  }
+  const currentToast = toastState.current;
+  useEffect(() => {
+    if (!currentToast) return;
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToastState((current) => current.current === currentToast ? nextToast(current) : current), toastDuration(currentToast));
+    return () => { if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current); };
+  }, [currentToast]);
+
+  function presentEventAnnouncement(event: RandomEvent) {
+    if (eventAnnouncementRef.current) {
+      const alreadyQueued = eventAnnouncementQueueRef.current.some((queued) => queued.createdAt === event.createdAt);
+      if (!alreadyQueued && eventAnnouncementRef.current.createdAt !== event.createdAt) {
+        eventAnnouncementQueueRef.current = [...eventAnnouncementQueueRef.current, event];
+      }
+      return;
+    }
+    eventAnnouncementRef.current = event;
+    setEventAnnouncement(event);
+  }
+
+  function dismissEventAnnouncement() {
+    const next = eventAnnouncementQueueRef.current.shift() ?? null;
+    eventAnnouncementRef.current = next;
+    setEventAnnouncement(next);
+  }
+
+  useEffect(() => {
+    if (!eventAnnouncement) return;
+    const duration = eventAnnouncement.tone === 'negative' ? 5000 : eventAnnouncement.amount === 0 ? 3000 : 4000;
+    const timer = window.setTimeout(dismissEventAnnouncement, duration);
+    return () => window.clearTimeout(timer);
+  }, [eventAnnouncement]);
+
+  function dismissTransferAnnouncement() {
+    setTransferAnnouncement(null);
+  }
+
+  // Table and gazette close on their own after a while, but never while the player reads them:
+  // hovering, focus inside or an opened <details> holds them until the player lets go.
+  const standingsHeld = useAnnouncementHold(standingsCardRef, Boolean(seasonStandingsAnnouncement));
+  const gazetteHeld = useAnnouncementHold(gazetteCardRef, Boolean(gazetteAnnouncement));
+  useEffect(() => {
+    if (!seasonStandingsAnnouncement || standingsHeld) return;
+    const timer = window.setTimeout(() => setSeasonStandingsAnnouncement((current) => current === seasonStandingsAnnouncement ? null : current), ANNOUNCEMENT_AUTO_CLOSE_MS);
+    return () => window.clearTimeout(timer);
+  }, [seasonStandingsAnnouncement, standingsHeld]);
+  useEffect(()=>{
+    if(!gazetteAnnouncement || gazetteHeld)return;
+    const timer=window.setTimeout(()=>setGazetteAnnouncement(null),ANNOUNCEMENT_AUTO_CLOSE_MS);
+    return ()=>window.clearTimeout(timer);
+  },[gazetteAnnouncement, gazetteHeld]);
+
+  function dismissGazetteAnnouncement() {
+    setGazetteAnnouncement(null);
+  }
+
+  function clearEventAnnouncements() {
+    eventAnnouncementQueueRef.current = [];
+    eventAnnouncementRef.current = null;
+    transferEventRef.current = null;
+    gazetteIssueRef.current = null;
+    setEventAnnouncement(null);
+    setTransferAnnouncement(null);
+    setGazetteAnnouncement(null);
+  }
+
+  function flushCoopClickBatch() {
+    // Exactly one timer waits at a time: a flush called while one is pending (more than 50 clicks queued during a
+    // blocked request) replaces it instead of starting a second chain.
+    if (coopClickBatchTimerRef.current) window.clearTimeout(coopClickBatchTimerRef.current);
+    coopClickBatchTimerRef.current = null;
+    if (coopForegroundPendingRef.current > 0) {
+      coopClickBatchTimerRef.current = window.setTimeout(flushCoopClickBatch, 70);
+      return;
+    }
+    // One click request at a time: the server counts each batch on top of the previous one.
+    if (coopClickInFlightRef.current) {
+      coopClickBatchTimerRef.current = window.setTimeout(flushCoopClickBatch, 70);
+      return;
+    }
+    const batch = coopClickBatchRef.current;
+    coopClickBatchRef.current = { amount: 0, count: 0 };
+    coopClickBatchTimerRef.current = null;
+    if (batch.count > 0) {
+      coopClickInFlightRef.current = true;
+      void sendCoopAction("click", { amount: batch.amount, clickCount: batch.count }).finally(() => { coopClickInFlightRef.current = false; });
+    }
+  }
+
+  function queueCoopClick(amount: number) {
+    if (coopClickBatchRef.current.count >= 50) flushCoopClickBatch();
+    coopClickBatchRef.current.amount += amount;
+    coopClickBatchRef.current.count += 1;
+    if (coopClickBatchTimerRef.current) return;
+    coopClickBatchTimerRef.current = window.setTimeout(flushCoopClickBatch, 70);
+  }
+
+  function addFeed(text: string, icon: IconName) {
+    const entry = { id: feedIdRef.current++, icon, text };
+    setFeed((current) => [entry, ...current].slice(0, 8));
+  }
+
+  function presentStarReveal(reveal: StarPackReveal) {
+    if (starRevealTimerRef.current) window.clearTimeout(starRevealTimerRef.current);
+    const elapsed = Math.max(0, Date.now() - reveal.openedAt);
+    const revealDuration = getStarRevealReadyDelay(reveal);
+    setStarRevealLag(elapsed);
+    setStarReveal(reveal);
+    openAllRef.current?.opened.push(reveal);
+    packSoundRef.current?.();
+    packSoundRef.current = null;
+    // Only a reveal that starts now gets its sound, not one restored half way through after a reload.
+    if (gameRef.current.sound && soundPrefsRef.current.effects && elapsed < 1000) {
+      const tier = getStarCardTier(reveal.player), walkout = tier === "walkout" || tier === "icon" || tier === "legendary";
+      packSoundRef.current = playPackReveal(tier, { top: reveal.player.rating >= 90, delay: reveal.troll && walkout ? PACK_TROLL_INTRO_MS - elapsed : -elapsed });
+    }
+    if (elapsed < revealDuration) {
+      const tier = getStarCardTier(reveal.player);
+      if (tier === "walkout" || tier === "icon" || tier === "legendary") vibrate([90, 50, 90, 50, 260]);
+      setStarWalkoutReady(false);
+      setWalkoutSkippable(false);
+      setStarRevealSkipped(false);
+      starRevealTimerRef.current = window.setTimeout(() => {
+        setStarWalkoutReady(true);
+        starRevealTimerRef.current = null;
+      }, revealDuration - elapsed);
+      if (walkoutSkipTimerRef.current) window.clearTimeout(walkoutSkipTimerRef.current);
+      walkoutSkipTimerRef.current = null;
+      let seen = false;
+      try { seen = window.localStorage.getItem(WALKOUT_SEEN_STORAGE_KEY) === "1"; } catch { /* storage blocked */ }
+      if (seen && revealDuration - elapsed > STAR_WALKOUT_SKIP_AFTER_MS) walkoutSkipTimerRef.current = window.setTimeout(() => { setWalkoutSkippable(true); walkoutSkipTimerRef.current = null; }, Math.max(0, STAR_WALKOUT_SKIP_AFTER_MS - elapsed));
+      return;
+    }
+    setStarWalkoutReady(true);
+    starRevealTimerRef.current = null;
+  }
+
+  function dismissStarReveal() {
+    packPurchaseRef.current = false;
+    packSoundRef.current?.();
+    packSoundRef.current = null;
+    if (starRevealTimerRef.current) window.clearTimeout(starRevealTimerRef.current);
+    starRevealTimerRef.current = null;
+    if (walkoutSkipTimerRef.current) window.clearTimeout(walkoutSkipTimerRef.current);
+    walkoutSkipTimerRef.current = null;
+    setWalkoutSkippable(false);
+    setStarRevealSkipped(false);
+    setStarWalkoutReady(false);
+    setStarReveal(null);
+    continueOpenAll();
+  }
+
+  /** Skips the rest of a walkout or rare reveal: the card shows at once, ready to take over. */
+  function skipStarReveal() {
+    if (starRevealTimerRef.current) window.clearTimeout(starRevealTimerRef.current);
+    starRevealTimerRef.current = null;
+    setWalkoutSkippable(false);
+    setStarRevealSkipped(true);
+    setStarRevealLag(24 * 60 * 60 * 1000);
+    setStarWalkoutReady(true);
+  }
+
+  function finishStarWalkout(event: AnimationEvent<HTMLDivElement>) {
+    if (event.target !== event.currentTarget || event.animationName !== "star-avatar-walk") return;
+    if (starRevealTimerRef.current) window.clearTimeout(starRevealTimerRef.current);
+    starRevealTimerRef.current = null;
+    setStarWalkoutReady(true);
+  }
+
+  function layoutOrderNumber(id: LayoutCardId) {
+    return layoutOrder.indexOf(id) + 1;
+  }
+
+  function layoutCardClass(id: LayoutCardId, baseClass: string) {
+    return `${baseClass} layout-card${layoutEditMode ? " layout-card-editing" : ""}${dragOverLayoutCard === id ? " layout-card-drag-over" : ""}`;
+  }
+
+  function handleLayoutDragStart(event: DragEvent<HTMLElement>, id: LayoutCardId) {
+    if (!layoutEditMode) return;
+    setDraggingLayoutCard(id);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", id);
+  }
+
+  function handleLayoutDragOver(event: DragEvent<HTMLElement>, id: LayoutCardId) {
+    if (!layoutEditMode || !draggingLayoutCard || draggingLayoutCard === id) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDragOverLayoutCard(id);
+  }
+
+  function handleLayoutDrop(event: DragEvent<HTMLElement>, targetId: LayoutCardId) {
+    if (!layoutEditMode) return;
+    event.preventDefault();
+    const sourceId = draggingLayoutCard ?? event.dataTransfer.getData("text/plain") as LayoutCardId;
+    if (!sourceId || sourceId === targetId || !LAYOUT_CARD_IDS.includes(sourceId)) {
+      setDraggingLayoutCard(null);
+      setDragOverLayoutCard(null);
+      return;
+    }
+    setLayoutOrder((current) => {
+      const next = current.filter((id) => id !== sourceId);
+      const targetIndex = next.indexOf(targetId);
+      next.splice(targetIndex < 0 ? next.length : targetIndex, 0, sourceId);
+      return normalizeLayoutOrder(next);
+    });
+    setDraggingLayoutCard(null);
+    setDragOverLayoutCard(null);
+  }
+
+  function handleLayoutDragEnd() {
+    setDraggingLayoutCard(null);
+    setDragOverLayoutCard(null);
+  }
+
+  function moveLayoutCard(id: LayoutCardId, direction: -1 | 1) {
+    setLayoutOrder((current) => {
+      const index = current.indexOf(id);
+      const nextIndex = Math.max(0, Math.min(current.length - 1, index + direction));
+      if (index < 0 || index === nextIndex) return current;
+      const next = [...current];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  }
+
+  function resetLayout() {
+    setLayoutOrder(DEFAULT_LAYOUT_ORDER);
+    showToast("Standardanordnung wiederhergestellt");
+  }
+
+  async function createCoopRoom() {
+    const nickname = normalizeNickname(coopNickname);
+    if (!playerId) {
+      setCoopMessage("Deine Spieler-ID wird noch vorbereitet.");
+      return;
+    }
+    if (nickname.length < 2) {
+      setCoopMessage("Gib zuerst deinen Spielernamen ein.");
+      return;
+    }
+    setCoopBusy(true);
+    localStorage.setItem(PLAYER_NAME_KEY, nickname);
+    setPlayerName(nickname);
+    try {
+      const response = await fetch("/api/multiplayer", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "create", playerId, nickname, roomName: coopRoomName, protocol: MULTIPLAYER_PROTOCOL_VERSION }) });
+      const data = await readCoopResponse(response);
+      syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
+      if (!response.ok || !data.room) throw new Error(data.error ?? "Der Koop-Raum konnte nicht erstellt werden.");
+      coopStatusRef.current = data.room.status;
+      coopPlayerCountRef.current = data.room.playerCount;
+      setSavedRooms((current) => upsertSavedRoom(current, data.room!));
+      setCoopSession({ code: data.room.code, role: data.role ?? "host", playerId, room: data.room });
+      setCoopMessage("Raum erstellt. Teile den Code mit bis zu drei Mitspielern.");
+    } catch (error) {
+      setCoopMessage(error instanceof Error ? error.message : "Der Koop-Raum konnte nicht erstellt werden.");
+    } finally {
+      setCoopBusy(false);
+    }
+  }
+
+  async function joinCoopRoom() {
+    const nickname = normalizeNickname(coopNickname);
+    const code = coopCodeInput.trim().toUpperCase().slice(0, 6);
+    if (!playerId) {
+      setCoopMessage("Deine Spieler-ID wird noch vorbereitet.");
+      return;
+    }
+    if (nickname.length < 2) {
+      setCoopMessage("Gib zuerst deinen Spielernamen ein.");
+      return;
+    }
+    if (code.length !== 6) {
+      setCoopMessage("Ein Raumcode besteht aus 6 Zeichen.");
+      return;
+    }
+    setCoopBusy(true);
+    localStorage.setItem(PLAYER_NAME_KEY, nickname);
+    setPlayerName(nickname);
+    try {
+      const response = await fetch("/api/multiplayer", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "join", code, playerId, nickname, protocol: MULTIPLAYER_PROTOCOL_VERSION }) });
+      const data = await readCoopResponse(response);
+      syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
+      if (!response.ok || !data.room) throw new Error(data.error ?? "Der Raum konnte nicht betreten werden.");
+      coopStatusRef.current = data.room.status;
+      coopPlayerCountRef.current = data.room.playerCount;
+      setSavedRooms((current) => upsertSavedRoom(current, data.room!));
+      setCoopSession({ code: data.room.code, role: data.role ?? "guest", playerId, room: data.room });
+      setCoopMessage(`${data.room.playerCount} von 4 Spielern sind im Raum. Jetzt gemeinsam Tore sammeln.`);
+    } catch (error) {
+      setCoopMessage(error instanceof Error ? error.message : "Der Raum konnte nicht betreten werden.");
+    } finally {
+      setCoopBusy(false);
+    }
+  }
+
+  async function reopenSavedRoom(code: string) {
+    if (!playerId || code.length !== 6) return;
+    setCoopBusy(true);
+    try {
+      const response = await fetch(multiplayerUrl({ code, playerId }), { cache: "no-store" });
+      const data = await readCoopResponse(response);
+      syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
+      if (!response.ok || !data.room) throw new Error(data.error ?? "Der Raum konnte nicht geöffnet werden.");
+      coopStatusRef.current = data.room.status;
+      coopPlayerCountRef.current = data.room.playerCount;
+      setSavedRooms((current) => upsertSavedRoom(current, data.room!));
+      setCoopSession({ code: data.room.code, role: data.role ?? "host", playerId, room: data.room });
+      setAppMode("coop");
+      setCoopMessage("Gespeicherter Koop-Raum geöffnet.");
+    } catch (error) {
+      setCoopMessage(error instanceof Error ? error.message : "Der Raum konnte nicht geöffnet werden.");
+      if (error instanceof Error && error.message.includes("nicht in diesem Raum")) {
+        setSavedRooms((current) => current.filter((room) => room.code !== code));
+      }
+    } finally {
+      setCoopBusy(false);
+    }
+  }
+
+  function leaveCoopRoom() {
+    notifyCoopOffline(coopSession?.code, coopSession?.playerId);
+    localStorage.removeItem(COOP_ROOM_KEY);
+    coopStatusRef.current = null;
+    coopPlayerCountRef.current = 0;
+    coopEventRef.current = null;
+    coopPackRevealRef.current = null;
+    clearEventAnnouncements();
+    dismissStarReveal();
+    setCoopSession(null);
+    setCoopMessage("Du hast den Koop-Raum verlassen. Er bleibt gespeichert und kann später wieder geöffnet werden.");
+    void loadSavedRooms();
+  }
+
+  /** Closes the co-op screen after this player's seat is gone (left on purpose); the world is no longer listed. */
+  function forgetCoopRoom(code: string, message: string) {
+    localStorage.removeItem(COOP_ROOM_KEY);
+    coopStatusRef.current = null;
+    coopPlayerCountRef.current = 0;
+    coopEventRef.current = null;
+    coopPackRevealRef.current = null;
+    clearEventAnnouncements();
+    dismissStarReveal();
+    setSavedRooms((current) => current.filter((item) => item.code !== code));
+    setCoopSession(null);
+    setCoopMessage(message);
+    void loadSavedRooms();
+  }
+
+  async function leaveCoopSeat() {
+    if (!coopSession) return;
+    const code = coopSession.code;
+    setSeatDialog(null);
+    setCoopBusy(true);
+    const data = await sendCoopAction("leave-seat");
+    setCoopBusy(false);
+    if (!data?.left) return;
+    forgetCoopRoom(code, data.newHost ? "Du hast deinen Platz freigegeben. Die Host Rolle ging an das zuletzt aktive Mitglied. Mit dem Raumcode kannst du wieder beitreten, solange ein Platz frei ist." : "Du hast deinen Platz freigegeben. Die Welt spielt ohne dich weiter. Mit dem Raumcode kannst du wieder beitreten, solange ein Platz frei ist.");
+  }
+
+  async function kickCoopMember(role: CoopRole, name: string, force: boolean) {
+    if (!coopSession || coopSession.role !== "host") return;
+    setSeatDialog(null);
+    setCoopBusy(true);
+    const data = await sendCoopAction("kick", { targetRole: role, force });
+    setCoopBusy(false);
+    if (data?.left) setCoopMessage(`${name} ist nicht mehr in dieser Welt. Der Platz ist wieder frei.`);
+  }
+
+  async function answerPrestigeVote(decision: "approve" | "decline") {
+    const vote = coopSession?.room.prestigeVote;
+    if (!vote) return;
+    setCoopBusy(true);
+    const data = await sendCoopAction("prestige-vote", { voteId: vote.id, decision });
+    setCoopBusy(false);
+    if (data?.prestigeVote === "pending") setCoopMessage("Du hast zugestimmt. Die Abstimmung wartet noch auf die anderen.");
+  }
+
+  async function deleteCoopRoom(code: string) {
+    const room = coopSession?.code === code ? coopSession.room : savedRooms.find((item) => item.code === code);
+    if (!room?.canDelete) {
+      setCoopMessage("Nur der Host kann diesen Raum löschen.");
+      return;
+    }
+    if (!window.confirm(`Raum ${code} wirklich löschen? Der gemeinsame Spielstand geht für alle verloren.`)) return;
+    setCoopBusy(true);
+    try {
+      const response = await fetch("/api/multiplayer", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "delete", code, playerId, protocol: MULTIPLAYER_PROTOCOL_VERSION }) });
+      const data = await readCoopResponse(response);
+      syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
+      if (!response.ok || !data.deleted) throw new Error(data.error ?? "Der Raum konnte nicht gelöscht werden.");
+      localStorage.removeItem(COOP_ROOM_KEY);
+      setSavedRooms((current) => current.filter((item) => item.code !== code));
+      if (coopSession?.code === code) {
+        coopStatusRef.current = null;
+        coopPlayerCountRef.current = 0;
+        coopEventRef.current = null;
+        coopPackRevealRef.current = null;
+        clearEventAnnouncements();
+        dismissStarReveal();
+        setCoopSession(null);
+      }
+      setCoopMessage("Raum gelöscht. Er ist bei allen Spielern entfernt.");
+      void loadSavedRooms();
+    } catch (error) {
+      setCoopMessage(error instanceof Error ? error.message : "Der Raum konnte nicht gelöscht werden.");
+    } finally {
+      setCoopBusy(false);
+    }
+  }
+
+  const vibrationSupported = hydrated && canVibrate();
+  // Travel previews show an estimate ("ca.") and use exact routes as soon as the route data arrived. The 1.5 MB
+  // route data only loads once the Spiele tab is open (the travel map loads it itself), not on every start.
+  const [, setRoutesLoaded] = useState(false);
+  const routesWanted = featureTab === "cup";
+  useEffect(() => { if (!routesWanted) return; let active = true; void loadRouteCache().then((loaded) => { if (active && loaded) setRoutesLoaded(true); }); return () => { active = false; }; }, [routesWanted]);
+  // Without clicks the combo drains one click per step, so a short pause costs a little instead of everything.
+  const scheduleComboDecay = useCallback(function scheduleDecay(delay: number) {
+    if (comboTimerRef.current) window.clearTimeout(comboTimerRef.current);
+    comboTimerRef.current = window.setTimeout(() => {
+      const state = comboRef.current;
+      const count = decayComboCount(state.count, Date.now() - state.last);
+      const { multiplier } = getComboLevel(count);
+      if (state.multiplier > 1 && multiplier === 1) clickFeedback.setBurst({ id: Date.now(), text: "Combo vorbei" });
+      clickFeedback.setCombo({ count, multiplier });
+      if (count > 0) {
+        state.multiplier = multiplier;
+        scheduleDecay(COMBO_DECAY_MS);
+      } else {
+        comboTimerRef.current = null;
+        comboRef.current = { count: 0, last: 0, paused: false, multiplier: 1 };
+      }
+    }, delay);
+  }, [clickFeedback]);
+  // Full screen announcements (Fabrizio Romario, gazette) pause the combo instead of ending it.
+  const comboPaused = Boolean(transferAnnouncement || gazetteAnnouncement);
+  useEffect(() => {
+    const state = comboRef.current;
+    if (comboPaused) {
+      if (comboTimerRef.current) window.clearTimeout(comboTimerRef.current);
+      comboTimerRef.current = null;
+      if (!state.paused) state.count = decayComboCount(state.count, Date.now() - state.last);
+      state.paused = true;
+      return;
+    }
+    if (!state.paused) return;
+    state.paused = false;
+    state.last = Date.now();
+    if (state.count > 0) scheduleComboDecay(COMBO_HOLD_MS + COMBO_DECAY_MS);
+  }, [comboPaused, scheduleComboDecay]);
+  useEffect(() => () => { if (comboTimerRef.current) window.clearTimeout(comboTimerRef.current); }, []);
+  const latestClubGoalId = displayGame.features.cup.matchEvents.filter((event) => event.side === "home").at(-1)?.id ?? null;
+  const liveMatch = displayGame.features.cup.active;
+  useEffect(() => {
+    // Vibrate once for every new goal of our club while the match is live; ignore goals restored from a save.
+    if (clubGoalRef.current === null) { clubGoalRef.current = latestClubGoalId ?? ""; return; }
+    if (latestClubGoalId && latestClubGoalId !== clubGoalRef.current && liveMatch) vibrate([70, 40, 140]);
+    clubGoalRef.current = latestClubGoalId ?? "";
+  }, [latestClubGoalId, liveMatch]);
+  async function sendCoopAction(action: string, extra: Record<string, unknown> = {}) {
+    if (!coopSession) return null;
+    // Foreground actions carry one id for all their attempts: a resend after a lost answer is answered from the
+    // server's receipt instead of being applied a second time.
+    const actionId = action === "click" || action === "tick" || action === "cup-tick" ? undefined : newCoopActionId();
+    const run = async () => {
+      const maxAttempts = action === "click" ? 1 : 4;
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        // Growing pauses with jitter, so clients that collided do not collide again in lockstep.
+        if (attempt > 0) await new Promise((resolve) => window.setTimeout(resolve, coopRetryDelay(attempt)));
+        try {
+          const response = await fetch("/api/multiplayer", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action, code: coopSession.code, playerId: coopSession.playerId, protocol: MULTIPLAYER_PROTOCOL_VERSION, featuresKey: coopFeaturesKeyRef.current, ...(actionId ? { actionId } : {}), ...extra }),
+          });
+          const data = await readCoopResponse(response);
+      syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
+          if (data.room) setCoopSession((current) => mergeCoopSessionRoom(current, data.room!, data.role));
+          // A newer server: the reload banner explains it (readCoopResponse); nothing was saved.
+          if (response.status === 426) return null;
+          if (!response.ok && data.errorCode === "STALE_STATE" && attempt + 1 < maxAttempts) continue;
+          if (!response.ok) {
+            // Clicks beyond the server's click budget are simply not counted; that is no error to show.
+            if (action !== "click" || response.status !== 429) { setCoopMessage(data.error ?? "Die Koop-Aktion ist fehlgeschlagen."); showToast(data.error ?? "Die Koop-Aktion ist fehlgeschlagen.", "error"); }
+            return null;
+          }
+          if (actionId) setCoopFailed((current) => current?.extra.actionId === actionId ? null : current);
+          if (data.packReveal) {
+            coopPackRevealRef.current = data.packReveal.openedAt;
+            presentStarReveal(data.packReveal);
+            showToast(data.packReveal.duplicate ? `Doppelt gezogen · +${formatNumber(data.packReveal.fragmentCompensation)} Fragmente` : data.packReveal.source === "custom-draw" ? `${data.packReveal.player.name} als Spezialkarte gezogen` : `${data.packReveal.player.name} gezogen`);
+          }
+          return data;
+        } catch {
+          const retryUnsafe = NETWORK_RETRY_UNSAFE_COOP_ACTIONS.has(action);
+          if (action !== "click" && !retryUnsafe && attempt + 1 < maxAttempts) continue;
+          if (actionId && !retryUnsafe) setCoopFailed({ action, extra: { ...extra, actionId } });
+          setCoopMessage(retryUnsafe ? "Die Verbindung wurde unterbrochen. Prüfe den gemeinsamen Kontostand, bevor du den Kauf wiederholst." : "Die Verbindung zum Koop-Raum ist gerade unterbrochen.");
+          return null;
+        }
+      }
+      setCoopMessage("Die Koop-Aktion konnte nach mehreren gleichzeitigen Änderungen nicht gespeichert werden.");
+      return null;
+    };
+    // Klicks werden serverseitig atomar addiert. Hintergrund-Ticks werden
+    // zusammengefasst, damit sie Käufe während eines Live-Spiels nie blockieren.
+    if (action === "click") return run();
+    if (action === "tick" || action === "cup-tick") {
+      if (coopForegroundPendingRef.current > 0 || coopBackgroundActionRef.current) return null;
+      const backgroundAction = run();
+      coopBackgroundActionRef.current = backgroundAction;
+      try {
+        return await backgroundAction;
+      } finally {
+        if (coopBackgroundActionRef.current === backgroundAction) coopBackgroundActionRef.current = null;
+      }
+    }
+
+    coopForegroundPendingRef.current += 1;
+    const runForeground = async () => {
+      const backgroundAction = coopBackgroundActionRef.current;
+      if (backgroundAction) await backgroundAction;
+      return run();
+    };
+    const queued = coopControlQueueRef.current.then(runForeground, runForeground);
+    coopControlQueueRef.current = queued.then(() => undefined, () => undefined);
+    try {
+      return await queued;
+    } finally {
+      coopForegroundPendingRef.current = Math.max(0, coopForegroundPendingRef.current - 1);
+      if (coopForegroundPendingRef.current === 0 && coopClickBatchRef.current.count > 0 && !coopClickBatchTimerRef.current) {
+        coopClickBatchTimerRef.current = window.setTimeout(flushCoopClickBatch, 0);
+      }
+    }
+  }
+
+  // Invite link (Q60): the share sheet where there is one, else the clipboard.
+  async function shareInvite() {
+    if (!coopSession) return;
+    const url = inviteUrl(window.location.origin, coopSession.code);
+    const text = `Spiel mit mir Goal Clicker in der Welt «${coopSession.room.roomName}». Raumcode ${coopSession.code}.`;
+    try {
+      if (navigator.share) { await navigator.share({ title: "Goal Clicker Koop", text, url }); return; }
+      await navigator.clipboard?.writeText(url);
+      showToast("Einladungslink kopiert");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setCoopMessage(`Einladungslink: ${url}`);
+      showToast(`Einladungslink: ${url}`);
+    }
+  }
+
+  async function copyCoopCode() {
+    if (!coopSession) return;
+    try {
+      await navigator.clipboard?.writeText(coopSession.code);
+      setCoopMessage("Raumcode kopiert.");
+    } catch {
+      setCoopMessage(`Raumcode: ${coopSession.code}`);
+    }
+  }
+
+  async function renameCoopRoom() {
+    if (!coopSession || coopSession.role !== "host") return;
+    const roomName = coopRoomName.trim().replace(/\s+/g, " ").slice(0, 28);
+    if (!roomName) {
+      setCoopMessage("Gib deiner Welt zuerst einen Namen.");
+      return;
+    }
+    setCoopBusy(true);
+    const data = await sendCoopAction("rename-room", { roomName });
+    if (data?.room) setCoopMessage(`Die Welt heisst jetzt ${data.room.roomName}.`);
+    setCoopBusy(false);
+  }
+
+  function applyLocalEvent(event: RandomEvent) {
+    presentEventAnnouncement(event);
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      const amount = Math.floor(event.amount);
+      features.randomEvent = event;
+      if (event.id === "var") features.nextVarAt = Date.now() + getRandomEventDelay();
+      else features.nextEventAt = Date.now() + getRandomEventDelay();
+      addHistory(features, { title: event.title, detail: event.message, tone: event.tone });
+      return {
+        ...current,
+        goals: Math.max(0, current.goals + amount),
+        seasonGoals: Math.max(0, current.seasonGoals + amount),
+        totalGoals: Math.max(0, current.totalGoals + Math.max(0, amount)),
+        features,
+      };
+    });
+    addFeed(event.message, event.tone === "negative" ? "screen" : event.id === "var" ? "screen" : "star");
+    showToast(event.title);
+  }
+
+  function triggerRandomEvent() {
+    if (gameRef.current.features.squadLock || eventLockRef.current || gameRef.current.features.nextEventAt > getCurrentTime()) return;
+    eventLockRef.current = true;
+    const event = resolveRandomEvent(gameRef.current.goals, getBasePassivePower(gameRef.current.upgrades, gameRef.current.stars, gameRef.current.features));
+    applyLocalEvent(event);
+    window.setTimeout(() => { eventLockRef.current = false; }, 1200);
+  }
+
+  function triggerVarEvent() {
+    if (gameRef.current.features.squadLock || eventLockRef.current || gameRef.current.features.nextVarAt > getCurrentTime()) return;
+    eventLockRef.current = true;
+    const event = resolveVarEvent(gameRef.current.goals, getBasePassivePower(gameRef.current.upgrades, gameRef.current.stars, gameRef.current.features));
+    applyLocalEvent(event);
+    window.setTimeout(() => { eventLockRef.current = false; }, 1200);
+  }
+
+  function triggerTransferInsiderEvent() {
+    if (eventLockRef.current || gameRef.current.features.cup.active || gameRef.current.features.squadLock || gameRef.current.features.transferSaga.nextAt > getCurrentTime()) return;
+    eventLockRef.current = true;
+    const result = resolveTransferInsiderEvent(gameRef.current.features);
+    setGame((current) => ({
+      ...current,
+      goals: current.goals + result.goalDelta,
+      seasonGoals: current.seasonGoals + result.goalDelta,
+      totalGoals: current.totalGoals + result.goalDelta,
+      features: result.features,
+    }));
+    window.setTimeout(() => { eventLockRef.current = false; }, 1200);
+  }
+
+  /** An offer nobody answered in time counts as declined. */
+  function expireLocalTransferOffer() {
+    const result = expireTransferOffer(gameRef.current.features, getCurrentTime());
+    if (result.event || result.deferred) setGame((current) => ({ ...current, features: result.features }));
+  }
+
+  function answerTransferOffer(accept: boolean) {
+    setTransferAnnouncement(null);
+    if (appMode === "coop" && isCoopLive) { void sendCoopAction(accept ? "transfer-accept" : "transfer-decline"); return; }
+    const now = getCurrentTime();
+    const result = accept ? acceptTransferOffer(gameRef.current.features, now) : declineTransferOffer(gameRef.current.features, now);
+    if (result.error) { showToast(result.error); if (!result.features.transferSaga.pendingOffer) setGame((current) => ({ ...current, features: result.features })); return; }
+    setGame((current) => ({
+      ...current,
+      goals: current.goals + result.goalDelta,
+      seasonGoals: current.seasonGoals + result.goalDelta,
+      totalGoals: current.totalGoals + result.goalDelta,
+      features: result.features,
+    }));
+  }
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const timer = window.setInterval(() => {
+      const coopOffer = displayGame.features.transferSaga.pendingOffer, localOffer = gameRef.current.features.transferSaga.pendingOffer;
+      if (appMode === "coop" && isCoopLive) {
+        if (isAway()) return;
+        if (!displayGame.features.squadLock && coopOffer && coopOffer.expiresAt <= getCurrentTime()) void sendCoopAction("transfer-insider-event");
+        else if (!displayGame.features.squadLock && !coopOffer && !displayGame.features.cup.active && displayGame.features.transferSaga.nextAt <= getCurrentTime()) void sendCoopAction("transfer-insider-event");
+        else if (!displayGame.features.squadLock && displayGame.features.nextVarAt <= getCurrentTime()) void sendCoopAction("var-event");
+        else if (!displayGame.features.squadLock && displayGame.features.nextEventAt <= getCurrentTime()) void sendCoopAction("event");
+      } else if (appMode === "single") {
+        if (!gameRef.current.features.squadLock && localOffer && localOffer.expiresAt <= getCurrentTime()) expireLocalTransferOffer();
+        else if (!gameRef.current.features.squadLock && !localOffer && !gameRef.current.features.cup.active && gameRef.current.features.transferSaga.nextAt <= getCurrentTime()) triggerTransferInsiderEvent();
+        else if (!gameRef.current.features.squadLock && gameRef.current.features.nextVarAt <= getCurrentTime()) triggerVarEvent();
+        else if (!gameRef.current.features.squadLock && gameRef.current.features.nextEventAt <= getCurrentTime()) triggerRandomEvent();
+      }
+    }, 5000);
+    return () => window.clearInterval(timer);
+    // These handlers intentionally stay out of the dependency list so the five-second clock is not restarted on every click.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appMode, displayGame.features.nextEventAt, displayGame.features.nextVarAt, displayGame.features.transferSaga.nextAt, displayGame.features.transferSaga.pendingOffer?.expiresAt, hydrated, isCoopLive]);
+
+  async function saveClubProfile() {
+    const profile = {
+      name: clubDraft.name.trim().replace(/\s+/g, " ").slice(0, 22) || "FC Goal",
+      badge: CLUB_BADGES.includes(clubDraft.badge) ? clubDraft.badge : CLUB_BADGES[0],
+      color: CLUB_COLORS.includes(clubDraft.color) ? clubDraft.color : CLUB_COLORS[0],
+    };
+    setClubDraft(profile);
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("profile", profile);
+      if (data) setCoopMessage("Clubprofil gemeinsam gespeichert.");
+      setCoopBusy(false);
+      return;
+    }
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      features.club = profile;
+      features.seasonMode.table = features.seasonMode.table.map((team) => team.id === "club" ? { ...team, name: profile.name } : team);
+      features.seasonMode.lastTable = features.seasonMode.lastTable.map((team) => team.id === "club" ? { ...team, name: profile.name } : team);
+      addHistory(features, { title: "Clubprofil aktualisiert", detail: `${profile.badge} ${profile.name} ist bereit für die nächste Runde.`, tone: "neutral" });
+      return { ...current, features };
+    });
+    showToast("Clubprofil gespeichert");
+  }
+
+  async function openRewardPack(rewardId:string) {
+    if(packPurchaseRef.current||starReveal||displayGame.features.cup.active)return;
+    packPurchaseRef.current=true;setCoopBusy(true);
+    try {
+      if(isCoopLive){const data=await sendCoopAction('reward-pack',{rewardId});if(!data)openAllRef.current=null;return;}
+      const playerId=localStorage.getItem(PLAYER_ID_KEY);
+      const response=await fetch('/api/rewards',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({playerId,rewardId,features:gameRef.current.features})});
+      const data=await response.json() as {error?:string;opening?:import('./feature-data').StarPackOpening};if(!response.ok){openAllRef.current=null;showToast(data.error??'Prämie konnte nicht geöffnet werden.');return;}
+      const apply=async()=>{
+        const current=gameRef.current, saved=readStoredGame().saved;
+        const features=normalizeGameFeatures(current.features);
+        const receipts=normalizeGameFeatures(saved?.features);
+        for(const receipt of receipts.earnedPacks){const existing=features.earnedPacks.find(p=>p.id===receipt.id);if(existing&&receipt.opening)existing.opening=receipt.opening;else if(!existing)features.earnedPacks.push(receipt);}
+        // Merge receipts from this tab before applying the single canonical server draw.
+        for(const earned of current.features.earnedPacks)if(!features.earnedPacks.some(p=>p.id===earned.id))features.earnedPacks.push(earned);
+        const reveal=openEarnedPack(features,rewardId,Date.now(),Math.random,data.opening);
+        if(!reveal){showToast('Diese Prämie wurde bereits geöffnet.');return;}
+        const next={...current,features,lastSaved:Date.now()};persistLocalGame(next);gameRef.current=next;setGame(next);presentStarReveal(reveal);
+      };
+      if(navigator.locks)await navigator.locks.request('goal-clicker-reward',apply);else await apply();
+    } catch {openAllRef.current=null;showToast('Prämie bleibt gespeichert. Bitte erneut versuchen.');}
+    finally {packPurchaseRef.current=false;setCoopBusy(false);}
+  }
+
+  // "Alle öffnen": the earned packs open one after the other; each reveal shows, the last one ends with a summary.
+  const openAllRef = useRef<{ ids: string[]; opened: StarPackReveal[] } | null>(null);
+  const openRewardPackRef = useRef(openRewardPack);
+  openRewardPackRef.current = openRewardPack;
+  function openAllRewardPacks() {
+    const ids = displayGame.features.earnedPacks.filter((pack) => !pack.opening).map((pack) => pack.id);
+    if (!ids.length || openAllRef.current) return;
+    const [first, ...rest] = ids;
+    openAllRef.current = { ids: rest, opened: [] };
+    void openRewardPack(first);
+  }
+  function continueOpenAll() {
+    const run = openAllRef.current;
+    if (!run) return;
+    const next = run.ids.shift();
+    if (next) { window.setTimeout(() => void openRewardPackRef.current(next), 250); return; }
+    openAllRef.current = null;
+    const fresh = run.opened.filter((reveal) => !reveal.duplicate);
+    const best = [...run.opened].sort((a, b) => b.player.rating - a.player.rating)[0];
+    if (run.opened.length) showToast(`${run.opened.length} Packs geöffnet · ${fresh.length} neue Spieler${best ? ` · Bester: ${best.player.name} (${best.player.rating})` : ""}`);
+  }
+
+  async function buyStarPack(packId: StarPackId) {
+    if (packPurchaseRef.current || starReveal) return;
+    const pack = getStarPack(packId);
+    if (!pack || isRewardPack(pack.id)) return;
+    const unlockLeague = getPackUnlockLeague(pack.id);
+    if (!isLeagueContentUnlocked(unlockLeague, reachedLeague, hasFullTestAccess)) {
+      showToast(`${pack.label} wird ab Liga ${unlockLeague} freigeschaltet.`);
+      return;
+    }
+    if (displayGame.features.cup.active) {
+      showToast("Während eines Pokalspiels keine Packs.");
+      return;
+    }
+    if (!hasInfiniteMoney && displayGame.goals < pack.price) {
+      showToast(`${pack.label} kostet ${formatNumber(pack.price)} Tore.`);
+      return;
+    }
+    packPurchaseRef.current = true;
+    if (isCoopLive) {
+      setCoopBusy(true);
+      try {
+        await sendCoopAction("star-pack", { packId: pack.id });
+      } finally {
+        packPurchaseRef.current = false;
+        setCoopBusy(false);
+      }
+      return;
+    }
+    const latestGame = gameRef.current;
+    if (latestGame.goals < pack.price || latestGame.features.cup.active) {
+      packPurchaseRef.current = false;
+      showToast(latestGame.features.cup.active ? "Während eines Pokalspiels keine Packs." : `${pack.label} kostet ${formatNumber(pack.price)} Tore.`);
+      return;
+    }
+    const opening = openStarPack(pack.id, latestGame.features.starXI.ownedIds, Math.random, latestGame.features.starXI.formationPositions);
+    const reveal: StarPackReveal = { packId: opening.packId, packName: opening.packName, player: opening.player, duplicate: opening.duplicate, fragmentCompensation: opening.fragmentCompensation, source: opening.source, openedAt: Date.now(), openedBy: "Du", troll: shouldTriggerPackTroll(opening.player) };
+    // The reveal and toast follow the state update: a purchase the updater refused shows nothing.
+    // The flag keeps a repeated updater call (React StrictMode) from presenting twice.
+    let settled = false;
+    const settle = (applied: boolean) => {
+      if (settled) return;
+      settled = true;
+      window.setTimeout(() => {
+        if (!applied) { packPurchaseRef.current = false; return; }
+        presentStarReveal(reveal);
+        showToast(opening.duplicate ? `Doppelter Star · +${formatNumber(opening.fragmentCompensation)} Fragmente` : `${opening.player.name} gezogen`);
+      }, 0);
+    };
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      if (current.goals < pack.price || features.cup.active) { settle(false); return current; }
+      settle(true);
+      features.starPackReveal = reveal;
+      notePackOpened(features, reveal.openedAt);
+      if (!opening.duplicate) features.starXI = addStarXIPlayer(features.starXI, opening.player.id, getBestXIUnavailablePlayerIds(features));
+      if (opening.duplicate) {
+        features.starXI.fragments += opening.fragmentCompensation;
+        addHistory(features, { title: `Doppelter Star: ${opening.player.name}`, detail: `+${formatNumber(opening.fragmentCompensation)} Fragmente · nur für Custom-Karten.`, tone: "neutral" });
+      } else {
+        addHistory(features, { title: `${opening.player.name} in die Star XI gezogen`, detail: `${formatStarXIPositions(opening.player)} · Rating ${opening.player.rating}`, tone: "positive" });
+      }
+      return { ...current, goals: current.goals - pack.price, features };
+    });
+  }
+
+  async function buySpecialCardPack() {
+    if (packPurchaseRef.current || starReveal) return;
+    const cost = SPECIAL_CARD_PACK.price;
+    const unlockLeague = getPackUnlockLeague(SPECIAL_CARD_PACK.id);
+    if (!isLeagueContentUnlocked(unlockLeague, reachedLeague, hasFullTestAccess)) {
+      showToast(`${SPECIAL_CARD_PACK.label} wird ab Liga ${unlockLeague} freigeschaltet.`);
+      return;
+    }
+    if (displayGame.features.cup.active) {
+      showToast("Während eines Spiels keine Packs.");
+      return;
+    }
+    if (!hasInfiniteMoney && displayGame.features.starXI.fragments < cost) {
+      showToast(`${SPECIAL_CARD_PACK.label} kostet ${formatNumber(cost)} Fragmente.`);
+      return;
+    }
+    // One ID per click: the server and the local save both refuse a repeated receipt.
+    const purchaseId = `special-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    packPurchaseRef.current = true;
+    if (isCoopLive) {
+      setCoopBusy(true);
+      try {
+        await sendCoopAction("special-pack", { purchaseId });
+      } finally {
+        packPurchaseRef.current = false;
+        setCoopBusy(false);
+      }
+      return;
+    }
+    // The draw takes two rolls (rarity, then card); both runs replay the same ones.
+    const rolls = [Math.random(), Math.random()], openedAt = Date.now();
+    const replayRolls = () => { let index = 0; return () => rolls[index++ % rolls.length]; };
+    const preview = normalizeGameFeatures(structuredClone(gameRef.current.features));
+    const result = purchaseSpecialCardPack(preview, purchaseId, { random: replayRolls(), now: openedAt, unlimited: hasInfiniteMoney });
+    if (!result.ok) {
+      packPurchaseRef.current = false;
+      showToast(result.error);
+      return;
+    }
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      // Same rolls and time as the preview, so the stored card is exactly the revealed card.
+      return purchaseSpecialCardPack(features, purchaseId, { random: replayRolls(), now: openedAt, unlimited: hasInfiniteMoney }).ok ? { ...current, features } : current;
+    });
+    packPurchaseRef.current = false;
+    presentStarReveal(result.reveal);
+    showToast(result.reveal.duplicate ? `Doppelt gezogen · +${formatNumber(result.reveal.fragmentCompensation)} Fragmente` : `${result.reveal.player.name} gezogen`);
+  }
+
+  async function confirmMatchChanges(changes: {playerId:string;slot:number}[]) {
+    if(isCoopLive){await sendCoopAction('cup-substitutions',{changes});return;}
+    let failure='';
+    setGame(current=>{const features=normalizeGameFeatures(current.features);failure=queueMatchChanges(features,changes,getCurrentTime());return failure?current:{...current,features};});
+    showToast(failure||'Wechsel für den nächsten Unterbruch vorgemerkt.');
+  }
+
+  async function moveStarXIPlayerToLineup(playerId: string, lineupIndex: number) {
+    if(displayGame.features.cup.active && displayGame.features.cup.simulation){showToast('Öffne Wechsel in der Matchansicht.');return;}
+    if(displayGame.features.cup.active){await confirmMatchChanges([{playerId,slot:lineupIndex}]);return;}
+    const player = getStarXIPlayer(playerId);
+    if (!player || !Number.isInteger(lineupIndex) || lineupIndex < 0 || lineupIndex >= STAR_XI_SQUAD_SIZE || !displayGame.features.starXI.ownedIds.includes(playerId)) return;
+    if (displayGame.features.cup.active && displayGame.features.squadLock && !displayGame.features.squadLock.playerIds.includes(playerId)) { showToast('Dieser Spieler gehört nicht zum Spieltagskader.'); return; }
+    if (suspendedStarIds.includes(playerId)) {
+      showToast(`${player.name} ist nach der Roten Karte für die nächste Partie gesperrt.`);
+      return;
+    }
+    const lineupPosition = activeFormationPositions[lineupIndex];
+    const outgoingPlayerId = lineupStarIds[lineupIndex];
+    if (displayGame.features.cup.active && outgoingPlayerId && displayGame.features.cup.sentOffPlayerIds.includes(outgoingPlayerId)) {
+      const outgoingPlayer = getStarXIPlayer(outgoingPlayerId);
+      showToast(`${outgoingPlayer?.name ?? "Dieser Spieler"} kann nach einer Roten Karte nicht ausgewechselt werden.`);
+      return;
+    }
+    if (!canStarXIPlayerFillSlot(playerId, lineupIndex, activeFormationPositions)) {
+      showToast(`${player.name} kann nicht auf ${lineupPosition} spielen.`);
+      return;
+    }
+    const comesFromBench = displayGame.features.starXI.benchIds.includes(playerId);
+    if (displayGame.features.cup.active && !comesFromBench) {
+      showToast("Während des Spiels kannst du nur von der Bank wechseln.");
+      return;
+    }
+    if (displayGame.features.cup.active && displayGame.features.cup.substitutionsUsed >= STAR_XI_MAX_SUBSTITUTIONS) {
+      showToast("Alle fünf Wechsel sind bereits gebraucht.");
+      return;
+    }
+    if (displayGame.features.cup.active && displayGame.features.cup.playerExitedAt[playerId]) {
+      showToast(`${player.name} wurde bereits ausgewechselt und darf nicht zurück aufs Feld.`);
+      return;
+    }
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("star-lineup", { lineupIndex, starPlayerId: playerId });
+      if (data) setCoopMessage(displayGame.features.cup.active ? `${player.name} wird live eingewechselt.` : `${player.name} spielt jetzt auf Position ${lineupPosition}.`);
+      setCoopBusy(false);
+      if (data) setSelectedLineupSlot(null);
+      return;
+    }
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      const outgoingPlayerId = features.starXI.lineupIds[lineupIndex];
+      features.starXI = setStarXIStarter(features.starXI, lineupIndex, playerId, getUnavailableStarXIPlayerIds(features));
+      if (features.cup.active) {
+        const substitutionMinute = getCupMatchMinute(features.cup, getCurrentTime());
+        features.cup = applyCupSubstitution(features.cup, outgoingPlayerId, playerId, substitutionMinute, getCurrentTime()).cup;
+        if (outgoingPlayerId) features.cup.playerExitedAt[outgoingPlayerId] = Math.min(features.cup.playerExitedAt[outgoingPlayerId] ?? substitutionMinute, substitutionMinute);
+        features.cup.playerEnteredAt[playerId] = substitutionMinute;
+        features.cup.playerMatchPositions[playerId] = features.starXI.formationPositions[lineupIndex] ?? player.position;
+        features.cup.substitutionsUsed = Math.min(STAR_XI_MAX_SUBSTITUTIONS, features.cup.substitutionsUsed + 1);
+      }
+      return { ...current, features };
+    });
+    showToast(displayGame.features.cup.active ? `${player.name} wird eingewechselt` : `${player.name} auf ${lineupPosition} gesetzt`);
+    setSelectedLineupSlot(null);
+    setSelectedBenchSlot(null);
+  }
+
+  async function changeStarXIFormation(formationId: StarFormationId) {
+    if (displayGame.features.cup.active || activeFormation.id === formationId) return;
+    const formation = getStarFormation(formationId);
+    const unlockLeague = getFormationUnlockLeague(formation.id);
+    if (!isLeagueContentUnlocked(unlockLeague, reachedLeague, hasFullTestAccess)) {
+      showToast(`${formation.label} wird ab Liga ${unlockLeague} freigeschaltet.`);
+      return;
+    }
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("star-formation", { formationId });
+      if (data) setCoopMessage(`Formation auf ${formation.label} umgestellt.`);
+      setCoopBusy(false);
+      return;
+    }
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      features.starXI = setStarXIFormation(features.starXI, formationId, getUnavailableStarXIPlayerIds(features));
+      addHistory(features, { title: "Formation angepasst", detail: `Die Startelf spielt jetzt im ${formation.label}.`, tone: "neutral", kind: "squad" });
+      return { ...current, features };
+    });
+    setSelectedLineupSlot(null);
+    showToast(`Formation: ${formation.label}`);
+  }
+
+  async function autoPickBestStarXI() {
+    if (displayGame.features.cup.active) {
+      showToast("Während eines Spiels ist die Startelf gesperrt. Wechsle im Spiel über «Wechsel».");
+      return;
+    }
+    const preview = setBestStarXI(displayGame.features.starXI, getBestXIUnavailablePlayerIds(displayGame.features), { career: displayGame.features.career, cup: displayGame.features.cup });
+    const selectedCount = preview.lineupIds.filter(Boolean).length;
+    if (!selectedCount) {
+      showToast("Du hast noch keine passenden Spieler im Kader.");
+      return;
+    }
+    const unchanged = preview.lineupIds.join() === displayGame.features.starXI.lineupIds.join() && preview.benchIds.join() === displayGame.features.starXI.benchIds.join();
+    if (unchanged) {
+      showToast("Das ist schon deine beste Startelf.");
+      return;
+    }
+    const before = displayGame.features.starXI;
+    setBestXIPreview({ after: preview, changes: lineupChanges(before, preview), bench: benchChangeCount(before, preview), before: getStarXIRating(before.ownedIds, before.lineupIds), rating: getStarXIRating(preview.ownedIds, preview.lineupIds) });
+  }
+
+  async function applyBestStarXI() {
+    setBestXIPreview(null);
+    if (displayGame.features.cup.active) return;
+    const preview = setBestStarXI(displayGame.features.starXI, getBestXIUnavailablePlayerIds(displayGame.features), { career: displayGame.features.career, cup: displayGame.features.cup });
+    const selectedCount = preview.lineupIds.filter(Boolean).length;
+    if (!selectedCount) return;
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("star-best-lineup");
+      if (data) {
+        setSelectedLineupSlot(null);
+        setSelectedBenchSlot(null);
+        setCoopMessage(`Beste Startelf aufgestellt · ${selectedCount} von ${STAR_XI_SQUAD_SIZE} Plätzen besetzt.`);
+        showToast(`Beste Startelf · ${selectedCount} von ${STAR_XI_SQUAD_SIZE}`);
+      }
+      setCoopBusy(false);
+      return;
+    }
+    const shown = displayGame.features;
+    setSquadUndo({ lineupIds: [...shown.starXI.lineupIds], benchIds: [...shown.starXI.benchIds], formationId: shown.starXI.formationId, signature: `${preview.lineupIds.join()}|${preview.benchIds.join()}` });
+    setGame((current) => {
+      // The preview was computed from exactly these features: reuse it instead of normalizing and searching again.
+      let features: GameFeatures;
+      if (current.features === shown) features = { ...current.features, starXI: preview };
+      else {
+        features = normalizeGameFeatures(current.features);
+        features.starXI = setBestStarXI(features.starXI, getBestXIUnavailablePlayerIds(features), { career: features.career, cup: features.cup });
+      }
+      const count = features.starXI.lineupIds.filter(Boolean).length;
+      addHistory(features, { title: "Beste Startelf aufgestellt", detail: `${count} von ${STAR_XI_SQUAD_SIZE} Positionen mit den stärksten passenden Spielern besetzt.`, tone: "positive", kind: "squad" });
+      return { ...current, features };
+    });
+    setSelectedLineupSlot(null);
+    setSelectedBenchSlot(null);
+    showToast(`Beste Startelf · ${selectedCount} von ${STAR_XI_SQUAD_SIZE}`);
+  }
+
+  /** One step back after "Beste Startelf" (single player), as long as nobody changed the squad since. */
+  function undoBestStarXI() {
+    const undo = squadUndo;
+    setSquadUndo(null);
+    if (!undo || isCoopLive || displayGame.features.cup.active) return;
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      if (`${features.starXI.lineupIds.join()}|${features.starXI.benchIds.join()}` !== undo.signature || features.starXI.formationId !== undo.formationId) return current;
+      features.starXI = removeStarXIPlayersFromSquad(normalizeStarXIState({ ...features.starXI, lineupIds: undo.lineupIds, benchIds: undo.benchIds }), getBestXIUnavailablePlayerIds(features));
+      return { ...current, features };
+    });
+    showToast("Aufstellung zurückgesetzt");
+  }
+
+  /** "Lücken füllen" (Q21): only empty or unavailable places change; everything else stays as the player set it. */
+  async function fillSquadGaps() {
+    if (displayGame.features.cup.active) { showToast("Während eines Spiels füllst du Lücken über die Wechsel."); return; }
+    const preview = fillStarXIGaps(displayGame.features, { career: displayGame.features.career, cup: displayGame.features.cup });
+    if (!preview.replacements.length) { showToast(startingStarXISelection.length < STAR_XI_SQUAD_SIZE ? "Kein passender Spieler für die freien Plätze. Neue Spieler gibt es in den Packs." : "Keine Lücken in Startelf und Bank."); return; }
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("star-fill-gaps");
+      setCoopBusy(false);
+      if (data) showToast(describeReplacements(preview.replacements).join(" · "));
+      return;
+    }
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      const result = fillStarXIGaps(features, { career: features.career, cup: features.cup });
+      if (!result.replacements.length) return current;
+      features.starXI = result.starXI;
+      addHistory(features, { title: "Lücken gefüllt", detail: describeReplacements(result.replacements).join(" · "), tone: "neutral", kind: "squad" });
+      return { ...current, features };
+    });
+    pickSquadSpot(null);
+    showToast(describeReplacements(preview.replacements).join(" · "));
+  }
+
+  /** "Beste Bank" (Q27): the strongest fitting substitutes behind the eleven, which stays as it is. */
+  async function pickBestBench() {
+    if (displayGame.features.cup.active) return;
+    const next = withBestBench(displayGame.features, { career: displayGame.features.career, cup: displayGame.features.cup });
+    if (next.benchIds.join() === displayGame.features.starXI.benchIds.join()) { showToast("Das ist schon deine beste Bank."); return; }
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("star-best-bench");
+      setCoopBusy(false);
+      if (data) showToast("Beste Bank aufgestellt");
+      return;
+    }
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      features.starXI = withBestBench(features, { career: features.career, cup: features.cup });
+      addHistory(features, { title: "Beste Bank aufgestellt", detail: `${features.starXI.benchIds.filter(Boolean).length} Bankplätze mit den stärksten passenden Spielern besetzt.`, tone: "neutral", kind: "squad" });
+      return { ...current, features };
+    });
+    showToast("Beste Bank aufgestellt");
+  }
+
+  /** A player leaves his place without a replacement: onto an empty bench place or back to the reserve (Q30). */
+  async function unassignSquadPlayer(playerId: string, benchIndex?: number) {
+    if (displayGame.features.cup.active) return;
+    const name = getStarXIPlayer(playerId)?.name ?? "Spieler";
+    const preview = benchIndex === undefined ? movePlayerToReserve(displayGame.features.starXI, playerId) : movePlayerToEmptyBench(displayGame.features.starXI, playerId, benchIndex);
+    if (!preview) return;
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("star-unassign", { starPlayerId: playerId, ...(benchIndex === undefined ? {} : { benchIndex }) });
+      setCoopBusy(false);
+      if (data) showToast(benchIndex === undefined ? `${name} ist jetzt in der Reserve` : `${name} sitzt jetzt auf der Bank`);
+      return;
+    }
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      const next = benchIndex === undefined ? movePlayerToReserve(features.starXI, playerId) : movePlayerToEmptyBench(features.starXI, playerId, benchIndex);
+      if (!next) return current;
+      features.starXI = next;
+      return { ...current, features };
+    });
+    showToast(benchIndex === undefined ? `${name} ist jetzt in der Reserve` : `${name} sitzt jetzt auf der Bank`);
+  }
+
+  // "Kaderlücke schliessen": the best eleven and bench fill the free place; without enough players the packs help.
+  async function closeSquadVacancy() {
+    // Filling only the free places keeps every other choice (Q21); the best eleven is the fallback.
+    const filled = fillStarXIGaps(displayGame.features, { career: displayGame.features.career, cup: displayGame.features.cup });
+    if (filled.replacements.length && !getOpenTransferSquadVacancies({ ...displayGame.features, starXI: filled.starXI }).length) { await fillSquadGaps(); return; }
+    const starXI = setBestStarXI(displayGame.features.starXI, getBestXIUnavailablePlayerIds(displayGame.features), { career: displayGame.features.career, cup: displayGame.features.cup });
+    if (getOpenTransferSquadVacancies({ ...displayGame.features, starXI }).length) {
+      showToast("Zu wenige einsatzfähige Spieler für die Lücke. Neue Spieler gibt es in den Packs.");
+      return;
+    }
+    await autoPickBestStarXI();
+  }
+
+  async function selectStarXIBenchPlayer(playerId: string, benchIndex: number) {
+    const player = getStarXIPlayer(playerId);
+    if (!player || displayGame.features.cup.active || !displayGame.features.starXI.ownedIds.includes(playerId) || displayGame.features.starXI.lineupIds.includes(playerId)) return;
+    if (displayGame.features.cup.active && displayGame.features.squadLock && !displayGame.features.squadLock.playerIds.includes(playerId)) { showToast('Dieser Spieler gehört nicht zum Spieltagskader.'); return; }
+    if (suspendedStarIds.includes(playerId)) {
+      showToast(`${player.name} darf nach einer Roten Karte nicht auf die Bank.`);
+      return;
+    }
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("star-bench", { benchIndex, starPlayerId: playerId });
+      if (data) setCoopMessage(`${player.name} sitzt jetzt auf Bankplatz ${benchIndex + 1}.`);
+      setCoopBusy(false);
+      if (data) setSelectedBenchSlot(null);
+      return;
+    }
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      features.starXI = setStarXIBenchPlayer(features.starXI, benchIndex, playerId, getUnavailableStarXIPlayerIds(features));
+      return { ...current, features };
+    });
+    setSelectedBenchSlot(null);
+    showToast(`${player.name} auf die Bank verschoben`);
+  }
+
+  /** The spot picked by a first tap in the "Kader" tab: a pitch place, a bench place or a reserve player. */
+  function pickedSquadSpot(): SquadPick | null {
+    if (activeLineupSlot !== null) { const id = lineupStarIds[activeLineupSlot]; return { source: id ? { playerId: id, area: "lineup", index: activeLineupSlot } : null, target: { area: "lineup", index: activeLineupSlot } }; }
+    if (selectedBenchSlot !== null) { const id = benchStarIds[selectedBenchSlot]; return { source: id ? { playerId: id, area: "bench", index: selectedBenchSlot } : null, target: { area: "bench", index: selectedBenchSlot } }; }
+    return selectedReserveId ? { source: { playerId: selectedReserveId, area: "reserve", index: null }, target: null } : null;
+  }
+
+  function pickSquadSpot(pick: SquadPick | null) {
+    setSelectedLineupSlot(pick?.target?.area === "lineup" ? pick.target.index : null);
+    setSelectedBenchSlot(pick?.target?.area === "bench" ? pick.target.index : null);
+    setSelectedReserveId(pick && !pick.target ? pick.source?.playerId ?? null : null);
+    if (pick?.target) setReservePage(0);
+  }
+
+  // First tap picks, second tap moves or swaps (see resolveSquadTap); drag and drop does the same in one go.
+  function tapSquadSpot(tapped: SquadPick) {
+    const result = resolveSquadTap(pickedSquadSpot(), tapped, canDropSquadPlayer);
+    if ("move" in result) { pickSquadSpot(null); void dropSquadPlayer(...result.move); return; }
+    pickSquadSpot(result.pick);
+  }
+
+  function chooseLineupSlot(index: number) {
+    const playerId = lineupStarIds[index];
+    if (displayGame.features.cup.active && playerId && displayGame.features.cup.sentOffPlayerIds.includes(playerId)) {
+      const player = getStarXIPlayer(playerId);
+      showToast(`${player?.name ?? "Dieser Spieler"} kann nach einer Roten Karte nicht ausgewechselt werden.`);
+      return;
+    }
+    tapSquadSpot({ source: playerId ? { playerId, area: "lineup", index } : null, target: { area: "lineup", index } });
+  }
+
+  function chooseBenchSlot(index: number) {
+    if (displayGame.features.cup.active) {
+      showToast("Wähle zuerst den Spieler in der Startelf, den du auswechseln willst.");
+      return;
+    }
+    const playerId = benchStarIds[index];
+    tapSquadSpot({ source: playerId ? { playerId, area: "bench", index } : null, target: { area: "bench", index } });
+  }
+
+  function chooseReservePlayer(playerId: string) {
+    tapSquadSpot({ source: { playerId, area: "reserve", index: null }, target: null });
+  }
+
+  function canDropSquadPlayer(source: SquadDragSource, target: SquadDropTarget) {
+    const player = getStarXIPlayer(source.playerId);
+    if (!player || coopBusy || !displayGame.features.starXI.ownedIds.includes(source.playerId)) return false;
+    if (suspendedStarIds.includes(source.playerId)) return false;
+    // A yellow card ban for the coming match keeps a reserve player out of the eleven and the bench.
+    if (source.area === "reserve" && getBannedPlayerIds(displayGame.features, displayGame.features.cup.active ? competitionOfCup(displayGame.features.cup) : nextCompetition(displayGame.features)).includes(source.playerId)) return false;
+
+    if (target.area === "lineup") {
+      if (target.index < 0 || target.index >= STAR_XI_SQUAD_SIZE || !canStarXIPlayerFillSlot(source.playerId, target.index, activeFormationPositions)) return false;
+      if (source.area === "lineup" && source.index === target.index) return false;
+      if (displayGame.features.cup.active) {
+        const outgoingPlayerId = lineupStarIds[target.index];
+        if (outgoingPlayerId && displayGame.features.cup.sentOffPlayerIds.includes(outgoingPlayerId)) return false;
+        return source.area === "bench"
+          && displayGame.features.cup.substitutionsUsed < STAR_XI_MAX_SUBSTITUTIONS
+          && !displayGame.features.cup.playerExitedAt[source.playerId];
+      }
+      if (source.area === "lineup" && source.index !== null) {
+        const displacedPlayerId = lineupStarIds[target.index];
+        if (displacedPlayerId && !canStarXIPlayerFillSlot(displacedPlayerId, source.index, activeFormationPositions)) return false;
+      }
+      return true;
+    }
+
+    if (target.area === "reserve") return source.area !== "reserve" && !displayGame.features.cup.active;
+    if (target.index < 0 || target.index >= STAR_XI_BENCH_SIZE || (source.area === "bench" && source.index === target.index)) return false;
+    if (source.area !== "lineup") return !displayGame.features.cup.active;
+    if (source.index === null) return false;
+    const incomingPlayerId = benchStarIds[target.index];
+    if (!incomingPlayerId) return !displayGame.features.cup.active;
+    if (!canStarXIPlayerFillSlot(incomingPlayerId, source.index, activeFormationPositions)) return false;
+    if (!displayGame.features.cup.active) return true;
+    return displayGame.features.cup.substitutionsUsed < STAR_XI_MAX_SUBSTITUTIONS
+      && !displayGame.features.cup.playerExitedAt[incomingPlayerId];
+  }
+
+  async function dropSquadPlayer(source: SquadDragSource, target: SquadDropTarget) {
+    if (target.area === "reserve") { await unassignSquadPlayer(source.playerId); return; }
+    if (source.area === "lineup" && target.area === "bench" && !benchStarIds[target.index]) { await unassignSquadPlayer(source.playerId, target.index); return; }
+    if (target.area === "lineup") {
+      await moveStarXIPlayerToLineup(source.playerId, target.index);
+      return;
+    }
+    if (source.area === "lineup" && source.index !== null) {
+      const incomingPlayerId = benchStarIds[target.index];
+      if (incomingPlayerId) await moveStarXIPlayerToLineup(incomingPlayerId, source.index);
+      return;
+    }
+    await selectStarXIBenchPlayer(source.playerId, target.index);
+  }
+
+  function travelLabel(fixture:TravelFixture) {
+    if(!fixture.away)return 'Match starten';
+    const j=displayGame.features.travel.journey;
+    if(!j||j.fixture.id!==fixture.id||j.consumed)return 'Reise antreten';
+    return journeyView(j,getTravelTime()).arrived?'Match starten':'Reise läuft …';
+  }
+  async function prepareTravel(mode:'season'|'tournament', tournamentId: TournamentId):Promise<TravelFixture|null> {
+    const fixture=fixtureFor(displayGame.features,mode,tournamentId);
+    const error=eligibilityError(displayGame.features,mode,tournamentId,getTravelTime());
+    if(error){showToast(error);return null;}
+    const j=displayGame.features.travel.journey;
+    if(j&&!j.consumed&&j.fixture.id!==fixture.id){showToast('Schliesse zuerst die begonnene Auswärtsreise ab.');openFeatureTab('cup');return null;}
+    if(!fixture.away)return fixture;
+    if(travelActionRef.current)return null;
+    travelActionRef.current=true;setTravelBusy(true);
+    try {
+      if(isCoopLive){
+        if(j?.fixture.id===fixture.id&&journeyView(j,getTravelTime()).arrived)return fixture;
+        await sendCoopAction('travel-start',{mode,tournamentId});openFeatureTab('cup');return null;
+      }
+      const action=j?.fixture.id===fixture.id&&journeyView(j,getTravelTime()).arrived?'start':'depart';
+      const response=await fetch('/api/travel',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,mode,tournamentId,playerId,features:displayGame.features})});
+      const data=await response.json() as {journey?:Journey;serverNow?:number;error?:string};
+      if(!response.ok||!data.journey){showToast(data.error||'Reise konnte nicht gespeichert werden.');return null;}
+      syncTravelClock(data.serverNow);
+      setGame(current=>{
+        const old=current.features.travel, same=old.journey?.id===data.journey!.id, counted=same?(old.journey as Journey & {counted?:boolean}).counted:false, finesPaid=same?old.journey!.finesPaid:false;
+        const travel=settleTravel({...old,journey:{...data.journey!,consumed:false,counted,finesPaid} as Journey},data.serverNow!);
+        travel.journey!.consumed=false;
+        return {...current,features:{...current.features,travel,squadLock:data.journey!.squadLock}};
+      });
+      openFeatureTab('cup');
+      return action==='start'?data.journey.fixture:null;
+    }catch{showToast('Die Reise braucht eine Verbindung zum Spielserver. Bitte erneut versuchen.');return null;}
+    finally{travelActionRef.current=false;setTravelBusy(false);}
+  }
+
+  async function startCup(tournamentId: TournamentId = selectedTournamentId) {
+    if (displayGame.features.cup.active) return;
+    const cupStartNow = getCurrentTime();
+    if (!displayGame.features.cup.pendingNextRound && displayGame.features.cup.nextTournamentAt > cupStartNow) {
+      showToast(`Neues Turnier in ${formatCountdown(displayGame.features.cup.nextTournamentAt, cupStartNow)}.`);
+      return;
+    }
+    if (hasTransferSquadVacancy) {
+      showToast(`Besetze zuerst den freien Platz ${transferSquadVacancyLabel}.`);
+      return;
+    }
+    if (displayGame.features.cup.pendingNextRound && tournamentId !== displayGame.features.cup.tournamentId) {
+      showToast("Zuerst die nächste Partie dieses Turniers vorbereiten.");
+      return;
+    }
+    if (!starXIComplete) {
+      showToast(suspendedStarPlayers.length ? `Ersetze zuerst ${suspendedStarPlayers.map((player) => player.name).join(", ")}.` : `Für die Startelf werden ${STAR_XI_SQUAD_SIZE} passende Spieler benötigt.`);
+      return;
+    }
+    const tournament = getTournament(tournamentId) ?? TOURNAMENTS[0];
+    const unlockLeague = getTournamentUnlockLeague(tournament.id);
+    if (!isLeagueContentUnlocked(unlockLeague, reachedLeague, hasFullTestAccess)) {
+      showToast(`${tournament.label} wird ab Liga ${unlockLeague} freigeschaltet.`);
+      return;
+    }
+    if (starXIRating < tournament.minimumRating) {
+      showToast(`${tournament.label} braucht mindestens ${tournament.minimumRating} OVR.`);
+      return;
+    }
+    const tournamentBanError = squadBanError(displayGame.features, competitionFor("tournament", tournament.id));
+    if (tournamentBanError) {
+      showToast(tournamentBanError);
+      return;
+    }
+    const travelFixture = await prepareTravel("tournament", tournament.id);
+    if (!travelFixture) return;
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("cup-start", { tournamentId: tournament.id });
+      if (data) setCoopMessage(`${tournament.label} ist eröffnet.`);
+      setCoopBusy(false);
+      return;
+    }
+    setGame((current) => {
+      let features = normalizeGameFeatures(current.features);
+      const suspendedOnSquad = features.cup.suspendedPlayerIds.some((playerId) => features.starXI.lineupIds.includes(playerId) || features.starXI.benchIds.includes(playerId));
+      if (squadBanError(features, competitionFor("tournament", tournament.id)) || getOpenTransferSquadVacancies(features).length > 0 || getStarXISelection(features.starXI.ownedIds, features.starXI.lineupIds).length < STAR_XI_SQUAD_SIZE || suspendedOnSquad || features.cup.active || (!features.cup.pendingNextRound && features.cup.nextTournamentAt > cupStartNow)) return current;
+      if (!features.cup.pendingNextRound) features = activatePendingTransferLoans(features, tournament.id);
+      const homePlayers = getStarXISelection(features.starXI.ownedIds, features.starXI.lineupIds);
+      features.cup = beginCupMatch(features.cup, cupStartNow, tournament.id, homePlayers, features.starXI.formationPositions, features.starXI.lineupIds, features.starXI.benchIds, Math.random, travelFixture.schedule);
+      consumeTravel(features, travelFixture);
+      prepareCareerMatch(features);
+      return { ...current, features };
+    });
+    showToast(`${tournament.label} · Anpfiff · ${formatCountdown(tournamentMatchDuration(tournament.minimumRating), 0)}`);
+  }
+
+  async function startSeasonCupMatch() {
+    if (displayGame.features.cup.active) return;
+    const cupStartNow = getCurrentTime();
+    if (displayGame.features.seasonMode.hallOfFame) {
+      showToast("Die Hall of Fame ist erreicht. Starte zuerst Prestige.");
+      return;
+    }
+    if (displayGame.features.cup.pendingNextRound) {
+      showToast("Die vorherige Partie muss zuerst abgeschlossen werden.");
+      return;
+    }
+    if (hasTransferSquadVacancy) {
+      showToast(`Besetze zuerst den freien Platz ${transferSquadVacancyLabel}.`);
+      return;
+    }
+    if (!starXIComplete) {
+      showToast(suspendedStarPlayers.length ? `Ersetze zuerst ${suspendedStarPlayers.map((player) => player.name).join(", ")}.` : `Für die Startelf werden ${STAR_XI_SQUAD_SIZE} passende Spieler benötigt.`);
+      return;
+    }
+    const nextOpponent = getSeasonModeNextOpponent(displayGame.features.seasonMode, displayClubName);
+    const leagueBanError = squadBanError(displayGame.features, competitionFor("season", "stadium"));
+    if (leagueBanError) {
+      showToast(leagueBanError);
+      return;
+    }
+    const travelFixture = await prepareTravel("season", "stadium");
+    if (!travelFixture) return;
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("cup-start", { mode: "season" });
+      if (data) setCoopMessage(`Saisonspiel gegen ${nextOpponent.name} ist eröffnet.`);
+      setCoopBusy(false);
+      return;
+    }
+    setGame((current) => {
+      let features = normalizeGameFeatures(current.features);
+      const suspendedOnSquad = features.cup.suspendedPlayerIds.some((playerId) => features.starXI.lineupIds.includes(playerId) || features.starXI.benchIds.includes(playerId));
+      if (squadBanError(features, competitionFor("season", "stadium")) || getOpenTransferSquadVacancies(features).length > 0 || getStarXISelection(features.starXI.ownedIds, features.starXI.lineupIds).length < STAR_XI_SQUAD_SIZE || suspendedOnSquad || features.cup.active || features.cup.pendingNextRound) return current;
+      features = activatePendingTransferLoans(features, "stadium");
+      const homePlayers = getStarXISelection(features.starXI.ownedIds, features.starXI.lineupIds);
+      features.cup = beginSeasonCupMatch(features.cup, features.seasonMode, cupStartNow, homePlayers, features.starXI.formationPositions, features.starXI.lineupIds, features.starXI.benchIds);
+      consumeTravel(features, travelFixture);
+      prepareCareerMatch(features);
+      return { ...current, features };
+    });
+    showToast(`Spieltag ${displayGame.features.seasonMode.matchday + 1} · ${nextOpponent.name} · Anpfiff · ${formatCountdown(seasonMatchDuration(displayGame.features.seasonMode.division), 0)}`);
+  }
+
+
+  function recordFinishedSeasonMatch(features: GameFeatures, now: number, passivePerSecond: number) {
+    // The stadium and the table still show the match that was played, so the takings are counted first.
+    const tickets = getTicketIncome(features, passivePerSecond);
+    const result = recordSeasonModeMatch(features.seasonMode, features.cup.homeScore, features.cup.awayScore, features.club.name, now, Math.random, features.cup.opponentIds[0]);
+    if (!result.played || !result.entry) return { features, entry: null as typeof result.entry, ticketIncome: 0 };
+    features = recordCareerMatch(features, now, result.entry);
+    if (tickets) recordTicketIncome(features, tickets, now);
+    features.seasonMode = result.state;
+    features.seasonMode.table = features.seasonMode.table.map((team) => team.id === "club" ? { ...team, name: features.club.name } : team);
+    awardMatchStamp(features, now);
+    features = finishActiveTransferLoans(features, now, { hallOfFameReached: result.entry.seasonOutcome === "hall-of-fame" }).features;
+    const outcomeLabel = result.entry.seasonOutcome === "promoted" ? "Aufstieg" : result.entry.seasonOutcome === "relegated" ? "Abstieg" : result.entry.seasonOutcome === "hall-of-fame" ? "Hall of Fame" : result.entry.completedSeason ? "Klassenerhalt" : result.entry.outcome === "win" ? "Sieg" : result.entry.outcome === "loss" ? "Niederlage" : "Remis";
+    addHistory(features, {
+      title: `Saisonspiel · ${outcomeLabel}`,
+      detail: `${result.entry.clubScore}:${result.entry.opponentScore} gegen ${result.entry.opponent} · Spieltag ${result.entry.matchday}/${SEASON_MODE_MATCHES_PER_SEASON}`,
+      tone: result.entry.seasonOutcome === "relegated" || result.entry.outcome === "loss" ? "negative" : result.entry.seasonOutcome === "promoted" || result.entry.seasonOutcome === "hall-of-fame" || result.entry.outcome === "win" ? "positive" : "neutral",
+    });
+    // Stars only for a league never reached before (getSeasonStarReward), never for promotion after relegation.
+    const seasonReward = result.starReward;
+    return { features, entry: result.entry, seasonReward, ticketIncome: tickets?.income ?? 0 };
+  }
+
+  async function takeCupPenalty(direction: CupPenaltyDirection) {
+    const visibleCup = displayGame.features.cup;
+    if (!visibleCup.active || visibleCup.phase !== "penalties" || coopBusy) return;
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const expectedPenaltyStep = getCupPenaltyStep(visibleCup);
+      const data = await sendCoopAction("cup-penalty", { direction, expectedPenaltyStep });
+      if (data) setCoopMessage("Elfmeter ausgeführt und bei beiden Spielern synchronisiert.");
+      setCoopBusy(false);
+      return;
+    }
+    // A second tap before the screen shows the next attempt aims at a step that is already taken.
+    const expectedPenaltyStep = getCupPenaltyStep(visibleCup);
+    setGame((current) => {
+      let features = normalizeGameFeatures(current.features);
+      if (!features.cup.active || features.cup.phase !== "penalties" || getCupPenaltyStep(features.cup) !== expectedPenaltyStep) return current;
+      const homePlayers = getStarXISelection(features.starXI.ownedIds, features.starXI.lineupIds);
+      const effectiveRating = getStarXIEffectiveMatchRating(features.starXI.ownedIds, features.starXI.lineupIds, features.cup, 120);
+      const cupNow = getCurrentTime();
+      const result = resolveCupPenalty(features.cup, effectiveRating, direction, cupNow, Math.random, homePlayers, features.starXI.formationPositions);
+      features.cup = result.cup;
+      applyPendingMatchChanges(features, getCurrentTime());
+      if (result.finished) releaseMatchSquad(features, getCurrentTime());
+      if (result.finished) {
+        features.starXI = restoreStarXIAfterMatch(features.starXI, features.cup);
+        if (features.cup.mode === "season") {
+          const finished = recordFinishedSeasonMatch(features, cupNow, getBasePassivePower(current.upgrades, current.stars, current.features));
+          features = finished.features;
+          return { ...current, features, goals: current.goals + finished.ticketIncome, seasonGoals: current.seasonGoals + finished.ticketIncome, totalGoals: current.totalGoals + finished.ticketIncome, seasons: Math.max(current.seasons, features.seasonMode.highestDivision - 1), stars: Math.min(MAX_SEASON_STARS, current.stars + (finished.seasonReward ?? 0)) };
+        } else {
+          recordCareerMatch(features, cupNow);
+
+          addHistory(features, {
+            title: result.tournamentWon ? `${getTournament(features.cup.tournamentId)?.trophyName ?? "Pokal"} gewonnen` : result.won ? `Runde ${result.completedRound} gewonnen` : `Turnieraus gegen ${result.opponent}`,
+            detail: result.tournamentWon ? `Elfmeterschiessen gewonnen · Trophäe erhalten · ${getTournamentRewardPack(result.cup.tournamentId, features.seasonMode.highestDivision).label}` : result.cup.pendingNextRound ? result.cup.suspendedPlayerIds.length ? "Elfmeterschiessen gewonnen · Gesperrten Spieler ersetzen und nächste Partie manuell starten" : "Elfmeterschiessen gewonnen · Aufstellung anpassen und nächste Partie manuell starten" : result.nextRoundStarted ? `Elfmeterschiessen gewonnen · Runde ${result.completedRound + 1} läuft bereits` : "Im Elfmeterschiessen ausgeschieden.",
+            tone: result.won ? "positive" : "negative",
+          });
+          if (result.runEnded) features = completeTournamentRun(features, { tournamentId: result.cup.tournamentId, tournamentWon: result.tournamentWon, completedRound: result.completedRound, opponent: result.opponent, homeScore: result.cup.homeScore, awayScore: result.cup.awayScore, tieBreak: result.tieBreak }, cupNow);
+        }
+      }
+      return { ...current, features };
+    });
+  }
+
+  async function editInteractiveMatch() {
+    if(isCoopLive){await sendCoopAction('cup-edit');return;}
+    setGame(current=>({...current,features:requestMatchEdit(normalizeGameFeatures(current.features),getCurrentTime())}));
+  }
+  async function batchInteractiveMatch(draft:MatchDraft){
+    if(isCoopLive){await sendCoopAction('cup-batch',{draft});return;}
+    setGame(current=>{const result=confirmMatchDraft(normalizeGameFeatures(current.features),draft,getCurrentTime());return result.error?current:{...current,features:result.features};});
+  }
+  async function resumeInteractiveMatch(){
+    if(isCoopLive){await sendCoopAction('cup-resume');return;}
+    setGame(current=>({...current,features:{...current.features,cup:resumeCupMatch(current.features.cup,getCurrentTime())}}));
+  }
+  function advanceLocalCup() {
+    if (!gameRef.current.features.cup.active) return;
+    const now = getCurrentTime();
+    setGame((current) => {
+      let features = { ...current.features };
+      const homePlayers = getStarXISelection(features.starXI.ownedIds, features.starXI.lineupIds);
+      const matchMinute = getCupMatchMinute(features.cup, now);
+      const effectiveRating = getStarXIEffectiveMatchRating(features.starXI.ownedIds, features.starXI.lineupIds, features.cup, matchMinute);
+      const result = advanceCupMatch(features.cup, effectiveRating, now, Math.random, homePlayers, features.starXI.formationPositions);
+      if (!result.finished && result.cup.lastTickAt === features.cup.lastTickAt) return current;
+      features.cup = result.cup;
+      applyPendingMatchChanges(features, getCurrentTime());
+      if (result.finished) releaseMatchSquad(features, getCurrentTime());
+      if (result.finished) {
+        features = structuredClone(features);
+        features.starXI = restoreStarXIAfterMatch(features.starXI, features.cup);
+        if (features.cup.mode === "season") {
+          const finished = recordFinishedSeasonMatch(features, now, getBasePassivePower(current.upgrades, current.stars, current.features));
+          features = finished.features;
+          return { ...current, features, goals: current.goals + finished.ticketIncome, seasonGoals: current.seasonGoals + finished.ticketIncome, totalGoals: current.totalGoals + finished.ticketIncome, seasons: Math.max(current.seasons, features.seasonMode.highestDivision - 1), stars: Math.min(MAX_SEASON_STARS, current.stars + (finished.seasonReward ?? 0)) };
+        } else {
+          recordCareerMatch(features, now);
+
+          addHistory(features, {
+            title: result.tournamentWon ? `${getTournament(features.cup.tournamentId)?.trophyName ?? "Pokal"} gewonnen` : result.won ? `Runde ${result.completedRound} gewonnen` : `Turnieraus gegen ${result.opponent}`,
+            detail: result.tournamentWon ? `Trophäe erhalten · ${getTournamentRewardPack(result.cup.tournamentId, features.seasonMode.highestDivision).label}` : result.cup.pendingNextRound ? result.cup.suspendedPlayerIds.length ? "Rote Karte · Gesperrten Spieler ersetzen und nächste Partie manuell starten" : "Aufstellung anpassen und nächste Partie manuell starten" : result.nextRoundStarted ? `Runde ${result.completedRound + 1} läuft bereits` : "Der nächste Turnierlauf kommt bestimmt.",
+            tone: result.won ? "positive" : "negative",
+          });
+          if (result.runEnded) features = completeTournamentRun(features, { tournamentId: result.cup.tournamentId, tournamentWon: result.tournamentWon, completedRound: result.completedRound, opponent: result.opponent, homeScore: result.cup.homeScore, awayScore: result.cup.awayScore, tieBreak: result.tieBreak }, now);
+        }
+      }
+      return { ...current, features };
+    });
+  }
+
+  useEffect(() => {
+    if (!hydrated || (appMode !== "single" && !isCoopLive)) return;
+    const timer = window.setInterval(() => {
+      if (appMode === "coop" && isCoopLive && displayGame.features.cup.active && displayGame.features.cup.phase !== "penalties") { if (!isAway()) void sendCoopAction("cup-tick"); }
+      else if (appMode === "single" && gameRef.current.features.cup.active) advanceLocalCup();
+    }, 1000);
+    return () => window.clearInterval(timer);
+    // The one-second clock should stay stable while the match is live.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appMode, displayGame.features.cup.active, hydrated, isCoopLive]);
+
+  // After a single player match the places of injured, suspended or banned players are filled at once (Q21).
+  const soloCupActive = game.features.cup.active;
+  const soloCupWasActiveRef = useRef(soloCupActive);
+  useEffect(() => {
+    const was = soloCupWasActiveRef.current;
+    soloCupWasActiveRef.current = soloCupActive;
+    if (!hydrated || isCoopLive || !was || soloCupActive) return;
+    const timer = window.setTimeout(() => {
+      const current = gameRef.current;
+      if (current.features.cup.active) return;
+      const preview = fillStarXIGaps(current.features, { career: current.features.career, cup: current.features.cup });
+      if (!preview.replacements.some((entry) => entry.area === "lineup")) return;
+      setGame((latest) => {
+        if (latest.features.cup.active) return latest;
+        const features = normalizeGameFeatures(latest.features);
+        const result = fillStarXIGaps(features, { career: features.career, cup: features.cup });
+        if (!result.replacements.length) return latest;
+        features.starXI = result.starXI;
+        addHistory(features, { title: "Lücken automatisch gefüllt", detail: describeReplacements(result.replacements).join(" · "), tone: "neutral", kind: "squad" });
+        return { ...latest, features };
+      });
+      showToast(`Automatisch ersetzt: ${describeReplacements(preview.replacements).join(" · ")}`);
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [soloCupActive, hydrated, isCoopLive, setGame]);
+
+  async function collectAlbumReward(groupId: string) {
+    if (coopBusy) return;
+    if (isCoopLive) {
+      setCoopBusy(true);
+      await sendCoopAction("album-claim", { groupId });
+      setCoopBusy(false);
+      return;
+    }
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      // Fragments plus seconds of income in goals (claimAlbumRewards).
+      const claim = claimAlbumRewards(features, groupId, getBasePassivePower(current.upgrades, current.stars, current.features));
+      return claim.claimed ? { ...current, features, goals: current.goals + claim.goals, seasonGoals: current.seasonGoals + claim.goals, totalGoals: current.totalGoals + claim.goals } : current;
+    });
+  }
+
+  async function claimWeeklyGoalReward(goalId: string) {
+    if (coopBusy) return;
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("weekly-claim", { goalId });
+      if (data) setCoopMessage("Wochenziel abgeholt. Die Prämie gehört dem ganzen Team.");
+      setCoopBusy(false);
+      return;
+    }
+    let message = "";
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      const claim = claimWeeklyGoal(features, goalId, Date.now(), current.minigameWins);
+      message = claim.ok ? `${claim.goal.title} geschafft · ${claim.goal.reward.kind === "pack" ? `${claim.label} liegt bei den Packs bereit` : `+${claim.label}`}` : claim.error;
+      return claim.ok ? { ...current, features } : current;
+    });
+    if (message) showToast(message);
+  }
+
+  // Single player: a new Zurich week starts its goals (and the baseline of every counter) as soon as it begins.
+  useEffect(() => {
+    if (!hydrated || appMode !== "single") return;
+    const check = () => {
+      const now = Date.now(), current = gameRef.current;
+      if (!weeklyGoalsNeedUpdate(current.features, now, current.minigameWins)) return;
+      setGame((latest) => {
+        const features = { ...latest.features };
+        return ensureWeeklyGoals(features, now, latest.minigameWins) ? { ...latest, features } : latest;
+      });
+    };
+    check();
+    const timer = window.setInterval(check, 30000);
+    return () => window.clearInterval(timer);
+  }, [hydrated, appMode, setGame]);
+
+  function playTone(frequency: number, duration: number, type: OscillatorType = "sine", volume = 0.03, delay = 0) {
+    if (!gameRef.current.sound || !soundPrefsRef.current.effects || typeof window === "undefined") return;
+    const audio = gameAudioContext();
+    if (!audio) return;
+    const oscillator = audio.createOscillator();
+    const gain = audio.createGain();
+    const start = audio.currentTime + delay;
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(volume, start + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    oscillator.connect(gain).connect(audio.destination);
+    oscillator.start(start);
+    oscillator.stop(start + duration + 0.02);
+  }
+
+  function toggleVibration() {
+    const next = !vibrationOn;
+    setVibrationOn(next);
+    setVibrationEnabled(next);
+    try { localStorage.setItem(VIBRATION_STORAGE_KEY, next ? "on" : "off"); } catch { /* Storage can be unavailable. */ }
+    if (next) vibrate(40);
+    showToast(next ? "Vibration an" : "Vibration aus");
+  }
+
+  function registerCombo(now: number) {
+    const state = comboRef.current;
+    if (state.paused) return getComboLevel(state.count).multiplier;
+    const current = decayComboCount(state.count, now - state.last);
+    const previous = getComboLevel(current);
+    state.count = Math.min(COMBO_MAX_COUNT, current + 1);
+    state.last = now;
+    const level = getComboLevel(state.count);
+    state.multiplier = level.multiplier;
+    clickFeedback.setCombo({ count: state.count, multiplier: level.multiplier });
+    if (level.multiplier > previous.multiplier) {
+      clickFeedback.setBurst({ id: now, text: `COMBO ${formatComboMultiplier(level.multiplier)}` });
+      window.setTimeout(() => clickFeedback.setBurst((current) => current?.id === now ? null : current), 900);
+      playTone(level.tier === 3 ? 988 : 784, 0.12, "triangle", 0.045);
+      vibrate(level.tier === 3 ? [30, 25, 45] : 30);
+    }
+    scheduleComboDecay(COMBO_HOLD_MS + COMBO_DECAY_MS);
+    return level.multiplier;
+  }
+
+  // The starter squad after the first clicks, also for a loaded save that is already past them; once per club or world.
+  const starterSquadDue = hydrated && !displayGame.features.starterSquadGranted && displayGame.clicks >= STARTER_SQUAD_UNLOCK_CLICKS && !displayGame.features.cup.active && !displayGame.features.squadLock;
+  useEffect(() => {
+    if (!starterSquadDue || starterSquadRequestedRef.current) return;
+    starterSquadRequestedRef.current = true;
+    const announce = (added: number, complete: boolean) => {
+      if (!added) return;
+      addFeed(`Starterkader: ${added} Spieler sind neu in deiner Elf.`, "squad");
+      showToast(complete ? "Startelf komplett! Starte deine erste Partie." : `${added} Starterspieler sind neu in deinem Kader.`);
+    };
+    const timer = window.setTimeout(() => {
+      if (isCoopLive) {
+        void sendCoopAction("starter-squad").then((data) => {
+          if (data?.starterSquad) { announce(data.starterSquad.added, data.starterSquad.complete); return; }
+          // Not granted (network, conflict): ask again a little later. When another player got it meanwhile, the
+          // synced world no longer needs it and nothing is sent.
+          window.setTimeout(() => { starterSquadRequestedRef.current = false; setStarterSquadRetry((count) => count + 1); }, 10_000);
+        });
+        return;
+      }
+      const features = normalizeGameFeatures(structuredClone(gameRef.current.features));
+      const result = maybeGrantStarterSquad(features, gameRef.current.clicks);
+      if (!result) return;
+      setGame((current) => ({ ...current, features }));
+      announce(result.added.length, result.complete);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [starterSquadDue, isCoopLive, starterSquadRetry]);
+
+  function handleBallClick(event: MouseEvent<HTMLButtonElement>) {
+    const comboMultiplier = registerCombo(Date.now());
+    const liveClickPower = getClickPower(displayGame.upgrades, displayGame.stars, displayGame.features, getCurrentTime()) * comboMultiplier;
+    const result = createClickResult(liveClickPower, lastClickRef.current, streakRef.current);
+    lastClickRef.current = result.now;
+    streakRef.current = result.streak;
+    if (isCoopLive) queueCoopClick(result.amount);
+    else setGame((current) => ({ ...current, goals: current.goals + result.amount, seasonGoals: current.seasonGoals + result.amount, totalGoals: current.totalGoals + result.amount, clicks: current.clicks + 1 }));
+    const rect = stageRef.current?.getBoundingClientRect();
+    const x = rect ? event.clientX - rect.left : 50;
+    const y = rect ? event.clientY - rect.top : 50;
+    const effect = { id: result.effectId, x, y, amount: result.amount, critical: result.critical, combo: getComboLevel(comboRef.current.count).tier };
+    clickFeedback.addEffect(effect);
+    setTimeout(() => clickFeedback.removeEffect(effect.id), 850);
+    clickFeedback.togglePulse();
+    playTone(result.critical ? 720 : 350, 0.07, "triangle", result.critical ? 0.055 : 0.025);
+    if (result.critical) { showToast("Kritischer Abschluss", "minor"); playTone(980, 0.13, "square", 0.04, 0.07); }
+    else if (result.streak === 10) showToast("Zehn Klicks am Stück", "minor");
+  }
+
+  function handleBallKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if ((event.key === "Enter" || event.key === " ") && event.repeat) event.preventDefault();
+  }
+
+  /** A mini game reward at the club's current income (fixed amounts are the floor). */
+  function miniGameReward(id: MiniGameId, baseReward: number) {
+    return scaleMiniGameReward(id, baseReward, getBasePassivePower(displayGame.upgrades, displayGame.stars, displayGame.features));
+  }
+
+  function awardMiniGame(reward: number, name: string, id: MiniGameId, icon: IconName = "star") {
+    const safeReward = Math.max(0, Math.floor(reward));
+    const celebrate = () => {
+      addFeed(`${name}: +${formatNumber(safeReward)} Tore Prämie. Nächste Runde in ${MINI_GAME_COOLDOWN_SECONDS[id]} Sekunden.`, icon);
+      showToast(`${name}: +${formatNumber(safeReward)} Tore`);
+      playTone(523, 0.1, "triangle", 0.035);
+      playTone(784, 0.18, "triangle", 0.04, 0.1);
+    };
+    // In a world the server decides; the reward is only announced once it accepted it (else its message shows).
+    if (isCoopLive) {
+      void sendCoopAction("minigame", { minigameId: id, reward: safeReward }).then((data) => { if (data) celebrate(); });
+      return;
+    }
+    setGame((current) => ({ ...current, goals: current.goals + safeReward, seasonGoals: current.seasonGoals + safeReward, totalGoals: current.totalGoals + safeReward, minigameWins: current.minigameWins + 1, miniGameCooldowns: { ...current.miniGameCooldowns, [id]: getMiniGameCooldownUntil(id) } }));
+    celebrate();
+  }
+
+  /** Opens a mini game; in a world only after the server started the run, without which no reward counts. */
+  function openMiniGame(id: MiniGameId, open: () => void) {
+    if (!isCoopLive) { open(); return; }
+    if (coopMiniGameStartingRef.current) return;
+    coopMiniGameStartingRef.current = true;
+    void sendCoopAction("minigame-start", { minigameId: id }).then((data) => { if (data) open(); }).finally(() => { coopMiniGameStartingRef.current = false; });
+  }
+
+  function closeMiniGame() {
+    setActiveMiniGame(null);
+  }
+
+  function startPenaltyGame() {
+    if (isMiniGameOnCooldown("penalty")) {
+      showToast(`${MINI_GAME_NAMES.penalty} ist noch ${formatCountdown(displayGame.miniGameCooldowns.penalty, countdownNow)} gesperrt.`);
+      return;
+    }
+    openMiniGame("penalty", () => {
+      setActiveMiniGame("penalty");
+      setPenaltyGame({ shots: 0, goals: 0, message: "Such dir eine Ecke aus.", finished: false, reward: 0 });
+    });
+  }
+
+  function takePenalty(direction: PenaltyDirection) {
+    if (!penaltyGame || penaltyGame.finished) return;
+    const goalkeeper = getRandomPenaltyDirection();
+    const scored = direction !== goalkeeper;
+    const shots = penaltyGame.shots + 1;
+    const goals = penaltyGame.goals + (scored ? 1 : 0);
+    if (shots >= 5) {
+      const reward = miniGameReward("penalty", 250 + goals * 150);
+      setPenaltyGame({ shots, goals, message: `${goals} von 5 Elfmetern drin. ${formatNumber(reward)} Tore Prämie.`, finished: true, reward });
+      awardMiniGame(reward, `Penalty Challenge ${goals}/5`, "penalty", scored ? "ball" : "screen");
+      return;
+    }
+    setPenaltyGame({ ...penaltyGame, shots, goals, message: scored ? "Tor. Der Goalie war in der falschen Ecke." : `Gehalten. Der Goalie war ${goalkeeper}.`, finished: false, reward: 0 });
+  }
+
+  function startDribbleGame() {
+    if (isMiniGameOnCooldown("dribble")) {
+      showToast(`${MINI_GAME_NAMES.dribble} ist noch ${formatCountdown(displayGame.miniGameCooldowns.dribble, countdownNow)} gesperrt.`);
+      return;
+    }
+    const sequence = Array.from({ length: 6 }, () => getRandomPenaltyDirection());
+    openMiniGame("dribble", () => {
+      setActiveMiniGame("dribble");
+      setDribbleGame({ sequence, step: 0, attempts: 0, misses: 0, message: `Erster Move: ${directionLabel(sequence[0])}.`, finished: false, reward: 0 });
+    });
+  }
+
+  function takeDribble(direction: PenaltyDirection) {
+    if (!dribbleGame || dribbleGame.finished) return;
+    const expected = dribbleGame.sequence[dribbleGame.step];
+    const correct = direction === expected;
+    const step = correct ? dribbleGame.step + 1 : 0;
+    const attempts = dribbleGame.attempts + 1;
+    const misses = dribbleGame.misses + (correct ? 0 : 1);
+    if (correct && step >= dribbleGame.sequence.length) {
+      const reward = miniGameReward("dribble", 220 + Math.max(0, 3 - misses) * 45);
+      setDribbleGame({ ...dribbleGame, step, attempts, misses, message: `Perfekte Ballführung in ${attempts} Moves.`, finished: true, reward });
+      awardMiniGame(reward, "Dribble Run", "dribble", "striker");
+      return;
+    }
+    if (!correct && misses >= 3) {
+      const reward = miniGameReward("dribble", 60 + dribbleGame.step * 15);
+      setDribbleGame({ ...dribbleGame, step, attempts, misses, message: `Dreimal den Ball verloren. ${formatNumber(reward)} Tore Trostpreis.`, finished: true, reward });
+      awardMiniGame(reward, "Dribble Run", "dribble", "boot");
+      return;
+    }
+    setDribbleGame({ ...dribbleGame, step, attempts, misses, message: correct ? `Sauber. Als Nächstes: ${directionLabel(dribbleGame.sequence[step])}.` : "Ball verloren. Wieder von vorne.", finished: false, reward: 0 });
+  }
+
+  function startCrossbarGame() {
+    if (isMiniGameOnCooldown("crossbar")) {
+      showToast(`${MINI_GAME_NAMES.crossbar} ist noch ${formatCountdown(displayGame.miniGameCooldowns.crossbar, countdownNow)} gesperrt.`);
+      return;
+    }
+    openMiniGame("crossbar", () => {
+      setActiveMiniGame("crossbar");
+      setCrossbarGame({ shots: 0, hits: 0, message: "Zielhöhe wählen und die Latte treffen.", finished: false, reward: 0 });
+    });
+  }
+
+  function takeCrossbar(height: CrossbarHeight) {
+    if (!crossbarGame || crossbarGame.finished) return;
+    const target = getRandomCrossbarHeight();
+    const hit = height === target;
+    const shots = crossbarGame.shots + 1;
+    const hits = crossbarGame.hits + (hit ? 1 : 0);
+    if (shots >= 5) {
+      const reward = miniGameReward("crossbar", 50 + hits * 45);
+      setCrossbarGame({ shots, hits, message: `${hits} von 5 Latten getroffen. ${formatNumber(reward)} Tore Prämie.`, finished: true, reward });
+      awardMiniGame(reward, `Latten Challenge ${hits}/5`, "crossbar", hit ? "star" : "screen");
+      return;
+    }
+    setCrossbarGame({ ...crossbarGame, shots, hits, message: hit ? "Ping. Genau die richtige Höhe." : `Daneben. Das Ziel war ${heightLabel(target)}.`, finished: false, reward: 0 });
+  }
+
+  function startPredictionGame() {
+    if (isMiniGameOnCooldown("prediction")) {
+      showToast(`${MINI_GAME_NAMES.prediction} ist noch ${formatCountdown(displayGame.miniGameCooldowns.prediction, countdownNow)} gesperrt.`);
+      return;
+    }
+    openMiniGame("prediction", () => {
+      setActiveMiniGame("prediction");
+      setPredictionGame({ round: 0, wins: 0, message: "Wer gewinnt das nächste Match?", finished: false, reward: 0 });
+    });
+  }
+
+  function takePrediction(prediction: MatchPrediction) {
+    if (!predictionGame || predictionGame.finished) return;
+    const outcome = getRandomMatchPrediction();
+    const round = predictionGame.round + 1;
+    const wins = predictionGame.wins + (prediction === outcome ? 1 : 0);
+    if (round >= 3) {
+      const reward = miniGameReward("prediction", 70 + wins * 55 + (wins === 3 ? 100 : 0));
+      setPredictionGame({ round, wins, message: `${wins} von 3 Tipps richtig. ${formatNumber(reward)} Tore Prämie.`, finished: true, reward });
+      awardMiniGame(reward, `Matchday Tipp ${wins}/3`, "prediction", "broadcast");
+      return;
+    }
+    setPredictionGame({ ...predictionGame, round, wins, message: prediction === outcome ? `Richtig: ${predictionLabel(outcome)}. Nächster Tipp.` : `Falsch: Es war ${predictionLabel(outcome)}. Nächster Tipp.`, finished: false, reward: 0 });
+  }
+
+  async function buyUpgrade(upgrade: UpgradeDefinition) {
+    const unlockLeague = getUpgradeUnlockLeague(upgrade.id);
+    const alreadyOwned = getLevel(displayGame.upgrades, upgrade.id) > 0;
+    if (!alreadyOwned && !isLeagueContentUnlocked(unlockLeague, reachedLeague, hasFullTestAccess)) {
+      showToast(`${upgrade.name} wird ab Liga ${unlockLeague} freigeschaltet.`);
+      return;
+    }
+    const purchase = getBulkPurchase(upgrade, displayGame.upgrades, spendableGoals, purchaseMode, hasInfiniteMoney);
+    const isBigPurchase = purchase.count >= 10 || (!hasInfiniteMoney && purchase.totalCost >= displayGame.goals * 0.5);
+    if (purchase.count === 0) {
+      const nextCost = getCost(upgrade, displayGame.upgrades);
+      showToast(nextCost === Infinity ? "Dieses Upgrade ist auf dem Maximum." : `${upgrade.name} kostet ${formatNumber(nextCost)} Tore.`);
+      return;
+    }
+    if (isCoopLive) {
+      setCoopBusy(true);
+      try {
+        const data = await sendCoopAction("buy", { upgradeId: upgrade.id, count: purchase.count });
+        if (data) setCoopMessage(`${upgrade.name} wurde gemeinsam gekauft.`);
+        if (data && isBigPurchase) vibrate([35, 30, 60]);
+      } finally {
+        setCoopBusy(false);
+      }
+      return;
+    }
+    const level = getLevel(game.upgrades, upgrade.id) + purchase.count;
+    setGame((current) => ({ ...current, goals: current.goals - purchase.totalCost, upgrades: { ...current.upgrades, [upgrade.id]: level } }));
+    addFeed(`${upgrade.name} x${purchase.count} für ${formatNumber(purchase.totalCost)} Tore.`, upgrade.icon);
+    showToast(purchase.count === 1 ? `${upgrade.name} auf Level ${level}` : `${upgrade.name}: ${purchase.count} Level gekauft`);
+    playTone(440, 0.08, "triangle", 0.03);
+    playTone(660, 0.13, "triangle", 0.04, 0.08);
+    if (isBigPurchase) vibrate([35, 30, 60]);
+  }
+
+  async function claimDaily() {
+    if (dailyBusy) return;
+    if (isCoopLive) {
+      setDailyBusy(true);
+      try {
+        const data = await sendCoopAction("daily-claim");
+        if (data?.dailyReward) {
+          showToast(`Tag ${data.dailyReward.dayIndex}: +${formatNumber(data.dailyReward.amount)} Tore${data.dailyReward.pack ? " und ein Spezialkarten-Pack für die ganze Welt" : ""}`);
+          vibrate([40, 30, 90]);
+        }
+      } finally {
+        setDailyBusy(false);
+      }
+      return;
+    }
+    const now = getCurrentTime();
+    const preview = claimDailyReward(game.features.dailyRewards, "solo", getBasePassivePower(game.upgrades, game.stars, game.features), getBaseClickPower(game.upgrades, game.stars, game.features), now);
+    if (!preview) { showToast("Die Prämie für heute ist schon abgeholt."); return; }
+    setGame((current) => {
+      const claim = claimDailyReward(current.features.dailyRewards, "solo", getBasePassivePower(current.upgrades, current.stars, current.features), getBaseClickPower(current.upgrades, current.stars, current.features), now);
+      if (!claim) return current;
+      const features = normalizeGameFeatures(current.features);
+      features.dailyRewards = claim.state;
+      if (claim.pack && !features.earnedPacks.some((pack) => pack.id === claim.pack!.id)) features.earnedPacks.push(claim.pack);
+      addHistory(features, { title: `Tägliche Prämie · Tag ${claim.dayIndex}`, detail: `+${formatNumber(claim.amount)} Tore${claim.pack ? " und ein Spezialkarten-Pack" : ""}. Serie: ${claim.streak} ${claim.streak === 1 ? "Tag" : "Tage"}.`, tone: "positive" }, now);
+      return { ...current, goals: current.goals + claim.amount, seasonGoals: current.seasonGoals + claim.amount, totalGoals: current.totalGoals + claim.amount, features };
+    });
+    addFeed(`Tägliche Prämie Tag ${preview.dayIndex}: +${formatNumber(preview.amount)} Tore.`, "star");
+    showToast(`Tag ${preview.dayIndex}: +${formatNumber(preview.amount)} Tore${preview.pack ? " und ein Spezialkarten-Pack unter Packs & Album" : ""}`);
+    playTone(659, 0.1, "triangle", 0.04);
+    playTone(988, 0.18, "triangle", 0.045, 0.1);
+    vibrate([40, 30, 90]);
+  }
+
+  async function answerPress(matchId: string, questionId: string, answerIndex: number) {
+    if (pressBusy) return;
+    if (isCoopLive) {
+      setPressBusy(true);
+      try {
+        const data = await sendCoopAction("press-answer", { matchId, questionId, answerIndex });
+        if (data?.press) showToast(`Medienprämie +${formatNumber(data.press.reward)} Tore · Fanstimmung ${data.press.mood >= 0 ? "+" : ""}${data.press.mood}`);
+      } finally {
+        setPressBusy(false);
+      }
+      return;
+    }
+    const now = getCurrentTime();
+    const preview = answerPressConference(game.features.press, game.features.cup, game.features.club.name, matchId, questionId, answerIndex, now);
+    if (!preview) return;
+    const reward = getPressReward(getBasePassivePower(game.upgrades, game.stars, game.features), getBaseClickPower(game.upgrades, game.stars, game.features));
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      const result = answerPressConference(features.press, features.cup, features.club.name, matchId, questionId, answerIndex, now);
+      if (!result) return current;
+      features.press = result.press;
+      addHistory(features, { title: "Pressekonferenz", detail: `«${result.answer}» · Fanstimmung ${result.mood >= 0 ? "+" : ""}${result.mood}`, tone: result.mood >= 0 ? "positive" : "neutral" }, now);
+      return { ...current, goals: current.goals + reward, seasonGoals: current.seasonGoals + reward, totalGoals: current.totalGoals + reward, features };
+    });
+    showToast(`Medienprämie +${formatNumber(reward)} Tore · Fanstimmung ${preview.mood >= 0 ? "+" : ""}${preview.mood}`);
+    playTone(523, 0.08, "triangle", 0.03);
+  }
+
+  function openPrestigeDialog() {
+    const reason = getPrestigeBlockReason(displayGame.features);
+    if (reason) { showToast(reason); return; }
+    setPrestigeDialog({ requestId: crypto.randomUUID(), error: "", prestigeCount: displayGame.features.seasonMode.prestigeCount });
+  }
+
+  async function confirmSeasonPrestige(keepNormalId: string | null) {
+    if (!prestigeDialog) return;
+    const { requestId, prestigeCount } = prestigeDialog;
+    // A double click confirms once: the feed, the toast and the sound come only with the first confirmation.
+    if (prestigeConfirmedRef.current.has(requestId)) return;
+    if (isCoopLive) {
+      prestigeConfirmedRef.current.add(requestId);
+      setCoopBusy(true);
+      const data = await sendCoopAction("season-prestige", { requestId, keepNormalId, expectedPrestigeCount: prestigeCount });
+      setCoopBusy(false);
+      if (!data) {
+        // The same request id may be sent again: the server counts it once.
+        prestigeConfirmedRef.current.delete(requestId);
+        setPrestigeDialog((current) => current && { ...current, error: "Prestige wurde nicht bestätigt. Wurde es in dieser Welt doch gestartet, schliesst sich dieses Fenster von selbst." });
+        return;
+      }
+      setPrestigeDialog(null);
+      // Other members are online: the proposal opened a vote; Prestige starts once they all agreed.
+      if (data.prestigeVote === "pending") {
+        setHiddenPrestigeVote("");
+        setCoopMessage("Abstimmung gestartet. Prestige startet, sobald alle Mitspieler, die online sind, zugestimmt haben.");
+        return;
+      }
+      setCoopMessage("Prestige gestartet. Die Aufstiegsjagd beginnt wieder in Saison 1, alle Upgrades stehen wieder auf Stufe 0.");
+    } else {
+      const now = getCurrentTime();
+      // Checked once more against the current state; season, squad, album, upgrades, goals and count change in one update.
+      const check = applyGamePrestige(gameRef.current, keepNormalId, now, requestId);
+      if (check.duplicate) { setPrestigeDialog(null); return; }
+      if (check.error) { setPrestigeDialog((current) => current && { ...current, error: check.error }); return; }
+      prestigeConfirmedRef.current.add(requestId);
+      setGame((current) => {
+        const result = applyGamePrestige(current, keepNormalId, now, requestId);
+        return result.error || result.duplicate ? current : result.game;
+      });
+      setPrestigeDialog(null);
+    }
+    addFeed("Prestige gestartet: zurück auf Saison 1, alle Upgrades wieder auf Stufe 0, die Freischaltungen bleiben.", "star");
+    showToast("Prestige gestartet");
+    playTone(523, 0.12, "triangle", 0.04);
+    playTone(784, 0.2, "triangle", 0.05, 0.1);
+  }
+
+  async function abandonTournament() {
+    setAbandonDialog(false);
+    if (!displayGame.features.cup.pendingNextRound || displayGame.features.cup.active) return;
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("cup-abandon");
+      setCoopBusy(false);
+      if (data) showToast("Turnier aufgegeben");
+      return;
+    }
+    const now = getCurrentTime();
+    setGame((current) => { const features = abandonTournamentRun(normalizeGameFeatures(current.features), now); return features ? { ...current, features } : current; });
+    showToast("Turnier aufgegeben");
+  }
+
+  async function resumeCupWithoutSubstitution() {
+    if (!displayGame.features.cup.active || !displayGame.features.cup.matchPaused) return;
+    if (isCoopLive) {
+      setCoopBusy(true);
+      const data = await sendCoopAction("cup-resume");
+      if (data) setCoopMessage("Die Partie läuft ohne Wechsel weiter.");
+      setCoopBusy(false);
+      return;
+    }
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      if (!features.cup.active || !features.cup.matchPaused) return current;
+      features.cup = resumeCupMatch(features.cup, getCurrentTime());
+      addHistory(features, { title: "Verletzungspause beendet", detail: "Der verletzte Spieler bleibt draussen; die Partie läuft ohne Wechsel weiter.", tone: "neutral" });
+      return { ...current, features };
+    });
+    setSelectedLineupSlot(null);
+    showToast("Partie läuft ohne Wechsel weiter");
+  }
+
+  function toggleSound() {
+    setGame((current) => ({ ...current, sound: !current.sound }));
+    showToast(game.sound ? "Sound aus" : "Sound an");
+  }
+
+  function closeWhatsNew() {
+    setWhatsNewOpen(false);
+    try {
+      // A synced key: the cloud upload carries it to the player's other devices.
+      localStorage.setItem(WHATS_NEW_STORAGE_KEY, WHATS_NEW[0]?.id ?? "");
+    } catch {
+      // The window closes even when the browser storage refuses the write.
+    }
+  }
+
+  function setTutorial(next: TutorialState) {
+    setTutorialState(next);
+    try {
+      // A synced key: the cloud upload carries the progress to the player's other devices.
+      localStorage.setItem(TUTORIAL_STORAGE_KEY, serializeTutorialState(next));
+    } catch {
+      // Without browser storage the tutorial still runs until the page closes.
+    }
+  }
+
+  function endTutorial() {
+    setTutorial({ ...tutorial, status: "done" });
+  }
+
+  function restartTutorial() {
+    setTutorial(newTutorial());
+    openFeatureTab("home");
+  }
+
+  // "Zeig es mir": open the tab of the task, or bring the ball or the upgrade shop on the home screen into view.
+  function showTutorialStep(step: TutorialStep) {
+    const target = step.target;
+    const homeTarget = target === "ball" || target === "shop";
+    openFeatureTab(target === "ball" || target === "shop" ? "home" : target);
+    window.setTimeout(() => {
+      const element = target === "ball" ? stageRef.current : target === "shop" ? document.querySelector(".shop-card") : document.querySelector(".feature-card");
+      element?.scrollIntoView({ behavior: "smooth", block: homeTarget ? "center" : "start" });
+    }, 50);
+  }
+
+  // What the autosave did: another tab saved meanwhile (load that game), or the browser storage is full.
+  const outdatedShownRef = useRef(false);
+  const handleLocalSave = useCallback((result: LocalSaveResult) => {
+    if (result === "stale") {
+      suspendLocalPersistence();
+      window.location.reload();
+      return;
+    }
+    // A newer version of the game stored this save; it stays untouched until the page is reloaded.
+    if (result === "outdated") {
+      if (!outdatedShownRef.current) { outdatedShownRef.current = true; setOffline(NEWER_VERSION_MESSAGE); }
+      return;
+    }
+    if (result === "failed" && !saveFailedRef.current) {
+      saveFailedRef.current = true;
+      setOffline(SAVE_FAILED_MESSAGE);
+    } else if (result === "saved" && saveFailedRef.current) {
+      saveFailedRef.current = false;
+      setOffline((current) => current === SAVE_FAILED_MESSAGE ? "" : current);
+    }
+  }, []);
+
+  useEffect(() => {
+    const stored = readStoredGame();
+    markLocalSaveLoaded();
+    // The newest release notes show once to players who already had a game; new players start without them.
+    try {
+      const latest = WHATS_NEW[0]?.id;
+      if (latest && localStorage.getItem(WHATS_NEW_STORAGE_KEY) !== latest) {
+        if (stored.saved) window.setTimeout(() => setWhatsNewOpen(true), 0);
+        else localStorage.setItem(WHATS_NEW_STORAGE_KEY, latest);
+      }
+    } catch {
+      // Without browser storage the window simply stays closed.
+    }
+    // A brand new club starts the tutorial; a game saved before the tutorial existed never sees it.
+    try {
+      const raw = localStorage.getItem(TUTORIAL_STORAGE_KEY);
+      const next = raw ? parseTutorialState(raw) : stored.saved ? finishedTutorial() : newTutorial();
+      if (!raw) localStorage.setItem(TUTORIAL_STORAGE_KEY, serializeTutorialState(next));
+      window.setTimeout(() => setTutorialState(next), 0);
+    } catch {
+      if (!stored.saved) window.setTimeout(() => setTutorialState(newTutorial()), 0);
+    }
+    if (document.visibilityState === "visible") claimLocalSave();
+    if (stored.saved) {
+      try {
+        const saved = stored.saved;
+        const upgrades = normalizeUpgrades(saved.upgrades);
+        const savedAt = Number(saved.lastSaved) || Date.now();
+        const pausedMs = Math.max(0, Date.now() - savedAt);
+        const totalGoalsValue = Number(saved.totalGoals);
+        const totalGoals = Number.isFinite(totalGoalsValue) ? Math.max(0, totalGoalsValue) : 0;
+        const savedSeasonGoals = Number(saved.seasonGoals);
+        const seasonGoals = Number.isFinite(savedSeasonGoals) ? Math.max(0, savedSeasonGoals) : totalGoals;
+        const stars = Math.min(MAX_SEASON_STARS, Math.max(0, Number(saved.stars) || 0));
+        const seasons = Math.max(0, Number(saved.seasons) || 0);
+        const minigameWins = Math.max(0, Math.floor(Number(saved.minigameWins) || 0));
+        const miniGameCooldowns = pauseMiniGameCooldowns(saved.miniGameCooldowns, pausedMs, savedAt);
+        const features = pauseGameFeatureTimers(saved.features, pausedMs);
+        const goalsValue = Number(saved.goals);
+        const goals = capGoalsAfterRebalance(Number.isFinite(goalsValue) ? Math.max(0, goalsValue) : 0, saved.features, upgrades, stars, features);
+        const clicksValue = Number(saved.clicks);
+        const next: GameState = { ...initialGame(), upgrades, features, achievements: normalizeAchievements(saved.achievements), goals, totalGoals, seasonGoals, clicks: Number.isFinite(clicksValue) ? Math.max(0, clicksValue) : 0, stars, seasons, balanceVersion: BALANCE_VERSION, sound: saved.sound !== false, lastSaved: Date.now(), miniGameCooldowns, minigameWins };
+        if (stored.recovered) {
+          window.setTimeout(() => setOffline("Die Hauptspeicherung war leer. Deine letzte intakte Sicherung wurde automatisch geladen."), 0);
+        } else if (pausedMs > 10000 && matchRanWhileAway(features.cup)) {
+          // The match is not paused while the app is closed: say so, and list what happened once it has caught up.
+          missedMatchRef.current = { since: savedAt, until: Date.now(), matchStartedAt: features.cup.matchStartedAt };
+          window.setTimeout(() => setOffline(MATCH_RAN_WHILE_AWAY), 0);
+        } else if (pausedMs > 10000 && (getPassivePower(upgrades, stars, features) > 0 || features.cup.active)) {
+          // Return summary: how long the club was alone and what waits now (the chips on Home lead there).
+          const waiting = getOpenActions({ features, now: Date.now(), miniGameCooldowns, minigameWins });
+          window.setTimeout(() => setOffline(`Willkommen zurück: ${returnSummary(pausedMs, waiting)}. Solange niemand auf der Seite war, war das Spiel pausiert.`), 0);
+        }
+        window.setTimeout(() => {
+          setGame(next);
+          // Restore the last saved event as a presentation-only notification.
+          // The event is presentation-only here: its reward was already applied
+          // before the save and must not be applied a second time.
+          if (next.features.randomEvent) presentEventAnnouncement(next.features.randomEvent);
+        }, 0);
+      } catch {
+        window.setTimeout(() => setOffline("Der gespeicherte Stand konnte nicht gelesen werden. Die Sicherung bleibt unangetastet."), 0);
+      }
+    } else {
+      // A brand new club: the first thing it sees is a free pack with a walkout.
+      window.setTimeout(() => {
+        const features = normalizeGameFeatures(structuredClone(gameRef.current.features));
+        const reveal = grantWelcomePack(features);
+        setGame((current) => ({ ...current, features }));
+        presentStarReveal(reveal);
+      }, 0);
+    }
+    window.setTimeout(() => setHydrated(true), 0);
+  }, [setGame]);
+
+  // Hidden time is measured on the monotonic clock (system clock changes earn nothing), and one hidden period
+  // earns at most MAX_BACKGROUND_CATCH_UP_MS of passive income in total. pageInactiveAtRef holds monotonic readings.
+  const hiddenBudgetRef = useRef(MAX_BACKGROUND_CATCH_UP_MS);
+  const markPageHidden = useCallback((now: number) => {
+    if (pageInactiveAtRef.current !== null) return;
+    pageInactiveAtRef.current = now;
+    hiddenBudgetRef.current = MAX_BACKGROUND_CATCH_UP_MS;
+  }, []);
+  const takeHiddenTime = useCallback((now: number) => {
+    const taken = takeBackgroundTime(pageInactiveAtRef.current, hiddenBudgetRef.current, now);
+    hiddenBudgetRef.current = taken.budgetMs;
+    return taken.elapsedMs;
+  }, []);
+  // Once the match that ran on while the app was closed has caught up, the banner lists what was missed.
+  useEffect(() => {
+    const missed = missedMatchRef.current;
+    if (!hydrated || !missed) return;
+    const cup = game.features.cup;
+    const sameMatch = cup.matchStartedAt === missed.matchStartedAt;
+    if (sameMatch && !missedMatchCaughtUp(cup, missed.until) && Date.now() - missed.until < 15000) return;
+    missedMatchRef.current = null;
+    if (!sameMatch) return;
+    const summary = summarizeMissedMatch(cup, missed.since, missed.until);
+    window.setTimeout(() => setOffline((current) => current === MATCH_RAN_WHILE_AWAY ? summary : current), 0);
+  }, [hydrated, game.features.cup]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const tick = window.setInterval(() => {
+      if (document.hidden) return;
+      const power = getPassivePower(gameRef.current.upgrades, gameRef.current.stars, gameRef.current.features);
+      if (power <= 0) return;
+      // Earned at once (gameRef, saves, the counter); committed to the state with the next flush.
+      passiveGoals.addPending(power / 5);
+      gameRef.current = addPassiveGoals(gameRef.current, power / 5);
+      passiveGoals.setDisplay(gameRef.current.goals);
+    }, 200);
+    const save = window.setInterval(() => {
+      const now = Date.now();
+      const mono = monotonicNow();
+      const next = document.hidden && pageInactiveAtRef.current !== null
+        ? advanceLocalGameWhileOpen(gameRef.current, takeHiddenTime(mono), now)
+        : { ...gameRef.current, lastSaved: now };
+      if (document.hidden) { markPageHidden(mono); pageInactiveAtRef.current = mono; }
+      gameRef.current = next;
+      handleLocalSave(persistLocalGame(next));
+    }, 2200);
+    return () => { window.clearInterval(tick); window.clearInterval(save); };
+  }, [hydrated, handleLocalSave, markPageHidden, takeHiddenTime, passiveGoals]);
+
+  useEffect(() => {
+    if (!hydrated || isCoopLive) return;
+    const newlyUnlocked = ACHIEVEMENTS.filter((achievement) => game.totalGoals >= achievement.threshold && !game.achievements.includes(achievement.id));
+    if (!newlyUnlocked.length) return;
+    window.setTimeout(() => setGame((current) => ({ ...current, achievements: [...current.achievements, ...newlyUnlocked.map((item) => item.id)] })), 0);
+    const first = newlyUnlocked[0];
+    window.setTimeout(() => {
+      showToast(`Erfolg: ${first.name}`);
+      addFeed(`${first.name} freigeschaltet. Die Kurve zeigt nach oben.`, first.icon);
+      playTone(523, 0.12, "square", 0.035);
+      playTone(659, 0.12, "square", 0.035, 0.1);
+      playTone(784, 0.22, "square", 0.04, 0.2);
+    }, 0);
+  }, [game.totalGoals, game.achievements, hydrated, isCoopLive, setGame]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const saveOnExit = () => {
+      const now = Date.now();
+      const mono = monotonicNow();
+      const hidden = pageInactiveAtRef.current !== null;
+      const next = hidden ? advanceLocalGameWhileOpen(gameRef.current, takeHiddenTime(mono), now) : { ...gameRef.current, lastSaved: now };
+      if (hidden) pageInactiveAtRef.current = mono;
+      gameRef.current = next;
+      // No reload while the page closes; the next start reads the newest save anyway.
+      const result = persistLocalGame(next);
+      if (result !== "stale") handleLocalSave(result);
+    };
+    // The tab the player uses is the one that saves; an older tab first loads what the other one saved.
+    const claim = () => {
+      if (!isLocalSaveWriter() && claimLocalSave() === "stale") handleLocalSave("stale");
+    };
+    const onVisibility = () => {
+      if (document.hidden) {
+        markPageHidden(monotonicNow());
+        persistLocalGame({ ...gameRef.current, lastSaved: Date.now() });
+        return;
+      }
+      if (!isLocalSaveWriter() && claimLocalSave() === "stale") { handleLocalSave("stale"); return; }
+      if (pageInactiveAtRef.current === null) return;
+      const now = Date.now();
+      const elapsed = takeHiddenTime(monotonicNow());
+      pageInactiveAtRef.current = null;
+      const next = advanceLocalGameWhileOpen(gameRef.current, elapsed, now);
+      gameRef.current = next;
+      handleLocalSave(persistLocalGame(next));
+      setGame(next);
+    };
+    if (document.hidden) onVisibility();
+    window.addEventListener("beforeunload", saveOnExit);
+    window.addEventListener("pagehide", saveOnExit);
+    window.addEventListener(FLUSH_SAVE_EVENT, saveOnExit);
+    window.addEventListener("pointerdown", claim, { capture: true, passive: true });
+    window.addEventListener("keydown", claim, { capture: true, passive: true });
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => { window.removeEventListener("beforeunload", saveOnExit); window.removeEventListener("pagehide", saveOnExit); window.removeEventListener(FLUSH_SAVE_EVENT, saveOnExit); window.removeEventListener("pointerdown", claim, { capture: true }); window.removeEventListener("keydown", claim, { capture: true }); document.removeEventListener("visibilitychange", onVisibility); };
+  }, [hydrated, handleLocalSave, markPageHidden, takeHiddenTime, setGame]);
+
+  // Tutorial tasks tick off from the game itself; a league match counts at kick off, before its history exists.
+  const tutorialCup = game.features.cup;
+  useEffect(() => {
+    if (!hydrated || tutorial.status === "done") return;
+    const next = advanceTutorial(tutorial, game, featureTab);
+    if (next === tutorial) return;
+    const finished = next.status === "done";
+    window.setTimeout(() => {
+      setTutorial(next);
+      if (finished) {
+        showToast("Tutorial geschafft! Viel Erfolg mit deinem Club.");
+        addFeed("Tutorial geschafft. Jetzt gehört der Club ganz dir.", "star");
+      }
+    }, 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, tutorial, game.clicks, game.upgrades, featureTab, tutorialCup.active, tutorialCup.mode, tutorialCup.matchStartedAt, game.features.squadLock, game.features.seasonMode.history.length, game.features.seasonMode.lastMatchAt]);
+
+  const rankRange = nextRank ? nextRank.minimum - currentRank.minimum : 1;
+  const rankProgress = nextRank ? Math.max(0, Math.min(100, ((displayGame.totalGoals - currentRank.minimum) / rankRange) * 100)) : 100;
+  const activeTournament = getTournament(displayGame.features.cup.tournamentId) ?? TOURNAMENTS[0];
+  const seasonNextOpponent = getSeasonModeNextOpponent(displayGame.features.seasonMode, displayGame.features.club.name);
+  const selectedTournament = displayGame.features.cup.pendingNextRound ? activeTournament : (getTournament(selectedTournamentId) ?? TOURNAMENTS[0]);
+  const selectedTournamentUnlockLeague = getTournamentUnlockLeague(selectedTournament.id);
+  const selectedTournamentLeagueUnlocked = isLeagueContentUnlocked(selectedTournamentUnlockLeague, reachedLeague, hasFullTestAccess);
+  const allFeatureHistory = [...displayGame.features.history].reverse();
+  const featureHistoryActors = historyActors(allFeatureHistory);
+  const featureHistory = filterHistory(allFeatureHistory, historyTopic, featureHistoryActors.includes(historyActor) ? historyActor : "");
+  // The next match in one tap (Q44, Q46): the waiting cup round, else the next league matchday (or its journey).
+  const seasonFixture = fixtureFor(displayGame.features, "season");
+  const nextMatchAction = displayGame.features.cup.active || journeyUnderway ? undefined
+    : displayGame.features.cup.pendingNextRound ? { label: `${activeTournament.label} · Runde ${displayGame.features.cup.round + 1}`, disabled: coopBusy || travelBusy, onClick: () => void startCup(activeTournament.id) }
+    : seasonCareerComplete ? undefined
+    : { label: `${travelLabel(seasonFixture) === "Reise antreten" ? "Reise antreten" : "Nächstes Saisonspiel"} · Spieltag ${seasonMode.matchday + 1}`, disabled: coopBusy || travelBusy, onClick: () => void startSeasonCupMatch() };
+  const seasonTabAction = displayGame.features.cup.active ? undefined
+    : seasonCareerComplete ? { label: "Prestige starten", disabled: coopBusy || Boolean(prestigeBlockReason), note: prestigeBlockReason || undefined, onClick: openPrestigeDialog }
+    : { label: displayGame.features.cup.pendingNextRound ? "Zuerst Pokalrunde abschliessen" : `${travelLabel(seasonFixture)} · Spieltag ${seasonMode.matchday + 1}`, disabled: coopBusy || travelBusy || journeyUnderway || displayGame.features.cup.pendingNextRound || hasTransferSquadVacancy || suspendedPlayerOnSquad || !starXIComplete, note: hasTransferSquadVacancy || suspendedPlayerOnSquad || !starXIComplete ? "Die Startelf ist noch nicht vollständig. Unter Spiele steht, was fehlt." : journeyUnderway ? "Die Mannschaft ist unterwegs." : undefined, onClick: () => void startSeasonCupMatch() };
+  // "Vor dem Anpfiff" (Q25, Q45): every blocker of the next match at once, each with its fix, and the open press talk.
+  const kickoffItems: KickoffItem[] = [];
+  if (!displayGame.features.cup.active) {
+    const fillFix = squadGapCount > 0 || fillStarXIGaps(displayGame.features, { career: displayGame.features.career, cup: displayGame.features.cup }).replacements.length > 0 ? { label: "Lücken füllen", run: () => void fillSquadGaps() } : { label: "Zum Kader", run: () => openFeatureTab("squad") };
+    if (hasTransferSquadVacancy) kickoffItems.push({ id: "vacancy", text: `Freier Platz ${transferSquadVacancyLabel} nach einem Transfer.`, fix: fillFix });
+    if (suspendedPlayerOnSquad) kickoffItems.push({ id: "red", text: `${suspendedStarPlayers.map((player) => player.name).join(", ")} nach Roter Karte gesperrt.`, fix: fillFix });
+    else if (!starXIComplete) kickoffItems.push({ id: "eleven", text: `Startelf: ${startingStarXISelection.length} von ${STAR_XI_SQUAD_SIZE} Plätzen besetzt.`, fix: fillFix });
+    const banError = !seasonCareerComplete && !displayGame.features.cup.pendingNextRound ? squadBanError(displayGame.features, competitionFor("season", "stadium")) : displayGame.features.cup.pendingNextRound ? squadBanError(displayGame.features, competitionFor("tournament", displayGame.features.cup.tournamentId)) : "";
+    if (banError) kickoffItems.push({ id: "ban", text: banError, fix: fillFix });
+    if (displayGame.features.cup.pendingNextRound) kickoffItems.push({ id: "pending", tone: "hint", text: `${activeTournament.label}: Runde ${displayGame.features.cup.round + 1} wartet. Liga und Prestige kommen danach.`, fix: { label: "Turnier aufgeben", run: () => setAbandonDialog(true) } });
+    if (openActions.some((action) => action.id === "press")) kickoffItems.push({ id: "press", tone: "hint", text: `Pressekonferenz offen: +${formatNumber(getPressReward(getBasePassivePower(displayGame.upgrades, displayGame.stars, displayGame.features), getBaseClickPower(displayGame.upgrades, displayGame.stars, displayGame.features)))} Tore. Sie verfällt mit dem nächsten Anpfiff.`, fix: { label: "Antworten", run: () => document.querySelector(".press-conference")?.scrollIntoView({ behavior: "smooth", block: "center" }) } });
+  }
+  // short: the label in the phone tab bar; the button keeps the full label as its accessible name.
+  const primaryTabs: { id: FeatureTab; label: string; text?: string; short: string; icon: IconName }[] = [{id:'home',label:'Home',short:'Home',icon:'home'},{id:'cup',label:displayGame.features.cup.active?'Spiele · LIVE':'Spiele',text:'Spiele',short:'Spiele',icon:'trophy'},{id:'season',label:'Saison',short:'Saison',icon:'table'},{id:'squad',label:'Kader',short:'Kader',icon:'squad'},{id:'career',label:'Karriere',short:'Karriere',icon:'career'},{id:'packs',label:'Packs & Album',short:'Packs',icon:'cards'},{id:'club',label:'Club & Mehr',short:'Club',icon:'shield'}];
+  const featureTabs: {id:FeatureTab;label:string}[] = ['packs','album'].includes(featureTab) ? [{id:'packs',label:'Packshop'},{id:'album',label:'Sammelalbum'}] : ['club','fabrizio','missions','leaderboard','history'].includes(featureTab) ? [{id:'club',label:'Clubprofil'},{ id: "fabrizio", label: "Fabrizio" },{id:'missions',label:'Wochenziele'},{id:'leaderboard',label:'Rangliste'},{id:'history',label:'Verlauf'}] : [];
+  const primarySection = primarySectionOf(featureTab);
+  // Desktop shortcuts (Q61): 1 to 7 open the main tabs, the arrow keys aim in the shootout; Escape closes dialogs.
+  const shortcutRef = useRef<(event: globalThis.KeyboardEvent) => void>(() => undefined);
+  shortcutRef.current = (event) => {
+    const target = event.target as HTMLElement | null;
+    if (document.querySelector('[role="dialog"][aria-modal="true"]:not(.cup-penalty-takeover)')) return;
+    const action = shortcutFor({ key: event.key, altKey: event.altKey, ctrlKey: event.ctrlKey, metaKey: event.metaKey, repeat: event.repeat, targetTag: target?.tagName, editable: Boolean(target?.isContentEditable) }, penaltyOverlayOpen);
+    if (!action) return;
+    if (action.kind === "penalty") { event.preventDefault(); void takeCupPenalty(action.direction); return; }
+    if (appMode !== "single" && !isCoopLive) return;
+    const tab = primaryTabs[action.index];
+    if (tab) { openFeatureTab(tab.id); setLayoutEditMode(false); }
+  };
+  useEffect(() => {
+    const onKey = (event: globalThis.KeyboardEvent) => shortcutRef.current(event);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  // Invite link (Q60): "?join=ABC123" fills in the room code and opens the co-op lobby once.
+  useEffect(() => {
+    if (!hydrated) return;
+    const code = joinCodeFromSearch(window.location.search);
+    if (!code) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("join");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    const timer = window.setTimeout(() => {
+      setCoopCodeInput(code);
+      if (guest) setGuestCoopPrompt(true);
+      else { setAppMode("coop"); setCoopMessage(`Einladung zu Raum ${code}. Prüfe deinen Namen und tippe auf Beitreten.`); }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [hydrated, guest]);
+
+
+  return (
+    <div className={`app-shell section-${featureTab}${displayGame.features.cup.active && featureTab === "cup" ? " match-in-progress" : ""}`}>
+      <header className="topbar">
+        <div className="brand-lockup"><div className="brand-ball"><FootballGraphic /></div><div className="brand-copy"><p className="eyebrow">FOOTBALL IDLE CLUB</p><h1>GOAL <span>CLICKER</span></h1></div></div>
+        <div className={`header-goals${goalBoostActive ? " goal-boost-active" : ""}`} role="group" aria-label={`Aktueller Kontostand: ${hasInfiniteMoney ? "unbegrenzt" : formatNumber(displayGame.goals)} Tore${goalBoostActive ? `; ${goalBoostLabel}-facher Goalboost noch ${goalBoostCountdown}` : ""}`}><span>{hasInfiniteMoney ? "AZB TESTMODUS" : "AKTUELLER STAND"}</span><strong>{displayBalance}</strong><small>TORE</small>{goalBoostActive && <em className="header-goal-boost">⚡ {goalBoostLabel}× · {goalBoostCountdown}</em>}{seasonMode.prestigeCount > 0 && <em className="header-prestige" title={prestigeBonusLabel(seasonMode.prestigeCount)}><span className="header-prestige-long">Prestige {seasonMode.prestigeCount} · </span>+{prestigeBonusPercent(seasonMode.prestigeCount)} % Tore</em>}{navBadges.season && <button type="button" className="header-prestige-ready" onClick={() => openFeatureTab("season")}>★ Prestige bereit</button>}</div>
+        <div className="top-actions"><AccountButton /><button className="icon-button bell-button" aria-label={unreadHistory ? `Benachrichtigungsverlauf, ${unreadHistory} neu` : "Benachrichtigungsverlauf"} onClick={()=>openFeatureTab("history")}><Icon name="bell" size={18} />{unreadHistory > 0 && <span className="bell-count" aria-hidden="true">{unreadHistory > 9 ? "9+" : unreadHistory}</span>}</button><button className="icon-button" onClick={toggleSound} aria-label={game.sound ? "Sound ausschalten" : "Sound einschalten"}><Icon name={game.sound ? "sound" : "mute"} size={17} /></button>{vibrationSupported && <button className={`icon-button vibration-toggle${vibrationEnabled ? "" : " off"}`} onClick={toggleVibration} aria-pressed={vibrationEnabled} aria-label={vibrationEnabled ? "Vibration ausschalten" : "Vibration einschalten"}><Icon name="vibrate" size={18} /></button>}</div>
+      </header>
+
+      {seasonTitle && <SeasonTrophyCelebration title={seasonTitle} clubName={displayClubName} onClose={() => setSeasonTitle(null)} />}
+      {whatsNewOpen && WHATS_NEW[0] && <WhatsNewDialog entry={WHATS_NEW[0]} onClose={closeWhatsNew} />}
+      {whatsNewArchive && !whatsNewOpen && WHATS_NEW[0] && <WhatsNewDialog entry={WHATS_NEW[0]} archive={WHATS_NEW} onClose={() => setWhatsNewArchive(false)} />}
+      {hydrated && tutorial.status === "intro" && !starReveal && !whatsNewOpen && appMode === "single" && <TutorialIntroDialog onStart={() => setTutorial({ ...tutorial, status: "active" })} onSkip={endTutorial} />}
+      {guestCoopPrompt && guest && <ConfirmDialog title="Koop braucht ein Konto" confirmLabel="Anmelden" onCancel={() => setGuestCoopPrompt(false)} onConfirm={() => { setGuestCoopPrompt(false); guest.signIn(); }}>
+        <p>Als Gast spielst du nur Einzelspieler. Melde dich an oder erstelle ein Konto, um mit anderen in einer Koop Welt zu spielen. Hat dein Konto noch keinen Spielstand, nimmt es deinen Gast Spielstand mit.</p>
+      </ConfirmDialog>}
+      {prestigeDialog && <PrestigeDialog features={displayGame.features} goals={displayGame.goals} upgradeLevels={Object.values(displayGame.upgrades).reduce((sum, level) => sum + level, 0)} busy={coopBusy} error={prestigeDialog.error} voteMembers={isCoopLive ? otherCoopOnlineCount : 0} onCancel={() => setPrestigeDialog(null)} onConfirm={(keepNormalId) => void confirmSeasonPrestige(keepNormalId)} />}
+      {coopPrestigeVote && coopSession && !prestigeDialog && hiddenPrestigeVote !== coopPrestigeVote.id && <PrestigeVoteDialog vote={coopPrestigeVote} room={coopSession.room} busy={coopBusy} onApprove={() => void answerPrestigeVote("approve")} onDecline={() => void answerPrestigeVote("decline")} onHide={() => setHiddenPrestigeVote(coopPrestigeVote.id)} />}
+      {seatDialog?.kind === "leave" && coopSession && <ConfirmDialog title="Platz in dieser Welt freigeben?" confirmLabel="Platz freigeben" onCancel={() => setSeatDialog(null)} onConfirm={() => void leaveCoopSeat()}>
+        <p>Du verlässt {coopSession.room.roomName} für immer. Der gemeinsame Spielstand bleibt für die anderen vollständig erhalten, auch deine bisherigen Tore und Klicks zählen weiter.</p>
+        <p>{coopSession.role === "host" ? "Die Host Rolle geht an das Mitglied, das zuletzt aktiv war. " : ""}Mit dem Raumcode {coopSession.code} kannst du später wieder beitreten, solange ein Platz frei ist.</p>
+      </ConfirmDialog>}
+      {seatDialog?.kind === "kick" && <ConfirmDialog title={`${seatDialog.name} entfernen?`} confirmLabel={seatDialog.inactive ? "Entfernen" : "Trotzdem entfernen"} onCancel={() => setSeatDialog(null)} onConfirm={() => void kickCoopMember(seatDialog.role, seatDialog.name, !seatDialog.inactive)}>
+        <p>{seatDialog.inactive ? `${seatDialog.name} war seit mindestens ${coopSession?.room.inactiveDays ?? 7} Tagen nicht mehr aktiv (${seatDialog.activity}).` : `${seatDialog.name} war in den letzten ${coopSession?.room.inactiveDays ?? 7} Tagen aktiv (${seatDialog.activity || "kürzlich"}). Entferne nur, wenn ihr das so abgesprochen habt.`}</p>
+        <p>Der Platz wird frei, der gemeinsame Spielstand bleibt unverändert. {seatDialog.name} kann mit dem Raumcode wieder beitreten, solange ein Platz frei ist.</p>
+      </ConfirmDialog>}
+      {abandonDialog && <ConfirmDialog title={`${activeTournament.label} aufgeben?`} confirmLabel="Turnier aufgeben" onCancel={() => setAbandonDialog(false)} onConfirm={() => void abandonTournament()}>
+        <p>Der Turnierlauf endet nach Runde {displayGame.features.cup.round} wie ein Ausscheiden: keine Trophäe und keine Turnierprämie. Danach sind Ligaspiele und Prestige wieder frei, das nächste Turnier nach der üblichen Pause.</p>
+      </ConfirmDialog>}
+      {bestXIPreview && <ConfirmDialog title="Beste Startelf übernehmen?" confirmLabel={`Übernehmen (${formatRatingDelta(bestXIPreview.rating - bestXIPreview.before)})`} onCancel={() => setBestXIPreview(null)} onConfirm={() => void applyBestStarXI()}>
+        <p>Teamwertung {bestXIPreview.before} → {bestXIPreview.rating} OVR{bestXIPreview.bench ? ` · ${bestXIPreview.bench} neue Bankspieler` : ""}.</p>
+        {bestXIPreview.changes.length > 0 ? <ul className="best-xi-changes">{bestXIPreview.changes.map((change) => <li key={change.slot}><b>{change.position}</b> {getStarXIPlayer(change.inId)?.name ?? "offen"}{change.outId ? <> für {getStarXIPlayer(change.outId)?.name ?? "Spieler"}</> : " (freier Platz)"}</li>)}</ul> : <p>Die Startelf bleibt gleich, nur die Bank ändert sich.</p>}
+        {!isCoopLive && <p>Danach kannst du einmal rückgängig machen.</p>}
+      </ConfirmDialog>}
+      {confirmSingle && <ConfirmDialog title="Zum Singleplayer wechseln?" confirmLabel="Wechseln" onCancel={() => setConfirmSingle(false)} onConfirm={() => { setConfirmSingle(false); notifyCoopOffline(coopSession?.code, coopSession?.playerId); setAppMode("single"); }}>
+        <p>{coopSession ? `Du verlässt „${coopSession.room.roomName}“. Die Welt bleibt gespeichert und du kannst jederzeit zurück.` : "Du verlässt den Koop Multiplayer und spielst mit deinem eigenen Spielstand weiter."}</p>
+      </ConfirmDialog>}
+      <nav className="mode-switch" aria-label="Spielmodus">
+        <button className={appMode === "single" ? "active" : ""} onClick={() => { if (appMode === "coop") setConfirmSingle(true); }}>Singleplayer</button>
+        <button className={appMode === "coop" ? "active" : ""} onClick={() => guest ? setGuestCoopPrompt(true) : setAppMode("coop")}>Koop Multiplayer{guest ? " 🔒" : ""}</button>
+      </nav>
+      <AccountLink playerId={playerId} onPlayerId={adoptAccountPlayerId} onMessage={accountMessage} />
+
+      {hydrated && appMode === "single" && tutorial.status === "active" && <TutorialCoach state={tutorial} game={game} onShow={showTutorialStep} onEnd={endTutorial} />}
+      {(appMode === 'single' || isCoopLive) && <nav className="section-navigation" aria-label="Hauptnavigation">{primaryTabs.map(tab=><button type="button" key={tab.id} aria-label={tab.label} title={navBadges[tab.id as keyof typeof navBadges]?.join(", ")} aria-current={primarySection===tab.id?'page':undefined} className={primarySection===tab.id?'active':''} onClick={()=>{openFeatureTab(tab.id==='club'&&pendingTransferOffer&&primarySection!=='club'?'fabrizio':tab.id);setLayoutEditMode(false);}}><span className="tab-icon"><Icon name={tab.icon} size={22} />{tab.id==='cup'&&displayGame.features.cup.active&&<i className="tab-live-dot" aria-hidden="true" />}{tab.id==='club'&&pendingTransferOffer&&<i className="tab-live-dot offer" aria-hidden="true" />}{navBadges[tab.id as keyof typeof navBadges]&&!(tab.id==='cup'&&displayGame.features.cup.active)&&!(tab.id==='club'&&pendingTransferOffer)&&<i className="tab-live-dot action" aria-hidden="true" />}</span><span className="tab-label-full">{tab.text ?? tab.label}{tab.id==='cup'&&displayGame.features.cup.active&&<span className="tab-live-badge" aria-hidden="true">LIVE</span>}</span><span className="tab-label-short" aria-hidden="true">{tab.short}</span></button>)}</nav>}
+      {(appMode === "single" || isCoopLive) && <main className={`clicker-layout${isCoopLive ? " coop-clicker-layout" : ""}`}>
+        {isCoopLive && coopSession && <><div className="coop-inline-room-bar"><div><p className="eyebrow">KOOP / {coopSession.room.roomName}</p><strong>{coopSession.code}</strong><span>{occupiedCoopPlayers(coopSession.room).map((player) => player.name).join(" · ")}</span></div><div className="coop-inline-room-actions"><span className={`coop-presence${otherCoopOnline ? " online" : ""}`}><i />{otherCoopOnline ? `${otherCoopOnlineCount} ${otherCoopOnlineCount === 1 ? "MITSPIELER" : "MITSPIELER"} ONLINE` : "MITSPIELER OFFLINE"}</span><span className="coop-live-badge">{coopSession.room.playerCount} / 4 SPIELER</span><span className="coop-live-badge">{hasInfiniteMoney ? "AZB VOLLZUGRIFF" : "GEMEINSAM GESPEICHERT"}</span>{coopBusy && <span className="coop-pending-chip" role="status">Wird gespeichert …</span>}{!coopBusy && coopFailed && <button type="button" className="coop-pending-chip failed" onClick={() => { const failed = coopFailed; setCoopFailed(null); void sendCoopAction(failed.action, failed.extra); }}>Nicht gespeichert · erneut senden</button>}<button className="mode-secondary" onClick={() => void shareInvite()}>Einladen</button><button className="mode-secondary" onClick={() => void copyCoopCode()}>Code kopieren</button>{coopSession.role === "host" && <button className="mode-secondary danger" onClick={() => void deleteCoopRoom(coopSession.code)}>Raum löschen</button>}<button className="mode-secondary quiet" onClick={leaveCoopRoom}>Verlassen</button>{coopPrestigeVote && hiddenPrestigeVote === coopPrestigeVote.id && <button className="mode-secondary" onClick={() => setHiddenPrestigeVote("")}>Prestige Abstimmung zeigen</button>}</div></div><div className="coop-world-tools"><div><p className="eyebrow">WELT VERWALTEN</p>{coopSession.role === "host" ? <div className="coop-tool-input"><input className="mode-input" value={coopRoomName} maxLength={28} onChange={(event) => setCoopRoomName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !coopBusy) { event.preventDefault(); void renameCoopRoom(); } }} aria-label="Name der Welt" /><button className="mode-secondary" onClick={() => void renameCoopRoom()} disabled={coopBusy}>Name speichern</button></div> : <strong>{coopSession.room.roomName}</strong>}</div><div className="coop-members"><p className="eyebrow">MITGLIEDER</p><ul>{occupiedCoopPlayers(coopSession.room).map((player) => { const activity = coopLastActiveLabel(player); return <li key={player.role}><span><strong>{player.name ?? coopRoleLabel(player.role)}</strong><small>{player.role === "host" ? "Host" : coopRoleLabel(player.role)}{player.role === coopSession.role ? " · du" : ""}{activity ? ` · ${activity}` : ""}{player.inactive ? " · inaktiv" : ""}</small></span>{coopSession.role === "host" && player.role !== "host" && <button className="mode-secondary quiet" disabled={coopBusy} onClick={() => setSeatDialog({ kind: "kick", role: player.role, name: player.name ?? coopRoleLabel(player.role), inactive: Boolean(player.inactive), activity })}>Entfernen</button>}</li>; })}</ul>{coopSession.room.playerCount > 1 ? <button className="mode-secondary quiet danger" disabled={coopBusy} onClick={() => setSeatDialog({ kind: "leave" })}>Platz freigeben</button> : <small>Du bist das letzte Mitglied. Lösche die Welt, wenn du sie nicht mehr brauchst.</small>}<small className="coop-members-note">Wer {coopSession.room.inactiveDays ?? 7} Tage nicht aktiv war, kann vom Host entfernt werden. Ist der Host so lange weg, übernimmt das zuletzt aktive Mitglied.</small></div></div></>}
+        <div className={`layout-toolbar${layoutEditMode ? " active" : " compact"}`}>
+          {layoutEditMode && <div><p className="eyebrow">ANSICHT / LAYOUT</p><strong>Karten im Raster anordnen.</strong><small>Zieh den Griff. Beim Loslassen rastet jede Karte im nächsten Slot ein. Die Anordnung bleibt auf diesem Gerät gespeichert.</small></div>}
+          <div className="layout-toolbar-actions">{layoutEditMode && <button className="mode-secondary" onClick={resetLayout}>Standard</button>}<button className={layoutEditMode ? "mode-primary" : "mode-secondary"} onClick={() => { setLayoutEditMode((current) => !current); setDraggingLayoutCard(null); setDragOverLayoutCard(null); }}>{layoutEditMode ? "Fertig" : "Ansicht bearbeiten"}</button></div>
+        </div>
+        <section className={layoutCardClass("hero", "click-zone-card")} style={{ order: layoutOrderNumber("hero") }} onDragOver={(event) => handleLayoutDragOver(event, "hero")} onDrop={(event) => handleLayoutDrop(event, "hero")}>
+          {layoutEditMode && <div className="layout-card-handle" draggable onDragStart={(event) => handleLayoutDragStart(event, "hero")} onDragEnd={handleLayoutDragEnd} aria-label="Ball und Turniere verschieben"><span className="layout-handle-grip" aria-hidden="true"><Icon name="grip" size={18} /></span><div><strong>Ball und Turniere</strong><small>ziehen und im Raster ablegen</small></div><div className="layout-order-controls"><button type="button" onClick={(event) => { event.stopPropagation(); moveLayoutCard("hero", -1); }} aria-label="Ballkarte nach oben">↑</button><button type="button" onClick={(event) => { event.stopPropagation(); moveLayoutCard("hero", 1); }} aria-label="Ballkarte nach unten">↓</button></div></div>}
+          <div className="panel-intro"><div><p className="eyebrow">{isCoopLive ? "CO-OP CAREER / LIVE MATCH" : "CAREER MODE / 01"}</p><h2>{isCoopLive ? <>Gemeinsam<br /><span>zum Sieg.</span></> : <>Build your<br /><span>football empire.</span></>}</h2><p className="intro-copy">{isCoopLive ? `Bis zu vier Spieler. Ein gemeinsamer Club. Aktuell ${coopSession?.room.playerCount ?? 2} dabei.` : "Ein Klick. Ein Tor. Eine völlig übertriebene Karriere."}</p></div><div className="career-badges"><div className="rank-badge"><span className="rank-symbol"><Icon name={currentRank.icon} size={21} /></span><div><small>{isCoopLive ? "TEAM RANG" : "DEIN RANG"}</small><strong>{currentRank.name}</strong></div></div><div className="season-chip" title={currentSeasonMilestone.title}><Icon name="star" size={14} /><span>SAISON {currentSeason}</span><strong>★ {displayGame.stars}</strong></div></div></div>
+          {hydrated && <NextStepsStrip actions={openActions} onOpen={openActionTarget} />}
+          <div className="score-display"><span className="score-label">{hasInfiniteMoney ? "UNBEGRENZTES TESTGUTHABEN" : isCoopLive ? "GEMEINSAME TORE" : "DEINE TORE"}</span><strong>{displayBalance}</strong><span className="per-click-label">+{formatNumber(clickPower)} {isCoopLive ? "pro Team-Klick" : "pro Klick"}</span>{savingsGoal && savingsTarget && !hasInfiniteMoney && <SavingsGoalBar goal={savingsGoal} label={savingsTarget.label} cost={savingsTarget.cost} goals={displayGame.goals} passivePerSecond={passivePower} format={formatNumber} onClear={() => setSavingsGoal(null)} onOpen={() => { if (savingsGoal.kind === "pack") openFeatureTab("packs"); else { openFeatureTab("home"); window.setTimeout(() => document.querySelector(".shop-card")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); } }} />}</div>
+          <div className="ball-stage" ref={stageRef}>
+            <div className="stadium-glow" /><div className="stadium-lights"><span /><span /><span /><span /><span /></div><div className="field-circle" /><div className="field-line field-line-one" /><div className="field-line field-line-two" /><div className="field-label">{isCoopLive ? "CO-OP CLICKER ARENA" : "GOAL CLICKER ARENA"}</div>
+            <ClickBallButton store={clickFeedback} coop={isCoopLive} onClick={handleBallClick} onKeyDown={handleBallKeyDown} />
+            <p className="click-label"><span>CLICK</span> den Ball {isCoopLive ? "fürs Team" : "für Tore"}</p>
+            <FloatingClickNumbers store={clickFeedback} />
+            <ComboMeter store={clickFeedback} paused={comboPaused} />
+          </div>
+          <div className="production-strip"><div className="production-item"><span className="production-icon">/s</span><div><small>PRO SEKUNDE</small><strong>{formatNumber(passivePower)}</strong></div></div><div className="production-divider" /><div className="production-item"><span className="production-icon">+1</span><div><small>PRO KLICK</small><strong>{formatNumber(clickPower)}</strong></div></div><div className="production-divider" /><div className="production-item"><span className="production-icon">#</span><div><small>KLICKS</small><strong>{formatNumber(displayGame.clicks)}</strong></div></div></div>
+          {hydrated && (!isCoopLive || coopSession) && <DailyRewardCard state={isCoopLive ? mergeDailyRewardsForWorld(displayGame.features.dailyRewards) : displayGame.features.dailyRewards} claimKey={isCoopLive ? WORLD_DAILY_KEY : "solo"} now={countdownNow} passivePerSecond={getBasePassivePower(displayGame.upgrades, displayGame.stars, displayGame.features)} clickPower={getBaseClickPower(displayGame.upgrades, displayGame.stars, displayGame.features)} busy={dailyBusy || coopBusy} coop={isCoopLive} onClaim={() => { void claimDaily(); }} format={formatNumber} />}
+          {!activeMiniGame && <div className="mini-game-hub">
+            <div className="mini-game-hub-heading"><div><p className="eyebrow">STADION / ARCADE</p><h3>Matchday Minigames</h3></div><span>ROTIEREND</span></div>
+            <div className="mini-game-grid">
+              <button className={`mini-game-card${isMiniGameOnCooldown("penalty") ? " cooldown" : ""}`} disabled={isMiniGameOnCooldown("penalty")} onClick={startPenaltyGame} aria-label={`${MINI_GAME_NAMES.penalty}${isMiniGameOnCooldown("penalty") ? `, ${miniGameCooldownLabel("penalty", "bereit")}` : " starten"}`}><span className="mini-game-icon"><Icon name="star" size={17} /></span><span className="mini-game-card-copy"><small>MINIGAME / 01</small><strong>Penalty Challenge</strong><em>{miniGameCooldownLabel("penalty", "5 Schüsse · Präzision")}</em></span><b>{isMiniGameOnCooldown("penalty") ? "◷" : "↗"}</b></button>
+              <button className={`mini-game-card${isMiniGameOnCooldown("dribble") ? " cooldown" : ""}`} disabled={isMiniGameOnCooldown("dribble")} onClick={startDribbleGame} aria-label={`${MINI_GAME_NAMES.dribble}${isMiniGameOnCooldown("dribble") ? `, ${miniGameCooldownLabel("dribble", "bereit")}` : " starten"}`}><span className="mini-game-icon"><Icon name="striker" size={17} /></span><span className="mini-game-card-copy"><small>MINIGAME / 02</small><strong>Dribble Run</strong><em>{miniGameCooldownLabel("dribble", "Muster · Ballkontrolle")}</em></span><b>{isMiniGameOnCooldown("dribble") ? "◷" : "↗"}</b></button>
+              <button className={`mini-game-card${isMiniGameOnCooldown("crossbar") ? " cooldown" : ""}`} disabled={isMiniGameOnCooldown("crossbar")} onClick={startCrossbarGame} aria-label={`${MINI_GAME_NAMES.crossbar}${isMiniGameOnCooldown("crossbar") ? `, ${miniGameCooldownLabel("crossbar", "bereit")}` : " starten"}`}><span className="mini-game-icon"><Icon name="stadium" size={17} /></span><span className="mini-game-card-copy"><small>MINIGAME / 03</small><strong>Latten Challenge</strong><em>{miniGameCooldownLabel("crossbar", "5 Versuche · Timing")}</em></span><b>{isMiniGameOnCooldown("crossbar") ? "◷" : "↗"}</b></button>
+              <button className={`mini-game-card${isMiniGameOnCooldown("prediction") ? " cooldown" : ""}`} disabled={isMiniGameOnCooldown("prediction")} onClick={startPredictionGame} aria-label={`${MINI_GAME_NAMES.prediction}${isMiniGameOnCooldown("prediction") ? `, ${miniGameCooldownLabel("prediction", "bereit")}` : " starten"}`}><span className="mini-game-icon"><Icon name="broadcast" size={17} /></span><span className="mini-game-card-copy"><small>MINIGAME / 04</small><strong>Matchday Tipp</strong><em>{miniGameCooldownLabel("prediction", "3 Tipps · Glück")}</em></span><b>{isMiniGameOnCooldown("prediction") ? "◷" : "↗"}</b></button>
+            </div>
+          </div>}
+          {activeMiniGame === "penalty" && penaltyGame && <div className="mini-game-panel"><div className="mini-game-head"><div><p className="eyebrow">MINIGAME / 01 · PRÄZISION</p><h3>Penalty Challenge</h3></div><button className="mini-game-close" onClick={closeMiniGame} aria-label="Penalty Challenge schliessen">×</button></div><div className="penalty-meta"><span>{penaltyGame.shots} / 5 Schüsse</span><strong>{penaltyGame.goals} Tore</strong></div><div className="penalty-progress"><div style={{ width: `${(penaltyGame.shots / 5) * 100}%` }} /></div>{!penaltyGame.finished ? <div className="penalty-buttons">{PENALTY_DIRECTIONS.map((direction) => <button key={direction} onClick={() => takePenalty(direction)}><span>{directionLabel(direction)}</span><small>Schuss</small></button>)}</div> : <div className="mini-game-result"><strong>{penaltyGame.goals} / 5</strong><span>{penaltyGame.message}</span><button className="mini-game-again" disabled={isMiniGameOnCooldown("penalty")} onClick={startPenaltyGame}>{isMiniGameOnCooldown("penalty") ? `Bereit in ${formatCountdown(displayGame.miniGameCooldowns.penalty, countdownNow)}` : "Neue Runde"}</button></div>}<p className="mini-game-message">{penaltyGame.finished ? "Die Prämie wurde deinem Spielstand gutgeschrieben." : penaltyGame.message}</p></div>}
+          {activeMiniGame === "dribble" && dribbleGame && <div className="mini-game-panel"><div className="mini-game-head"><div><p className="eyebrow">MINIGAME / 02 · BALLKONTROLLE</p><h3>Dribble Run</h3></div><button className="mini-game-close" onClick={closeMiniGame} aria-label="Dribble Run schliessen">×</button></div><p className="mini-game-intro">Folge dem Muster und bring den Ball durch sechs Hütchen.</p><div className="dribble-sequence" aria-label="Dribbling Muster">{dribbleGame.sequence.map((direction, index) => <span className={index < dribbleGame.step ? "done" : index === dribbleGame.step ? "current" : ""} key={`${direction}-${index}`}>{directionLabel(direction)}</span>)}</div><div className="penalty-meta"><span>{dribbleGame.step} / 6 Hütchen</span><strong>{dribbleGame.misses} Fehler</strong></div><div className="penalty-progress"><div style={{ width: `${(dribbleGame.step / dribbleGame.sequence.length) * 100}%` }} /></div>{!dribbleGame.finished ? <div className="penalty-buttons">{PENALTY_DIRECTIONS.map((direction) => <button key={direction} onClick={() => takeDribble(direction)}><span>{directionLabel(direction)}</span><small>Move</small></button>)}</div> : <div className="mini-game-result"><strong>{dribbleGame.step} / 6</strong><span>{dribbleGame.message}</span><button className="mini-game-again" disabled={isMiniGameOnCooldown("dribble")} onClick={startDribbleGame}>{isMiniGameOnCooldown("dribble") ? `Bereit in ${formatCountdown(displayGame.miniGameCooldowns.dribble, countdownNow)}` : "Neue Runde"}</button></div>}<p className="mini-game-message">{dribbleGame.message}</p></div>}
+          {activeMiniGame === "crossbar" && crossbarGame && <div className="mini-game-panel"><div className="mini-game-head"><div><p className="eyebrow">MINIGAME / 03 · TIMING</p><h3>Latten Challenge</h3></div><button className="mini-game-close" onClick={closeMiniGame} aria-label="Latten Challenge schliessen">×</button></div><p className="mini-game-intro">Die Latte bewegt sich. Triff fünfmal die richtige Höhe.</p><div className="penalty-meta"><span>{crossbarGame.shots} / 5 Schüsse</span><strong>{crossbarGame.hits} Treffer</strong></div><div className="penalty-progress"><div style={{ width: `${(crossbarGame.shots / 5) * 100}%` }} /></div>{!crossbarGame.finished ? <div className="penalty-buttons crossbar-buttons">{CROSSBAR_HEIGHTS.map((height) => <button key={height} onClick={() => takeCrossbar(height)}><span>{heightLabel(height)}</span><small>Schuss</small></button>)}</div> : <div className="mini-game-result"><strong>{crossbarGame.hits} / 5</strong><span>{crossbarGame.message}</span><button className="mini-game-again" disabled={isMiniGameOnCooldown("crossbar")} onClick={startCrossbarGame}>{isMiniGameOnCooldown("crossbar") ? `Bereit in ${formatCountdown(displayGame.miniGameCooldowns.crossbar, countdownNow)}` : "Neue Runde"}</button></div>}<p className="mini-game-message">{crossbarGame.message}</p></div>}
+          {activeMiniGame === "prediction" && predictionGame && <div className="mini-game-panel"><div className="mini-game-head"><div><p className="eyebrow">MINIGAME / 04 · MATCHDAY</p><h3>Matchday Tipp</h3></div><button className="mini-game-close" onClick={closeMiniGame} aria-label="Matchday Tipp schliessen">×</button></div><p className="mini-game-intro">Der Anpfiff ist gleich. Tippe drei fiktive Spiele richtig.</p><div className="penalty-meta"><span>{predictionGame.round} / 3 Tipps</span><strong>{predictionGame.wins} richtig</strong></div><div className="penalty-progress"><div style={{ width: `${(predictionGame.round / 3) * 100}%` }} /></div>{!predictionGame.finished ? <div className="prediction-buttons">{MATCH_PREDICTIONS.map((prediction) => <button key={prediction} onClick={() => takePrediction(prediction)}><span>{predictionLabel(prediction)}</span><small>Tipp abgeben</small></button>)}</div> : <div className="mini-game-result"><strong>{predictionGame.wins} / 3</strong><span>{predictionGame.message}</span><button className="mini-game-again" disabled={isMiniGameOnCooldown("prediction")} onClick={startPredictionGame}>{isMiniGameOnCooldown("prediction") ? `Bereit in ${formatCountdown(displayGame.miniGameCooldowns.prediction, countdownNow)}` : "Neue Runde"}</button></div>}<p className="mini-game-message">{predictionGame.message}</p></div>}
+        </section>
+
+        <section className={layoutCardClass("shop", "shop-card")} style={{ order: layoutOrderNumber("shop") }} onDragOver={(event) => handleLayoutDragOver(event, "shop")} onDrop={(event) => handleLayoutDrop(event, "shop")}><div className="layout-card-handle" draggable={layoutEditMode} onDragStart={(event) => handleLayoutDragStart(event, "shop")} onDragEnd={handleLayoutDragEnd} aria-label="Verstärkungen verschieben">{layoutEditMode && <><span className="layout-handle-grip" aria-hidden="true"><Icon name="grip" size={18} /></span><div><strong>Verstärkungen</strong><small>ziehen und im Raster ablegen</small></div><div className="layout-order-controls"><button type="button" onClick={(event) => { event.stopPropagation(); moveLayoutCard("shop", -1); }} aria-label="Verstärkungen nach oben">↑</button><button type="button" onClick={(event) => { event.stopPropagation(); moveLayoutCard("shop", 1); }} aria-label="Verstärkungen nach unten">↓</button></div></>}</div><div className="shop-header"><div><p className="eyebrow">CLUB OFFICE / {UPGRADES.length} AUSBAUSTUFEN</p><h2>Verstärkungen</h2><small className="shop-subtitle">{displayGame.features.cup.active ? "Live Match · Upgrades bleiben kaufbar" : hasFullTestAccess ? "AZB Vollzugriff · alle Stufen verfügbar" : "Saison für Saison wächst dein Club"}</small></div><div className="shop-balance"><span>{displayBalance}</span> TORE</div></div><div className="bulk-buy-bar"><div><span>KAUFMENGE</span><small>Mehrere Level mit einem Klick</small></div><div className="bulk-options" role="group" aria-label="Kaufmenge">{PURCHASE_MODES.map((mode) => <button className={purchaseMode === mode ? "active" : ""} key={String(mode)} onClick={() => setPurchaseMode(mode)}>{mode === "max" ? "MAX" : `x${mode}`}</button>)}</div></div><div className="shop-tabs" role="tablist"><button className={`tab-button${activeTab === "all" ? " active" : ""}`} onClick={() => setActiveTab("all")} role="tab">Alle</button><button className={`tab-button${activeTab === "click" ? " active" : ""}`} onClick={() => setActiveTab("click")} role="tab">Klicks</button><button className={`tab-button${activeTab === "auto" ? " active" : ""}`} onClick={() => setActiveTab("auto")} role="tab">Automatisch</button></div><div className="upgrade-list">{visibleUpgrades.map((upgrade) => { const level = getLevel(displayGame.upgrades, upgrade.id); const unlockLeague = getUpgradeUnlockLeague(upgrade.id); const unlocked = level > 0 || isLeagueContentUnlocked(unlockLeague, reachedLeague, hasFullTestAccess); const purchase = getBulkPurchase(upgrade, displayGame.upgrades, spendableGoals, purchaseMode, hasInfiniteMoney); const affordable = unlocked && purchase.count > 0; const nextCost = getCost(upgrade, displayGame.upgrades); const purchaseLabel = !unlocked ? `Liga ${unlockLeague}` : purchase.count === 0 ? (nextCost === Infinity ? "MAX" : "Preis") : purchaseMode === "max" ? `MAX · x${purchase.count}` : purchaseMode === 1 ? "kaufen" : `x${purchase.count} kaufen`; const buttonCost = purchase.count > 0 ? purchase.totalCost : nextCost; return <div className={`upgrade-item${affordable ? " affordable" : ""}${unlocked ? "" : " season-locked"}`} key={upgrade.id}><div className="upgrade-icon"><Icon name={upgrade.icon} size={20} /></div><div className="upgrade-copy"><strong>{upgrade.name}</strong><small>{unlocked ? getUpgradeEffect(upgrade, level) : `Verfügbar ab Liga ${unlockLeague}`}</small><span className="upgrade-level">{unlocked ? `LEVEL ${level}` : "NOCH GESPERRT"}</span>{unlocked && !hasInfiniteMoney && <UpgradeHints gain={upgradeGains.get(upgrade.id)!} best={bestValueUpgradeId === upgrade.id} goals={displayGame.goals} passivePerSecond={passivePower} pinned={savingsGoal?.kind === "upgrade" && savingsGoal.id === upgrade.id} onPin={() => toggleSavingsGoal({ kind: "upgrade", id: upgrade.id })} format={formatNumber} />}</div><button className="buy-button" disabled={!affordable || coopBusy} onClick={() => void buyUpgrade(upgrade)} aria-label={`${upgrade.name} ${purchaseLabel}`}>{unlocked ? hasInfiniteMoney ? "∞" : formatNumber(buttonCost) : "🔒"}<br /><small>{purchaseLabel}</small></button></div>; })}</div></section>
+
+        <section className={layoutCardClass("feature", "feature-card")} style={{ order: layoutOrderNumber("feature") }} onDragOver={(event) => handleLayoutDragOver(event, "feature")} onDrop={(event) => handleLayoutDrop(event, "feature")}>
+          {layoutEditMode && <div className="layout-card-handle" draggable onDragStart={(event) => handleLayoutDragStart(event, "feature")} onDragEnd={handleLayoutDragEnd} aria-label="Club World verschieben"><span className="layout-handle-grip" aria-hidden="true"><Icon name="grip" size={18} /></span><div><strong>Club World</strong><small>ziehen und im Raster ablegen</small></div><div className="layout-order-controls"><button type="button" onClick={(event) => { event.stopPropagation(); moveLayoutCard("feature", -1); }} aria-label="Club World nach oben">↑</button><button type="button" onClick={(event) => { event.stopPropagation(); moveLayoutCard("feature", 1); }} aria-label="Club World nach unten">↓</button></div></div>}
+          <div className="feature-card-heading"><div><p className="eyebrow">CLUB WORLD / NEUE MÖGLICHKEITEN</p><h2>Mehr als nur klicken.</h2><p>Saisonpartien, Packs, Clubidentität und Ereignisse sorgen für neue Entscheidungen.</p></div><span className="feature-card-icon" style={{ color: displayGame.features.club.color, borderColor: `${displayGame.features.club.color}35` }}>{displayGame.features.club.badge}</span></div>
+
+          {featureTabs.length>0 && <div className="feature-tabs" role="tablist" aria-label="Club World"><div>{featureTabs.map((tab) => <button key={tab.id} className={featureTab === tab.id ? "active" : ""} onClick={() => openFeatureTab(tab.id)} role="tab" aria-selected={featureTab === tab.id} title={tab.id !== "fabrizio" ? openActions.filter((action) => action.tab === tab.id).map((action) => action.label).join(", ") || undefined : undefined}>{tab.label}{tab.id === "fabrizio" && pendingTransferOffer && <><i className="feature-tab-offer-dot" aria-hidden="true" /><span className="sr-only"> (offenes Angebot)</span></>}{tab.id !== "fabrizio" && openActions.some((action) => action.tab === tab.id) && <i className="feature-tab-offer-dot" aria-hidden="true" />}</button>)}</div></div>}
+
+          {featureTab === "cup" && <TravelPanel features={displayGame.features} travel={displayGame.features.travel} serverNow={getTravelTime} busy={coopBusy || travelBusy} onStart={()=>{const f=displayGame.features.travel.journey?.fixture;if(f)void(f.mode==='season'?startSeasonCupMatch():startCup(f.tournamentId));}} />}
+          {featureTab === "career" && <CareerArea features={displayGame.features} />}
+          {featureTab === "album" && <AlbumPanel features={displayGame.features} busy={coopBusy} onClaim={(id) => void collectAlbumReward(id)} showMilestones={albumMilestones} onShowMilestones={setAlbumMilestones} />}
+
+          {featureTab === "fabrizio" && <div className="transfer-saga-dashboard">
+            <div className="transfer-match-lock"><span>MARKT ZU</span><strong>Keine Spielerkäufe bei Fabrizio</strong><small>Der Transfermarkt ist geschlossen. Fabrizio Romario meldet Leihen und Rückkehrer und bringt Verkaufsangebote, die du annehmen oder ablehnen kannst.</small></div>
+            {pendingTransferOffer && <section className="transfer-offer-card" aria-live="polite"><div><span>OFFENES ANGEBOT</span><strong>{pendingTransferOffer.playerName} · {pendingTransferOffer.club}</strong><small>{pendingTransferOffer.message}</small></div><TransferOfferActions offer={pendingTransferOffer} now={countdownNow} busy={coopBusy} onAnswer={answerTransferOffer} /></section>}
+            {deadlineDayActive && <section className="deadline-day-banner" aria-live="polite"><div><span>DEADLINE DAY / ROMARIO LIVE</span><strong>Das Transferfenster dreht durch.</strong><small>Mehr Leihangebote bis das nächste Turnier wieder freigegeben wird.</small></div><b>{deadlineDayLabel}</b></section>}
+            {displayGame.features.cup.active && <div className="transfer-match-lock"><span>SPIEL LÄUFT</span><strong>Keine Abgänge bis zum Abpfiff</strong><small>Fällige Romario Meldungen werden direkt nach dem Saisonspiel ausgeführt.</small></div>}
+            <div className="transfer-ledger-grid">
+              <section className="transfer-ledger-card"><div className="transfer-ledger-heading"><div><p className="eyebrow">LEIHSTATIONEN / LIVE</p><h4>Aktuell verliehen</h4></div><span>{currentTransferLoans.length}</span></div>{currentTransferLoans.length ? <div className="transfer-ledger-list">{currentTransferLoans.map(({ loan, player }) => <article key={`loan-${loan.playerId}`}><span>{player?.name.slice(0, 1) ?? "?"}</span><div><strong>{player?.name ?? "Unbekannter Spieler"}</strong><small>{loan.club} · {loan.status === "active" ? "kehrt nach dem laufenden Saisonspiel zurück" : "fehlt in der nächsten kompletten Saisonpartie"}</small></div><b>LEIHE</b></article>)}</div> : <div className="transfer-ledger-empty">Zurzeit ist niemand ausgeliehen.</div>}</section>
+              <section className="transfer-ledger-card"><div className="transfer-ledger-heading"><div><p className="eyebrow">CLUBARCHIV / ABGÄNGE</p><h4>Transferhistorie</h4></div><span>{transferArchive.length}</span></div>{transferArchive.length ? <div className="transfer-ledger-list archive">{transferArchive.slice(0, 12).map((event) => <article key={`archive-${event.id}`}><span>{event.outcome === "sale" ? "↗" : event.outcome === "return" ? "↙" : event.outcome === "declined" ? "✋" : "⇄"}</span><div><strong>{event.playerName ?? "Mehrere Spieler"}</strong><small>{event.outcome === "return" ? `Zurück von ${event.club}` : event.outcome === "declined" ? `Behalten · wollte zu ${event.club}` : `${event.outcome === "sale" ? "Verkauft" : "Verliehen"} an ${event.club}${event.fee > 0 ? ` · ${formatNumber(event.fee)} Goals` : event.outcome === "sale" ? " · ablösefrei" : ""}`}</small></div><b>{formatHistoryTime(event.createdAt)}</b></article>)}</div> : <div className="transfer-ledger-empty">Noch keine Abgänge. Romario prüft sein Handy.</div>}</section>
+            </div>
+          </div>}
+
+          {featureTab === "season" && <SeasonPanel features={displayGame.features} action={seasonTabAction} />}
+          {featureTab === "cup" && <div className="feature-panel cup-panel">
+            {!displayGame.features.cup.active && <div className="post-match-extras">
+      {seasonStandingsAnnouncement && seasonStandingsEntry && <div ref={standingsCardRef} className={`inline-standings ${seasonStandingsEntry.outcome}`}  aria-label="Aktuelle Saisonrangliste">
+        <div className="season-standings-panel">
+          <div className="season-standings-topline"><span>SAISON / SPIELTAG {seasonStandingsEntry.matchday}</span><b>{getSeasonModeDivisionLabel(seasonStandingsEntry.division)}</b></div>
+          <div className="season-standings-result">
+            <div><small>DEIN ERGEBNIS</small><strong>{seasonStandingsEntry.clubScore}:{seasonStandingsEntry.opponentScore}</strong><span>{displayClubName} gegen {seasonStandingsEntry.opponent}</span></div>
+            <div className={`season-standings-outcome ${seasonStandingsEntry.outcome}`}><b>{seasonStandingsOutcomeLabel}</b><small>{seasonStandingsEntry.completedSeason ? `${seasonStandingsPosition}. PLATZ · SAISON BEENDET` : `${seasonStandingsPosition}. PLATZ · TABELLE AKTUALISIERT`}</small></div>
+          </div>
+          <div className="season-standings-table-head"><span>PLATZ / CLUB</span><span>SP · S-U-N</span><span title="Tordifferenz">TOR-DIFF.</span><b>P</b></div>
+          <details><summary>Saisontabelle und Fortschritt</summary><div className="season-standings-large-table">{seasonStandingsTable.map((team, index) => { const goalDifference = team.goalsFor - team.goalsAgainst; return <div className={`season-standings-large-row${team.id === "club" ? " club" : ""}`} key={`season-standings-${seasonStandingsEntry.id}-${team.id}`}><i>{index + 1}</i><div><strong>{team.name}</strong><small>{team.played} SP · {team.wins}-{team.draws}-{team.losses}</small></div><span className={`season-standings-goal-difference${goalDifference > 0 ? " positive" : goalDifference < 0 ? " negative" : ""}`} aria-label={`Tordifferenz ${formatGoalDifference(team)}`}>{formatGoalDifference(team)}</span><b>{team.points}</b></div>; })}</div></details>
+          <p className="season-standings-note">Die Tabelle entscheidet über Aufstieg und Abstieg. Dein Ergebnis ist gespeichert.</p>
+          <button className="event-takeover-dismiss season-standings-dismiss" onClick={() => setSeasonStandingsAnnouncement(null)}>Weiter</button>
+        </div>
+      </div>}
+      {gazetteAnnouncement && <div ref={gazetteCardRef} className={`inline-gazette ${gazetteAnnouncement.tone}`}  aria-label={`Goal Gazette: ${gazetteAnnouncement.headline}`}><article className="gazette-front-page"><header><span>GOAL GAZETTE</span><b>SONDERAUSGABE</b></header><div className="gazette-dateline"><span>{getTournament(gazetteAnnouncement.tournamentId)?.label ?? "TURNIER"}</span><strong>{displayClubName} {gazetteAnnouncement.homeScore}:{gazetteAnnouncement.awayScore} {gazetteAnnouncement.opponent}</strong></div><h2>{gazetteAnnouncement.headline}</h2><h3>{gazetteAnnouncement.strapline}</h3><p>{gazetteAnnouncement.body}</p><footer><span>{gazetteAnnouncement.tieBreak ? "ENTSCHEIDUNG IM ELFMETERSCHIESSEN" : `RUNDE ${gazetteAnnouncement.completedRound} BEENDET`}</span><button className="event-takeover-dismiss" onClick={dismissGazetteAnnouncement}>Zeitung zuklappen</button></footer></article></div>}
+            </div>}
+            {!displayGame.features.cup.active && displayGame.features.cup.matchStartedAt > 0 && <PostMatchSummary features={displayGame.features} onCareer={()=>openFeatureTab("career")} onContinue={()=>openFeatureTab("squad")} next={nextMatchAction} />}
+            {!displayGame.features.cup.active && displayGame.features.cup.matchStartedAt > 0 && <PressConferencePanel features={displayGame.features} busy={pressBusy || coopBusy} reward={getPressReward(getBasePassivePower(displayGame.upgrades, displayGame.stars, displayGame.features), getBaseClickPower(displayGame.upgrades, displayGame.stars, displayGame.features))} onAnswer={(matchId, questionId, index) => { void answerPress(matchId, questionId, index); }} format={formatNumber} />}
+
+            {(() => { const opponent = displayGame.features.cup.active ? displayGame.features.cup.opponent : getSeasonModeNextOpponent(displayGame.features.seasonMode, displayClubName).name; const rival = displayGame.features.career.rivals[rivalryKey(opponent)]; return rival?.active ? <div className="career-derby-banner"><strong>🔥 Derby gegen {rival.opponent}</strong>{rival.wins} Siege · {rival.draws} Remis · {rival.losses} Niederlagen. Die Kurve zählt auf dich. Sieg: 400 Fragmente, Remis: 150.</div> : null; })()}
+            <div className="feature-panel-heading"><div><p className="eyebrow">SAISONMODUS / STAR XI</p><h3>Jede Partie zählt.</h3></div><span className="feature-stat">{starXIRating} OVR</span></div>
+            <p className="feature-copy">10 Spieltage pro Saison, Aufstieg und Abstieg über die Tabelle. Ligaspiele dauern 3:30 oder 4:00 Minuten, Pokalspiele 4 bis 5 Minuten plus Unterbrüche. Formation, Spielerstärke, Form und Fitness bestimmen die Partie.</p>
+            <div className="starxi-summary"><div><span>STAR XI RATING</span><strong>{starXIRating}</strong><small>Bewertung deiner aktuellen Startelf</small></div><div><span>STARTELF</span><strong>{startingStarXISelection.length} / {STAR_XI_SQUAD_SIZE}</strong><small>{starXIComplete ? "Alle 11 Positionen korrekt besetzt" : `${STAR_XI_SQUAD_SIZE} passende Startplätze erforderlich`}</small></div><div><span>BANK</span><strong>{benchStarXIPlayerCount} / {STAR_XI_BENCH_SIZE}</strong><small>{reserveStarXICount} weitere Spieler im Speicher</small></div><div><span>{displayGame.features.cup.active ? "LIVE WECHSEL" : "SAISONPARTIEN"}</span><strong>{displayGame.features.cup.active ? `${displayGame.features.cup.substitutionsUsed} / ${STAR_XI_MAX_SUBSTITUTIONS}` : displayGame.features.seasonMode.history.length}</strong><small>{displayGame.features.cup.active ? "Startelf wählen, danach passenden Bankspieler" : "Alle Ergebnisse zählen für die Tabelle"}</small></div><div><span>FRAGMENTE</span><strong>{formatNumber(displayGame.features.starXI.fragments)}</strong><small>Automatisch für Custom-Karten</small></div></div>
+            {suspendedStarPlayers.length > 0 && <div className="red-card-warning" role="alert"><span>🟥</span><div><strong>{suspendedStarPlayers.map((player) => player.name).join(", ")} nach Roter Karte gesperrt</strong><small>{suspendedStarPlayers.length === 1 ? pronounText("Ersetze {den Spieler} in der Startelf. {Er} darf", suspendedStarPlayers[0]) : "Ersetze die Spieler in der Startelf. Sie dürfen"} bis zum nächsten Anpfiff nicht auf die Bank.</small></div></div>}
+            {ownedDisciplineBans.length > 0 && <div className="discipline-warning" role="status"><span aria-hidden="true">{ownedDisciplineBans.some((ban) => ban.reason === "red") ? "🟥" : "🟨"}</span><div><strong>Sperren</strong>{ownedDisciplineBans.map((ban) => <span key={ban.id}>{getStarXIPlayer(ban.playerId)?.name ?? "Spieler"}: {suspensionLabel(ban)}. </span>)}<small>Gesperrte Spieler dürfen in diesem Wettbewerb weder in der Startelf noch auf der Bank stehen.</small></div></div>}
+            {injuredStarPlayers.length > 0 && <div className="injury-warning" role="status"><span>🩹</span><div><strong>{injuredStarPlayers.map(({ player }) => player.name).join(", ")} verletzt</strong><small>{injuredStarPlayers.map(({ player, matches }) => `${player.name}: noch ${matches} ${matches === 1 ? "Spiel" : "Spiele"}`).join(" · ")}. Verletzungen entstehen nur im laufenden Saisonspiel.</small></div></div>}
+            {!displayGame.features.cup.active && !journeyUnderway && <KickoffChecklist items={kickoffItems} busy={coopBusy || travelBusy} />}
+            {!displayGame.features.cup.active && !journeyUnderway && <section className="tournament-picker competition-picker" aria-label="Saisonspiele und Turniere">
+              <div className="tournament-picker-heading"><div><p className="eyebrow">SPIELE / SAISON + TURNIERE</p><h4>Wähle deine nächste Partie.</h4></div><span>{displayGame.features.cup.pendingNextRound ? "POKALLAUF FORTSETZEN" : `LIGASPIEL · ${formatCountdown(seasonMatchDuration(displayGame.features.seasonMode.division), 0)}`}</span></div>
+              <div className="tournament-grid competition-grid">
+                <article className="competition-card season-competition-card">
+                  <div className="competition-card-top"><strong>Saisonspiel</strong><b>{seasonCareerComplete ? "HALL OF FAME" : getSeasonModeDivisionLabel(seasonMode.division)}</b></div>
+                  <p>10 Spieltage · 5 Heimspiele und 5 Auswärtsspiele · {getSeasonModeDivisionLabel(seasonMode.division)}</p>
+                  <div className="competition-card-route"><span>{seasonCareerComplete ? (prestigeBlockReason ? "PRESTIGE WARTET" : "PRESTIGE BEREIT") : `SPIELTAG ${seasonMode.matchday + 1} / ${SEASON_MODE_MATCHES_PER_SEASON}`}</span><strong>{seasonCareerComplete ? "★" : `★ ${displayGame.stars}`}</strong></div>
+                  <div className="competition-card-opponent"><strong>{seasonCareerComplete ? "Hall of Fame erreicht" : seasonNextOpponent.name}</strong><small>{seasonCareerComplete ? `Freischaltungen bleiben, Spezialkarten und eine Karte deiner Wahl auch. Upgrades starten wieder bei Stufe 0. Danach +${prestigeBonusPercent(seasonMode.prestigeCount + 1)} % Tore.` : `${seasonNextOpponent.rating} OVR · Tabellenwertung nach dem Abpfiff`}</small></div>
+                  <span className="travel-home-label">{!fixtureFor(displayGame.features,"season").away ? `Heimspiel · Bümplizstrasse 45, Bern · etwa ${expectedHomeCrowd(displayGame.features).toLocaleString("de-CH")} Fans erwartet` : `Auswärtsspiel · ${fixtureFor(displayGame.features,"season").venue.stadium}, ${fixtureFor(displayGame.features,"season").venue.city} · ${Math.round(travelTiming(fixtureFor(displayGame.features,"season")).km)} km · ca. ${durationLabel(travelTiming(fixtureFor(displayGame.features,"season")).baseMs/1000)} im Spiel`}</span><button className="mode-primary competition-card-action" onClick={() => seasonCareerComplete ? openPrestigeDialog() : void startSeasonCupMatch()} disabled={coopBusy || (seasonCareerComplete ? Boolean(prestigeBlockReason) : travelBusy || displayGame.features.cup.pendingNextRound || hasTransferSquadVacancy || suspendedPlayerOnSquad || !starXIComplete)}>{seasonCareerComplete ? "Prestige starten" : travelLabel(fixtureFor(displayGame.features,"season"))}</button>{seasonCareerComplete && prestigeBlockReason && <small className="prestige-block-reason" role="status">{prestigeBlockReason}</small>}
+                </article>
+                {TOURNAMENTS.map((tournament) => {
+                  const unlockLeague = getTournamentUnlockLeague(tournament.id);
+                  const leagueUnlocked = isLeagueContentUnlocked(unlockLeague, reachedLeague, hasFullTestAccess);
+                  const continuingOtherTournament = displayGame.features.cup.pendingNextRound && tournament.id !== activeTournament.id;
+                  const locked = continuingOtherTournament || !leagueUnlocked || hasTransferSquadVacancy || !starXIComplete || suspendedPlayerOnSquad || starXIRating < tournament.minimumRating;
+                  const lowestOpponentRating = Math.min(...tournament.opponents.map((opponent) => opponent.rating));
+                  const highestOpponentRating = Math.max(...tournament.opponents.map((opponent) => opponent.rating));
+                  const tier = tournament.id === "stadium" ? "EINSTIEG" : tournament.id === "champions" ? "PROFI" : "ELITE";
+                  const lockLabel = continuingOtherTournament ? "Aktuellen Pokallauf zuerst abschliessen" : !leagueUnlocked ? `Ab Liga ${unlockLeague}` : hasTransferSquadVacancy ? `Freien Platz ${transferSquadVacancyLabel} besetzen` : suspendedPlayerOnSquad ? "Rote-Karte-Spieler ersetzen" : !starXIComplete ? `${STAR_XI_SQUAD_SIZE} Spieler benötigt` : `${tournament.minimumRating} OVR benötigt`;
+                  return <button className={`tournament-card${selectedTournament.id === tournament.id ? " selected" : ""}${locked ? " locked" : ""}`} key={tournament.id} onClick={() => chooseTournament(tournament.id)} disabled={locked} style={{ borderTopColor: tournament.accent }}><span className="tournament-card-top"><strong>{tournament.label}</strong><b>{tier}</b></span><small>{tournament.description}</small><span className="tournament-route-preview" aria-label={`${tournament.rounds} Runden`}>{Array.from({ length: tournament.rounds }, (_, index) => <i key={`${tournament.id}-round-${index}`} className={index === tournament.rounds - 1 ? "final" : ""}>{index + 1}</i>)}</span><span className="tournament-card-meta"><b>{tournament.rounds} Runden · {tournament.opponents.length} mögliche Gegner</b><em>{lowestOpponentRating}–{highestOpponentRating} OVR</em></span><span className="tournament-boost-reward">🎁 TURNIERSIEG · {getTournamentRewardPack(tournament.id).label}</span>{locked && <span className="tournament-lock">{lockLabel}</span>}</button>;
+                })}
+              </div>
+              <span className="travel-home-label">{(()=>{const f=fixtureFor(displayGame.features,'tournament',selectedTournament.id);return `${f.away?'Auswärtsspiel':'Heimspiel'} · ${f.opponent} · ${f.away?`${f.venue.stadium}, ${f.venue.city}`:'Bümplizstrasse 45, Bern'}`;})()}</span>
+              <div className={`cup-start${displayGame.features.cup.pendingNextRound ? " paused" : tournamentCooldownActive ? " cooldown" : hasTransferSquadVacancy ? " vacancy" : ""}`}>
+                <div aria-live={tournamentCooldownActive ? "polite" : undefined}>
+                  {displayGame.features.cup.pendingNextRound ? <p className="eyebrow">POKALLAUF · MANUELLER ANPFIFF</p> : tournamentCooldownActive ? <p className="eyebrow">TURNIERPAUSE · NÄCHSTER ANPFIFF</p> : hasTransferSquadVacancy ? <p className="eyebrow">TRANSFER · KADERLÜCKE</p> : <p className="eyebrow">TURNIERAUSWAHL</p>}
+                  <strong>{displayGame.features.cup.pendingNextRound ? suspendedPlayerOnSquad ? `Ersetze zuerst ${suspendedStarPlayers.map((player) => player.name).join(", ") || "den gesperrten Spieler"}.` : !starXIComplete ? "Vervollständige zuerst deine Startelf." : `${selectedTournament.label} · Runde ${displayGame.features.cup.round + 1} ist bereit.` : tournamentCooldownActive ? `Neues Turnier in ${tournamentCooldownLabel}` : hasTransferSquadVacancy ? `Besetze zuerst den freien Platz ${transferSquadVacancyLabel}.` : !selectedTournamentLeagueUnlocked ? `${selectedTournament.label} ist noch gesperrt.` : suspendedPlayerOnSquad && !starXIComplete ? `Ersetze zuerst ${suspendedStarPlayers.map((player) => player.name).join(", ")}.` : starXIComplete ? `${selectedTournament.label} ist ausgewählt.` : `${STAR_XI_SQUAD_SIZE} passende Spieler werden bis zum Anpfiff benötigt.`}</strong>
+                  <small>{displayGame.features.cup.pendingNextRound ? suspendedPlayerOnSquad ? "Der gesperrte Spieler darf weder in der Startelf noch auf der Bank sein." : !starXIComplete ? `${STAR_XI_SQUAD_SIZE} passende Spieler werden für den nächsten Anpfiff benötigt.` : "Passe deine Aufstellung und Bank an. Der nächste Anpfiff erfolgt erst nach deinem Klick." : tournamentCooldownActive ? "Nach einem vollständig beendeten Turnier gilt eine Pause von 05:00." : hasTransferSquadVacancy ? "Verkaufte oder verliehene Spieler werden nicht automatisch ersetzt." : !selectedTournamentLeagueUnlocked ? `Verfügbar ab Liga ${selectedTournamentUnlockLeague}` : suspendedPlayerOnSquad && !starXIComplete ? "Nach einer Roten Karte muss der nächste Anpfiff warten, bis die Position neu besetzt ist." : starXIComplete ? `${selectedTournament.label} · ${selectedTournament.rounds} Partien · Turniersieg: ${getTournamentRewardPack(selectedTournament.id, displayGame.features.seasonMode.highestDivision).label}` : "Alle elf Positionen müssen korrekt besetzt sein"}</small>
+                </div>
+                <button className="mode-primary" onClick={() => void (hasTransferSquadVacancy ? closeSquadVacancy() : startCup(selectedTournament.id))} disabled={travelBusy || coopBusy || tournamentCooldownActive || (!hasTransferSquadVacancy && (!selectedTournamentLeagueUnlocked || !starXIComplete || suspendedPlayerOnSquad || starXIRating < selectedTournament.minimumRating))}>{tournamentCooldownActive ? `Neues Turnier in ${tournamentCooldownLabel}` : hasTransferSquadVacancy ? "Kaderlücke schliessen" : displayGame.features.cup.pendingNextRound ? starXIComplete && !suspendedPlayerOnSquad ? travelLabel(fixtureFor(displayGame.features,"tournament",selectedTournament.id)) : "Startelf vervollständigen" : !selectedTournamentLeagueUnlocked ? `Ab Liga ${selectedTournamentUnlockLeague}` : starXIComplete ? travelLabel(fixtureFor(displayGame.features,"tournament",selectedTournament.id)) : "Startelf vervollständigen"}</button>
+              </div>
+            </section>}
+            {!displayGame.features.cup.active && <details className="season-overview"><summary>Saisontabelle · {getSeasonModeDivisionLabel(seasonMode.division)}</summary><div className="season-table">{seasonTable.map((team,index)=><div className={`season-table-row${team.id==='club'?' club':''}`} key={team.id}><i>{index+1}</i><strong>{team.name}</strong><small>{team.points} P · {team.played} SP · {team.wins}-{team.draws}-{team.losses} · TD {formatGoalDifference(team)}</small></div>)}</div></details>}
+            <details className="tournament-reward-odds"><summary>Turnierprämie: {getTournamentRewardPack(selectedTournament.id, displayGame.features.seasonMode.highestDivision).label} · Chancen anzeigen</summary><div className="star-pack-odds">{getRewardPackOdds(getTournamentRewardPack(selectedTournament.id, displayGame.features.seasonMode.highestDivision).id as import('./feature-data').RewardPackId).map(o=><span key={o.label}><em>{o.label}</em><b>{formatPackChance(o.chance)}</b></span>)}</div><small>Eine Basiskarte. Keine Custom-, Icon- oder legendären Karten.</small></details>
+            <MatchAudio features={displayGame.features} now={countdownNow} sound={displayGame.sound && soundPrefs.stadium} />
+            {displayGame.features.cup.active && <LiveMatchViewer key={displayGame.features.cup.careerMatchId ?? displayGame.features.cup.matchStartedAt} features={displayGame.features} now={countdownNow} clubName={displayClubName} clubColor={displayClubColor} disabled={coopBusy} onEdit={()=>{void editInteractiveMatch();}} onBatch={draft=>{void batchInteractiveMatch(draft);}} onResume={()=>{void resumeInteractiveMatch();}} onSubstitute={changes=>{void confirmMatchChanges(changes);}} />}
+              {activeMatchInjury && <div className="cup-injury-pause" role="alert"><div className="cup-injury-pause-icon">🩹</div><div><span className="eyebrow">MEDIZINISCHE PAUSE / {activeMatchInjury.minute}′</span><h4>{activeMatchInjury.player} muss raus.</h4><p>{activeMatchInjury.reason}. Die Verletzung zählt für dieses Spiel und noch {activeMatchInjury.matches} {activeMatchInjury.matches === 1 ? "weitere Partie" : "weitere Partien"}.</p><small>Wähle den verletzten Platz und danach einen passenden Bankspieler – oder setze die Partie ohne Wechsel fort.</small></div><div className="cup-injury-pause-actions"><button className="mode-primary" onClick={() => { document.querySelector<HTMLButtonElement>(".match-sub-button")?.click(); }} disabled={coopBusy || !lineupStarIds.includes(activeMatchInjury.playerId)}>Auswechslungen</button><button className="mode-secondary" onClick={() => void resumeCupWithoutSubstitution()} disabled={coopBusy}>Ohne Wechsel weiterspielen</button></div></div>}
+
+          </div>}
+
+          {featureTab === "packs" && <div className="feature-panel">
+            <div className="starxi-pack-heading"><div><p className="eyebrow">STAR XI / PACKS</p><h4>{formatStableInteger(STAR_XI_TOTAL_CARD_COUNT)} Spieler. Jeder Pull zählt.</h4><small>{formatStableInteger(STAR_XI_BASE_CARD_COUNT)} Basiskarten, alle {STAR_XI_ICON_CARD_COUNT} FC 27 Icons und {STAR_XI_SPECIAL_CARD_COUNT} einzigartige Spezialkarten.</small></div><span>{ownedStarXIPlayers.length - loanedStarIds.length} Spieler im Team</span></div>
+            {displayGame.features.earnedPacks.some(p=>!p.opening)&&<><div className="earned-packs-heading"><h4>Deine Prämien</h4>{displayGame.features.earnedPacks.filter(p=>!p.opening).length>1&&<button type="button" className="mode-secondary" onClick={openAllRewardPacks} disabled={coopBusy||Boolean(starReveal)||displayGame.features.cup.active}>{displayGame.features.cup.active?"Nach dem Abpfiff":`Alle öffnen (${displayGame.features.earnedPacks.filter(p=>!p.opening).length})`}</button>}</div><div className="star-pack-grid">{displayGame.features.earnedPacks.filter(p=>!p.opening).map(earned=>{if(earned.packId==='special'){const odds=getSpecialCardPackOdds(displayGame.features.starXI.ownedIds),hundred=canDrawHundredSpecialCards(displayGame.features.seasonMode.highestDivision);return <article className="star-pack-card special-card-pack" key={earned.id}><div className="star-pack-top"><span className="star-pack-icon">✦</span><div><strong>{SPECIAL_CARD_PACK.label}</strong><small>Geschenk der täglichen Prämie: eine zufällige Spezialkarte.{hundred?"":" 100er gibt es erst ab Liga 3."}</small></div><span className="star-pack-price">GRATIS</span></div><div className="star-pack-odds"><span><em>Inhalt</em><b>{odds.total} Spezialkarten</b></span><span><em>100er Karte</em><b>{hundred?formatPackChance(odds.hundredChance):"ab Liga 3"}</b></span></div><button className="feature-buy-button" onClick={()=>void openRewardPack(earned.id)} disabled={coopBusy||Boolean(starReveal)||displayGame.features.cup.active}>{displayGame.features.cup.active?"Nach dem Abpfiff":"Spezialkarten-Pack öffnen"}</button></article>;}const pack=getStarPack(earned.packId)!;return <article className="star-pack-card" key={earned.id}><div className="star-pack-top"><span className="star-pack-icon">🏆</span><div><strong>{pack.label}</strong><small>{pack.description}</small></div><span className="star-pack-price">GEWONNEN</span></div><div className="star-pack-odds">{getRewardPackOdds(earned.packId).map(o=><span key={o.label}><em>{o.label}</em><b>{formatPackChance(o.chance)}</b></span>)}</div><button className="feature-buy-button" onClick={()=>void openRewardPack(earned.id)} disabled={coopBusy||Boolean(starReveal)||displayGame.features.cup.active}>{displayGame.features.cup.active?"Nach dem Abpfiff":"Prämienpack öffnen"}</button></article>;})}</div></>}
+            <div className="star-pack-grid">{STAR_PACKS.map((pack) => { const unlockLeague = getPackUnlockLeague(pack.id); const unlocked = isLeagueContentUnlocked(unlockLeague, reachedLeague, hasFullTestAccess); return <article className={`star-pack-card ${pack.id}${unlocked ? "" : " season-locked"}`} key={pack.id}><div className="star-pack-top"><span className="star-pack-icon">{unlocked ? "★" : "🔒"}</span><div><strong>{pack.label}</strong><small>{unlocked ? pack.description : `Verfügbar ab Liga ${unlockLeague}`}</small></div><span className="star-pack-price">{unlocked ? hasInfiniteMoney ? "∞ TESTMODUS" : `${formatNumber(pack.price)} TORE` : `LIGA ${unlockLeague}`}</span></div><div className="star-pack-odds">{pack.odds.map((odd) => <span key={`${pack.id}-${odd.label}`}><em>{odd.label}</em><b>{formatPackChance(odd.chance)}</b></span>)}</div>{unlocked && !hasInfiniteMoney && <div className="pack-savings">{displayGame.goals < pack.price && <small>{savingsHint(pack.price, displayGame.goals, passivePower, formatNumber)}</small>}<button type="button" className={`savings-pin${savingsGoal?.kind === "pack" && savingsGoal.id === pack.id ? " active" : ""}`} aria-pressed={savingsGoal?.kind === "pack" && savingsGoal.id === pack.id} onClick={() => toggleSavingsGoal({ kind: "pack", id: pack.id })}>{savingsGoal?.kind === "pack" && savingsGoal.id === pack.id ? "Sparziel ✓" : "Als Sparziel"}</button></div>}<button className="feature-buy-button" onClick={() => void buyStarPack(pack.id)} disabled={!unlocked || displayGame.features.cup.active || (!hasInfiniteMoney && displayGame.goals < pack.price) || coopBusy || Boolean(starReveal)}>{!unlocked ? `Ab Liga ${unlockLeague}` : displayGame.features.cup.active ? "Nach dem Abpfiff" : hasInfiniteMoney ? "∞ · Pack testen" : `${formatNumber(pack.price)} · Pack öffnen`}</button></article>; })}
+              {(() => { const unlockLeague = getPackUnlockLeague(SPECIAL_CARD_PACK.id); const unlocked = isLeagueContentUnlocked(unlockLeague, reachedLeague, hasFullTestAccess); const fragments = displayGame.features.starXI.fragments; const odds = getSpecialCardPackOdds(displayGame.features.starXI.ownedIds); const affordable = hasInfiniteMoney || fragments >= SPECIAL_CARD_PACK.price; return <article className={`star-pack-card special-card-pack${unlocked ? "" : " season-locked"}`} key={SPECIAL_CARD_PACK.id} aria-label="Spezialkarten-Pack, bezahlt mit Fragmenten"><div className="star-pack-top"><span className="star-pack-icon">{unlocked ? "✦" : "🔒"}</span><div><strong>{SPECIAL_CARD_PACK.label}</strong><small>{unlocked ? SPECIAL_CARD_PACK.description : `Verfügbar ab Liga ${unlockLeague}`}</small></div><span className="star-pack-price">{unlocked ? hasInfiniteMoney ? "∞ TESTMODUS" : `${SPECIAL_CARD_PACK.price.toLocaleString("de-CH")} FRAGMENTE` : `LIGA ${unlockLeague}`}</span></div><div className="star-pack-odds"><span><em>Währung</em><b>Fragmente</b></span><span><em>Inhalt</em><b>{odds.total} Spezialkarten</b></span><span><em>100er Karte</em><b>{formatPackChance(odds.hundredChance)}</b></span><span><em>Neu für deinen Club</em><b>{formatPackChance(odds.newCard)}</b></span></div><small className="special-pack-balance">Dein Guthaben: <b>{fragments.toLocaleString("de-CH")} Fragmente</b>{!affordable && unlocked ? ` · noch ${formatNumber(SPECIAL_CARD_PACK.price - fragments)} bis zum nächsten Pack` : ""}</small><button className="feature-buy-button" onClick={() => void buySpecialCardPack()} disabled={!unlocked || displayGame.features.cup.active || !affordable || coopBusy || Boolean(starReveal)}>{!unlocked ? `Ab Liga ${unlockLeague}` : displayGame.features.cup.active ? "Nach dem Abpfiff" : hasInfiniteMoney ? "∞ · Pack testen" : `${SPECIAL_CARD_PACK.price.toLocaleString("de-CH")} Fragmente · Pack öffnen`}</button></article>; })()}</div>
+            <p className="star-pack-rarity-note">Icons stecken in ihrer jeweiligen Ratingstufe, sind darin aber nochmals deutlich seltener als normale Karten. Doppelte Karten geben je nach Rating und Kartentyp unterschiedlich viele Fragmente.</p>
+          </div>}
+          {featureTab === "squad" && <div className="feature-panel">{displayGame.features.cup.active ? <div className="career-empty"><p>Auswechslungen steuerst du im laufenden Match.</p><button className="mode-primary" onClick={()=>openFeatureTab('cup')}>Zum Live-Match</button></div> : <>
+            <div className="starxi-lineup-heading"><span>DEINE ELF / {activeFormation.label}</span><small>Spieler ziehen oder zwei Spieler nacheinander antippen zum Tauschen</small></div>
+            <div className="starxi-squad-layout">
+              <SquadPitchPanel status={squadMovePreview ? <b className="squad-move-preview">Wechsel: {squadMovePreview}</b> : activeLineupSlot === null ? "Startplatz wählen" : `Platz ${activeLineupSlot + 1} · ${activeLineupPosition}`} controls={<div className="starxi-formation-picker"><span><strong>FORMATION WÄHLEN</strong><small>{displayGame.features.cup.active ? "Während des Spiels gesperrt" : `${unlockedFormationCount} von ${STAR_FORMATIONS.length} Formationen freigeschaltet`}</small></span><div className="starxi-formation-actions"><select value={activeFormation.id} disabled={displayGame.features.cup.active || coopBusy} onChange={(event) => void changeStarXIFormation(event.target.value as StarFormationId)} aria-label="Formation wählen">{pickerFormations.map((formation) => { const unlockLeague = getFormationUnlockLeague(formation.id); const unlocked = isFormationAvailable(formation); return <option value={formation.id} key={formation.id} disabled={!unlocked}>{formation.label}{unlocked ? formationRatings[formation.id] ? ` · bis ${formationRatings[formation.id]} OVR` : "" : ` · ab Liga ${unlockLeague}`}</option>; })}</select><button type="button" className="starxi-best-button" onClick={() => void autoPickBestStarXI()} disabled={coopBusy || ownedStarXIPlayers.length === 0} aria-disabled={displayGame.features.cup.active || undefined} title={displayGame.features.cup.active ? "Während eines Spiels gesperrt" : undefined}>★ Beste Startelf</button></div><div className="starxi-squad-tools">{squadGapCount > 0 && <button type="button" className="mode-secondary" onClick={() => void fillSquadGaps()} disabled={coopBusy}>Lücken füllen ({squadGapCount})</button>}<button type="button" className="mode-secondary" onClick={() => void pickBestBench()} disabled={coopBusy || ownedStarXIPlayers.length === 0}>Beste Bank</button>{undoAvailable && <button type="button" className="mode-secondary" onClick={undoBestStarXI}>Rückgängig</button>}</div></div>} help={displayGame.features.cup.active ? `Live Wechsel: Bankspieler auf den passenden Feldspieler ziehen oder zwei Spieler nacheinander antippen. Maximal ${STAR_XI_MAX_SUBSTITUTIONS} Wechsel, ${displayGame.features.cup.substitutionsUsed} bereits genutzt.` : activeLineupSlot !== null ? `Für ${activeLineupPosition} werden nur passende Spieler angezeigt. Du kannst sie auch direkt hierher ziehen.` : selectedBenchSlot !== null ? `Bankplatz ${selectedBenchSlot + 1} gewählt. Klicke einen Spieler an oder ziehe ihn auf den Bankplatz.` : selectedReserveId !== null ? `${getStarXIPlayer(selectedReserveId)?.name ?? "Spieler"} gewählt. Tippe einen passenden Platz auf dem Feld oder der Bank an.` : `Ziehe Spieler zwischen Feld, Bank und Reserve oder tippe zwei Spieler nacheinander an, um sie zu tauschen.`}>{activeFormation.slots.map((slot, index) => {
+                  const player = startingStarXIPlayers[index];
+                  const liveRating = displayGame.features.cup.active && player ? getCupPlayerMatchRating(displayGame.features.cup, player.id, cupMatchMinute) : null;
+                  return <SquadPitchSlot key={`${activeFormation.id}-${index}`} features={displayGame.features} drag={squadDrag} index={index} position={activeFormationPositions[index]} x={slot.x} y={slot.y} player={player} selected={activeLineupSlot === index} liveRating={liveRating} draggable={!layoutEditMode && !coopBusy} disabled={coopBusy} banLabel={banLabelFor(player?.id)} onClick={() => chooseLineupSlot(index)} />;
+                })}</SquadPitchPanel>
+              <div className="starxi-squad-side">
+                <SquadBenchPanel id="gc-live-bench" count={benchStarXIPlayerCount} size={STAR_XI_BENCH_SIZE}>{Array.from({ length: STAR_XI_BENCH_SIZE }, (_, index) => {
+                    const player = benchStarXIPlayers[index];
+                    const compatible = Boolean(player && activeLineupSlot !== null && canStarXIPlayerFillSlot(player.id, activeLineupSlot, activeFormationPositions));
+                    const selected = selectedBenchSlot === index;
+                    const liveRating = displayGame.features.cup.active && player ? getCupPlayerMatchRating(displayGame.features.cup, player.id, cupMatchMinute) : null;
+                    const alreadySubbedOut = Boolean(player && displayGame.features.cup.active && displayGame.features.cup.playerExitedAt[player.id]);
+                    return player ? <SquadBenchCard key={player.id} features={displayGame.features} drag={squadDrag} index={index} player={player} selected={selected} incompatible={activeLineupSlot !== null && (!compatible || alreadySubbedOut)} liveRating={liveRating} status={alreadySubbedOut ? "Bereits ausgewechselt" : activeLineupSlot !== null ? compatible ? displayGame.features.cup.active ? "Nur für dieses Spiel einwechseln" : `Auf ${activeLineupPosition} einsetzen` : `Passt nicht auf ${activeLineupPosition}` : displayGame.features.cup.active ? "Auf einen Feldspieler ziehen" : `Bankplatz ${index + 1} · ziehen zum Tauschen`} draggable={!layoutEditMode && !coopBusy} disabled={coopBusy} banLabel={banLabelFor(player.id)} onClick={() => chooseBenchSlot(index)} /> : <SquadBenchSlot key={`bank-empty-${index}`} drag={squadDrag} index={index} selected={selected} disabled={displayGame.features.cup.active || coopBusy} onClick={() => chooseBenchSlot(index)} />;
+                  })}</SquadBenchPanel>
+                <section className={`starxi-reserve-panel${squadDrag.squadDropClass("reserve", 0)}`} aria-label="Reservekader" data-squad-area="reserve" data-squad-index={0} onDragOver={(event) => squadDrag.handleSquadDragOver(event, { area: "reserve", index: 0 })} onDrop={(event) => void squadDrag.handleSquadDrop(event, { area: "reserve", index: 0 })}>
+                  <div className="starxi-subheading"><div><span className="eyebrow">KADER / RESERVE</span><h4>Weitere Spieler</h4></div><strong>{reserveStarXIPlayers.length}</strong></div>
+                  <div className="starxi-reserve-controls"><div className="starxi-filter-tools"><input className="starxi-search" value={starSearch} onChange={(event) => { setStarSearch(event.target.value); setReservePage(0); }} placeholder="Spieler suchen" aria-label="Spieler im Reservekader suchen" /><select className="starxi-position-filter" value={starPositionFilter} onChange={(event) => { setStarPositionFilter(event.target.value); setReservePage(0); }} aria-label="Position im Reservekader filtern"><option value="all">Alle Positionen</option>{STAR_POSITIONS.map((position) => <option value={position} key={`reserve-position-${position}`}>{position}</option>)}</select></div><div className="starxi-filter-tools"><select className="starxi-position-filter" value={reserveSort} onChange={(event) => { setReserveSort(event.target.value); setReservePage(0); }} aria-label="Reserve sortieren">{RESERVE_SORTS.map((item) => <option value={item.id} key={item.id}>Sortieren: {item.label}</option>)}</select><select className="starxi-position-filter" value={reserveType} onChange={(event) => { setReserveType(event.target.value); setReservePage(0); }} aria-label="Kartentyp filtern">{RESERVE_TYPES.map((item) => <option value={item.id} key={item.id}>{item.label}</option>)}</select></div><div className="starxi-filter-row" role="group" aria-label="Verfügbarkeit">{RESERVE_STATUS_FILTERS.map((item) => <button type="button" className={reserveStatus === item.id ? "active" : ""} key={item.id} onClick={() => { setReserveStatus(item.id); setReservePage(0); }} aria-pressed={reserveStatus === item.id}>{item.label}</button>)}</div>{activeLineupSlot !== null && <label className="starxi-only-compatible"><input type="checkbox" checked={reserveOnlyCompatible} onChange={(event) => { setReserveOnlyCompatible(event.target.checked); setReservePage(0); }} /> Nur Spieler für {activeLineupPosition}</label>}<div className="starxi-filter-row" role="group" aria-label="Ratingfilter">{STAR_RATING_FILTERS.map((filter) => <button type="button" className={starRatingFilter === filter.id ? "active" : ""} key={filter.id} onClick={() => { setStarRatingFilter(filter.id); setReservePage(0); }} aria-pressed={starRatingFilter === filter.id}>{filter.label}</button>)}</div></div>
+                  <div className="starxi-reserve-list">{filteredReserveStarXIPlayers.length ? visibleReserveStarXIPlayers.map((player) => { const compatible = activeLineupSlot === null || canStarXIPlayerFillSlot(player.id, activeLineupSlot, activeFormationPositions); const suspended = suspendedStarIds.includes(player.id); const injuryMatches = injuredStarPlayers.find((entry) => entry.player.id === player.id)?.matches ?? 0; const unavailable = suspended || injuryMatches > 0; const injuryText = `${injuryMatches} ${injuryMatches === 1 ? "Spiel" : "Spiele"}`; const dragSource: SquadDragSource = { playerId: player.id, area: "reserve", index: null }; const typeLabel = reserveTypeLabel(reserveCardType(player)); const favorite = favoriteCardIds.has(player.id); return <div className="starxi-reserve-item" key={player.id}><button type="button" className={`starxi-player-card reserve${activeLineupSlot !== null && !compatible ? " incompatible" : ""}${suspended ? " red-carded" : ""}${injuryMatches > 0 ? " injured" : ""}${selectedReserveId === player.id ? " selected" : ""}${draggingSquadPlayer?.playerId === player.id ? " squad-dragging" : ""}`} aria-pressed={selectedReserveId === player.id} onClick={() => { if (squadDrag.consumeDragClick()) return; if (suspended) showToast(`${player.name} ist für die nächste Partie gesperrt.`); else if (injuryMatches > 0) showToast(`${player.name} ist verletzt und fehlt noch ${injuryText}.`); else chooseReservePlayer(player.id); }} disabled={displayGame.features.cup.active || coopBusy || unavailable} draggable={!layoutEditMode && !displayGame.features.cup.active && !coopBusy && !unavailable} onDragStart={(event) => squadDrag.handleSquadDragStart(event, dragSource)} onDragEnd={squadDrag.handleSquadDragEnd}>{!unavailable && !displayGame.features.cup.active && !coopBusy && <span className="reserve-drag-grip" aria-hidden="true" {...squadDrag.touchHandlers(dragSource)}>⠿</span>}{suspended ? <span style={{ color: player.accent }}>🟥</span> : injuryMatches > 0 ? <span className="starxi-injury-mark" aria-hidden="true">🩹</span> : <StarXIPositionBadges player={player} variant="compact" />}<div><strong>{player.name}{newCardIds.has(player.id) && <em className="card-new-chip">NEU</em>}{typeLabel && <em className="card-type-chip">{typeLabel}</em>}</strong><CareerPlayerBadge features={displayGame.features} player={player} /><small>{suspended ? "ROTE KARTE · NICHT AUF DIE BANK" : banLabelFor(player.id) ? `${banLabelFor(player.id)} · NICHT IN DEN KADER` : injuryMatches > 0 ? `VERLETZT · FEHLT NOCH ${injuryText.toUpperCase()}` : selectedReserveId === player.id ? "Gewählt · jetzt Platz antippen" : selectedBenchSlot !== null ? `Auf Bankplatz ${selectedBenchSlot + 1}` : activeLineupSlot !== null ? compatible ? `Auf ${activeLineupPosition} einsetzen` : `Kann nicht ${activeLineupPosition}` : "Antippen oder auf Startelf und Bank ziehen"}</small></div><b>{getCareerCard(displayGame.features.career, player).rating}</b></button><button type="button" className={`card-favorite-toggle${favorite ? " active" : ""}`} aria-pressed={favorite} aria-label={favorite ? `${player.name} als Favorit entfernen` : `${player.name} als Favorit markieren`} disabled={coopBusy} onClick={() => void toggleFavorite(player.id)}>{favorite ? "★" : "☆"}</button></div>; }) : <div className="starxi-empty">Keine Spieler passen zu diesem Filter.</div>}</div>
+                  {filteredReserveStarXIPlayers.length > 0 && <nav className="starxi-pagination" aria-label="Seiten im Reservekader"><button type="button" onClick={() => setReservePage(Math.max(0, activeReservePage - 1))} disabled={activeReservePage === 0}>← Zurück</button><span><strong>Seite {activeReservePage + 1} von {reservePageCount}</strong><small>{activeReservePage * RESERVE_PAGE_SIZE + 1} bis {Math.min((activeReservePage + 1) * RESERVE_PAGE_SIZE, filteredReserveStarXIPlayers.length)} von {filteredReserveStarXIPlayers.length}</small></span><button type="button" onClick={() => setReservePage(Math.min(reservePageCount - 1, activeReservePage + 1))} disabled={activeReservePage >= reservePageCount - 1}>Weiter →</button></nav>}
+                  {currentTransferLoans.length > 0 && <div className="starxi-loaned-list" aria-label="Verliehene Spieler"><span className="eyebrow">VERLIEHEN</span>{currentTransferLoans.map(({ loan, player }) => <div className="starxi-player-card reserve loaned" key={`loaned-${player.id}`} aria-disabled="true"><StarXIPositionBadges player={player} variant="compact" /><div><strong>{player.name}</strong><small>Verliehen an {loan.club} · {loan.status === "active" ? "zurück nach dem laufenden Spiel" : "fehlt in der nächsten Partie"}</small></div><b>{getCareerCard(displayGame.features.career, player).rating}</b></div>)}</div>}
+                  <p className="starxi-reserve-drop-hint">Ziehe einen Spieler aus Startelf oder Bank hierher, um seinen Platz frei zu machen.</p>
+                </section>
+              </div>
+            </div>
+
+          </>}</div>}
+          {featureTab === "club" && <div className="feature-panel">            <section className="trophy-room" aria-label="Gewonnene Pokale"><div className="trophy-room-heading"><div><p className="eyebrow">TROPHÄENRAUM</p><h4>Deine gewonnenen Pokale.</h4></div><span>{totalTrophies} GESAMT</span></div><div className="trophy-grid">{TOURNAMENTS.map((tournament) => { const count = displayGame.features.cup.trophies[tournament.id]; return <article className={`trophy-card${count > 0 ? " earned" : " locked"}`} key={`trophy-${tournament.id}`} style={{ "--trophy-accent": tournament.accent } as CSSProperties}><span className="trophy-icon" aria-hidden="true">{tournament.trophyIcon}</span><div><strong>{tournament.trophyName}</strong><small>{count > 0 ? `${count} Mal gewonnen` : `${tournament.rounds} Runden bis zum Pokal`}</small></div><b>{count}</b></article>; })}</div></section>
+            <section className="club-scorer-board" aria-label="Ewige Torschützenliste"><div className="club-scorer-heading"><div><p className="eyebrow">CLUBREKORDE / EWIG</p><h4>Deine drei besten Torschützen.</h4></div><span>ALLE SPIELE</span></div>{allTimeTopScorers.length ? <ol>{allTimeTopScorers.map(({ player, goals, appearances }, index) => <li key={`all-time-${player.id}`}><span>{index + 1}</span><div><strong>{player.name}</strong><small>{formatStarXIPositions(player)} · OVR {player.rating}</small></div><b>{goals} {goals === 1 ? "TOR" : "TORE"} · {appearances} {appearances === 1 ? "SPIEL" : "SPIELE"}</b></li>)}</ol> : <div className="club-scorer-empty"><strong>Die Rekordliste wartet.</strong><small>Das erste Tor eröffnet deine Klubgeschichte.</small></div>}</section>
+            <TravelStatsPanel travel={displayGame.features.travel} now={getTravelTime()} clubName={displayGame.features.club.name} />
+            <DeviceSettingsPanel sound={game.sound} soundPrefs={soundPrefs} onSound={toggleSound} onSoundPrefs={setSoundPrefs} notifications={notificationsOn} onNotifications={changeNotifications} onWhatsNew={() => setWhatsNewArchive(true)} onMessage={showToast} />
+            <section className="tutorial-restart" aria-label="Tutorial"><div><p className="eyebrow">TUTORIAL / ERSTE SCHRITTE</p><strong>Noch einmal von vorn erklärt.</strong><small>Das Begrüssungsfenster und die Aufgaben für den Einstieg. Dein Spielstand bleibt, wie er ist.</small></div><button type="button" className="mode-secondary" onClick={restartTutorial}>Tutorial erneut starten</button></section>
+            <section className="tutorial-restart" aria-label="Spielstand als Datei"><div><p className="eyebrow">SPIELSTAND / DATEI</p><strong>Deinen Spielstand sichern.</strong><small>Speichert deinen Einzelspieler Spielstand als Datei auf diesem Gerät. Aus der Datei kannst du ihn später wieder laden; vorher wird nachgefragt.</small></div><SaveFileControls getGame={() => gameRef.current} onMessage={showToast} /></section>
+<div className="feature-panel-heading"><div><p className="eyebrow">CLUBIDENTITÄT / DEIN VEREIN</p><h3>Mach ihn zu deinem Club.</h3></div><span className="club-preview" style={{ color: clubDraft.color, borderColor: clubDraft.color }}>{clubDraft.badge}</span></div><div className="club-form"><label htmlFor="club-name">Clubname</label><input id="club-name" className="mode-input" value={clubDraft.name} maxLength={22} onChange={(event) => setClubDraft((current) => ({ ...current, name: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter" && !coopBusy) { event.preventDefault(); void saveClubProfile(); } }} enterKeyHint="done" /><div><span className="club-form-label">Wappen</span><div className="club-choice-row">{CLUB_BADGES.map((badge) => <button key={badge} className={clubDraft.badge === badge ? "selected" : ""} onClick={() => setClubDraft((current) => ({ ...current, badge }))}>{badge}</button>)}</div></div><div><span className="club-form-label">Clubfarbe</span><div className="club-choice-row colors">{CLUB_COLORS.map((color) => <button key={color} className={clubDraft.color === color ? "selected" : ""} style={{ background: color }} aria-label={`Clubfarbe ${color}`} onClick={() => setClubDraft((current) => ({ ...current, color }))} />)}</div></div><button className="mode-primary" onClick={() => void saveClubProfile()} disabled={coopBusy}>Clubprofil speichern</button></div></div>}
+
+          {featureTab === "missions" && <WeeklyGoalsPanel features={displayGame.features} minigameWins={displayGame.minigameWins} coop={isCoopLive} busy={coopBusy} now={getTravelTime()} onClaim={(goalId) => void claimWeeklyGoalReward(goalId)} />}
+
+          {featureTab === "leaderboard" && <LeaderboardPanel playerId={playerId} />}
+          {featureTab === "history" && <div className="feature-panel"><div className="feature-panel-heading"><div><p className="eyebrow">MATCH CENTER / VERLAUF</p><h3>Was im Club passiert.</h3></div><span className="feature-stat">{featureHistory.length} EINTRÄGE</span></div><div className="history-filters"><div className="starxi-filter-row" role="group" aria-label="Verlauf filtern">{HISTORY_TOPICS.map((topic) => <button type="button" key={topic.id} className={historyTopic === topic.id ? "active" : ""} aria-pressed={historyTopic === topic.id} onClick={() => setHistoryTopic(topic.id)}>{topic.label}</button>)}</div>{featureHistoryActors.length > 0 && <select className="starxi-position-filter" value={historyActor} onChange={(event) => setHistoryActor(event.target.value)} aria-label="Verlauf nach Mitspieler filtern"><option value="">Alle Mitspieler</option>{featureHistoryActors.map((actor) => <option key={actor} value={actor}>{actor}</option>)}</select>}</div><div className="history-list">{featureHistory.length ? featureHistory.map((entry) => <div className={`history-row ${entry.tone}`} key={entry.id}><span><Icon name={entry.tone === "negative" ? "screen" : entry.title.includes("Pokal") ? "crown" : "star"} size={15} /></span><div><strong>{entry.title}</strong><small>{entry.actor ? `${entry.actor} · ` : ""}{entry.detail}</small></div><em>{formatHistoryTime(entry.timestamp)}</em></div>) : <div className="feature-empty"><Icon name="broadcast" size={25} /><p>Noch keine Einträge. Das Stadion wartet auf seine erste Geschichte.</p></div>}</div></div>}
+          {featureTab === "history" && displayGame.features.gazetteIssues.length > 0 && <section className="gazette-archive"><div className="gazette-archive-heading"><div><p className="eyebrow">GOAL GAZETTE / ARCHIV</p><h3>Die letzten Titelseiten.</h3></div><span>{displayGame.features.gazetteIssues.length} AUSGABEN</span></div><div>{[...displayGame.features.gazetteIssues].reverse().map((issue) => <article className={issue.tone} key={`gazette-archive-${issue.id}`}><small>{getTournament(issue.tournamentId)?.label ?? "Turnier"} · {formatHistoryTime(issue.createdAt)}</small><strong>{issue.headline}</strong><p>{issue.strapline}</p></article>)}</div></section>}
+        </section>
+
+        <aside className={layoutCardClass("side", "side-column")} style={{ order: layoutOrderNumber("side") }} onDragOver={(event) => handleLayoutDragOver(event, "side")} onDrop={(event) => handleLayoutDrop(event, "side")}>
+          {layoutEditMode && <div className="layout-card-handle" draggable onDragStart={(event) => handleLayoutDragStart(event, "side")} onDragEnd={handleLayoutDragEnd} aria-label="Seitenkarten verschieben"><span className="layout-handle-grip" aria-hidden="true"><Icon name="grip" size={18} /></span><div><strong>Seitenkarten</strong><small>ziehen und im Raster ablegen</small></div><div className="layout-order-controls"><button type="button" onClick={(event) => { event.stopPropagation(); moveLayoutCard("side", -1); }} aria-label="Seitenkarten nach oben">↑</button><button type="button" onClick={(event) => { event.stopPropagation(); moveLayoutCard("side", 1); }} aria-label="Seitenkarten nach unten">↓</button></div></div>}
+          {isCoopLive && coopSession && <div className="side-card coop-team-card"><div className="side-card-heading"><span className="heading-icon"><Icon name="stadium" size={16} /></span><div><p className="eyebrow">TEAM / {String(coopSession.room.playerCount).padStart(2, "0")} VON 04</p><h2>Dein Team</h2></div><span className="coop-live-badge">{hasInfiniteMoney ? "TEST" : "LIVE"}</span></div><div className="coop-players">{coopSession.room.players.map((player) => <div className={`coop-player-card${player.role === coopSession.role ? " you" : ""}${player.online ? " online" : ""}${!player.occupied ? " waiting" : ""}`} key={player.role}><span className="coop-player-tag">{player.role === coopSession.role ? `DU · ${coopRoleLabel(player.role)}` : coopRoleLabel(player.role)}</span><strong>{player.occupied ? player.name : "Freier Platz"}</strong><small>{player.occupied ? `${formatNumber(player.goals)} Tore · ${formatNumber(player.clicks)} Klicks · ${player.online ? "online" : coopLastActiveLabel(player) || "offline"}` : "Raumcode teilen"}</small></div>)}</div><div className="coop-team-total"><span>{hasInfiniteMoney ? "AZB TESTGUTHABEN" : "GEMEINSAMER KONTOSTAND"}</span><strong>{displayBalance} Tore</strong></div></div>}
+          <div className="side-column-stack side-column-stack-rank">
+            <div className="side-card"><div className="side-card-heading"><span className="heading-icon">↗</span><div><p className="eyebrow">AUFSTIEG</p><h2>Die Tabelle</h2></div></div><div className="rank-display"><span className="rank-symbol large"><Icon name={currentRank.icon} size={29} /></span><div><strong>{currentRank.name}</strong><small>{nextRank ? `${formatNumber(nextRank.minimum)} Tore für ${nextRank.name}` : "Du bist die Tabelle."}</small></div></div><div className="rank-progress"><div style={{ width: `${rankProgress}%` }} /></div><div className="rank-progress-labels"><span>{formatNumber(displayGame.totalGoals)} insgesamt</span><span>{nextRank ? formatNumber(nextRank.minimum) : "MAX"}</span></div></div>
+            <div className="side-card feed-card"><div className="side-card-heading"><span className="heading-icon">≡</span><div><p className="eyebrow">STADIONFUNK</p><h2>Live aus dem Block</h2></div></div><div className="feed-list">{feed.slice(0, feedExpanded ? 8 : 3).map((item) => <div className="feed-item" key={item.id}><span className="feed-mark"><Icon name={item.icon} size={13} /></span><p>{item.text}</p></div>)}</div>{feed.length > 3 && <button type="button" className="feed-more" aria-expanded={feedExpanded} onClick={() => setFeedExpanded((current) => !current)}>{feedExpanded ? "weniger" : `mehr (${feed.length - 3})`}</button>}</div>
+          </div>
+          <div className="side-column-stack side-column-stack-season">
+            <div className="side-card season-card">
+            <div className="side-card-heading"><span className="heading-icon">★</span><div><p className="eyebrow">SAISONMODUS / LIGA {leagueForTier(currentSeason)}</p><h2>{currentSeasonMilestone.title}</h2></div><span className="season-stars">★ {displayGame.stars}</span></div>
+            <p className="season-copy">{seasonCareerComplete ? "Die höchste Saison ist erreicht. Prestige startet wieder in Saison 1: Freischaltungen und Spezialkarten bleiben, dazu eine Karte deiner Wahl. Torstand und alle Upgrades beginnen bei 0. Jedes Prestige gibt +20 % Tore auf Klicks und passives Einkommen." : `${getSeasonModeDivisionLabel(currentSeason)}: 10 Spiele pro Saison, Top 2 steigen auf, die letzten 2 steigen ab.`} Jeder Vereinsstern gibt dauerhaft 2% auf alle Einnahmen.</p>
+            <div className="season-unlocks"><span>AKTIVE FREISCHALTUNGEN</span><div>{currentSeasonMilestone.rewards.map((reward) => <b key={`${currentSeason}-${reward}`}>✓ {reward}</b>)}</div></div>
+            <div className="season-stat"><span>{seasonCareerComplete ? "HALL OF FAME ERREICHT" : `SPIELTAG ${seasonMode.matchday} / 10`}</span><strong>{seasonCareerComplete ? `PRESTIGE ${seasonMode.prestigeCount}` : seasonMode.lastResult.includes("wartet") ? "ANPFIFF BEREIT" : `BESTE LIGA ${leagueForTier(seasonMode.highestDivision)}`}</strong></div>
+            <div className="season-progress"><div style={{ width: `${seasonCareerComplete ? 100 : Math.min(100, (seasonMode.matchday / 10) * 100)}%` }} /></div>
+            <div className="season-table" aria-label="Saison Tabelle"><div className="season-table-heading"><span>TABELLE</span><span>P · SP · S-U-N · TD</span></div>{seasonTable.map((team, index) => <div className={`season-table-row${team.id === "club" ? " club" : ""}`} key={team.id}><i>{index + 1}</i><strong>{team.name}</strong><small>{team.points} P · {team.played} SP · {team.wins}-{team.draws}-{team.losses} · TD {formatGoalDifference(team)}</small></div>)}</div>
+            <div className="season-next"><span>LETZTES ERGEBNIS</span><strong>{seasonMode.lastResult}</strong><small>{seasonMode.highestDivision > 1 ? `Beste erreichte Liga: Liga ${leagueForTier(seasonMode.highestDivision)}` : "Spiele deine erste Partie und kämpfe dich hoch."}</small></div>
+            <details className="season-roadmap"><summary>Alle Liga Freischaltungen <span>＋</span></summary><div>{SEASON_MILESTONES.map((milestone) => { const league = leagueForTier(milestone.season); return <article className={league > reachedLeague ? "done" : league === reachedLeague ? "current" : "future"} key={`season-roadmap-${milestone.season}`}><i>{league > reachedLeague ? "✓" : league}</i><div><strong>Liga {league} · {milestone.title}</strong><small>{milestone.rewards.join(" · ")}</small></div></article>; })}</div></details>
+            <p className="season-action-note">Saisonspiele und Turniere startest du gemeinsam oben unter «Spiele».</p>
+            </div>
+          </div>
+          <div className="side-column-stack side-column-stack-achievements">
+            <div className="side-card achievement-card"><div className="side-card-heading"><span className="heading-icon">◇</span><div><p className="eyebrow">ERFOLGE</p><h2>Pokalschrank</h2></div><span className="achievement-count">{displayGame.achievements.length} / {ACHIEVEMENTS.length}</span></div><div className="achievement-list">{ACHIEVEMENTS.map((achievement) => { const unlocked = displayGame.achievements.includes(achievement.id); return <div className={`achievement-row${unlocked ? " unlocked" : ""}`} key={achievement.id}><span><Icon name={achievement.icon} size={17} /></span><div><strong>{achievement.name}</strong><small>{achievement.description}</small></div><em>{unlocked ? "✓" : formatNumber(achievement.threshold)}</em></div>; })}</div></div>
+            <div className="coach-note"><span className="coach-avatar">COACH</span><div><strong>Trainer Tipp</strong><p>{seasonCareerComplete ? "Hall of Fame erreicht. Prestige startet wieder in Saison 1 mit deinen Spezialkarten und einer Karte deiner Wahl, die Upgrades beginnen wieder bei Stufe 0. Alle anderen Karten bleiben im Album." : seasonInProgress ? "Jede Partie zählt: Bleib unter den Top 2 für den Aufstieg und meide die letzten beiden Plätze." : "Starte dein erstes Saisonspiel. Es gibt keine Torziele – nur die Tabelle entscheidet."}</p></div></div>
+          </div>
+        </aside>
+      </main>}
+
+      {appMode === "coop" && !isCoopLive && <main className="mode-page coop-mode-page">
+        <section className={`mode-card coop-card${coopSession?.room.status === "live" ? " is-live" : ""}`}>
+          <div className="mode-card-heading"><div><p className="eyebrow">CO-OP CAREER / BIS ZU VIER SPIELER</p><h2>Zusammen auf die Torjagd.</h2><p>Ein Raum, ein gemeinsames Konto, bis zu vier Geräte. Der Singleplayer bleibt komplett separat.</p></div><span className="mode-card-icon"><Icon name="stadium" size={24} /></span></div>
+          {!coopSession ? <div className="coop-lobby">
+            <div className="coop-lobby-panel"><span className="coop-panel-number">01</span><div><p className="eyebrow">NEUE WELT ERÖFFNEN</p><h3>Du bist der Host.</h3><p>Gib deiner Welt einen Namen und teile den Raumcode mit bis zu drei Mitspielern.</p></div><input className="mode-input room-name-input" value={coopRoomName} maxLength={28} placeholder="z. B. Xevihans United" onChange={(event) => setCoopRoomName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !coopBusy) { event.preventDefault(); void createCoopRoom(); } }} enterKeyHint="go" aria-label="Name der neuen Welt" /><button className="mode-primary" onClick={() => void createCoopRoom()} disabled={coopBusy}>Welt erstellen</button></div>
+            <div className="coop-lobby-panel"><span className="coop-panel-number">02</span><div><p className="eyebrow">MIT RAUMCODE BEITRETEN</p><h3>Schon eingeladen?</h3><p>Code eingeben und direkt im gemeinsamen Match landen.</p></div><input className="mode-input code-input" value={coopCodeInput} maxLength={6} placeholder="ABC123" aria-label="Raumcode" onChange={(event) => setCoopCodeInput(event.target.value.toUpperCase())} onKeyDown={(event) => { if (event.key === "Enter" && !coopBusy) { event.preventDefault(); void joinCoopRoom(); } }} enterKeyHint="go" autoCapitalize="characters" /><button className="mode-secondary" onClick={() => void joinCoopRoom()} disabled={coopBusy}>Beitreten</button></div>
+            {account ? <div className="coop-name-field"><span className="coop-name-label">Du spielst als</span><strong>{account.profile.displayName}</strong><small>Deinen Anzeigenamen änderst du oben beim Konto Knopf.</small></div> : <div className="coop-name-field"><label htmlFor="coop-name">Dein Spielername für den Koop-Raum</label><input id="coop-name" className="mode-input" value={playerName} maxLength={18} placeholder="z. B. Team Captain" onChange={(event) => setPlayerName(event.target.value)} /><small>Dieser Name wird allen Personen im Raum angezeigt.</small></div>}
+            {savedRooms.length > 0 && <div className="saved-rooms"><div className="saved-rooms-heading"><div><p className="eyebrow">DEINE KOOP WELTEN</p><h3>Gespeicherte Matches</h3></div><button className="mode-secondary" onClick={() => void loadSavedRooms()} disabled={roomsLoading}>{roomsLoading ? "Lädt …" : "Aktualisieren"}</button></div><div className="saved-room-list">{savedRooms.map((room) => { const otherOnlineCount = room.players.filter((player) => player.occupied && player.role !== room.viewerRole && player.online).length; const otherOnline = otherOnlineCount > 0; const names = occupiedCoopPlayers(room).map((player) => player.name).join(" · "); return <div className={`saved-room-row${otherOnline ? " other-online" : ""}`} key={room.code}><button className="saved-room-main" onClick={() => void reopenSavedRoom(room.code)} disabled={coopBusy}><span className="saved-room-code">{room.code}</span><span className="saved-room-copy"><strong>{room.roomName}</strong><small>{names} · {room.playerCount}/4 Spieler · {room.testMode ? "∞ AZB Testmodus" : `${formatNumber(room.sharedCoins)} Tore`}</small></span><span className={`saved-room-presence${otherOnline ? " online" : ""}`}><i />{otherOnline ? `${otherOnlineCount} ONLINE` : "OFFLINE"}</span><span className="saved-room-open">Öffnen&nbsp;↗</span></button>{room.canDelete && <button className="saved-room-delete" onClick={() => void deleteCoopRoom(room.code)} disabled={coopBusy}>Löschen</button>}</div>; })}</div><p className="saved-rooms-note">Jede Welt erscheint bei allen vier Mitgliedern mit demselben gemeinsamen Spielstand. Nach Updates wird dein Platz automatisch wiederhergestellt.</p></div>}
+          </div> : <div className="coop-room">
+            <div className="coop-room-bar"><div><p className="eyebrow">{coopSession.room.roomName} / RAUMCODE</p><strong className="coop-code">{coopSession.code}</strong><span>{coopSession.room.status === "live" ? `LIVE · ${coopSession.room.playerCount} von 4 Spielern verbunden` : "WARTET · Code mit bis zu drei Mitspielern teilen"}</span></div><div className="coop-room-actions"><button className="mode-secondary" onClick={() => void shareInvite()}>Einladen</button><button className="mode-secondary" onClick={() => void copyCoopCode()}>Code kopieren</button>{coopSession.role === "host" && <button className="mode-secondary danger" onClick={() => void deleteCoopRoom(coopSession.code)}>Raum löschen</button>}<button className="mode-secondary quiet" onClick={leaveCoopRoom}>Verlassen</button></div></div>
+            <div className="coop-world-tools waiting"><div><p className="eyebrow">WELTNAME</p>{coopSession.role === "host" ? <div className="coop-tool-input"><input className="mode-input" value={coopRoomName} maxLength={28} onChange={(event) => setCoopRoomName(event.target.value)} /><button className="mode-secondary" onClick={() => void renameCoopRoom()} disabled={coopBusy}>Speichern</button></div> : <strong>{coopSession.room.roomName}</strong>}</div></div>
+            {coopSession.room.status !== "live" && <div className="coop-waiting-state">
+              <div className="coop-waiting-icon"><Icon name="stadium" size={28} /></div>
+              <div><p className="eyebrow">ANPFIFF VORBEREITET</p><h3>Warte auf den zweiten Spieler.</h3><p>Die gemeinsame Clicker-Ansicht startet ab zwei Personen. Danach können noch zwei weitere Spieler beitreten.</p></div>
+              <div className="coop-players coop-waiting-players">{coopSession.room.players.map((player) => <div className={`coop-player-card${player.role === coopSession.role ? " you" : ""}${player.online ? " online" : ""}${!player.occupied ? " waiting" : ""}`} key={player.role}><span className="coop-player-tag">{player.role === coopSession.role ? `DU · ${coopRoleLabel(player.role)}` : coopRoleLabel(player.role)}</span><strong>{player.occupied ? player.name : "Wartet auf Beitritt …"}</strong><small>{player.occupied ? "Bereit für den Anpfiff" : "Raumcode teilen"}</small></div>)}</div>
+            </div>}
+          </div>}
+          {coopUpdateRequired && <p className="mode-message" role="status">{MULTIPLAYER_UPDATE_MESSAGE} <button type="button" onClick={reloadForUpdate}>Jetzt neu laden</button></p>}
+          {coopMessage && <p className="mode-message" role="status">{coopMessage}</p>}
+        </section>
+      </main>}
+
+      {displayGame.features.cup.active && displayGame.features.cup.phase === "penalties" && <div ref={penaltyDialogRef} className={`cup-penalty-takeover ${displayGame.features.cup.penaltyTurn}`} role="dialog" aria-modal="true" aria-label="Elfmeterschiessen steuern">
+        <div className="cup-penalty-panel">
+          <div className="cup-penalty-topline"><span>{displayGame.features.cup.mode === "season" ? "SAISON / ELFMETERSCHIESSEN" : "POKAL / ELFMETERSCHIESSEN"}</span><b>{cupPenaltyIsSuddenDeath ? "SUDDEN DEATH" : "BEST OF FIVE"}</b></div>
+          <div className="cup-penalty-match-score"><span>NACH 120′</span><strong>{displayClubName} {displayGame.features.cup.homeScore}:{displayGame.features.cup.awayScore} {displayGame.features.cup.opponent}</strong></div>
+          <div className="cup-penalty-scoreboard">
+            <div><small>DEIN CLUB</small><strong>{displayGame.features.cup.penaltyHomeScore}</strong><div className="cup-penalty-dots">{Array.from({ length: cupPenaltySlotCount }, (_, index) => { const event = cupPenaltyHomeEvents[index]; return <i className={!event ? "pending" : event.outcome === "goal" ? "goal" : "miss"} key={`home-penalty-${index}`}>{!event ? "" : event.outcome === "goal" ? "✓" : "×"}</i>; })}</div></div>
+            <em>:</em>
+            <div><small>GEGNER</small><strong>{displayGame.features.cup.penaltyAwayScore}</strong><div className="cup-penalty-dots">{Array.from({ length: cupPenaltySlotCount }, (_, index) => { const event = cupPenaltyAwayEvents[index]; return <i className={!event ? "pending" : event.outcome === "goal" ? "goal" : "miss"} key={`away-penalty-${index}`}>{!event ? "" : event.outcome === "goal" ? "✓" : "×"}</i>; })}</div></div>
+          </div>
+          <div className="cup-penalty-prompt"><span>{displayGame.features.cup.penaltyTurn === "home" ? "DU SCHIESST" : "DU BIST IM TOR"}</span><h2>{displayGame.features.cup.penaltyTurn === "home" ? "Wohin schiesst du?" : "Wohin springt dein Torwart?"}</h2><p>{displayGame.features.cup.penaltyMessage}</p><small className="cup-penalty-rules">{cupPenaltyIsSuddenDeath ? "Sudden Death: Wer bei gleich vielen Versuchen vorne liegt, gewinnt." : "Je fünf Schüsse, abwechselnd. Steht es danach gleich, folgt Sudden Death."} Pfeiltasten: links, unten für die Mitte, rechts.</small></div>
+          <div className="cup-penalty-goal" aria-label="Richtung wählen"><div className="cup-penalty-net" aria-hidden="true" />{(["left", "center", "right"] as CupPenaltyDirection[]).map((direction) => <button key={direction} className={direction} onClick={() => void takeCupPenalty(direction)} disabled={coopBusy}><span>{direction === "left" ? "↙" : direction === "right" ? "↘" : "↓"}</span><strong>{direction === "left" ? "LINKS" : direction === "right" ? "RECHTS" : "MITTE"}</strong><small>{displayGame.features.cup.penaltyTurn === "home" ? "SCHIESSEN" : "SPRINGEN"}</small></button>)}</div>
+          <div className="cup-penalty-footer"><span>{coopBusy ? "VERSUCH WIRD AUSGEFÜHRT …" : isCoopLive ? "Die erste Eingabe zählt und erscheint sofort auf beiden Geräten." : "Du steuerst abwechselnd Schütze und Torwart."}</span><b>{displayGame.features.cup.penaltyHomeTaken + displayGame.features.cup.penaltyAwayTaken + 1}. VERSUCH</b></div>
+        </div>
+      </div>}
+
+      {cupCardAnnouncement && <div className="gc-notification card-notification" role="status"><span>🟥</span><div><strong>{cupCardAnnouncement.minute}′ · {cupCardAnnouncement.player}</strong><p>{cupCardAnnouncement.reason}. Vom Platz gestellt und für die nächste Partie gesperrt.</p></div></div>}
+
+      {transferAnnouncement && !gazetteAnnouncement && <div ref={transferDialogRef} className={`transfer-insider-takeover ${transferAnnouncement.outcome}`} role="dialog" aria-modal="true" aria-label={`Transfermeldung: ${transferAnnouncement.headline}`}><div className="transfer-insider-card"><span className="transfer-insider-kicker">TRANSFER INSIDER / EXKLUSIV</span><div className="transfer-insider-reporter"><span aria-hidden="true">FR</span><div><strong>Fabrizio Romario</strong><small>@romario_transfers · gerade eben</small></div><b>LIVE</b></div><h2>{transferAnnouncement.headline}</h2><p>{transferAnnouncement.message}</p><span className="transfer-insider-result">{transferAnnouncement.outcome === "offer" ? transferAnnouncement.fee > 0 ? `ANGEBOT · ${formatNumber(transferAnnouncement.fee)} GOALS` : "WECHSELWUNSCH · ABLÖSEFREI" : transferAnnouncement.outcome === "declined" ? `BLEIBT · ${TRANSFER_UNHAPPY_MATCHES} SPIELE UNZUFRIEDEN` : transferAnnouncement.outcome === "sale" ? transferAnnouncement.fee > 0 ? `+${formatNumber(transferAnnouncement.fee)} GOALS ABLÖSE` : "ABLÖSEFREI · 0 GOALS" : transferAnnouncement.outcome === "loan" ? displayGame.features.cup.mode === "season" && !displayGame.features.seasonMode.hallOfFame ? "IN DER NÄCHSTEN SAISONPARTIE NICHT IM TEAM" : "IM NÄCHSTEN TURNIER NICHT IM TEAM" : transferAnnouncement.outcome === "return" ? "WIEDER IM TEAM" : "KEIN TRANSFER"}</span>{transferAnnouncement.outcome === "offer" && pendingTransferOffer?.id === transferAnnouncement.id ? <TransferOfferActions offer={pendingTransferOffer} now={countdownNow} busy={coopBusy} onAnswer={answerTransferOffer} onLater={dismissTransferAnnouncement} /> : <button className="event-takeover-dismiss" onClick={dismissTransferAnnouncement}>Weiter</button>}</div></div>}
+      {starReveal && <div ref={starRevealDialogRef} tabIndex={-1} className={`star-reveal${starRevealIsWalkout ? " walkout-active" : ""}${starRevealIsRare ? " rare-active" : ""}`} role="dialog" aria-modal="true" aria-label={starRevealIsCustomDraw ? "Spezialkarte gezogen" : "Star Pack geöffnet"}>
+        <div className={`star-reveal-card${starRevealIsWalkout ? " star-reveal-walkout" : ""}${starWalkoutIsTop ? " star-reveal-top-walkout" : ""}${starRevealIsIconic ? " star-reveal-iconic" : ""}${starRevealIsLegendary ? " star-reveal-legendary" : ""}${starRevealIsRare ? " star-reveal-rare" : ""}`} style={{ borderColor: `${starReveal.player.accent}55` }}>
+          {starRevealIsWalkout ? <>
+            <span className="star-reveal-walkout-label">{starRevealTrollActive ? "WALKOUT? · ETWAS KOMMT" : starRevealIsLegendary ? "LEGENDÄRER WALKOUT · EINZIGARTIG" : starRevealIsIconic ? "ICON WALKOUT · SILBER" : starWalkoutIsTop ? "TOP WALKOUT · 90+" : "WALKOUT · 86+"}</span>
+            <span className="star-reveal-kicker">{starRevealTrollActive ? "STADION / FALSCHE SPUR" : starRevealIsCustomDraw ? "ZUFALLSZUG / STADION ENTHÜLLUNG" : `${starReveal.packName} / STADION ENTHÜLLUNG`}</span>
+            {starRevealTrollActive ? <div className="star-pack-troll-stage" aria-live="assertive"><div className="star-pack-troll-mascot" aria-hidden="true"><i className="mascot-ear left" /><i className="mascot-ear right" /><span>GC</span><b>⚽</b></div><strong>Das Maskottchen!</strong><small>Falscher Walkout. Die echte Karte kommt sofort.</small></div> : <div className="star-walkout-stage" aria-live="assertive" style={starWalkoutStyle}>
+              <div className="star-walkout-pyro" aria-hidden="true">{Array.from({ length: starWalkoutIsTop ? 17 : 11 }, (_, index) => <i key={index} style={{ "--pyro-index": index } as CSSProperties} />)}</div>
+              <div className="star-walkout-confetti" aria-hidden="true">{GOAL_CONFETTI.map((particle, index) => <i key={index} style={{ left: particle.left, animationDelay: `calc(${900 + index * 28}ms + var(--walkout-delay, 0ms))`, animationDuration: particle.duration, background: starWalkoutConfetti ? starWalkoutConfetti[index % starWalkoutConfetti.length] : particle.color }} />)}</div>
+              {starWalkoutPresentation && <>
+                <div className="star-walkout-country"><WalkoutCountryFlag code={starWalkoutPresentation.countryCode} country={starWalkoutPresentation.country} /><strong>{starWalkoutPresentation.country}</strong><small>{starWalkoutPresentation.countryCode}</small></div>
+                <div className="star-walkout-rating-panel"><StarXIPositionBadges player={starReveal.player} variant="walkout" /><strong>{starReveal.player.rating}</strong><em>{starRevealIsLegendary ? "LEGENDÄRE KARTE" : starRevealIsIconic ? "ICON KARTE" : "WALKOUT KARTE"}</em></div>
+                <WalkoutAvatar presentation={starWalkoutPresentation} rating={starReveal.player.rating} label={`Ganzkörper Figur von ${starReveal.player.name}`} onAnimationEnd={finishStarWalkout} />
+                <div className="star-walkout-nameplate"><span><WalkoutCountryFlag compact code={starWalkoutPresentation.countryCode} country={starWalkoutPresentation.country} /> {starWalkoutPresentation.countryCode} · {formatStarXIPositions(starReveal.player)}</span><h2>{starReveal.player.name}</h2></div>
+              </>}
+            </div>}
+            <p className={`star-walkout-copy${starWalkoutReady ? " ready" : ""}`}>{starRevealTrollActive ? "Das Stadion wurde kurz getrollt. Gleich beginnt der echte Walkout." : `${isCoopLive ? `${starReveal.openedBy} hat ${starRevealAction}. ` : ""}${starReveal.duplicate ? `Doppelt gezogen. Du bekommst automatisch ${formatNumber(starReveal.fragmentCompensation)} Fragmente für Custom-Karten.` : `${formatStarXIPositions(starReveal.player)} · Rating ${starReveal.player.rating}. Der Walkout gehört jetzt deinem Club.`}`}</p>
+            <span className={`star-reveal-status star-walkout-status${starWalkoutReady ? " ready" : ""}`}>{starRevealTrollActive ? "PACK TROLL" : starWalkoutReady ? starReveal.duplicate ? "DOPPELT · FRAGMENTE" : starRevealIsLegendary ? "LEGENDÄR · STAR XI" : starRevealIsIconic ? "ICON · STAR XI" : "WALKOUT · STAR XI" : "WALKOUT LÄUFT"}</span>
+            {walkoutSkippable && !starWalkoutReady && <button type="button" className="mode-secondary star-walkout-skip" onClick={skipStarReveal}>Überspringen</button>}
+            {starWalkoutReady && !starRevealTrollActive && revealLineupButton}
+            <button className={`event-takeover-dismiss star-walkout-dismiss${starWalkoutReady ? " ready" : ""}`} disabled={!starWalkoutReady} onClick={dismissStarReveal}>{starRevealTrollActive ? "Maskottchen läuft …" : starWalkoutReady ? revealContinueLabel : "Walkout läuft …"}</button>
+          </> : starRevealIsRare ? <>
+            <span className="star-reveal-walkout-label">SELTENE KARTE · 80 BIS 85</span>
+            <span className="star-reveal-kicker">{starRevealKicker}</span>
+            <div className="star-rare-stage" style={starWalkoutStyle} aria-live="assertive">
+              <div className="star-rare-sparkles" aria-hidden="true">{Array.from({ length: 18 }, (_, index) => <i key={index} style={{ left: `${(index * 37) % 96}%`, top: `${8 + (index * 23) % 78}%`, animationDelay: `calc(${index * 70}ms + var(--rare-delay, 0ms))` }} />)}</div>
+              <div className="star-rare-card"><StarXIPositionBadges player={starReveal.player} variant="rare" /><strong>{starReveal.player.rating}</strong><small>SELTEN</small><h2>{starReveal.player.name}</h2></div>
+            </div>
+            <p className={`star-walkout-copy${starWalkoutReady ? " ready" : ""}`}>{`${isCoopLive ? `${starReveal.openedBy} hat ${starRevealAction}. ` : ""}${starReveal.duplicate ? `Doppelt gezogen. Du bekommst automatisch ${formatNumber(starReveal.fragmentCompensation)} Fragmente für Custom-Karten.` : `${formatStarXIPositions(starReveal.player)} · Rating ${starReveal.player.rating}. Seltene Karte für deinen Club.`}`}</p>
+            <span className={`star-reveal-status star-walkout-status${starWalkoutReady ? " ready" : ""}`}>{starWalkoutReady ? starReveal.duplicate ? "DOPPELT · FRAGMENTE" : "SELTEN · STAR XI" : "SELTENE KARTE"}</span>
+            {walkoutSkippable && !starWalkoutReady && <button type="button" className="mode-secondary star-walkout-skip" onClick={skipStarReveal}>Überspringen</button>}
+            {starWalkoutReady && !starRevealTrollActive && revealLineupButton}
+            <button className={`event-takeover-dismiss star-walkout-dismiss${starWalkoutReady ? " ready" : ""}`} disabled={!starWalkoutReady} onClick={dismissStarReveal}>{starWalkoutReady ? revealContinueLabel : "Karte wird enthüllt …"}</button>
+          </> : <>
+            <span className="star-reveal-kicker">{starRevealKicker}</span>
+            <div className="star-reveal-player"><StarXIPositionBadges player={starReveal.player} /><strong>{starReveal.player.rating}</strong></div>
+            <h2>{starReveal.player.name}</h2>
+            <p>{`${isCoopLive ? `${starReveal.openedBy} hat ${starRevealAction}. ` : ""}${starReveal.duplicate ? `Doppelt gezogen. Du bekommst automatisch ${formatNumber(starReveal.fragmentCompensation)} Fragmente für Custom-Karten.` : `${formatStarXIPositions(starReveal.player)} · Rating ${starReveal.player.rating}. Der Spieler wird nur auf passenden Positionen eingesetzt.`}`}</p>
+            <span className="star-reveal-status">{starReveal.duplicate ? "DOPPELT · FRAGMENTE" : starReveal.player.rating <= 70 ? "GEWÖHNLICHE KARTE" : "PROFI KARTE · STAR XI"}</span>
+            {revealLineupButton}
+            <button className="event-takeover-dismiss" onClick={dismissStarReveal}>{revealContinueLabel}</button>
+          </>}
+        </div>
+      </div>}
+      {eventAnnouncement && <div key={`${eventAnnouncement.id}:${eventAnnouncement.createdAt}`} className={`gc-notification ${eventAnnouncement.tone}`} role="status" aria-live="polite"><span aria-hidden="true">{eventAnnouncement.id==='var'?'📺':eventAnnouncement.tone==='negative'?'⚠️':'🏟️'}</span><div><strong>{eventAnnouncement.title}</strong><p>{eventAnnouncement.message}</p><small>{eventAnnouncement.amount<0?`−${formatNumber(Math.abs(eventAnnouncement.amount))} TORE`:eventAnnouncement.amount>0?`+${formatNumber(eventAnnouncement.amount)} TORE`:'Keine Kontoänderung'}</small></div></div>}
+      {offline && <div className="offline-banner" role="alert"><span className="offline-mark">Ⅱ</span><p>{offline}</p>{offline === SAVE_FAILED_MESSAGE && <button type="button" className="mode-secondary" style={{ minHeight: 44, flexShrink: 0, color: "var(--text)", fontSize: "var(--text-caption2)" }} onClick={() => showToast(exportCurrentSave(gameRef.current) ? "Spielstand als Datei gesichert." : "Der Spielstand konnte nicht als Datei gesichert werden.")}>Als Datei sichern</button>}{offline === NEWER_VERSION_MESSAGE && <button type="button" className="mode-secondary" style={{ minHeight: 44, flexShrink: 0, color: "var(--text)", fontSize: "var(--text-caption2)" }} onClick={() => window.location.reload()}>Neu laden</button>}<button type="button" style={{ minWidth: 44, minHeight: 44 }} onClick={() => setOffline("")} aria-label="Hinweis schliessen">×</button></div>}
+      <footer className="footer-note">Made by xevihans</footer>
+      {toast && <div className="toast" aria-hidden="true">{toast}</div>}
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{srAnnouncement}</div>
+    </div>
+  );
+}

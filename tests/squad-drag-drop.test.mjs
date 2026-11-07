@@ -5,7 +5,7 @@ import { readStyles } from "./helpers/styles.mjs";
 
 test("squad drag and drop keeps click controls, positions and multiplayer actions", async () => {
   const [pageSource, boardSource, cssSource] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/squad-board.tsx", import.meta.url), "utf8"),
     Promise.resolve(readStyles()),
   ]);

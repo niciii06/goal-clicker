@@ -76,7 +76,7 @@ test('B38: in co-op an offer due during a home match is kept and saved with its 
 });
 
 test('client call sites: drag checks yellow bans, pack reveal waits for the update, banner lists owned cards', async () => {
-  const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  const page = await readFile(new URL('../app/game-app.tsx', import.meta.url), 'utf8');
   const drop = page.slice(page.indexOf('function canDropSquadPlayer'), page.indexOf('async function dropSquadPlayer'));
   assert.match(drop, /source\.area === "reserve" && getBannedPlayerIds\(/);
   const buy = page.slice(page.indexOf('const opening = openStarPack(pack.id, latestGame'), page.indexOf('async function buySpecialCardPack'));
