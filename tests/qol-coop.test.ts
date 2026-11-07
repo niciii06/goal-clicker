@@ -141,3 +141,26 @@ test('star-favorite marks a card for the whole world; cup-abandon ends a waiting
   assert.equal((await post('cup-abandon', { actionId: 'a-1' }, GUEST)).data.duplicate, true);
   assert.equal((await post('cup-abandon', { actionId: 'a-2' }, GUEST)).status, 409);
 });
+
+test('cup-abandon is refused while the world travels to the next round; a world stuck by older builds is repaired on read', async () => {
+  const start = squad();
+  start.cup = { ...start.cup, mode: 'tournament', tournamentId: 'stadium', pendingNextRound: true, round: 1, matchStartedAt: Date.now() - 600_000 };
+  setup(start);
+  const go = await post('travel-start', { actionId: 't-1', mode: 'tournament', tournamentId: 'stadium' });
+  assert.equal(go.status, 200, go.data.error);
+  assert.ok(features().travel.journey && features().squadLock);
+  const refused = await post('cup-abandon', { actionId: 'a-1' });
+  assert.equal(refused.status, 409);
+  assert.match(String(refused.data.error), /unterwegs/);
+  assert.equal(features().cup.pendingNextRound, true);
+  // The stored world of an older build: given up after departing, the journey and the squad lock stayed.
+  const stuck = JSON.parse(row.sharedFeaturesJson) as GameFeatures;
+  assert.ok(stuck.travel.journey && stuck.squadLock);
+  stuck.completedTournamentRuns = [...stuck.completedTournamentRuns, `stadium:${stuck.cup.matchStartedAt}`];
+  stuck.cup = { ...stuck.cup, pendingNextRound: false, round: 0, nextTournamentAt: Date.now() - 1 };
+  setup(stuck);
+  assert.equal(features().travel.journey, null);
+  assert.equal(features().squadLock, undefined);
+  const season = await post('travel-start', { actionId: 't-2', mode: 'season' });
+  assert.notEqual(season.data.error, 'Schliesse zuerst die bereits begonnene Auswärtsreise ab.');
+});
