@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { readStyles } from "./helpers/styles.mjs";
 
 test("squad drag and drop keeps click controls, positions and multiplayer actions", async () => {
   const [pageSource, boardSource, cssSource] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/squad-board.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    Promise.resolve(readStyles()),
   ]);
 
   assert.match(boardSource, /application\/x-goal-clicker-player/);

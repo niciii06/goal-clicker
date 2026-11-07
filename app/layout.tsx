@@ -1,5 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+// The styles by area (audit P14), split from globals.css. This order is the cascade order: a rule that overrides a
+// rule of another file only moved into an area file when the original order between the two stayed the same.
+import "./styles/base.css";
+import "./styles/match.css";
+import "./styles/walkout.css";
+import "./styles/album.css";
+import "./styles/travel.css";
+import "./styles/season.css";
+import "./styles/coop.css";
 import "./qol/qol.css";
 import { PwaRegister } from "./pwa-register";
 import { THEME_BOOT_SCRIPT, THEME_COLORS } from "./theme";

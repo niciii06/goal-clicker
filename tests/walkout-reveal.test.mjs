@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { readStyles } from "./helpers/styles.mjs";
 
 test("walkout avatar renders the revealed player without crashing", async () => {
   const [pageSource, avatarSource] = await Promise.all([
@@ -16,7 +17,7 @@ test("walkout avatar renders the revealed player without crashing", async () => 
 test("walkout keeps only the fireworks and confetti effects", async () => {
   const [pageSource, styleSource] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    Promise.resolve(readStyles()),
   ]);
 
   assert.match(pageSource, /className="star-walkout-pyro"/);
@@ -34,7 +35,7 @@ test("walkout keeps only the fireworks and confetti effects", async () => {
 test("walkout continue action unlocks when the visible animation finishes", async () => {
   const [pageSource, styleSource] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    Promise.resolve(readStyles()),
   ]);
 
   assert.match(pageSource, /const STAR_WALKOUT_ANIMATION_MS = 9500/);
