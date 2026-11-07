@@ -40,7 +40,8 @@ export function readStoredGame() {
   return { saved: safest?.saved as Partial<GameState> | undefined, recovered: Boolean(safest && safest.key !== STORAGE_KEY) };
 }
 
-let persistenceSuspended = false;
+import { localPersistenceSuspended } from "./persistence";
+export { resumeLocalPersistence, suspendLocalPersistence } from "./persistence";
 
 // Several tabs share one localStorage. Only one of them saves at a time (the one last used), and a tab that
 // loaded an older revision than the stored one must load the newer save before it may write again.
@@ -97,16 +98,6 @@ export function claimLocalSave(now = Date.now()): "ok" | "stale" {
   return "ok";
 }
 
-/** Stops all autosaves until the page reloads, so an imported save file is not overwritten on the way out. */
-export function suspendLocalPersistence() {
-  persistenceSuspended = true;
-}
-
-/** Saves again after an import that did not go through; the previous game is still the one in storage. */
-export function resumeLocalPersistence() {
-  persistenceSuspended = false;
-}
-
 /** Forgets every stored copy of the game, including backups and old save versions, so a reset stays a reset. */
 export function clearStoredGames() {
   for (const key of [STORAGE_KEY, BACKUP_STORAGE_KEY, RECOVERY_STORAGE_KEY, ...LEGACY_STORAGE_KEYS]) localStorage.removeItem(key);
@@ -143,7 +134,7 @@ function storedSchemaVersion(game: StoredGameLike | null) {
 }
 
 export function persistLocalGame(state: GameState): LocalSaveResult {
-  if (persistenceSuspended) return "suspended";
+  if (localPersistenceSuspended()) return "suspended";
   const now = Date.now();
   try {
     // A tab in the background leaves the save to the tab in use; it only catches up once it is used itself.

@@ -1,7 +1,7 @@
 // Protection against older clients (an old PWA tab after a deploy). normalizeGameFeatures drops fields it does not
 // know and writes its own schema version, so a client must never normalize, store or upload a save that a newer
 // version of the game wrote. It keeps that save untouched and asks the player to reload instead.
-import { GAME_FEATURES_SCHEMA_VERSION } from "../feature-data";
+import { GAME_FEATURES_SCHEMA_VERSION } from "../features/schema-version";
 import { readGameSchemaVersion, readSaveSchemaVersion } from "../cloud-save-rules";
 import type { CloudSaveKeys } from "../cloud-save-rules";
 
