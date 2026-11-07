@@ -61,9 +61,9 @@
 .starxi-player-card > .reserve-drag-grip { display: none; position: absolute; top: 0; bottom: 0; left: 0; width: 26px; height: auto; align-items: center; justify-content: center; border-radius: 0; color: var(--soft); background: transparent; font-size: 18px; touch-action: none; cursor: grab; }
 @media (pointer: coarse) { .starxi-player-card > .reserve-drag-grip { display: inline-flex; } .starxi-reserve-item > .starxi-player-card.reserve:has(.reserve-drag-grip) { position: relative; padding-left: 30px; } }
 /* Name and chips: only the name is shortened, the NEU and type chips always stay readable. */
-.starxi-player-card .reserve-card-title { display: flex; align-items: center; min-width: 0; }
-.starxi-player-card .reserve-card-title > strong { flex: 0 1 auto; min-width: 0; }
-.starxi-player-card .reserve-card-title > em { flex: 0 0 auto; }
+.starxi-player-card .reserve-card-title { display: flex; flex-wrap: wrap; align-items: center; row-gap: 2px; min-width: 0; }
+.starxi-player-card .reserve-card-title > strong { flex: 0 1 auto; min-width: 0; max-width: 100%; margin-right: 6px; }
+.starxi-player-card .reserve-card-title > em { flex: 0 0 auto; margin-left: 0; margin-right: 4px; }
 .starxi-pitch-slot.banned, .starxi-player-card.banned { outline: 2px dashed #e6a800; outline-offset: -2px; }
 .starxi-loaned-list { display: grid; gap: 6px; margin-top: 12px; }
 .starxi-player-card.loaned { opacity: .55; filter: grayscale(.6); cursor: default; }
