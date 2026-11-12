@@ -10,7 +10,7 @@ node --import tsx --test tests/discipline.test.ts tests/red-card-competition.tes
 
 | Kriterium | Wo abgesichert |
 |---|---|
-| Spielende bei 120′ (auch mit angeforderter Änderung, mit den Pausen bei 90′ und 105′) | `interactive-match.test.ts`: «a five minute match with extra time reaches the final whistle at 120 minutes…», «extra time pauses…» |
+| Spielende bei 120′ (auch mit angeforderter Änderung, mit den Pausen bei 90′ und 105′) | `interactive-match.test.ts`: «a five minute match with extra time reaches the final whistle at 120 minutes…», «a drawn knockout match pauses at 90…», «extra time pauses once more at 105…» |
 | Rote Karten (Liga und Turnier getrennt, Altspielstände) | `red-card-competition.test.ts`, `discipline.test.ts` (zwei Gelbe in einem Spiel sind Rot) |
 | Sperren (Gelb Summen, Wettbewerbe getrennt, Reload und Wiederholung erzeugen keine zweite Sperre) | `discipline.test.ts`, `availability-transfers.test.ts` (Verkauf entfernt Sperre und Gelb) |
 | Bank (12er Bank), Torwart, Torwart Ersatz | `game-balance.test.ts` (Bank hat `STAR_XI_BENCH_SIZE` = 12 Plätze), `goalkeeper.test.ts`, `match-squad-editor.test.ts`, `availability-transfers.test.ts` (Formation füllt Lücken aus der Bank) |
