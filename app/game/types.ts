@@ -1,5 +1,5 @@
 // Shared types of the main game page (app/page.tsx).
-import type { GameFeatures, SeasonMatchHistoryEntry, SeasonResult, SeasonTableRow, StarPackReveal } from "../feature-data";
+import type { GameFeatures, StarPackReveal } from "../feature-data";
 
 export type UpgradeKind = "click" | "auto" | "multiplier";
 export type Tab = "all" | UpgradeKind;
@@ -18,7 +18,6 @@ export type SquadDragSource = { playerId: string; area: SquadArea; index: number
 /** "reserve": the reserve list as a whole (index 0); a player dropped there leaves the eleven or the bench. */
 export type SquadDropTarget = { area: "lineup" | "bench" | "reserve"; index: number };
 
-export type SeasonStandingsAnnouncement = { entry: SeasonMatchHistoryEntry; table: SeasonTableRow[]; results?: SeasonResult[] };
 
 export type StarXIPositionBadgeVariant = "reveal" | "walkout" | "rare" | "compact";
 export type CoopRoom = {

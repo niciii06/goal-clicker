@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import type { AnimationEvent, CSSProperties, DragEvent, KeyboardEvent, MouseEvent, RefObject } from "react";
-import type { AppMode, ClickEffect, CoopRole, CoopRoom, CoopSession, CrossbarGame, CrossbarHeight, DribbleGame, FeedEntry, GameState, IconName, LayoutCardId, MatchPrediction, MiniGameId, PenaltyDirection, PenaltyGame, PredictionGame, PurchaseMode, SeasonStandingsAnnouncement, SquadDragSource, SquadDropTarget, Tab, UpgradeDefinition } from "./game/types";
+import type { AppMode, ClickEffect, CoopRole, CoopRoom, CoopSession, CrossbarGame, CrossbarHeight, DribbleGame, FeedEntry, GameState, IconName, LayoutCardId, MatchPrediction, MiniGameId, PenaltyDirection, PenaltyGame, PredictionGame, PurchaseMode, SquadDragSource, SquadDropTarget, Tab, UpgradeDefinition } from "./game/types";
 import type { StarXIState, CupCardEvent, GameFeatures, PenaltyDirection as CupPenaltyDirection, RandomEvent, StarFormationId, StarPackId, StarPackReveal, TournamentGazetteIssue, TournamentId, TransferInsiderEvent } from "./feature-data";
 import type { Journey, TravelFixture } from "./travel-data";
 import type { MatchDraft } from "./match-commands";
@@ -385,8 +385,6 @@ function App() {
   const [transferAnnouncement, setTransferAnnouncement] = useState<TransferInsiderEvent | null>(null);
   const [gazetteAnnouncement, setGazetteAnnouncement] = useState<TournamentGazetteIssue | null>(null);
   const [cupCardAnnouncement, setCupCardAnnouncement] = useState<CupCardEvent | null>(null);
-  const [seasonStandingsAnnouncement, setSeasonStandingsAnnouncement] = useState<SeasonStandingsAnnouncement | null>(null);
-  const standingsCardRef = useRef<HTMLDivElement>(null);
   const gazetteCardRef = useRef<HTMLDivElement>(null);
   const [seasonTitle, setSeasonTitle] = useState<SeasonTitle | null>(null);
   const [starReveal, setStarReveal] = useState<StarPackReveal | null>(null);
@@ -884,10 +882,6 @@ function App() {
   // The same ranking as the season itself (head-to-head before goal difference), so the live table matches promotion.
   const seasonTable = sortSeasonTable(seasonMode.table, seasonMode.results);
   const seasonInProgress = seasonMode.matchday > 0 || seasonMode.table.some((team) => team.played > 0);
-  const seasonStandingsEntry = seasonStandingsAnnouncement?.entry ?? null;
-  const seasonStandingsTable = seasonStandingsAnnouncement ? sortSeasonTable(seasonStandingsAnnouncement.table, seasonStandingsAnnouncement.results) : [];
-  const seasonStandingsPosition = seasonStandingsEntry ? seasonStandingsTable.findIndex((team) => team.id === "club") + 1 : 0;
-  const seasonStandingsOutcomeLabel = seasonStandingsEntry?.seasonOutcome === "promoted" ? "AUFSTIEG" : seasonStandingsEntry?.seasonOutcome === "relegated" ? "ABSTIEG" : seasonStandingsEntry?.seasonOutcome === "hall-of-fame" ? "HALL OF FAME" : seasonStandingsEntry?.seasonOutcome === "stayed" ? "KLASSENERHALT" : seasonStandingsEntry?.outcome === "win" ? "SIEG" : seasonStandingsEntry?.outcome === "loss" ? "NIEDERLAGE" : "REMIS";
   // Available upgrades keep their order; locked ones follow in the order they unlock (Liga 15 is the entry,
   // so Liga 14 comes before Liga 13).
   const upgradeUnlockRank = (upgrade: UpgradeDefinition) => getLevel(displayGame.upgrades, upgrade.id) > 0 || isLeagueContentUnlocked(getUpgradeUnlockLeague(upgrade.id), reachedLeague, hasFullTestAccess) ? 0 : 100 - getUpgradeUnlockLeague(upgrade.id);
@@ -1017,7 +1011,6 @@ function App() {
       setCupCardAnnouncement(null);
       setTransferAnnouncement(null);
       setGazetteAnnouncement(null);
-      setSeasonStandingsAnnouncement(null);
       if (!eventAnnouncementRef.current) setEventAnnouncement(null);
     }, 0);
     return () => window.clearTimeout(resetGoal);
@@ -1028,8 +1021,7 @@ function App() {
     const latest = displayGame.features.seasonMode.history.at(-1) ?? null;
     if (!latest) {
       seasonHistoryRef.current = null;
-      const clearAnnouncement = window.setTimeout(() => setSeasonStandingsAnnouncement(null), 0);
-      return () => window.clearTimeout(clearAnnouncement);
+      return;
     }
     if (seasonHistoryRef.current === null) {
       seasonHistoryRef.current = latest.id;
@@ -1037,8 +1029,9 @@ function App() {
     }
     if (seasonHistoryRef.current === latest.id) return;
     seasonHistoryRef.current = latest.id;
-    setSeasonStandingsAnnouncement({ entry: latest, table: displayGame.features.seasonMode.lastTable, results: displayGame.features.seasonMode.lastResults });
-    showToast("Rangliste aktualisiert");
+    // No extra result card on "Spiele" any more (the match summary shows the result); the table lives in "Saison".
+    const seasonEnd = latest.completedSeason ? { promoted: "Aufstieg", relegated: "Abstieg", stayed: "Klassenerhalt", "hall-of-fame": "Hall of Fame" }[String(latest.seasonOutcome)] : undefined;
+    showToast(seasonEnd ? `Saison beendet: ${seasonEnd}. Die Tabelle steht im Reiter Saison.` : "Rangliste aktualisiert");
     // A league title gets the trophy celebration on top of the final table.
     const title = getSeasonTitle(latest, displayGame.features.seasonMode.lastTable, displayGame.features.seasonMode.lastResults);
     if (title) {
@@ -1236,15 +1229,9 @@ function App() {
     setTransferAnnouncement(null);
   }
 
-  // Table and gazette close on their own after a while, but never while the player reads them:
+  // The gazette closes on its own after a while, but never while the player reads it:
   // hovering, focus inside or an opened <details> holds them until the player lets go.
-  const standingsHeld = useAnnouncementHold(standingsCardRef, Boolean(seasonStandingsAnnouncement));
   const gazetteHeld = useAnnouncementHold(gazetteCardRef, Boolean(gazetteAnnouncement));
-  useEffect(() => {
-    if (!seasonStandingsAnnouncement || standingsHeld) return;
-    const timer = window.setTimeout(() => setSeasonStandingsAnnouncement((current) => current === seasonStandingsAnnouncement ? null : current), ANNOUNCEMENT_AUTO_CLOSE_MS);
-    return () => window.clearTimeout(timer);
-  }, [seasonStandingsAnnouncement, standingsHeld]);
   useEffect(()=>{
     if(!gazetteAnnouncement || gazetteHeld)return;
     const timer=window.setTimeout(()=>setGazetteAnnouncement(null),ANNOUNCEMENT_AUTO_CLOSE_MS);
@@ -3606,19 +3593,6 @@ function App() {
           {featureTab === "season" && <SeasonPanel features={displayGame.features} action={seasonTabAction} />}
           {featureTab === "cup" && <div className="feature-panel cup-panel">
             {!displayGame.features.cup.active && <div className="post-match-extras">
-      {seasonStandingsAnnouncement && seasonStandingsEntry && <div ref={standingsCardRef} className={`inline-standings ${seasonStandingsEntry.outcome}`}  aria-label="Aktuelle Saisonrangliste">
-        <div className="season-standings-panel">
-          <div className="season-standings-topline"><span>SAISON / SPIELTAG {seasonStandingsEntry.matchday}</span><b>{getSeasonModeDivisionLabel(seasonStandingsEntry.division)}</b></div>
-          <div className="season-standings-result">
-            <div><small>DEIN ERGEBNIS</small><strong>{seasonStandingsEntry.clubScore}:{seasonStandingsEntry.opponentScore}</strong><span>{displayClubName} gegen {seasonStandingsEntry.opponent}</span></div>
-            <div className={`season-standings-outcome ${seasonStandingsEntry.outcome}`}><b>{seasonStandingsOutcomeLabel}</b><small>{seasonStandingsEntry.completedSeason ? `${seasonStandingsPosition}. PLATZ · SAISON BEENDET` : `${seasonStandingsPosition}. PLATZ · TABELLE AKTUALISIERT`}</small></div>
-          </div>
-          <div className="season-standings-table-head"><span>PLATZ / CLUB</span><span>SP · S-U-N</span><span title="Tordifferenz">TOR-DIFF.</span><b>P</b></div>
-          <details><summary>Saisontabelle und Fortschritt</summary><div className="season-standings-large-table">{seasonStandingsTable.map((team, index) => { const goalDifference = team.goalsFor - team.goalsAgainst; return <div className={`season-standings-large-row${team.id === "club" ? " club" : ""}`} key={`season-standings-${seasonStandingsEntry.id}-${team.id}`}><i>{index + 1}</i><div><strong>{team.name}</strong><small>{team.played} SP · {team.wins}-{team.draws}-{team.losses}</small></div><span className={`season-standings-goal-difference${goalDifference > 0 ? " positive" : goalDifference < 0 ? " negative" : ""}`} aria-label={`Tordifferenz ${formatGoalDifference(team)}`}>{formatGoalDifference(team)}</span><b>{team.points}</b></div>; })}</div></details>
-          <p className="season-standings-note">Die Tabelle entscheidet über Aufstieg und Abstieg. Dein Ergebnis ist gespeichert.</p>
-          <button className="event-takeover-dismiss season-standings-dismiss" onClick={() => setSeasonStandingsAnnouncement(null)}>Weiter</button>
-        </div>
-      </div>}
       {gazetteAnnouncement && <div ref={gazetteCardRef} className={`inline-gazette ${gazetteAnnouncement.tone}`}  aria-label={`Goal Gazette: ${gazetteAnnouncement.headline}`}><article className="gazette-front-page"><header><span>GOAL GAZETTE</span><b>SONDERAUSGABE</b></header><div className="gazette-dateline"><span>{getTournament(gazetteAnnouncement.tournamentId)?.label ?? "TURNIER"}</span><strong>{displayClubName} {gazetteAnnouncement.homeScore}:{gazetteAnnouncement.awayScore} {gazetteAnnouncement.opponent}</strong></div><h2>{gazetteAnnouncement.headline}</h2><h3>{gazetteAnnouncement.strapline}</h3><p>{gazetteAnnouncement.body}</p><footer><span>{gazetteAnnouncement.tieBreak ? "ENTSCHEIDUNG IM ELFMETERSCHIESSEN" : `RUNDE ${gazetteAnnouncement.completedRound} BEENDET`}</span><button className="event-takeover-dismiss" onClick={dismissGazetteAnnouncement}>Zeitung zuklappen</button></footer></article></div>}
             </div>}
             {!displayGame.features.cup.active && displayGame.features.cup.matchStartedAt > 0 && <PostMatchSummary features={displayGame.features} onCareer={()=>openFeatureTab("career")} onContinue={()=>openFeatureTab("squad")} next={nextMatchAction} />}

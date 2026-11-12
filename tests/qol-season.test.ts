@@ -148,3 +148,15 @@ test('the season table ends with Form, then Pkt (points last)', () => {
   for (const body of html.match(/<tr class="[^"]*">[\s\S]*?<\/tr>/g) ?? []) assert.match(body, /<\/td><td><b>\d+<\/b><\/td><\/tr>$/);
   assert.match(html, /<button type="button" class="season-form-chip form-S" aria-label="Sieg: Spieltag 1 · Heim · /);
 });
+
+test('"Spiele" shows no extra season result card after a league match; the table stays in the Saison tab', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const [page, css] = await Promise.all([readFile(new URL('../app/page.tsx', import.meta.url), 'utf8'), readFile(new URL('../app/globals.css', import.meta.url), 'utf8')]);
+  assert.doesNotMatch(page, /inline-standings|season-standings-panel|seasonStandingsAnnouncement|SeasonStandingsAnnouncement/);
+  assert.doesNotMatch(css, /inline-standings|season-standings/);
+  // The compact post match summary and the season tab are untouched.
+  assert.match(page, /<PostMatchSummary features=\{displayGame\.features\}/);
+  assert.match(page, /featureTab === "season" && <SeasonPanel/);
+  // The end of a season is still announced (promotion, relegation, Hall of Fame) as a short message.
+  assert.match(page, /Saison beendet: \$\{seasonEnd\}\. Die Tabelle steht im Reiter Saison\./);
+});
