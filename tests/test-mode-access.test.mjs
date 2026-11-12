@@ -79,19 +79,17 @@ test("season mode uses the live match flow and table results instead of goal tar
   assert.doesNotMatch(apiSource, /seasonTarget|seasonPath/);
 });
 
-test("season match results use an inline expandable standings panel", async () => {
+test("season match results no longer open a separate result card on Spiele; the table and the season end stay visible elsewhere", async () => {
   const [pageSource, featureSource] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(pageSource, /inline-standings/);
-  assert.doesNotMatch(pageSource, /season-standings-takeover/);
+  assert.doesNotMatch(pageSource, /inline-standings|season-standings-takeover|seasonStandingsAnnouncement/);
   assert.match(pageSource, /displayGame\.features\.seasonMode\.lastTable/);
-  assert.match(pageSource, /TOR-DIFF\./);
-  assert.match(pageSource, /formatGoalDifference\(team\)/);
   assert.match(pageSource, /seasonHistoryRef\.current/);
   assert.match(pageSource, /Rangliste aktualisiert/);
+  assert.match(pageSource, /<SeasonPanel features=\{displayGame\.features\}/);
   assert.match(featureSource, /lastTable: SeasonTableRow\[\]/);
   assert.match(featureSource, /lastTable,\n    lastResult/);
 });

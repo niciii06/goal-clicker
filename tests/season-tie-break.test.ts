@@ -83,10 +83,10 @@ test("old saves without lastResults rank the running table with its results", ()
   assert.deepEqual(fresh.lastResults, []);
 });
 
-test("the solo announcement, the trophy and the season panel use the same ranking", () => {
+test("the trophy and the season panel use the same ranking (the separate result card on Spiele is gone)", () => {
   const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
   const panel = readFileSync(new URL("../app/season-panel.tsx", import.meta.url), "utf8");
-  assert.match(page, /sortSeasonTable\(seasonStandingsAnnouncement\.table, seasonStandingsAnnouncement\.results\)/);
+  assert.doesNotMatch(page, /seasonStandingsAnnouncement/);
   assert.match(page, /getSeasonTitle\(latest, displayGame\.features\.seasonMode\.lastTable, displayGame\.features\.seasonMode\.lastResults\)/);
   assert.match(panel, /results=\{season\.results \?\? \[\]\}/);
   assert.match(panel, /results=\{season\.lastResults \?\? \[\]\}/);
