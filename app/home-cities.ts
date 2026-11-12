@@ -13,7 +13,7 @@ export const DEFAULT_HOME_CITY: HomeCityId = "bern";
 export const REGIONAL_DIVISIONS = 8;
 
 /** A local club; `clubSource` names the club's own website that states its home ground (real clubs only). */
-export type RegionalClub = SeasonClub & { clubSource?: { url: string; quote: string } };
+export type RegionalClub = SeasonClub & { clubSource?: { url: string; quote: string; placeUrl?: string } };
 export type HomeCity = {
   id: HomeCityId;
   name: string;
@@ -27,7 +27,7 @@ export type HomeCity = {
 };
 
 type Ground = { name: string; osm: string; lat: number; lon: number; municipality: string; canton: string; kind: string };
-type Slot = { ground: Ground; distanceKm: number; real?: { name: string; source: string; quote: string }; shared?: boolean };
+type Slot = { ground: Ground; distanceKm: number; real?: { name: string; source: string; quote: string; place?: string }; shared?: boolean };
 type CityData = { canton: string; home: Ground; divisions: Record<string, Slot[]> };
 const DATA = (pitches as unknown as { cities: Record<string, CityData> }).cities;
 
@@ -85,7 +85,7 @@ function buildCity(id: Exclude<HomeCityId, "bern">): HomeCity {
       regionalClubs.push({
         id: clubId, name: real ? real.name : fictionalName(id, fictional++), league: 16 - division,
         venue: venueOf(`${clubId}-ground`, slot.ground, Boolean(real)),
-        ...(real ? { clubSource: { url: real.source, quote: real.quote } } : { fictional: true }),
+        ...(real ? { clubSource: { url: real.source, quote: real.quote, ...(real.place ? { placeUrl: real.place } : {}) } } : { fictional: true }),
       });
     });
   }
