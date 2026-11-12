@@ -618,8 +618,8 @@ const STAR_XI_PLAYER_BY_ID = new Map(STAR_XI_PLAYERS.map((player) => [player.id,
 
 export const STAR_XI_CUSTOM_PLAYERS = STAR_XI_PLAYERS.filter((player) => player.isCustom === true);
 export const STAR_XI_RANDOM_CUSTOM_CARD_COST = 50000;
-// A duplicate special card refunds at most a tenth of the pack, so duplicates never pay for the next draw.
-const CUSTOM_DUPLICATE_COMPENSATION_CAP = STAR_XI_RANDOM_CUSTOM_CARD_COST / 10;
+/** Owner decision 12 Nov 2026: every duplicate special card pays exactly 25,000 fragments, whatever its rating or tier. Other card types keep their own rules (below). */
+export const SPECIAL_CARD_DUPLICATE_FRAGMENTS = 25000;
 
 /** How far a card can still grow above its starting rating (special cards: 20). */
 function potentialGap(player: StarXIPlayer) {
@@ -648,9 +648,9 @@ function pickByPackWeight<T extends { packWeight?: number }>(candidates: readonl
 }
 
 export function getStarXIFragmentCompensation(player: StarXIPlayer) {
-  // Special cards keep the compensation of their pack tier, whatever they start at.
+  // A duplicate special card pays the same fixed amount from every pack and mode; the other types stay by their rating step.
+  if (player.isCustom) return SPECIAL_CARD_DUPLICATE_FRAGMENTS;
   const ratingStep = Math.max(1, Math.min(34, Math.floor(cardPackRating(player)) - 66));
-  if (player.isCustom) return Math.min(CUSTOM_DUPLICATE_COMPENSATION_CAP, ratingStep * 600);
   if (player.cardType === "icon") return ratingStep * 75;
   if (player.cardType === "legendary") return ratingStep * 150;
   return ratingStep * 15;
@@ -1291,7 +1291,7 @@ export const SPECIAL_CARD_PACK = {
   label: "Spezialkarten-Pack",
   price: STAR_XI_RANDOM_CUSTOM_CARD_COST,
   currency: "fragments" as const,
-  description: "Eine zufällige Spezialkarte, jede Spezialkarte ist gleich wahrscheinlich. Doppelte Karten geben ein paar Fragmente zurück.",
+  description: "Eine zufällige Spezialkarte, jede Spezialkarte ist gleich wahrscheinlich. Doppelte Spezialkarten geben 25'000 Fragmente zurück.",
 };
 export const PURCHASE_RECEIPT_LIMIT = 50;
 

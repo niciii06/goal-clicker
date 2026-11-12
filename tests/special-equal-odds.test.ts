@@ -1,5 +1,5 @@
 // Special cards (Spezialkarten): one pack, every card exactly the same chance (1 in N), duplicates allowed, no 100 category.
-// The amount of the duplicate compensation is unchanged until the owner confirms a new one.
+// Every duplicate special card pays 25,000 fragments (tests/special-duplicate-fragments.test.ts covers solo, co-op, bought and free).
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -58,18 +58,14 @@ test("duplicates stay allowed: the chance of a duplicate is the share of owned s
   }
 });
 
-test("the duplicate compensation is unchanged: the same fragments per card as before, credited once, and the price stays", () => {
-  // Existing amounts (600 to 5000 by the card) are protected until the owner decides otherwise.
-  const amounts = STAR_XI_CUSTOM_PLAYERS.map((player) => getStarXIFragmentCompensation(player));
-  assert.ok(amounts.every((amount) => amount >= 600 && amount <= 5000), amounts.join(","));
-  assert.equal(getStarXIFragmentCompensation(STAR_XI_CUSTOM_PLAYERS.find((player) => player.id === "star-di-certo")!), 5000);
-  assert.equal(getStarXIFragmentCompensation(STAR_XI_CUSTOM_PLAYERS.find((player) => player.id === "star-pfuschi")!), 600);
+test("the duplicate compensation is 25,000 for every special card, credited once, and the price stays", () => {
+  assert.ok(STAR_XI_CUSTOM_PLAYERS.every((player) => getStarXIFragmentCompensation(player) === 25000));
   assert.equal(SPECIAL_CARD_PACK.price, 50000);
   const owned = STAR_XI_CUSTOM_PLAYERS[0];
   const draw = drawRandomStarXICustomCard(state([owned.id]), () => 0);
   assert.equal(draw.duplicate, true);
-  assert.equal(draw.fragmentCompensation, getStarXIFragmentCompensation(owned));
-  assert.equal(draw.state.fragments, STAR_XI_RANDOM_CUSTOM_CARD_COST - draw.cost + draw.fragmentCompensation);
+  assert.equal(draw.fragmentCompensation, 25000);
+  assert.equal(draw.state.fragments, STAR_XI_RANDOM_CUSTOM_CARD_COST - draw.cost + 25000);
   assert.equal(draw.state.ownedIds.filter((id) => id === owned.id).length, 1, "no second inventory entry");
 });
 

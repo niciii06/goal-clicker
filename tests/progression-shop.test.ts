@@ -84,7 +84,7 @@ test('fragments buy the special card pack exactly once per purchase', () => {
   assert.ok(duplicate.ok && duplicate.reveal.duplicate);
   assert.equal(f.starXI.ownedIds.filter(id => id === firstHundred.id).length, 1);
   assert.equal(f.starXI.fragments, 120000 - 2 * SPECIAL_CARD_PACK.price + duplicate.reveal.fragmentCompensation);
-  assert.ok(duplicate.reveal.fragmentCompensation <= SPECIAL_CARD_PACK.price / 10, 'a duplicate never pays for the next pack');
+  assert.equal(duplicate.reveal.fragmentCompensation, 25000, 'every duplicate special card pays 25,000 fragments');
 });
 
 test('insufficient fragments and live matches block the purchase without side effects', () => {

@@ -16,10 +16,10 @@ test('all ten special cards start at 80 with potential 100, their pack tier and 
   assert.deepEqual(STAR_XI_CUSTOM_PLAYERS.filter((card) => cardPackRating(card) === 67).map((card) => card.id).sort(), ['star-benxli', 'star-pfuschi']);
   const pfuschi = getStarXIPlayer('star-pfuschi')!;
   assert.equal(pfuschi.benchOnly, true);
-  // Every special card has the same chance (no 100 category); the duplicate compensation did not change.
+  // Every special card has the same chance (no 100 category); every duplicate special card pays 25,000 fragments.
   assert.equal(getSpecialCardPackOdds().each.toFixed(6), (1 / STAR_XI_CUSTOM_PLAYERS.length).toFixed(6));
-  assert.equal(getStarXIFragmentCompensation(getStarXIPlayer('star-di-certo')!), 5000);
-  assert.equal(getStarXIFragmentCompensation(pfuschi), 600);
+  assert.equal(getStarXIFragmentCompensation(getStarXIPlayer('star-di-certo')!), 25000);
+  assert.equal(getStarXIFragmentCompensation(pfuschi), 25000);
 });
 
 test('every 5 match points of the card add one OVR, appearances and goals alone add nothing, up to 100', () => {
