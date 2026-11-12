@@ -99,5 +99,5 @@ test("the page commits passive goals through the store and flushes them before e
   // A press commits first, so handlers render with exact goals; the 1 s clock commits the rest.
   assert.match(page, /window\.addEventListener\("pointerdown", commit/);
   assert.match(page, /window\.addEventListener\("keydown", commit/);
-  assert.match(page, /flushPassiveGoals\(\); setCountdownNow\(getCurrentTime\(\)\);/);
+  assert.match(page, /flushPassiveGoals\(\);\s*setCountdownNow\(getCurrentTime\(\)\);\s*if \(document\.title !== pageTitleRef\.current\) document\.title = pageTitleRef\.current;/);
 });
