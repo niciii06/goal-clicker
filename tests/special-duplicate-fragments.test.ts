@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { getTableColumns } from 'drizzle-orm';
 import { coopRooms } from '../db/schema.ts';
-import { SPECIAL_CARD_DUPLICATE_FRAGMENTS, SPECIAL_CARD_PACK, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, getStarXIFragmentCompensation, getStarXIPlayer, initialGameFeatures, normalizeGameFeatures, openEarnedPack, purchaseSpecialCardPack } from '../app/feature-data.ts';
-import type { GameFeatures } from '../app/feature-data.ts';
+import { DUPLICATE_COMPENSATION_RULE, SPECIAL_CARD_DUPLICATE_FRAGMENTS, SPECIAL_CARD_PACK, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, getStarXIFragmentCompensation, getStarXIPlayer, initialGameFeatures, normalizeGameFeatures, openEarnedPack, purchaseSpecialCardPack } from '../app/feature-data.ts';
+import type { GameFeatures, StarPackOpening } from '../app/feature-data.ts';
 import type { RoomRow, RoomUpdate } from '../db/index.ts';
 import { MULTIPLAYER_PROTOCOL_VERSION } from '../app/multiplayer-protocol.ts';
 import { installLightRoomMocks } from './helpers/light-room-mock.ts';
@@ -92,6 +92,7 @@ test('solo server receipt (free pack): the server draw carries the 25,000, a sec
   const opening = (first.data as { opening: { duplicate: boolean; fragmentCompensation: number; player: { isCustom?: boolean } } }).opening;
   assert.equal(opening.duplicate, true);
   assert.equal(opening.fragmentCompensation, 25000);
+  assert.equal((opening as { compensationRule?: number }).compensationRule, DUPLICATE_COMPENSATION_RULE, 'the server stamps the rule it issued the receipt under');
   assert.ok(opening.player.isCustom);
   const second = await request(f, 'daily-solo-9');
   assert.deepEqual(second.data, first.data);
@@ -154,4 +155,89 @@ test('stored results and saves stay as they are: an old opened pack keeps its am
   // A duplicate regular card still pays by its rating step.
   const normal = STAR_XI_PLAYERS.find((candidate) => !candidate.isCustom && !candidate.cardType && candidate.rating === 70)!;
   assert.equal(getStarXIFragmentCompensation(normal), 4 * 15);
+});
+
+// ---- Receipts issued before the change (no rule marker) settle once under their former terms ----
+const former = (player: { rating: number; packRating?: number }) => Math.min(5000, Math.max(1, Math.min(34, Math.floor(player.packRating ?? player.rating) - 66)) * 600);
+/** What the server stored before the 25,000 rule: no compensationRule, the amount of its time. */
+function oldReceipt(playerId: string, duplicateAtDraw: boolean): StarPackOpening {
+  const player = getStarXIPlayer(playerId)!;
+  return { packId: 'legend', packName: SPECIAL_CARD_PACK.label, player, duplicate: duplicateAtDraw, fragmentCompensation: duplicateAtDraw ? former(player) : 0, source: 'custom-draw' };
+}
+
+test('an old receipt settles once under the former terms: 600 to 5,000 by card, a repeat pays nothing', () => {
+  for (const player of STAR_XI_CUSTOM_PLAYERS) {
+    const f = allOwned(0);
+    f.earnedPacks = [{ id: 'old-pack', packId: 'special', earnedAt: 1 }];
+    const reveal = openEarnedPack(f, 'old-pack', 2, Math.random, oldReceipt(player.id, true))!;
+    assert.equal(reveal.fragmentCompensation, former(player), player.id);
+    assert.ok(reveal.fragmentCompensation >= 600 && reveal.fragmentCompensation <= 5000);
+    assert.equal(f.starXI.fragments, former(player), 'credited once, under the old terms');
+    assert.equal(openEarnedPack(f, 'old-pack', 3, Math.random, oldReceipt(player.id, true)), null);
+    assert.equal(f.starXI.fragments, former(player), 'a repeated request pays nothing');
+  }
+});
+
+test('an old receipt drawn as a new card that is a duplicate when it is applied still settles under the former terms', () => {
+  const player = getStarXIPlayer('star-di-certo')!;
+  const f = allOwned(0);
+  f.earnedPacks = [{ id: 'old-late', packId: 'special', earnedAt: 1 }];
+  const reveal = openEarnedPack(f, 'old-late', 2, Math.random, oldReceipt(player.id, false))!;
+  assert.equal(reveal.duplicate, true);
+  assert.equal(reveal.fragmentCompensation, 5000, 'not 25,000: the receipt predates the rule');
+  assert.equal(f.starXI.fragments, 5000);
+});
+
+test('a new receipt carries the rule and pays 25,000, once; the amount named in a request is never an authority', () => {
+  const player = STAR_XI_CUSTOM_PLAYERS[3];
+  const issued: StarPackOpening = { ...oldReceipt(player.id, true), compensationRule: DUPLICATE_COMPENSATION_RULE, fragmentCompensation: 25000 };
+  const f = allOwned(0);
+  f.earnedPacks = [{ id: 'new-pack', packId: 'special', earnedAt: 1 }];
+  const reveal = openEarnedPack(f, 'new-pack', 2, Math.random, issued)!;
+  assert.equal(reveal.fragmentCompensation, 25000);
+  assert.equal(f.starXI.fragments, 25000);
+  assert.equal(openEarnedPack(f, 'new-pack', 3, Math.random, issued), null);
+  assert.equal(f.starXI.fragments, 25000);
+  // A forged amount in the receipt body changes nothing: the amount comes from the rule, not from the number in the request.
+  for (const [rule, expected] of [[undefined, former(player)], [DUPLICATE_COMPENSATION_RULE, 25000]] as const) {
+    const g = allOwned(0);
+    g.earnedPacks = [{ id: 'forged', packId: 'special', earnedAt: 1 }];
+    const forged = { ...oldReceipt(player.id, true), fragmentCompensation: 9999999, ...(rule ? { compensationRule: rule } : {}) };
+    assert.equal(openEarnedPack(g, 'forged', 2, Math.random, forged)!.fragmentCompensation, expected);
+    assert.equal(g.starXI.fragments, expected);
+  }
+});
+
+test('other card types do not depend on the rule marker', () => {
+  const normal = STAR_XI_PLAYERS.find((player) => !player.isCustom && !player.cardType && player.rating === 70)!;
+  assert.equal(getStarXIFragmentCompensation(normal, 1), getStarXIFragmentCompensation(normal, 2));
+  const icon = STAR_XI_PLAYERS.find((player) => player.cardType === 'icon')!;
+  assert.equal(getStarXIFragmentCompensation(icon, 1), getStarXIFragmentCompensation(icon, 2));
+});
+
+test('solo server: a receipt stored before the change is returned unchanged and settles old, a new one is stamped and pays 25,000', async () => {
+  ledger.clear();
+  const player = getStarXIPlayer('star-benxli')!;
+  const stored = { opening: oldReceipt(player.id, true) };
+  ledger.set('reward-owner-123:reward:old-solo', structuredClone(stored));
+  const f = allOwned(0);
+  f.earnedPacks = [{ id: 'old-solo', packId: 'special', earnedAt: 1 }, { id: 'new-solo', packId: 'special', earnedAt: 2 }];
+  const old = await request(f, 'old-solo');
+  assert.equal(old.status, 200);
+  assert.deepEqual(old.data, stored, 'the stored contract is returned exactly as it was written');
+  assert.equal((old.data as { opening: { compensationRule?: number } }).opening.compensationRule, undefined);
+  const fresh = await request(f, 'new-solo');
+  const freshOpening = (fresh.data as { opening: StarPackOpening }).opening;
+  assert.equal(freshOpening.compensationRule, DUPLICATE_COMPENSATION_RULE);
+  assert.equal(freshOpening.fragmentCompensation, 25000);
+  // Applying both: the old one pays its former amount, the new one 25,000, nothing twice.
+  const oldReveal = openEarnedPack(f, 'old-solo', 5, Math.random, (old.data as { opening: StarPackOpening }).opening)!;
+  const newReveal = openEarnedPack(f, 'new-solo', 6, Math.random, freshOpening)!;
+  assert.equal(oldReveal.fragmentCompensation, former(player));
+  assert.equal(newReveal.fragmentCompensation, 25000);
+  assert.equal(f.starXI.fragments, former(player) + 25000);
+  assert.equal(openEarnedPack(f, 'old-solo', 7, Math.random, (old.data as { opening: StarPackOpening }).opening), null);
+  assert.equal(f.starXI.fragments, former(player) + 25000);
+  // The same request again returns the same receipt.
+  assert.deepEqual((await request(f, 'new-solo')).data, fresh.data);
 });

@@ -620,6 +620,13 @@ export const STAR_XI_CUSTOM_PLAYERS = STAR_XI_PLAYERS.filter((player) => player.
 export const STAR_XI_RANDOM_CUSTOM_CARD_COST = 50000;
 /** Owner decision 12 Nov 2026: every duplicate special card pays exactly 25,000 fragments, whatever its rating or tier. Other card types keep their own rules (below). */
 export const SPECIAL_CARD_DUPLICATE_FRAGMENTS = 25000;
+/**
+ * Version of the duplicate compensation rule. Rule 1 (implicit, no marker): a special card paid a tenth of the pack at most,
+ * 600 fragments per rating step. Rule 2: 25,000 per special card. A server issued pack receipt carries the rule it was
+ * drawn under, so a receipt issued before the change settles once under the terms of its time.
+ */
+export const DUPLICATE_COMPENSATION_RULE = 2;
+const LEGACY_CUSTOM_DUPLICATE_CAP = STAR_XI_RANDOM_CUSTOM_CARD_COST / 10;
 
 /** How far a card can still grow above its starting rating (special cards: 20). */
 function potentialGap(player: StarXIPlayer) {
@@ -647,10 +654,10 @@ function pickByPackWeight<T extends { packWeight?: number }>(candidates: readonl
   return candidates.find((candidate) => (remaining -= weight(candidate)) <= 0) ?? candidates[candidates.length - 1];
 }
 
-export function getStarXIFragmentCompensation(player: StarXIPlayer) {
-  // A duplicate special card pays the same fixed amount from every pack and mode; the other types stay by their rating step.
-  if (player.isCustom) return SPECIAL_CARD_DUPLICATE_FRAGMENTS;
+export function getStarXIFragmentCompensation(player: StarXIPlayer, rule: number = DUPLICATE_COMPENSATION_RULE) {
   const ratingStep = Math.max(1, Math.min(34, Math.floor(cardPackRating(player)) - 66));
+  // A duplicate special card pays the same fixed amount from every pack and mode (rule 2); a receipt of rule 1 keeps the former amount.
+  if (player.isCustom) return rule >= 2 ? SPECIAL_CARD_DUPLICATE_FRAGMENTS : Math.min(LEGACY_CUSTOM_DUPLICATE_CAP, ratingStep * 600);
   if (player.cardType === "icon") return ratingStep * 75;
   if (player.cardType === "legendary") return ratingStep * 150;
   return ratingStep * 15;
@@ -721,9 +728,9 @@ function calculateRewardPackOdds(id:RewardPackId,players:readonly StarXIPlayer[]
 }
 /** The draw of an earned pack: a reward pack like a shop pack, a special card pack for free. */
 export function openEarnedPackDraw(packId:EarnedPackId, ownedIds:string[], highestDivision:number, random=Math.random):StarPackOpening {
-  if(packId!=='special')return openStarPack(packId,ownedIds,random);
+  if(packId!=='special')return {...openStarPack(packId,ownedIds,random),compensationRule:DUPLICATE_COMPENSATION_RULE};
   const draw=drawRandomStarXICustomCard({...initialGameFeatures().starXI,ownedIds:[...ownedIds]},random,{free:true});
-  return {packId:'legend',packName:SPECIAL_CARD_PACK.label,player:draw.player!,duplicate:draw.duplicate,fragmentCompensation:draw.fragmentCompensation,source:'custom-draw'};
+  return {packId:'legend',packName:SPECIAL_CARD_PACK.label,player:draw.player!,duplicate:draw.duplicate,fragmentCompensation:draw.fragmentCompensation,source:'custom-draw',compensationRule:DUPLICATE_COMPENSATION_RULE};
 }
 const earnedOpeningMatches=(earned:EarnedPack,opening:StarPackOpening)=>earned.packId==='special'?opening.source==='custom-draw'&&Boolean(opening.player?.isCustom):opening.packId===earned.packId;
 export function openEarnedPack(features:GameFeatures,id:string,now=Date.now(),random=Math.random,canonical?:StarPackOpening) {
@@ -733,7 +740,9 @@ export function openEarnedPack(features:GameFeatures,id:string,now=Date.now(),ra
  if(!earnedOpeningMatches(earned,opening)||!getStarXIPlayer(opening.player.id))return null;
  // Duplicate compensation is decided against the collection at application time.
  const player=getStarXIPlayer(opening.player.id)!,duplicate=features.starXI.ownedIds.includes(player.id);
- const result={...opening,player,duplicate,fragmentCompensation:duplicate?getStarXIFragmentCompensation(player):0};
+ // A server receipt settles under the rule it was issued with (none: the former rule); the amount in it is never taken from the request. Local draws use the current rule.
+ const rule=canonical?(canonical.compensationRule===DUPLICATE_COMPENSATION_RULE?DUPLICATE_COMPENSATION_RULE:1):DUPLICATE_COMPENSATION_RULE;
+ const result={...opening,player,duplicate,fragmentCompensation:duplicate?getStarXIFragmentCompensation(player,rule):0,compensationRule:rule};
  earned.opening=result;
  notePackOpened(features,now);
  if(duplicate)features.starXI.fragments+=result.fragmentCompensation;else features.starXI=addStarXIPlayer(features.starXI,player.id,getBestXIUnavailablePlayerIds(features));

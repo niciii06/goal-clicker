@@ -251,6 +251,11 @@ export type StarPackOpening = {
   duplicate: boolean;
   fragmentCompensation: number;
   source?: "pack" | "custom-draw";
+  /**
+   * The duplicate compensation rule a SERVER ISSUED receipt was drawn under (2: 25,000 for a special card). A receipt
+   * without it was issued before the rule existed and settles under the former rule (1). Only the server writes it.
+   */
+  compensationRule?: number;
 };
 
 export type StarPackReveal = StarPackOpening & {
