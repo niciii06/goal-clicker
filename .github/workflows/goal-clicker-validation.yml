@@ -12,7 +12,10 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    # Pinned: playwright-core 1.56.1 supports Chromium on Ubuntu 24.04, but not on the Ubuntu 26.04 that
+    # ubuntu-latest now resolves to ("Playwright does not support chromium on ubuntu26.04-x64").
+    # Move to a newer image together with a playwright-core upgrade that supports it.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     services:
       # Scratch database for the PostgreSQL tests; never a real Supabase project.
