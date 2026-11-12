@@ -112,3 +112,41 @@ test('cached geometry is matched with tolerance and never invented', () => {
   const [route] = projectRoutes(legacy);
   assert.ok(route.points.length > 2 && route.geometry === 'road');
 });
+
+/** Distance from a point to the line between consecutive points (local flat approximation, fine for a few km). */
+function distanceToPolylineKm(p: { lat: number; lon: number }, line: { lat: number; lon: number }[]) {
+  const kx = 111.32 * Math.cos(p.lat * Math.PI / 180), ky = 110.57;
+  let best = Infinity;
+  for (let i = 1; i < line.length; i++) {
+    const ax = (line[i - 1].lon - p.lon) * kx, ay = (line[i - 1].lat - p.lat) * ky, bx = (line[i].lon - p.lon) * kx, by = (line[i].lat - p.lat) * ky;
+    const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+    const t = len2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0;
+    best = Math.min(best, Math.hypot(ax + t * dx, ay + t * dy));
+  }
+  return best;
+}
+
+test('on every road trip the bus of a straight saved plan stays on its planned road (reproducible test track: all away venues)', () => {
+  const unproject = (x: number, y: number) => ({ lon: x * 360 - 180, lat: Math.atan(Math.sinh(Math.PI * (1 - 2 * y))) * 180 / Math.PI });
+  let checked = 0;
+  const failures: string[] = [];
+  for (const venue of awayVenues()) {
+    const fresh = createJourney(fixture(venue), 0, () => .99);
+    const buses = fresh.plan!.segments.filter((s) => s.mode === 'bus' && s.points.length > 2);
+    if (!buses.length) continue; // flights and trains have no road leg here
+    const saved: Journey = { ...fresh, events: [], plan: straightened(fresh.plan!) };
+    saved.endsAt = saved.startedAt + saved.baseMs;
+    const routes = projectRoutes(saved);
+    let worst = 0;
+    for (let f = .05; f < .95; f += .05) {
+      const v = vehicleAt(routes, saved, saved.startedAt + saved.baseMs * f, f);
+      if (v.mode !== 'bus') continue;
+      const p = unproject(v.point.x, v.point.y);
+      worst = Math.max(worst, Math.min(...buses.map((s) => distanceToPolylineKm(p, s.points))));
+    }
+    checked++;
+    if (worst >= 1) failures.push(`${venue.stadium}: ${worst.toFixed(2)} km`);
+  }
+  assert.ok(checked >= 10, `only ${checked} road trips found`);
+  assert.deepEqual(failures, []);
+});
