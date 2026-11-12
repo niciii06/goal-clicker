@@ -88,7 +88,7 @@ been manually browser-tested here.
 
 ## Refreshing cached geometry
 
-The committed Python helpers operate on local, public OSM graph JSON only:
+The committed Python helpers operate on local, public OSM graph JSON only. They use the Python standard library only (`json`, `math`, `heapq`, `sys`, `os`, `pathlib`), so no `requirements.txt` or `pyproject.toml` is needed; any current Python 3 works (checked with 3.13, no newer syntax such as `match` or `:=` is used). Declare dependencies only when a package from outside the standard library is added. Run the commands from the repository root:
 
 ```text
 python scripts/travel/cache-rail.py /tmp/public-rail-network.json
