@@ -4,7 +4,7 @@
 // first login, username accounts when they register. Before the game starts, the account's cloud save is written
 // to localStorage; while it runs, CloudSync uploads every change. A guest plays single player only, with a save
 // in this browser; signing in later takes that save into a new account.
-import { createContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { authErrorMessage, refreshAuthSession, registerWithUsername, signInWithGoogle, signInWithUsername, signOutOfAuth } from "./auth/browser";
 import { browserAuthMode } from "./auth/config";
@@ -430,7 +430,7 @@ function FinishDeletion({ message }: { message: string }) {
  * another hides them again. The state is local to the field (a new form starts masked), is never stored and does not
  * touch the value, the focus or the cursor position. The button is no submit button and keeps password managers working.
  */
-export function PasswordInput({ fieldName, value, onChange, autoComplete, minLength }: { fieldName: string; value: string; onChange: (next: string) => void; autoComplete: string; minLength?: number }) {
+export function PasswordInput({ fieldName, labelId, value, onChange, autoComplete, minLength }: { fieldName: string; /** The id of the visible label text: the field is named by it alone, not by the eye button inside the same label. */ labelId?: string; value: string; onChange: (next: string) => void; autoComplete: string; minLength?: number }) {
   const [shown, setShown] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const caretRef = useRef<[number, number] | null>(null);
@@ -445,7 +445,7 @@ export function PasswordInput({ fieldName, value, onChange, autoComplete, minLen
     return () => window.cancelAnimationFrame(frame);
   }, [shown]);
   return <span className="account-password">
-    <input ref={inputRef} className="mode-input" type={shown ? "text" : "password"} autoComplete={autoComplete} autoCapitalize="none" spellCheck={false} minLength={minLength} maxLength={PASSWORD_MAX} required value={value} onChange={(event) => onChange(event.target.value)} />
+    <input ref={inputRef} className="mode-input" type={shown ? "text" : "password"} aria-labelledby={labelId} autoComplete={autoComplete} autoCapitalize="none" spellCheck={false} minLength={minLength} maxLength={PASSWORD_MAX} required value={value} onChange={(event) => onChange(event.target.value)} />
     <button type="button" className="account-password-toggle" aria-label={`${fieldName} ${shown ? "verbergen" : "anzeigen"}`} aria-pressed={shown}
       onMouseDown={(event) => event.preventDefault()}
       onClick={() => { const input = inputRef.current; caretRef.current = [input?.selectionStart ?? value.length, input?.selectionEnd ?? value.length]; setShown((current) => !current); }}>
@@ -465,6 +465,7 @@ function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSigne
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const check = useUsernameCheck(mode === "register" ? username : "");
+  const passwordLabelId = useId(), repeatLabelId = useId();
 
   function switchMode(next: "login" | "register") {
     setMode(next);
@@ -507,8 +508,8 @@ function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSigne
       {mode === "register" && <UsernameHint check={check} />}
       {mode === "register" && <><label className="account-field"><span>Anzeigename</span><input className="mode-input" autoComplete="nickname" maxLength={DISPLAY_NAME_MAX} required value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
         <small className="account-hint">So heisst du im Spiel und im Multiplayer. Jederzeit änderbar.</small></>}
-      <label className="account-field"><span>{mode === "register" ? `Passwort (mindestens ${PASSWORD_MIN} Zeichen)` : "Passwort"}</span><PasswordInput key={`password-${mode}`} fieldName="Passwort" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? undefined : PASSWORD_MIN} value={password} onChange={setPassword} /></label>
-      {mode !== "login" && <label className="account-field"><span>Passwort wiederholen</span><PasswordInput fieldName="Passwort wiederholen" autoComplete="new-password" value={passwordRepeat} onChange={setPasswordRepeat} /></label>}
+      <label className="account-field"><span id={passwordLabelId}>{mode === "register" ? `Passwort (mindestens ${PASSWORD_MIN} Zeichen)` : "Passwort"}</span><PasswordInput key={`password-${mode}`} fieldName="Passwort" labelId={passwordLabelId} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? undefined : PASSWORD_MIN} value={password} onChange={setPassword} /></label>
+      {mode !== "login" && <label className="account-field"><span id={repeatLabelId}>Passwort wiederholen</span><PasswordInput fieldName="Passwort wiederholen" labelId={repeatLabelId} autoComplete="new-password" value={passwordRepeat} onChange={setPasswordRepeat} /></label>}
       {mode === "register" && <small className="account-hint">Merk dir dein Passwort gut: Ohne E-Mail Adresse lässt es sich nicht zurücksetzen.</small>}
       <button type="submit" className="mode-primary" disabled={busy || (mode === "register" && check.blocked)}>{mode === "login" ? "Anmelden" : "Konto erstellen"}</button>
     </form>

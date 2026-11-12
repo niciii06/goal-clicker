@@ -131,7 +131,14 @@ export type GameFeatures = {
   nextVarAt: number;
   /** Cards the club marked as favourites (Q38); missing in saves without any. */
   favoriteIds?: string[];
+  /**
+   * The free welcome pack of a brand new club: "pending" until the tutorial reaches its shop step, "available" while
+   * the pack can be opened, then "claimed" (the card was given once) or "forfeited" (the tutorial was ended before).
+   * Missing in every club that existed before the tutorial got this step: nothing changes for them.
+   */
+  welcomePack?: WelcomePackState;
 };
+export type WelcomePackState = "pending" | "available" | "claimed" | "forfeited";
 
 export const MAX_FAVORITE_CARDS = 200;
 
@@ -1984,6 +1991,27 @@ export function grantWelcomePack(features: GameFeatures, now = Date.now(), rando
   return reveal;
 }
 
+/** A brand new club: the welcome pack waits for the tutorial (invisible and not openable in the shop). */
+export function startWelcomePack(features: GameFeatures) {
+  if (features.welcomePack === undefined) features.welcomePack = "pending";
+}
+/** The tutorial reached its shop step: the pack shows up. Only a pending pack becomes available. */
+export function unlockWelcomePack(features: GameFeatures) {
+  if (features.welcomePack === "pending") features.welcomePack = "available";
+}
+/** The tutorial was ended before the pack was opened: the claim is gone for good (also for a repeated tutorial). */
+export function forfeitWelcomePack(features: GameFeatures) {
+  if (features.welcomePack === "pending" || features.welcomePack === "available") features.welcomePack = "forfeited";
+}
+/** True while the pack is still to be had, so ending the tutorial costs the player something. */
+export const welcomePackOpen = (features: Pick<GameFeatures, "welcomePack">) => features.welcomePack === "pending" || features.welcomePack === "available";
+/** Opens the welcome pack once: exactly one random walkout card. Anything but "available" returns null and changes nothing. */
+export function claimWelcomePack(features: GameFeatures, now = Date.now(), random: () => number = Math.random): StarPackReveal | null {
+  if (features.welcomePack !== "available") return null;
+  features.welcomePack = "claimed";
+  return grantWelcomePack(features, now, random);
+}
+
 export const STARTER_SQUAD_UNLOCK_CLICKS = 50;
 const STARTER_SQUAD_MAX_RATING = 59;
 
@@ -3180,6 +3208,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     if (!playerMatchPositions[playerId]) playerMatchPositions[playerId] = getStarXIPlayer(playerId)?.position ?? "ZM";
   });
   const favoriteIds = uniqueKnownStarIds(source.favoriteIds).slice(0, MAX_FAVORITE_CARDS);
+  const welcomePack = (['pending', 'available', 'claimed', 'forfeited'] as const).find((state) => state === source.welcomePack);
   const normalized: GameFeatures = {
     schemaVersion: GAME_FEATURES_SCHEMA_VERSION,
     // Clubs that already field eleven never need the starter squad.
@@ -3213,6 +3242,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     ...(weekly ? { weekly } : {}),
     // Favourite cards (Q38): optional, saves without them load unchanged.
     ...(favoriteIds.length ? { favoriteIds } : {}),
+    ...(welcomePack ? { welcomePack } : {}),
   };
   normalized.chronicle = normalizeChronicle(source.chronicle, normalized.career);
   repairAbandonedTournamentJourney(normalized, Date.now());

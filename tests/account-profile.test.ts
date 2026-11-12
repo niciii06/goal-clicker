@@ -347,10 +347,11 @@ test('password fields start masked and carry an accessible eye button that is no
   const { createElement } = await import('react');
   const { readFile } = await import('node:fs/promises');
   const { PasswordInput } = await import('../app/account-gate.tsx');
-  const html = renderToStaticMarkup(createElement(PasswordInput, { fieldName: 'Passwort wiederholen', value: 'geheim', onChange: () => undefined, autoComplete: 'new-password' }));
+  const html = renderToStaticMarkup(createElement(PasswordInput, { fieldName: 'Passwort wiederholen', labelId: 'label-1', value: 'geheim', onChange: () => undefined, autoComplete: 'new-password' }));
   assert.match(html, /<input[^>]*type="password"/, 'masked by default');
   assert.match(html, /<button type="button" class="account-password-toggle" aria-label="Passwort wiederholen anzeigen" aria-pressed="false"/);
   assert.match(html, /autoComplete|autocomplete="new-password"/i, 'password managers keep working');
+  assert.match(html, /<input[^>]*aria-labelledby="label-1"/, 'the field is named by its visible label, not by the eye button');
   const source = await readFile(new URL('../app/account-gate.tsx', import.meta.url), 'utf8');
   // Login, register and the repeat field all use it; nothing stores the visibility or the password.
   assert.equal((source.match(/<PasswordInput /g) ?? []).length, 2);

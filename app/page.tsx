@@ -11,8 +11,8 @@ import { RESERVE_SORTS, RESERVE_STATUS_FILTERS, RESERVE_TYPES, filterAndSortRese
 import { ACHIEVEMENTS, BALANCE_VERSION, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, COMBO_MAX_COUNT, COOP_ROOM_KEY, CROSSBAR_HEIGHTS, DEFAULT_LAYOUT_ORDER, GOAL_CONFETTI, GOLD_CONFETTI, LAYOUT_CARD_IDS, LAYOUT_STORAGE_KEY, LEGACY_PLAYER_ID_KEYS, MATCH_PREDICTIONS, MAX_SEASON_STARS, MINI_GAME_COOLDOWN_SECONDS, MINI_GAME_NAMES, NETWORK_RETRY_UNSAFE_COOP_ACTIONS, PACK_TROLL_INTRO_MS, PENALTY_DIRECTIONS, PLAYER_ID_KEY, PLAYER_NAME_KEY, PURCHASE_MODES, RANKS, RESERVE_PAGE_SIZE, SILVER_CONFETTI, STAR_RARE_REVEAL_DURATION_MS, ALBUM_MILESTONES_STORAGE_KEY, STAR_RATING_FILTERS, TUTORIAL_STORAGE_KEY, VIBRATION_STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from "./game/constants";
 import { AL, AR, AT, AU, AZ, BA, BE, BF, BG, BR, CA, CD, CH, CI, CL, CM, CN, CO, CR, CZ, DE, DK, DZ, EC, EG, ES, FI, FR, GB_ENG, GB_NIR, GB_SCT, GB_WLS, GE, GH, GM, GN, GR, GT, HR, HT, HU, IE, IL, IS, IT, JM, JP, KN, KR, MA, ME, ML, MW, MX, NG, NL, NO, NZ, PA, PH, PL, PT, PY, RO, RS, RU, SE, SI, SK, SN, SR, TR, UA, US, UY, VE, XK, ZA, ZM } from "country-flag-icons/react/3x2";
 import { AlbumPanel, CareerArea, CareerPlayerBadge, PostMatchSummary } from "./career-panels";
-import { normalizeStarXIState, removeStarXIPlayersFromSquad, toggleFavoriteCard, togglePinnedStarter } from "./feature-data";
-import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, SPECIAL_CARD_PACK, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_SQUAD_SIZE, STAR_XI_TOTAL_CARD_COUNT, TOURNAMENTS, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, applyPendingMatchChanges, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, getSpecialCardPackOdds, purchaseSpecialCardPack, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostMultiplier, getOpenTransferSquadVacancies, getRandomEventDelay, getRewardPackOdds, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXIRating, getStarXISelection, getTournament, getTournamentRewardPack, getBestXIUnavailablePlayerIds, grantWelcomePack, canDrawHundredSpecialCards, maybeGrantStarterSquad, STARTER_SQUAD_UNLOCK_CLICKS, getUnavailableStarXIPlayerIds, initialGameFeatures, isRewardPack, isTransferDeadlineDay, normalizeGameFeatures, openEarnedPack, openStarPack, pauseGameFeatureTimers, queueMatchChanges, recordSeasonModeMatch, releaseMatchSquad, resolveCupPenalty, getCupPenaltyStep, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, TRANSFER_UNHAPPY_MATCHES, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, getPrestigeBlockReason, seasonMatchDuration, sortSeasonTable, tournamentMatchDuration } from "./feature-data";
+import { claimWelcomePack, forfeitWelcomePack, normalizeStarXIState, removeStarXIPlayersFromSquad, startWelcomePack, toggleFavoriteCard, togglePinnedStarter, unlockWelcomePack, welcomePackOpen } from "./feature-data";
+import { CLUB_BADGES, CLUB_COLORS, SEASON_MODE_MATCHES_PER_SEASON, STAR_FORMATIONS, STAR_PACKS, STAR_POSITIONS, STAR_XI_BASE_CARD_COUNT, STAR_XI_BENCH_SIZE, STAR_XI_ICON_CARD_COUNT, STAR_XI_MAX_SUBSTITUTIONS, SPECIAL_CARD_PACK, STAR_XI_SPECIAL_CARD_COUNT, STAR_XI_SQUAD_SIZE, STAR_XI_TOTAL_CARD_COUNT, TOURNAMENTS, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, applyPendingMatchChanges, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, getSpecialCardPackOdds, purchaseSpecialCardPack, finishActiveTransferLoans, getCupMatchMinute, getCupPlayerMatchRating, getGoalBoostMultiplier, getOpenTransferSquadVacancies, getRandomEventDelay, getRewardPackOdds, getSeasonModeDivisionLabel, getSeasonModeNextOpponent, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXIRating, getStarXISelection, getTournament, getTournamentRewardPack, getBestXIUnavailablePlayerIds, canDrawHundredSpecialCards, maybeGrantStarterSquad, STARTER_SQUAD_UNLOCK_CLICKS, getUnavailableStarXIPlayerIds, initialGameFeatures, isRewardPack, isTransferDeadlineDay, normalizeGameFeatures, openEarnedPack, openStarPack, pauseGameFeatureTimers, queueMatchChanges, recordSeasonModeMatch, releaseMatchSquad, resolveCupPenalty, getCupPenaltyStep, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, TRANSFER_UNHAPPY_MATCHES, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, getPrestigeBlockReason, seasonMatchDuration, sortSeasonTable, tournamentMatchDuration } from "./feature-data";
 import { DailyRewardCard } from "./daily-reward-panel";
 import { FootballGraphic, GameErrorBoundary, Icon, StarXIPositionBadges } from "./game/ui";
 import { LiveMatchViewer } from "./match-viewer";
@@ -23,7 +23,7 @@ import { WHATS_NEW } from "./whats-new";
 import { WhatsNewDialog } from "./whats-new-dialog";
 import { TutorialCoach, TutorialIntroDialog } from "./tutorial-panel";
 import { SeasonTrophyCelebration, getSeasonTitle, type SeasonTitle } from "./season-trophy";
-import { advanceTutorial, finishedTutorial, newTutorial, parseTutorialState, serializeTutorialState, type TutorialState, type TutorialStep } from "./tutorial";
+import { advanceTutorial, currentTutorialStep, finishedTutorial, newTutorial, parseTutorialState, serializeTutorialState, type TutorialState, type TutorialStep } from "./tutorial";
 import { TAB_PATHS, tabForPath } from "./tab-routes";
 import type { RoutedTab } from "./tab-routes";
 import { gameAudioContext, playPackReveal } from "./match-audio";
@@ -255,6 +255,8 @@ function App() {
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   // Finished until the start decides: only a brand new club gets the tutorial.
   const [tutorial, setTutorialState] = useState<TutorialState>(finishedTutorial);
+  // Ending the tutorial before the welcome pack was opened asks first: the pack would be lost for good.
+  const [tutorialEndDialog, setTutorialEndDialog] = useState(false);
   const [appMode, setAppMode] = useState<AppMode>("single");
   const [playerId, setPlayerId] = useState("");
   const [playerName, setPlayerName] = useState("");
@@ -3203,6 +3205,32 @@ function App() {
     setTutorial({ ...tutorial, status: "done" });
   }
 
+  /** "Tutorial beenden" and the skip of the welcome window: with an unopened welcome pack the player is asked first. */
+  function requestEndTutorial() {
+    if (welcomePackOpen(gameRef.current.features)) setTutorialEndDialog(true);
+    else endTutorial();
+  }
+
+  function confirmEndTutorial() {
+    setTutorialEndDialog(false);
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      forfeitWelcomePack(features);
+      return { ...current, features };
+    });
+    endTutorial();
+  }
+
+  /** Opens the welcome pack of the shop: exactly one random walkout card, given once. */
+  function openWelcomePack() {
+    if (starReveal || gameRef.current.features.welcomePack !== "available") return;
+    const features = normalizeGameFeatures(structuredClone(gameRef.current.features));
+    const reveal = claimWelcomePack(features);
+    if (!reveal) return;
+    setGame((current) => ({ ...current, features }));
+    presentStarReveal(reveal);
+  }
+
   function restartTutorial() {
     setTutorial(newTutorial());
     openFeatureTab("home");
@@ -3305,12 +3333,12 @@ function App() {
         window.setTimeout(() => setOffline("Der gespeicherte Stand konnte nicht gelesen werden. Die Sicherung bleibt unangetastet."), 0);
       }
     } else {
-      // A brand new club: the first thing it sees is a free pack with a walkout.
+      // A brand new club: the free welcome pack (one random walkout) is not handed out now. It waits invisibly until the
+      // tutorial reaches its shop step, so the first walkout is part of the guided start.
       window.setTimeout(() => {
         const features = normalizeGameFeatures(structuredClone(gameRef.current.features));
-        const reveal = grantWelcomePack(features);
+        startWelcomePack(features);
         setGame((current) => ({ ...current, features }));
-        presentStarReveal(reveal);
       }, 0);
     }
     window.setTimeout(() => setHydrated(true), 0);
@@ -3436,7 +3464,18 @@ function App() {
       }
     }, 0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, tutorial, game.clicks, game.upgrades, featureTab, tutorialCup.active, tutorialCup.mode, tutorialCup.matchStartedAt, game.features.squadLock, game.features.seasonMode.history.length, game.features.seasonMode.lastMatchAt]);
+  }, [hydrated, tutorial, game.clicks, game.upgrades, featureTab, tutorialCup.active, tutorialCup.mode, tutorialCup.matchStartedAt, game.features.squadLock, game.features.seasonMode.history.length, game.features.seasonMode.lastMatchAt, game.features.welcomePack]);
+
+  // The shop step of the tutorial unlocks the welcome pack; before that it neither shows nor opens.
+  const tutorialStepId = tutorial.status === "active" ? currentTutorialStep(tutorial)?.id : undefined;
+  useEffect(() => {
+    if (!hydrated || tutorialStepId !== "packs" || game.features.welcomePack !== "pending") return;
+    setGame((current) => {
+      const features = normalizeGameFeatures(current.features);
+      unlockWelcomePack(features);
+      return { ...current, features };
+    });
+  }, [hydrated, tutorialStepId, game.features.welcomePack]);
 
   const rankRange = nextRank ? nextRank.minimum - currentRank.minimum : 1;
   const rankProgress = nextRank ? Math.max(0, Math.min(100, ((displayGame.totalGoals - currentRank.minimum) / rankRange) * 100)) : 100;
@@ -3524,7 +3563,7 @@ function App() {
       {seasonTitle && <SeasonTrophyCelebration title={seasonTitle} clubName={displayClubName} onClose={() => setSeasonTitle(null)} />}
       {whatsNewOpen && WHATS_NEW[0] && <WhatsNewDialog entry={WHATS_NEW[0]} onClose={closeWhatsNew} />}
       {whatsNewArchive && !whatsNewOpen && WHATS_NEW[0] && <WhatsNewDialog entry={WHATS_NEW[0]} archive={WHATS_NEW} onClose={() => setWhatsNewArchive(false)} />}
-      {hydrated && tutorial.status === "intro" && !starReveal && !whatsNewOpen && appMode === "single" && <TutorialIntroDialog onStart={() => setTutorial({ ...tutorial, status: "active" })} onSkip={endTutorial} />}
+      {hydrated && tutorial.status === "intro" && !starReveal && !whatsNewOpen && appMode === "single" && <TutorialIntroDialog onStart={() => setTutorial({ ...tutorial, status: "active" })} onSkip={requestEndTutorial} />}
       {guestCoopPrompt && guest && <ConfirmDialog title="Koop braucht ein Konto" confirmLabel="Anmelden" onCancel={() => setGuestCoopPrompt(false)} onConfirm={() => { setGuestCoopPrompt(false); guest.signIn(); }}>
         <p>Als Gast spielst du nur Einzelspieler. Melde dich an oder erstelle ein Konto, um mit anderen in einer Koop Welt zu spielen. Hat dein Konto noch keinen Spielstand, nimmt es deinen Gast Spielstand mit.</p>
       </ConfirmDialog>}
@@ -3555,7 +3594,8 @@ function App() {
       </nav>
       <AccountLink playerId={playerId} onPlayerId={adoptAccountPlayerId} onMessage={accountMessage} />
 
-      {hydrated && appMode === "single" && tutorial.status === "active" && <TutorialCoach state={tutorial} game={game} onShow={showTutorialStep} onEnd={endTutorial} />}
+      {hydrated && appMode === "single" && tutorial.status === "active" && <TutorialCoach state={tutorial} game={game} onShow={showTutorialStep} onEnd={requestEndTutorial} />}
+      {tutorialEndDialog && <ConfirmDialog title="Tutorial beenden?" confirmLabel="Beenden" cancelLabel="Weiter spielen" onConfirm={confirmEndTutorial} onCancel={() => setTutorialEndDialog(false)}>Wenn du das Tutorial jetzt abbrichst, erhältst du das Willkommenspack nicht.</ConfirmDialog>}
       {(appMode === 'single' || isCoopLive) && <nav className="section-navigation" aria-label="Hauptnavigation">{primaryTabs.map(tab=><button type="button" key={tab.id} aria-label={tab.label} title={navBadges[tab.id as keyof typeof navBadges]?.join(", ")} aria-current={primarySection===tab.id?'page':undefined} className={primarySection===tab.id?'active':''} onClick={()=>{openFeatureTab(tab.id==='club'&&pendingTransferOffer&&primarySection!=='club'?'fabrizio':tab.id);setLayoutEditMode(false);}}><span className="tab-icon"><Icon name={tab.icon} size={22} />{tab.id==='cup'&&displayGame.features.cup.active&&<i className="tab-live-dot" aria-hidden="true" />}{tab.id==='club'&&pendingTransferOffer&&<i className="tab-live-dot offer" aria-hidden="true" />}{navBadges[tab.id as keyof typeof navBadges]&&!(tab.id==='cup'&&displayGame.features.cup.active)&&!(tab.id==='club'&&pendingTransferOffer)&&<i className="tab-live-dot action" aria-hidden="true" />}</span><span className="tab-label-full">{tab.text ?? tab.label}{tab.id==='cup'&&displayGame.features.cup.active&&<span className="tab-live-badge" aria-hidden="true">LIVE</span>}</span><span className="tab-label-short" aria-hidden="true">{tab.short}</span></button>)}</nav>}
       {(appMode === "single" || isCoopLive) && <main className={`clicker-layout${isCoopLive ? " coop-clicker-layout" : ""}`}>
         {isCoopLive && coopSession && <div className="coop-inline-room-bar compact"><div><p className="eyebrow">KOOP / {coopSession.room.roomName}</p><strong>{coopSession.code}</strong><span>{occupiedCoopPlayers(coopSession.room).map((player) => player.name).join(" · ")}</span></div><div className="coop-inline-room-actions"><span className={`coop-presence${otherCoopOnline ? " online" : ""}`}><i />{otherCoopOnline ? `${otherCoopOnlineCount} ${otherCoopOnlineCount === 1 ? "MITSPIELER" : "MITSPIELER"} ONLINE` : "MITSPIELER OFFLINE"}</span>{coopBusy && <span className="coop-pending-chip" role="status">Wird gespeichert …</span>}{!coopBusy && coopFailed && <button type="button" className="coop-pending-chip failed" onClick={() => { const failed = coopFailed; setCoopFailed(null); void sendCoopAction(failed.action, failed.extra); }}>Nicht gespeichert · erneut senden</button>}{coopPrestigeVote && hiddenPrestigeVote === coopPrestigeVote.id && <button className="mode-secondary" onClick={() => setHiddenPrestigeVote("")}>Prestige Abstimmung zeigen</button>}<button className="mode-secondary" onClick={() => void shareInvite()}>Einladen</button><button className="mode-secondary" onClick={() => openFeatureTab("club")}>Welt verwalten</button></div></div>}
@@ -3674,6 +3714,7 @@ function App() {
 
           {featureTab === "packs" && <div className="feature-panel">
             <div className="starxi-pack-heading"><div><p className="eyebrow">STAR XI / PACKS</p><h4>{formatStableInteger(STAR_XI_TOTAL_CARD_COUNT)} Spieler. Jeder Pull zählt.</h4><small>{formatStableInteger(STAR_XI_BASE_CARD_COUNT)} Basiskarten, alle {STAR_XI_ICON_CARD_COUNT} FC 27 Icons und {STAR_XI_SPECIAL_CARD_COUNT} einzigartige Spezialkarten.</small></div><span>{ownedStarXIPlayers.length - loanedStarIds.length} Spieler im Team</span></div>
+            {displayGame.features.welcomePack === "available" && <div className="star-pack-grid"><article className="star-pack-card welcome-pack-card" aria-label="Willkommenspack"><div className="star-pack-top"><span className="star-pack-icon">✦</span><div><strong>Willkommenspack</strong><small>Ein einmaliges Geschenk für deinen neuen Club: eine zufällige Walkout-Karte.</small></div><span className="star-pack-price">GRATIS</span></div><button type="button" className="mode-primary" disabled={Boolean(starReveal)} onClick={openWelcomePack}>Willkommenspack öffnen</button></article></div>}
             {displayGame.features.earnedPacks.some(p=>!p.opening)&&<><div className="earned-packs-heading"><h4>Deine Prämien</h4>{displayGame.features.earnedPacks.filter(p=>!p.opening).length>1&&<button type="button" className="mode-secondary" onClick={openAllRewardPacks} disabled={coopBusy||Boolean(starReveal)||displayGame.features.cup.active}>{displayGame.features.cup.active?"Nach dem Abpfiff":`Alle öffnen (${displayGame.features.earnedPacks.filter(p=>!p.opening).length})`}</button>}</div><div className="star-pack-grid">{displayGame.features.earnedPacks.filter(p=>!p.opening).map(earned=>{if(earned.packId==='special'){const odds=getSpecialCardPackOdds(displayGame.features.starXI.ownedIds),hundred=canDrawHundredSpecialCards(displayGame.features.seasonMode.highestDivision);return <article className="star-pack-card special-card-pack" key={earned.id}><div className="star-pack-top"><span className="star-pack-icon">✦</span><div><strong>{SPECIAL_CARD_PACK.label}</strong><small>Geschenk der täglichen Prämie: eine zufällige Spezialkarte.{hundred?"":" 100er gibt es erst ab Liga 3."}</small></div><span className="star-pack-price">GRATIS</span></div><div className="star-pack-odds"><span><em>Inhalt</em><b>{odds.total} Spezialkarten</b></span><span><em>100er Karte</em><b>{hundred?formatPackChance(odds.hundredChance):"ab Liga 3"}</b></span></div><button className="feature-buy-button" onClick={()=>void openRewardPack(earned.id)} disabled={coopBusy||Boolean(starReveal)||displayGame.features.cup.active}>{displayGame.features.cup.active?"Nach dem Abpfiff":"Spezialkarten-Pack öffnen"}</button></article>;}const pack=getStarPack(earned.packId)!;return <article className="star-pack-card" key={earned.id}><div className="star-pack-top"><span className="star-pack-icon">🏆</span><div><strong>{pack.label}</strong><small>{pack.description}</small></div><span className="star-pack-price">GEWONNEN</span></div><div className="star-pack-odds">{getRewardPackOdds(earned.packId).map(o=><span key={o.label}><em>{o.label}</em><b>{formatPackChance(o.chance)}</b></span>)}</div><button className="feature-buy-button" onClick={()=>void openRewardPack(earned.id)} disabled={coopBusy||Boolean(starReveal)||displayGame.features.cup.active}>{displayGame.features.cup.active?"Nach dem Abpfiff":"Prämienpack öffnen"}</button></article>;})}</div></>}
             <div className="star-pack-grid">{STAR_PACKS.map((pack) => { const unlockLeague = getPackUnlockLeague(pack.id); const unlocked = isLeagueContentUnlocked(unlockLeague, reachedLeague, hasFullTestAccess); return <article className={`star-pack-card ${pack.id}${unlocked ? "" : " season-locked"}`} key={pack.id}><div className="star-pack-top"><span className="star-pack-icon">{unlocked ? "★" : "🔒"}</span><div><strong>{pack.label}</strong><small>{unlocked ? pack.description : `Verfügbar ab Liga ${unlockLeague}`}</small></div><span className="star-pack-price">{unlocked ? hasInfiniteMoney ? "∞ TESTMODUS" : `${formatNumber(pack.price)} TORE` : `LIGA ${unlockLeague}`}</span></div><div className="star-pack-odds">{pack.odds.map((odd) => <span key={`${pack.id}-${odd.label}`}><em>{odd.label}</em><b>{formatPackChance(odd.chance)}</b></span>)}</div>{unlocked && !hasInfiniteMoney && <div className="pack-savings">{displayGame.goals < pack.price && <small>{savingsHint(pack.price, displayGame.goals, passivePower, formatNumber)}</small>}<button type="button" className={`savings-pin${savingsGoal?.kind === "pack" && savingsGoal.id === pack.id ? " active" : ""}`} aria-pressed={savingsGoal?.kind === "pack" && savingsGoal.id === pack.id} onClick={() => toggleSavingsGoal({ kind: "pack", id: pack.id })}>{savingsGoal?.kind === "pack" && savingsGoal.id === pack.id ? "Sparziel ✓" : "Als Sparziel"}</button></div>}<button className="feature-buy-button" onClick={() => void buyStarPack(pack.id)} disabled={!unlocked || displayGame.features.cup.active || (!hasInfiniteMoney && displayGame.goals < pack.price) || coopBusy || Boolean(starReveal)}>{!unlocked ? `Ab Liga ${unlockLeague}` : displayGame.features.cup.active ? "Nach dem Abpfiff" : hasInfiniteMoney ? "∞ · Pack testen" : `${formatNumber(pack.price)} · Pack öffnen`}</button></article>; })}
               {(() => { const unlockLeague = getPackUnlockLeague(SPECIAL_CARD_PACK.id); const unlocked = isLeagueContentUnlocked(unlockLeague, reachedLeague, hasFullTestAccess); const fragments = displayGame.features.starXI.fragments; const odds = getSpecialCardPackOdds(displayGame.features.starXI.ownedIds); const affordable = hasInfiniteMoney || fragments >= SPECIAL_CARD_PACK.price; return <article className={`star-pack-card special-card-pack${unlocked ? "" : " season-locked"}`} key={SPECIAL_CARD_PACK.id} aria-label="Spezialkarten-Pack, bezahlt mit Fragmenten"><div className="star-pack-top"><span className="star-pack-icon">{unlocked ? "✦" : "🔒"}</span><div><strong>{SPECIAL_CARD_PACK.label}</strong><small>{unlocked ? SPECIAL_CARD_PACK.description : `Verfügbar ab Liga ${unlockLeague}`}</small></div><span className="star-pack-price">{unlocked ? hasInfiniteMoney ? "∞ TESTMODUS" : `${SPECIAL_CARD_PACK.price.toLocaleString("de-CH")} FRAGMENTE` : `LIGA ${unlockLeague}`}</span></div><div className="star-pack-odds"><span><em>Währung</em><b>Fragmente</b></span><span><em>Inhalt</em><b>{odds.total} Spezialkarten</b></span><span><em>100er Karte</em><b>{formatPackChance(odds.hundredChance)}</b></span><span><em>Neu für deinen Club</em><b>{formatPackChance(odds.newCard)}</b></span></div><small className="special-pack-balance">Dein Guthaben: <b>{fragments.toLocaleString("de-CH")} Fragmente</b>{!affordable && unlocked ? ` · noch ${formatNumber(SPECIAL_CARD_PACK.price - fragments)} bis zum nächsten Pack` : ""}</small><button className="feature-buy-button" onClick={() => void buySpecialCardPack()} disabled={!unlocked || displayGame.features.cup.active || !affordable || coopBusy || Boolean(starReveal)}>{!unlocked ? `Ab Liga ${unlockLeague}` : displayGame.features.cup.active ? "Nach dem Abpfiff" : hasInfiniteMoney ? "∞ · Pack testen" : `${SPECIAL_CARD_PACK.price.toLocaleString("de-CH")} Fragmente · Pack öffnen`}</button></article>; })()}</div>

@@ -84,30 +84,27 @@ async function register(page: Page, username: string, displayName: string, passw
   await page.getByText('Dieser Benutzername ist frei.').waitFor();
   await page.getByLabel('Anzeigename').fill(displayName);
   await page.getByLabel(/^Passwort \(mindestens/).fill(password);
-  await page.getByLabel('Passwort wiederholen').fill(password);
+  await page.getByLabel('Passwort wiederholen', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Konto erstellen', exact: true }).click();
   await closeWelcomePack(page);
 }
 
-/** A brand new game opens the free welcome pack first; its walkout covers the game until it is taken over. */
+/** A brand new game starts with the tutorial window (the free welcome pack comes later, from the shop). These tests skip it, which gives the pack up. */
 async function closeWelcomePack(page: Page) {
   await page.getByRole('button', { name: 'Fussball anklicken' }).waitFor();
-  const reveal = page.locator('.star-reveal');
-  try { await reveal.waitFor({ timeout: 4000 }); } catch { return; }
-  const takeOver = reveal.getByRole('button', { name: /^Weiter/ });
-  await takeOver.waitFor({ timeout: 20000 });
-  await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('.star-reveal .star-walkout-dismiss')?.disabled, undefined, { timeout: 20000 });
-  await takeOver.click();
-  await reveal.waitFor({ state: 'detached', timeout: 10000 });
-  // A new club then gets the tutorial window; these tests skip it.
   const skip = page.getByRole('dialog').getByRole('button', { name: 'Überspringen' });
-  try { await skip.waitFor({ timeout: 3000 }); await skip.click(); } catch { /* no tutorial for this save */ }
+  try {
+    await skip.waitFor({ timeout: 6000 });
+    await skip.click();
+    // Ending the tutorial before the pack was opened asks first.
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Beenden' }).click();
+  } catch { /* no tutorial for this save */ }
 }
 
 async function login(page: Page, username: string, password: string) {
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.getByLabel('Benutzername').fill(username);
-  await page.getByLabel('Passwort').fill(password);
+  await page.getByLabel('Passwort', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
 }
 
@@ -169,7 +166,7 @@ test('a wrong password is refused, the right one opens the same save on a second
   const page = await device('b');
   await login(page, 'STRIKER', 'falsches-passwort');
   await page.getByText('Benutzername oder Passwort stimmt nicht.').waitFor();
-  await page.getByLabel('Passwort').fill('sicheres-passwort-1');
+  await page.getByLabel('Passwort', { exact: true }).fill('sicheres-passwort-1');
   await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
   await page.getByRole('button', { name: 'Fussball anklicken' }).waitFor();
   const cloud = await cloudSave('Striker');
@@ -338,7 +335,7 @@ test('a guest plays single player only, and signing up takes the guest save into
   await page.getByText('Dieser Benutzername ist frei.').waitFor();
   await page.getByLabel('Anzeigename').fill('Gast');
   await page.getByLabel(/^Passwort \(mindestens/).fill('sicheres-passwort-9');
-  await page.getByLabel('Passwort wiederholen').fill('sicheres-passwort-9');
+  await page.getByLabel('Passwort wiederholen', { exact: true }).fill('sicheres-passwort-9');
   await page.getByRole('button', { name: 'Konto erstellen', exact: true }).click();
   await page.getByRole('button', { name: 'Konto von Gast' }).waitFor();
   await hideTab(page);
@@ -373,7 +370,7 @@ test('an original username account is taken over by simply logging in with the o
   await login(page, ORIGINAL_PASSWORD.username, 'falsches-passwort');
   await page.getByText('Benutzername oder Passwort stimmt nicht.').waitFor();
   assert.equal((await admin`select count(*)::int as n from auth_identities where account_id = ${ORIGINAL_PASSWORD.id}::uuid`)[0].n, 0);
-  await page.getByLabel('Passwort').fill('altes-passwort-7');
+  await page.getByLabel('Passwort', { exact: true }).fill('altes-passwort-7');
   await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
   await page.getByRole('button', { name: `Konto von ${ORIGINAL_PASSWORD.displayName}` }).waitFor();
   // The original save is in the browser, nothing of the account changed, and the player ID is the original one.

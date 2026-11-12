@@ -336,6 +336,7 @@ test('the "Was ist neu" window opens once for an existing game and stays closed 
 });
 
 /** A brand new game opens the free welcome pack first; its walkout covers the game until it is taken over. */
+/** Takes over the walkout of the welcome pack (opened from the shop at the tutorial's shop step). */
 async function closeWelcomePack(page: Page) {
   const reveal = page.locator('.star-reveal');
   await reveal.waitFor({ timeout: 10000 });
@@ -346,7 +347,7 @@ async function closeWelcomePack(page: Page) {
   await reveal.waitFor({ state: 'detached', timeout: 10000 });
 }
 
-test('a new player gets the welcome window after the walkout, then guided tasks that tick off and can be ended', async () => {
+test('a new player gets the welcome window first (no walkout), then guided tasks that tick off; ending asks about the welcome pack', async () => {
   for (const viewport of [VIEWPORTS[0], VIEWPORTS[1]]) {
     const page = await browser.newPage({ viewport });
     await page.addInitScript('globalThis.__name = (fn) => fn;');
@@ -354,9 +355,8 @@ test('a new player gets the welcome window after the walkout, then guided tasks 
     page.on('pageerror', (error) => problems.push(`page error: ${error.message}`));
     await page.goto(BASE, { waitUntil: 'networkidle' });
     const intro = page.getByRole('dialog', { name: TUTORIAL_INTRO_PAGES[0].title });
-    assert.equal(await intro.count(), 0, `${viewport.name}: the walkout comes first`);
-    await closeWelcomePack(page);
     await intro.waitFor();
+    assert.equal(await page.locator('.star-reveal').count(), 0, `${viewport.name}: no walkout on the first start`);
     assert.deepEqual(await layoutProblems(page), [], `${viewport.name}: welcome window layout`);
     for (const pageInfo of TUTORIAL_INTRO_PAGES.slice(1)) {
       await page.getByRole('dialog').getByRole('button', { name: 'Weiter' }).click();
@@ -371,26 +371,71 @@ test('a new player gets the welcome window after the walkout, then guided tasks 
     await ball.scrollIntoViewIfNeeded();
     for (let i = 0; i < 50; i++) await ball.click({ delay: 5 });
     await page.waitForFunction(() => /SCHRITT 2 \/ 5/.test(document.querySelector('.tutorial-coach')?.textContent ?? ''), undefined, { timeout: 10000 });
+    // The shop shows no welcome pack before its step.
+    await openTab(page, 'Packs & Album');
+    assert.equal(await page.getByRole('button', { name: 'Willkommenspack öffnen' }).count(), 0, `${viewport.name}: invisible before its step`);
+    await openTab(page, 'Home');
     // The progress survives a reload.
     await page.waitForTimeout(2500);
     await page.reload({ waitUntil: 'networkidle' });
     await coach.waitFor();
     assert.match(await coach.innerText(), /SCHRITT 2 \/ 5/);
+    // Ending asks first: keeping on playing changes nothing, confirming gives the pack up for good.
     await coach.getByRole('button', { name: 'Tutorial beenden' }).click();
+    const warning = page.getByRole('alertdialog');
+    await warning.waitFor();
+    assert.match(await warning.innerText(), /Wenn du das Tutorial jetzt abbrichst, erhältst du das Willkommenspack nicht\./);
+    await warning.getByRole('button', { name: 'Weiter spielen' }).click();
+    assert.equal(await coach.count(), 1, 'the tutorial goes on after "Weiter spielen"');
+    await coach.getByRole('button', { name: 'Tutorial beenden' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Beenden' }).click();
     assert.equal(await coach.count(), 0);
     assert.equal(JSON.parse((await page.evaluate((key) => localStorage.getItem(key), TUTORIAL_STORAGE_KEY))!).status, 'done');
+    await page.waitForTimeout(2500);
+    assert.equal(JSON.parse((await page.evaluate((key) => localStorage.getItem(key), SAVE_KEY))!).features.welcomePack, 'forfeited');
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForTimeout(1200);
     assert.equal(await page.getByRole('region', { name: 'Tutorial' }).count(), 0, `${viewport.name}: ended stays ended`);
-    // Club & Mehr starts it again.
+    // Club & Mehr starts it again; the forfeited pack does not come back.
     await openTab(page, 'Club & Mehr');
     await page.getByRole('button', { name: 'Tutorial erneut starten' }).click();
     await intro.waitFor();
     await page.keyboard.press('Escape');
     assert.equal(await intro.count(), 0, 'Escape skips the welcome window');
+    await openTab(page, 'Packs & Album');
+    assert.equal(await page.getByRole('button', { name: 'Willkommenspack öffnen' }).count(), 0, `${viewport.name}: forfeited for good`);
     assert.deepEqual(problems, []);
     await page.close();
   }
+});
+
+test('the welcome pack opens once from the shop at its tutorial step: one walkout, no odds, then the season match is the last step', async () => {
+  const now = Date.now();
+  const features = richFeatures(now);
+  features.welcomePack = 'available';
+  const { page, problems } = await openWithSave(VIEWPORTS[0], save(features, now));
+  await page.evaluate(([key, value]) => localStorage.setItem(key, value), [TUTORIAL_STORAGE_KEY, JSON.stringify({ status: 'active', done: ['clicks', 'upgrade', 'squad'], visited: ['squad'] })] as [string, string]);
+  await page.reload({ waitUntil: 'networkidle' });
+  const coach = page.getByRole('region', { name: 'Tutorial' });
+  await coach.waitFor();
+  assert.match(await coach.innerText(), /SCHRITT 4 \/ 5/);
+  await openTab(page, 'Packs & Album');
+  const card = page.getByRole('article', { name: 'Willkommenspack' });
+  await card.waitFor();
+  assert.doesNotMatch(await card.innerText(), /Chance|Wahrscheinlichkeit|%/);
+  assert.deepEqual(await layoutProblems(page), []);
+  await card.getByRole('button', { name: 'Willkommenspack öffnen' }).click();
+  await closeWelcomePack(page);
+  await page.waitForFunction(() => /SCHRITT 5 \/ 5/.test(document.querySelector('.tutorial-coach')?.textContent ?? ''), undefined, { timeout: 10000 });
+  assert.equal(await page.getByRole('article', { name: 'Willkommenspack' }).count(), 0, 'given once');
+  await page.waitForTimeout(2500);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  await openTab(page, 'Packs & Album');
+  assert.equal(await page.getByRole('article', { name: 'Willkommenspack' }).count(), 0, 'not again after a reload');
+  assert.match(await page.getByRole('region', { name: 'Tutorial' }).innerText(), /SCHRITT 5 \/ 5/);
+  assert.deepEqual(problems, []);
+  await page.close();
 });
 
 test('an existing game never sees the tutorial', async () => {
