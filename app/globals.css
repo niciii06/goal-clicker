@@ -295,6 +295,9 @@
 .strategy-grid strong, .strategy-grid small { display: block; }
 .strategy-grid strong { font-size: var(--text-footnote); }
 .strategy-grid small { margin-top: 6px; color: var(--muted); font-size: var(--text-footnote); line-height: 1.35; }
+/* Club identity is a section of its own, set apart from the cards above it (save file, tutorial, settings). */
+.club-identity { margin-top: 16px; padding: 16px; border: 1px solid var(--line-soft); border-radius: 16px; background: var(--surface-raised); }
+.club-identity .feature-panel-heading { margin-top: 0; }
 .club-preview { display: grid; width: 48px; height: 48px; place-items: center; border: 2px solid; border-radius: 15px; background: var(--surface-raised); font-size: 24px; }
 .club-form { display: grid; gap: 14px; max-width: 510px; }
 .club-form label, .club-form-label { color: var(--soft); font-size: var(--text-footnote); font-weight: 750; }

@@ -149,3 +149,11 @@ test('the Fabrizio transfer window follows the theme: light by default, dark tok
   // Every outcome keeps its own colours: offer, sale, failed and declined chips and card variants.
   for (const variant of ['sale', 'failed', 'offer', 'declined']) assert.match(css, new RegExp(`\\.transfer-insider-takeover\\.${variant} \\.transfer-insider-(card|result) \\{`));
 });
+
+test('Club & Mehr: the club identity is a section of its own, set apart from the save file card above it', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const [page, css] = await Promise.all([readFile(new URL('../app/page.tsx', import.meta.url), 'utf8'), readFile(new URL('../app/globals.css', import.meta.url), 'utf8')]);
+  assert.match(page, /<section className="club-identity" aria-label="Clubidentität">[\s\S]*Clubprofil speichern<\/button><\/div><\/section>/);
+  assert.match(page, /className="club-preview" role="img" aria-label=\{`Vorschau deines Wappens/, 'the badge preview is a picture, not a lookalike button');
+  assert.match(css, /\.club-identity \{ margin-top: 16px; padding: 16px; border: 1px solid var\(--line-soft\)/);
+});
