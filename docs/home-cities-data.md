@@ -1,56 +1,96 @@
-# Heimstädte Phase 1: Datenpaket (Zwischenstand)
+# Heimstädte Phase 1: Datenpaket
 
-Stand 12. November 2026, Branch `claude/opus-home-cities-data` ab `integration/sonnet-main-candidate` (`c145b19`). Konzept und Entscheide: Branch `claude/opus-home-stadium-plan`, `docs/home-stadium-phase1.md`.
+Stand 12. November 2026, Branch `claude/opus-home-cities-data` ab `integration/sonnet-main-candidate` (`c145b19`). Konzept: Branch `claude/opus-home-stadium-plan`, `docs/home-stadium-phase1.md`.
 
 **Freigabe von Nicolas:**
 * Städte Bern, Zürich, Basel und Genève.
 * Fiktiver Heimclub auf einem dokumentierten realen Platz.
-* Lokale Gegner bis Division 8: echte Clubs, wo verifiziert, sonst klar fiktiv.
-* Bern bleibt Standard für alte Spielstände.
-* Ein Wechsel ist nur beim Prestige möglich, im Koop eine Stadt pro Welt mit Wechsel beim Welt Prestige per Abstimmung.
+* Lokale Gegner bis Division 8: echte Clubs, wo belegt, sonst klar fiktiv.
+* Bern ist Standard für alte Spielstände.
+* Wechsel nur beim Prestige; im Koop eine Stadt pro Welt, Wechsel beim Welt Prestige per Abstimmung.
 * Sechs Clubs pro Liga, ein Aufsteiger und ein Absteiger bleiben.
 
-## Was es gibt
+**Nur Daten und Tests.** Nichts im Spiel liest `app/home-cities.ts`. Jeder Spielstand spielt weiter in Bern, bis der Katalog pro Welt verdrahtet ist (siehe unten).
 
-`scripts/home-cities/fetch-pitches.mts` sammelt reale Sportanlagen aus OpenStreetMap über Nominatim und schreibt `app/home-cities/pitches.json`.
+## Inhalt
 
-**Höflicher Abruf:**
-* Eine Anfrage nach der anderen, mindestens 1,5 Sekunden Abstand.
-* Eigene Kennung, jede Antwort im Zwischenspeicher.
-* Wird nur von Hand gestartet, nie in Tests.
+| Datei | Zweck |
+| --- | --- |
+| `app/home-cities.ts` | Vier Städte, Heimpunkt, Liganamen der Divisionen 1 bis 8, 47 lokale Clubs pro Stadt. `worldCatalog(stadt)` liefert die 89 Clubs einer Welt, `homeCityOf(gespeichert)` liefert Bern für jeden Spielstand ohne gültige Stadt. |
+| `app/home-cities/pitches.json` | Plätze aus OpenStreetMap mit OSM Objekt, Gemeinde und Kanton, dazu die belegten Clubs mit Quelle und Zitat. |
+| `scripts/home-cities/fetch-pitches.mts` | Erzeugt `pitches.json`. Läuft nur von Hand, mit Zwischenspeicher, höchstens eine Nominatim Anfrage alle 1,5 Sekunden. |
+| `tests/home-cities.test.ts` | 7 Tests, in `npm run test:unit`. |
+
+## Belegte echte Clubs
+
+Belegt heisst: Die **offizielle Vereinsseite** nennt den Heimplatz. Nominatim liefert nur die Lage eines Platzes, nie den Verein.
+
+Die Verbände (football.ch, FVRZ, FVNWS, ACGF) untersagen maschinellen Zugriff ausdrücklich und blockieren ihn. Ihre Seiten wurden deshalb nicht verwendet und auch nicht umgangen.
+
+| Stadt | Club | Quelle (Zitat) | Liga im Spiel |
+| --- | --- | --- | --- |
+| Zürich | FC Oerlikon/Polizei ZH | fcop.ch: «Heimplatz: Sportanlage Neudorf» | Division 2 |
+| Basel | FC Amicitia Riehen | fcamicitia.ch: «ein Zuhause auf der Sportanlage Grendelmatte», Grendelgasse 21, Riehen | Division 2 |
+| Basel | FC Pratteln | fcpratteln.ch: «Clubhaus und Sportanlage: Sportanlage in den Sandgruben, Giebenacherstrasse 14» | Division 4 |
+| Basel | SC Dornach | scdornach.ch: «Erneuerung der Fussballplätze im Gigersloch» | Division 8 |
+
+**Belegt, aber nicht platziert,** weil der Platz in OpenStreetMap nicht auffindbar ist:
+* FC Allschwil («Sportanlage im Brüel»)
+* Signal FC Bernex-Confignon (Heimspiel «Stade municipal de Bernex»)
+
+**Nicht belegt:**
+* Étoile Carouge: Profiklub, gehört nicht in eine Regionalliga.
+* Kloten, Altstetten, Witikon: Platz genannt, aber nicht als Heimspielort.
+* Nicht erreichbar: Red Star, Seefeld, Concordia, Black Stars, Muttenz, Lancy, Onex, Vernier, Meyrin.
+
+**Belegter Anteil der 47 lokalen Clubs:**
+
+| Stadt | Echt | Fiktiv |
+| --- | --- | --- |
+| Zürich | 1 | 46 |
+| Basel | 3 | 44 |
+| Genève | 0 | 47 |
+| Bern | unverändert | wie heute |
+
+Echte Clubs spielen nie in der Chaosliga (Division 1). Die bleibt wie in Bern eine Spassliga fiktiver Clubs.
+
+## Plätze und Zuteilung
+
+**Heimpunkte**, jeweils mit fiktivem Heimclub:
+* Zürich: Schul und Sportanlage Apfelbaum, Oerlikon. Nicht Neudorf, weil dort FC Oerlikon/Polizei zu Hause ist.
+* Basel: Sportplatz Rheinacker, Hirzbrunnen.
+* Genève: Centre Sportif du Bout du Monde, Champel.
 
 **Filter:**
-* Nur Anlagen der Art Platz, Sportzentrum, Stadion oder Spielwiese, sowie Schulanlagen mit «Sportanlage» im Namen.
-* Kein Tennis, Padel, Kart und Ähnliches.
-* Keine grossen Stadien oder Plätze bekannter Profiklubs.
-* Keine Namen mit Clubkürzeln (FC, SC …), damit der fiktive Club nie für einen echten gehalten wird.
+* Keine Stadien von Profiklubs.
+* Keine Platznamen mit Clubkürzeln.
+* Kein Tennis, Padel, Kart, Schach, keine Pfadfinder, Pumptrack oder Leichtathletik.
 
-**Zuteilung:** Für jeden Berner Club der Divisionen 1 bis 8 nimmt der Generator den freien Platz der Region, dessen Distanz zum neuen Heimpunkt am nächsten liegt. Jede Stadt übernimmt so Berns Distanzprofil pro Liga, damit Reisezeiten und Einnahmen vergleichbar bleiben.
+**Zuteilung nach Berns Distanzprofil:** Jeder Ligaplatz bekommt den Platz, dessen Distanz zum Heimpunkt der des Berner Clubs am nächsten liegt.
 
-**Echte Clubs:** Sie lassen sich hier nicht belegbar einem Platz zuordnen. OpenStreetMap kennt keine Vereinsobjekte (Proben «FC Red Star Zürich», «FC Concordia Basel», «Servette FC Chênois»), und Overpass ist nicht erreichbar. Nach der freigegebenen Regel sind die lokalen Gegner deshalb vorerst alle fiktiv. Echte Clubs können später einzelne fiktive ersetzen, sobald Verein und Platz belegt sind.
+**Geteilte Plätze:** Fehlen Plätze, teilen sich zwei fiktive Clubs einen. Nie in derselben Liga, nie mehr als zwei, nie der Heimplatz.
 
-## Stand der Läufe
+| Stadt | Geteilte Plätze |
+| --- | --- |
+| Zürich | 0 |
+| Basel | 16 |
+| Genève | 9 |
 
-| Stadt | Heimpunkt (OSM) | Ergebnis |
-| --- | --- | --- |
-| Bern | bestehendes Heimstadion Bümplizstrasse 45 | Katalog wie heute, keine neuen Daten |
-| Zürich | Sportanlage Neudorf, Oerlikon | **vollständig:** 47 Plätze in Division 1 bis 8, 28 in Reserve |
-| Basel | Sportplatz Rheinacker, Hirzbrunnen | **unvollständig:** Divisionen 1 bis 5 gefüllt, in Division 6 ist der Topf leer |
-| Genève | Centre sportif du Bout-du-Monde | noch nicht gelaufen (der Lauf bricht bei Basel ab) |
+**Mittlere Distanz zum Heimpunkt in km**, Division 1 bis 8:
 
-Nominatim findet um Basel zu wenige getrennte Anlagen; mehr Gemeinden in BL, AG und SO haben bisher nicht gereicht. `pitches.json` ist deshalb noch nicht geschrieben.
+| Stadt | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Bern | 1,2 | 2,1 | 2,6 | 9,3 | 13,6 | 31,8 | 12,7 | 23,6 |
+| Zürich | 1,4 | 3,5 | 6,0 | 10,2 | 13,6 | 30,9 | 14,5 | 24,3 |
+| Basel | 3,7 | 8,2 | 14,2 | 17,2 | 22,1 | 22,7 | 12,2 | 18,1 |
+| Genève | 2,0 | 3,6 | 4,4 | 9,4 | 13,8 | 26,4 | 11,8 | 22,9 |
+
+**Bekannte Abweichung Basel:** Die Stadtligen liegen weiter draussen als in Bern, weil OpenStreetMap in Basel Stadt über die Suche nur wenige getrennte Plätze liefert. Insgesamt liegt Basel im Rahmen (Test: Gesamtmittel höchstens 35 % von Bern entfernt). Verbessern lässt sich das mit weiteren belegten Basler Plätzen.
 
 ## Nächste Schritte
 
-1. **Basel auffüllen.** Weitere Suchbegriffe («Fussballplatz», «Rasenplatz») und Gemeinden im Fricktal, Laufental, Thierstein und Jura. Reicht das nicht, teilen sich in den Divisionen 6 bis 8 zwei fiktive Clubs einen Platz, wie es Sonnets fiktive sechste Clubs bereits tun.
-2. **Genève laufen lassen**, mit derselben Methode.
-3. **Prüfen, was die Läufe gefunden haben.** Generische Namen («Sportplatz») bekommen im Datenmodul die Gemeinde dazu. Plätze, die doch zu einem Profiklub gehören, kommen auf die Ausschlussliste.
-4. **`app/home-cities.ts`.** Städte, Heimpunkte, 47 fiktive Clubs pro Stadt mit Präfix `zh-`, `bs-`, `ge-` und regionale Liganamen. Bern liefert exakt die heutigen Clubs der Divisionen 1 bis 8.
-5. **`tests/home-cities.test.ts`.**
-   * Bern unverändert gegenüber `SEASON_CLUBS`.
-   * Pro Stadt 5 und 6 mal 6 Clubs, zusammen mit den nationalen Ligen 89.
-   * Eindeutige IDs.
-   * Jeder Platz mit OSM Quelle.
-   * Mittlere Distanz pro Division im Rahmen von Bern.
-   * Keine Namensgleichheit mit echten Clubs.
-6. **Danach,** getrennt: Katalog pro Welt in `app/season-leagues.ts`, Heimpunkt und Reisekategorie, Auswahl beim Prestige, Koop Abstimmung.
+1. **Katalog pro Welt:** in `app/season-leagues.ts` (`normalizeAiLeagues`, `advanceAiLeagues`) und `app/travel-geography.ts` (`defaultAiLeagues`, `seasonClubsOf`) `worldCatalog(homeCity)` statt `SEASON_CLUBS`. Dazu `seasonMode.homeCity` optional mit Standard Bern und der Test «alte Spielstände laden identisch».
+2. **Heimpunkt und Reisekategorie relativ zur Heimat:** Vergleichstest Bern, Bahnhof der Heimatstadt.
+3. **Auswahl beim Prestige**, im Koop per Abstimmung. Oberfläche nach den Apple Design Richtlinien.
+4. **Routencache** für die neuen Heimpunkte, sonst die getestete Ersatzlinie.
+5. **Mehr echte Clubs,** sobald weitere offizielle Vereinsseiten den Heimplatz nennen. Der Eintrag kommt in `VERIFIED` im Generator, der Test des belegten Anteils wird angepasst.

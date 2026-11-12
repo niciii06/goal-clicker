@@ -16,15 +16,15 @@ type CityPlan = { id: string; canton: string; home: { query: string; nameInclude
 const CACHE = process.argv[2] ?? '.cache/home-cities';
 const UA = 'goal-clicker-home-cities/1.0 (game data build script)';
 const TYPES = new Set(['pitch', 'sports_centre', 'stadium', 'recreation_ground']);
-const NOT_FOOTBALL = /kart|padel|tennis|golf|schwimm|piscine|bad\b|minigolf|reit|eis|patinoire|squash|beach|skate|boccia|pétanque|petanque|curling|kletter|basket|volley|badminton|tir\b|schiess/i;
+const NOT_FOOTBALL = /échecs|echecs|schach|scout|pfadi|pump ?track|athl[ée]tisme|leichtathletik|velodrom|kart|padel|tennis|golf|schwimm|piscine|bad\b|minigolf|reit|eis|patinoire|squash|beach|skate|boccia|pétanque|petanque|curling|kletter|basket|volley|badminton|tir\b|schiess/i;
 // Grounds of professional clubs or famous stadiums: the fictional clubs must not be mistaken for them.
 // Names that carry a club (FC Urdorf, SC ...) are left out: the club playing there in the game is fictional.
 const CLUB_NAME = /\b(FC|SC|SV|FCB|US|AS|CS|ES|FCZ|GC)\b/;
-const RESERVED = /letzigrund|hardturm|hardhof|st\. jakob|joggeli|stade de genève|stade de geneve|landhof|stade de la praille|schützenwiese|utogrund|brügglifeld|niedermatten|kybunpark/i;
+const RESERVED = /fontenette|letzigrund|hardturm|hardhof|st\. jakob|joggeli|stade de genève|stade de geneve|landhof|stade de la praille|schützenwiese|utogrund|brügglifeld|niedermatten|kybunpark/i;
 
 const PLANS: CityPlan[] = [
   {
-    id: 'zurich', canton: 'ZH', home: { query: 'Sportanlage Neudorf Zürich', nameIncludes: 'Neudorf' }, terms: ['Sportanlage', 'Sportplatz'],
+    id: 'zurich', canton: 'ZH', home: { query: 'Schul- und Sportanlage Apfelbaum Zürich', nameIncludes: 'Apfelbaum' }, terms: ['Sportanlage', 'Sportplatz'],
     bands: [
       { division: 1, places: ['Zürich Oerlikon', 'Zürich Seebach', 'Zürich Affoltern', 'Zürich Schwamendingen', 'Zürich Unterstrass', 'Zürich Wipkingen', 'Zürich Höngg', 'Zürich Altstetten', 'Zürich Albisrieden', 'Zürich Wiedikon', 'Zürich Wollishofen', 'Zürich Hottingen', 'Zürich Witikon', 'Zürich Hirslanden', 'Zürich Leimbach', 'Zürich'], match: ['Zürich'], minKm: 0, maxKm: 5 },
       { division: 2, places: ['Zürich Oerlikon', 'Zürich Seebach', 'Zürich Affoltern', 'Zürich Schwamendingen', 'Zürich Unterstrass', 'Zürich Wipkingen', 'Zürich Höngg', 'Zürich Altstetten', 'Zürich Albisrieden', 'Zürich Wiedikon', 'Zürich Wollishofen', 'Zürich Hottingen', 'Zürich Witikon', 'Zürich Hirslanden', 'Zürich Leimbach', 'Zürich'], match: ['Zürich'], minKm: 0, maxKm: 8 },
@@ -50,7 +50,7 @@ const PLANS: CityPlan[] = [
     ],
   },
   {
-    id: 'geneve', extra: ['Vernier', 'Meyrin', 'Lancy', 'Onex', 'Carouge', 'Thônex', 'Plan-les-Ouates', 'Veyrier', 'Versoix', 'Bernex', 'Satigny', 'Grand-Saconnex', 'Pregny-Chambésy', 'Genthod', 'Collex-Bossy', 'Presinge', 'Corsier', 'Aire-la-Ville', 'Avusy', 'Laconnex', 'Soral', 'Russin', 'Commugny', 'Mies', 'Tannay', 'Prangins', 'Begnins', 'Trélex', 'Genolier', 'Chêne-Bougeries', 'Vésenaz'], canton: 'GE', home: { query: 'Centre sportif du Bout-du-Monde Genève', nameIncludes: 'Bout-du-Monde' }, terms: ['Stade', 'Centre sportif', 'Terrain de football', 'Terrain de sport'],
+    id: 'geneve', extra: ['Vernier', 'Meyrin', 'Lancy', 'Onex', 'Carouge', 'Thônex', 'Plan-les-Ouates', 'Veyrier', 'Versoix', 'Bernex', 'Satigny', 'Grand-Saconnex', 'Pregny-Chambésy', 'Genthod', 'Collex-Bossy', 'Presinge', 'Corsier', 'Aire-la-Ville', 'Avusy', 'Laconnex', 'Soral', 'Russin', 'Commugny', 'Mies', 'Tannay', 'Prangins', 'Begnins', 'Trélex', 'Genolier', 'Chêne-Bougeries', 'Vésenaz'], canton: 'GE', home: { query: 'Centre sportif du Bout-du-Monde Genève', nameIncludes: 'Bout du Monde' }, terms: ['Stade', 'Centre sportif', 'Terrain de football', 'Terrain de sport'],
     bands: [
       { division: 1, places: ['Genève Champel', 'Genève Eaux-Vives', 'Genève Plainpalais', 'Genève Servette', 'Genève Petit-Saconnex', 'Genève Jonction', 'Genève Pâquis', 'Genève Acacias', 'Genève', 'Carouge', 'Lancy'], match: ['Genève', 'Carouge', 'Lancy'], minKm: 0, maxKm: 5 },
       { division: 2, places: ['Genève Champel', 'Genève Eaux-Vives', 'Genève Plainpalais', 'Genève Servette', 'Genève Petit-Saconnex', 'Genève Jonction', 'Genève Pâquis', 'Genève Acacias', 'Genève', 'Carouge', 'Lancy'], match: ['Genève', 'Carouge', 'Lancy'], minKm: 0, maxKm: 8 },
@@ -104,41 +104,77 @@ function toGround(raw: Record<string, unknown>): Ground | null {
   return { name, osm: `${raw.osm_type}/${raw.osm_id}`, lat: Number(Number(raw.lat).toFixed(5)), lon: Number(Number(raw.lon).toFixed(5)), municipality, canton, kind: schoolGround ? 'school-sports' : String(raw.type) };
 }
 
-// Bern's league geography is the model: for every Bern club of divisions 1 to 8 (sorted by distance from the Bern
-// home), the unused ground of the region whose distance from the city's home is closest takes its place. So every
-// city keeps Bern's distance profile per league, and travel times and rewards stay comparable.
+/**
+ * Real clubs whose own official website names their home ground (checked 12 November 2026). The football
+ * associations (football.ch, FVRZ, FVNWS, ACGF) refuse automated access, so their pages were not used; Nominatim
+ * only gives the ground's position, never the club. `ground` finds the ground in the cached Nominatim answers.
+ */
+const VERIFIED: { city: string; name: string; source: string; quote: string; ground: { query: string; osm: string } }[] = [
+  { city: 'zurich', name: 'FC Oerlikon/Polizei ZH', source: 'https://www.fcop.ch/', quote: 'Heimplatz: Sportanlage Neudorf', ground: { query: 'Sportanlage Neudorf Zürich', osm: 'way/998173254' } },
+  { city: 'basel', name: 'FC Amicitia Riehen', source: 'https://www.fcamicitia.ch/', quote: 'ein Zuhause auf der Sportanlage Grendelmatte (Grendelgasse 21, 4125 Riehen)', ground: { query: 'Grendelmatte Riehen', osm: 'way/867046393' } },
+  { city: 'basel', name: 'FC Pratteln', source: 'https://www.fcpratteln.ch/', quote: 'Clubhaus und Sportanlage: Sportanlage in den Sandgruben, Giebenacherstrasse 14, 4133 Pratteln', ground: { query: 'Giebenacherstrasse 14, 4133 Pratteln', osm: 'way/1033559231' } },
+  { city: 'basel', name: 'SC Dornach', source: 'https://www.scdornach.ch/', quote: 'Erneuerung der Fussballplätze im Gigersloch', ground: { query: 'Gigersloch Dornach', osm: 'relation/17929969' } },
+];
+
+// Bern's league geography is the model: every slot of divisions 1 to 8 has the distance of the Bern club in it (from
+// the Bern home). Verified real clubs take the slot closest to their own distance first; then, slot by slot, the free
+// ground of the region closest to the slot's distance. Only when the region runs out of grounds, two fictional clubs
+// share one (as the fictional sixth clubs of the national leagues already do), never more than two.
 const geo = await import('../../app/travel-geography.ts');
 const bernProfile: Record<number, number[]> = {};
 for (let division = 1; division <= 8; division++) {
   bernProfile[division] = geo.seasonClubsOf(division, geo.defaultAiLeagues(1)).filter((club) => club.league === 16 - division)
     .map((club) => km(geo.HOME_VENUE, club.venue)).sort((a, b) => a - b);
 }
-const output: Record<string, { canton: string; home: Ground; divisions: Record<string, Ground[]> }> = {};
+type Slot = { ground: Ground; distanceKm: number; real?: { name: string; source: string; quote: string }; shared?: boolean };
+const output: Record<string, { canton: string; home: Ground; divisions: Record<string, Slot[]> }> = {};
 for (const plan of PLANS) {
   const home = (await search(plan.home.query)).map(toGround).find((g) => g && g.name.includes(plan.home.nameIncludes));
   if (!home) throw new Error(`No home ground for ${plan.id}`);
+  const slots: { division: number; target: number; slot?: Slot }[] = [];
+  for (let division = 1; division <= 8; division++) for (const target of bernProfile[division]) slots.push({ division, target });
+  const taken: Ground[] = [home];
+  for (const club of VERIFIED.filter((v) => v.city === plan.id)) {
+    const raw = (await search(club.ground.query)).find((r) => `${r.osm_type}/${r.osm_id}` === club.ground.osm);
+    if (!raw) throw new Error(`${club.name}: ground ${club.ground.osm} not in the Nominatim answer`);
+    const address = (raw.address ?? {}) as Record<string, string>;
+    const ground: Ground = { name: String(raw.name || club.quote.split(':').at(-1)!.split(',')[0].trim()), osm: club.ground.osm, lat: Number(Number(raw.lat).toFixed(5)), lon: Number(Number(raw.lon).toFixed(5)), municipality: address.city || address.town || address.village || address.municipality || '', canton: (address['ISO3166-2-lvl4'] || '').replace('CH-', ''), kind: String(raw.type) };
+    const distance = km(home, ground);
+    // The Chaosliga (division 1) stays a joke league of fictional clubs, as in Bern: real clubs start in division 2.
+    const best = slots.filter((s) => !s.slot && s.division >= 2).sort((a, b) => Math.abs(a.target - distance) - Math.abs(b.target - distance))[0];
+    best.slot = { ground, distanceKm: Number(distance.toFixed(2)), real: { name: club.name, source: club.source, quote: club.quote } };
+    taken.push(ground);
+  }
   const pool: Ground[] = [];
   const places = [...new Set([...plan.bands.flatMap((band) => band.places), ...(plan.extra ?? [])])];
   for (const place of places) for (const term of plan.terms) for (const raw of await search(`${term} ${place}`)) {
     const ground = toGround(raw);
     if (!ground || km(home, ground) > 60) continue;
-    if ([home, ...pool].some((other) => other.osm === ground.osm || km(other, ground) < 0.15)) continue;
+    if ([...taken, ...pool].some((other) => other.osm === ground.osm || km(other, ground) < 0.15)) continue;
     pool.push(ground);
   }
-  const divisions: Record<string, Ground[]> = {};
-  for (let division = 1; division <= 8; division++) {
-    const picked: Ground[] = [];
-    for (const target of bernProfile[division]) {
-      const best = pool.filter((g) => !picked.includes(g)).sort((a, b) => Math.abs(km(home, a) - target) - Math.abs(km(home, b) - target))[0];
-      if (!best) throw new Error(`${plan.id} division ${division}: pool exhausted (${pool.length} grounds)`);
-      picked.push(best);
-      pool.splice(pool.indexOf(best), 1);
+  const uses = new Map<string, number>();
+  for (const entry of slots) {
+    if (entry.slot) continue;
+    const byFit = (a: Ground, b: Ground) => Math.abs(km(home, a) - entry.target) - Math.abs(km(home, b) - entry.target);
+    let ground = pool.sort(byFit)[0];
+    let shared = false;
+    if (ground) pool.splice(pool.indexOf(ground), 1);
+    else {
+      // Never two clubs of the same league on one ground.
+      const inDivision = new Set(slots.filter((s) => s.division === entry.division && s.slot).map((s) => s.slot!.ground.osm));
+      ground = slots.flatMap((s) => s.slot && !s.slot.real && (uses.get(s.slot.ground.osm) ?? 1) < 2 && !inDivision.has(s.slot.ground.osm) ? [s.slot.ground] : []).sort(byFit)[0];
+      if (!ground) throw new Error(`${plan.id}: no ground left for division ${entry.division}`);
+      shared = true;
     }
-    divisions[division] = picked;
-    console.log(`${plan.id} D${division}: ${picked.map((g) => `${g.name} (${g.municipality}, ${km(home, g).toFixed(1)} km)`).join('; ')}`);
+    uses.set(ground.osm, (uses.get(ground.osm) ?? 0) + 1);
+    entry.slot = { ground, distanceKm: Number(km(home, ground).toFixed(2)), ...(shared ? { shared: true } : {}) };
   }
-  console.log(`${plan.id}: ${pool.length} grounds left unused`);
+  const divisions: Record<string, Slot[]> = {};
+  for (const entry of slots) (divisions[entry.division] ??= []).push(entry.slot!);
+  for (const [division, list] of Object.entries(divisions)) console.log(`${plan.id} D${division}: ${list.map((s) => `${s.real ? `[${s.real.name}] ` : ''}${s.ground.name} (${s.ground.municipality}, ${s.distanceKm} km${s.shared ? ', geteilt' : ''})`).join('; ')}`);
+  console.log(`${plan.id}: ${pool.length} grounds left unused, ${slots.filter((s) => s.slot?.shared).length} shared slots, ${slots.filter((s) => s.slot?.real).length} verified clubs`);
   output[plan.id] = { canton: plan.canton, home, divisions };
 }
-writeFileSync('app/home-cities/pitches.json', `${JSON.stringify({ source: 'OpenStreetMap contributors via Nominatim (ODbL)', generatedAt: new Date().toISOString().slice(0, 10), cities: output }, null, 1)}\n`);
+writeFileSync('app/home-cities/pitches.json', `${JSON.stringify({ source: 'OpenStreetMap contributors via Nominatim (ODbL); clubs: their official websites', generatedAt: new Date().toISOString().slice(0, 10), cities: output }, null, 1)}\n`);
 console.log('app/home-cities/pitches.json written');
