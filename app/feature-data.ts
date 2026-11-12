@@ -20,7 +20,7 @@ import { HOME_VENUE, LEAGUE_LABELS, seasonGeography, venueForClubName } from "./
 import { addBroadcastSubstitution, advanceMatchBroadcast, chooseGoalPattern, createMatchBroadcast, normalizeMatchBroadcast, recordedActionRating } from "./match-broadcast";
 import { advanceInteractive, normalizeInteractive, resumeInteractive, simulationMinute } from "./interactive-match";
 import { emptyTravel, normalizeTravel } from "./travel-data";
-import { getCareerCard, getPlayerForm, initialCareerState, normalizeCareerState, rebaseCareerForPrestige } from "./career-data";
+import { getCareerCard, getPlayerForm, initialCareerState, normalizeCareerState, rebaseCareerForPrestige, resetCardMilestones, hasPotential } from "./career-data";
 import { getPackUnlockLeague, hasReachedLeague, leagueForTier } from "./season-progression";
 import { getFunnyPlayerName } from "./funny-player-names";
 import { normalizeDailyRewards } from "./daily-reward";
@@ -3476,7 +3476,7 @@ export function resolveTransferInsiderEvent(value: GameFeatures, random: () => n
       createdAt: now,
     };
   } else if (outcome === "sale" && player) {
-    // A sale with a fee is an offer the player answers: sell for the fee, or keep a player who then is unhappy.
+    // A sale with a fee is an offer the player answers: sell for the fee, or keep him and reset his milestones.
     // Without a fee the contract simply ends: the player leaves at once, there is nothing to decide.
     const paidSale = clamp(random(), 0, 0.999999) < TRANSFER_PAID_SALE_CHANCE;
     const fee = paidSale ? Math.max(0, Math.floor(player.price)) : 0;
@@ -3609,7 +3609,49 @@ export function acceptTransferOffer(value: GameFeatures, now = Date.now()): { fe
   return { features, event, goalDelta: offer.fee };
 }
 
-/** Keeps the player of the open offer; he wanted to leave and plays weaker for the next matches. */
+/** Reasons of a "declined" event; the dialog picks its result line by them (transferDeclinedLabel). */
+export const TRANSFER_DECLINE_REASONS = {
+  /** Kept against a paid offer: the milestones of a normal card start again. */
+  kept: "Behalten, Meilensteine neu",
+  /** Kept against a paid offer: a special card keeps its upgrades and potential. */
+  keptSpecial: "Spezialkarte behalten",
+  /** An open fee-free offer from a save before contract ends became automatic, kept: no consequence. */
+  keptFree: "Ablösefreien Wechsel abgesagt",
+  /** Nobody answered in time: the offer lapses, the player stays without any consequence. */
+  expired: "Keine Antwort auf das Angebot",
+  /** Saves before 12 November 2026: kept and unhappy for TRANSFER_UNHAPPY_MATCHES matches. */
+  legacyUnhappy: "Spieler behalten",
+} as const;
+
+/** What keeping the player of an open offer costs, for the offer dialog (shown before the answer). */
+export function transferKeepConsequence(features: Pick<GameFeatures, "career">, offer: Pick<TransferOffer, "playerId" | "fee">) {
+  const player = offer.playerId ? getStarXIPlayer(offer.playerId) : undefined;
+  if (!player || offer.fee <= 0) return "Behalten hat keine Folgen.";
+  if (hasPotential(player)) return pronounText("Behalten kostet nichts: Als Spezialkarte behält {er} Upgrades und Potential.", player);
+  const bonus = getCareerCard(features.career, player).bonus;
+  return bonus > 0
+    ? pronounText(`Behalten setzt {seine} Meilensteine zurück (−${bonus} OVR). {Er} muss sie mit neuen Einsätzen wieder erspielen.`, player)
+    : pronounText("Behalten setzt {seine} Meilensteine zurück. {Er} beginnt wieder bei null.", player);
+}
+
+/** The result line of a "declined" announcement. */
+export function transferDeclinedLabel(event: Pick<TransferInsiderEvent, "reason">) {
+  if (event.reason === TRANSFER_DECLINE_REASONS.expired) return "ANGEBOT VERFALLEN · BLEIBT";
+  if (event.reason === TRANSFER_DECLINE_REASONS.kept) return "BLEIBT · MEILENSTEINE ZURÜCKGESETZT";
+  if (event.reason === TRANSFER_DECLINE_REASONS.keptSpecial) return "BLEIBT · UPGRADES UND POTENTIAL BLEIBEN";
+  if (event.reason === TRANSFER_DECLINE_REASONS.keptFree) return "BLEIBT";
+  return `BLEIBT · ${TRANSFER_UNHAPPY_MATCHES} SPIELE UNZUFRIEDEN`;
+}
+
+/**
+ * Answers the open offer with "keep", or lets it lapse (`expired`). Owner's decisions of 12 November 2026:
+ * - Keeping against a paid offer resets the milestones of this card (resetCardMilestones) instead of the old
+ *   -2 OVR for three matches; a special card keeps its upgrades and potential.
+ * - An offer nobody answered lapses: the player stays, nothing is reset, nothing is penalised.
+ * - A fee-free offer still open from an older save (contract ends are automatic now) stays answerable; keeping it
+ *   has no consequence, so nobody loses anything retroactively.
+ * Players made unhappy before keep counting down their matches (TRANSFER_UNHAPPY_MATCHES) as before.
+ */
 export function declineTransferOffer(value: GameFeatures, now = Date.now(), expired = false): { features: GameFeatures; event: TransferInsiderEvent | null; goalDelta: number; error?: string } {
   const features = normalizeGameFeatures(value);
   const offer = features.transferSaga.pendingOffer;
@@ -3619,7 +3661,23 @@ export function declineTransferOffer(value: GameFeatures, now = Date.now(), expi
   features.transferSaga.pendingOffer = null;
   const player = offer.playerId ? getStarXIPlayer(offer.playerId) : undefined;
   if (!player || !features.starXI.ownedIds.includes(player.id)) return { features, event: null, goalDelta: 0 };
-  features.transferSaga.unhappy = [...features.transferSaga.unhappy.filter((entry) => entry.playerId !== player.id), { playerId: player.id, club: offer.club, matchesLeft: TRANSFER_UNHAPPY_MATCHES }];
+  let reason: string;
+  let message: string;
+  if (expired) {
+    reason = TRANSFER_DECLINE_REASONS.expired;
+    message = `Das Angebot von ${offer.club} ist verfallen. ${player.name} bleibt im Club, ohne Folgen.`;
+  } else if (offer.fee <= 0) {
+    reason = TRANSFER_DECLINE_REASONS.keptFree;
+    message = `Du hast ${offer.club} abgesagt. ${player.name} bleibt im Club.`;
+  } else {
+    const reset = resetCardMilestones(features.career, player);
+    // The new rule replaces the old penalty, it never adds to it: an earlier unhappiness of this card ends here.
+    features.transferSaga.unhappy = features.transferSaga.unhappy.filter((entry) => entry.playerId !== player.id);
+    reason = reset.special ? TRANSFER_DECLINE_REASONS.keptSpecial : TRANSFER_DECLINE_REASONS.kept;
+    message = reset.special
+      ? `Du hast ${offer.club} abgesagt. ${player.name} bleibt. ${pronounText("Als Spezialkarte behält {er} {seine} Upgrades und {sein} Potential.", player)}`
+      : `Du hast ${offer.club} abgesagt. ${player.name} bleibt, ${pronounText("{seine} Meilensteine sind zurückgesetzt", player)}${reset.bonusLost > 0 ? ` (−${reset.bonusLost} OVR)` : ""}. ${pronounText("{Er} muss sie mit neuen Einsätzen wieder erspielen.", player)}`;
+  }
   const event: TransferInsiderEvent = {
     id: `transfer-declined-${now}-${player.id}`,
     outcome: "declined",
@@ -3627,18 +3685,18 @@ export function declineTransferOffer(value: GameFeatures, now = Date.now(), expi
     playerName: player.name,
     club: offer.club,
     headline: expired ? "Angebot verfallen" : "Angebot abgelehnt",
-    message: `${expired ? `Das Angebot von ${offer.club} ist verfallen.` : `Du hast ${offer.club} abgesagt.`} ${player.name} bleibt, ist aber unzufrieden und spielt die nächsten ${TRANSFER_UNHAPPY_MATCHES} Spiele mit −${TRANSFER_UNHAPPY_PENALTY} OVR.`,
-    reason: expired ? "Keine Antwort auf das Angebot" : "Spieler behalten",
+    message,
+    reason,
     fee: 0,
     createdAt: now,
   };
   features.transferSaga.latestEvent = event;
   appendTransferArchive(features, event);
-  addHistory(features, { title: `Fabrizio Romario · ${event.headline}`, detail: event.message, tone: "negative" }, now);
+  addHistory(features, { title: `Fabrizio Romario · ${event.headline}`, detail: event.message, tone: expired || offer.fee <= 0 ? "neutral" : "negative" }, now);
   return { features, event, goalDelta: 0 };
 }
 
-/** An offer nobody answered in time counts as declined; matches and journeys stop its clock.
+/** An offer nobody answered in time lapses (declineTransferOffer with `expired`); matches and journeys stop its clock.
  * Journeys freeze it through the squad lock. A home match has no lock, so an offer that would run out
  * while the match is on keeps the time it had left at kick-off and gets it back after the final whistle
  * (`deferred`: the features changed without an event and must be saved). */

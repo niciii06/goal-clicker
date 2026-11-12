@@ -10,7 +10,7 @@ import { beginSeasonCupMatch, getStarXISelection, getStarXIPlayer } from '../app
 import { draftMatch } from '../app/match-commands';
 import { prepareCareerMatch } from '../app/career-data';
 import { getReachedLeague } from '../app/season-progression.ts';
-import { emptyPlayerStats, getAlbumGroups } from '../app/career-data.ts';
+import { emptyPlayerStats, getAlbumGroups, getCareerCard, hasPotential } from '../app/career-data.ts';
 import { MULTIPLAYER_PROTOCOL_VERSION } from '../app/multiplayer-protocol.ts';
 import type { GameFeatures } from '../app/feature-data.ts';
 type TestResponse = { room: { game: { features: GameFeatures } }; error?: string };
@@ -159,15 +159,28 @@ test('API sale offers are answered once by whoever is first in the world',async(
  const late=await action('transfer-decline',{},'guest-player-123');assert.equal(late.status,409);
  assert.equal(JSON.parse(row.sharedFeaturesJson).transferSaga.unhappy.length,0);
 });
-test('API keeping the player makes him unhappy, and an unanswered offer runs out',async()=>{
- setup(offerFeatures());
- const kept=await action('transfer-decline',{},'guest-player-123');assert.equal(kept.status,200,JSON.stringify(kept.data));
- assert.equal(kept.data.room.game.features.transferSaga.unhappy.length,1);
- assert.equal(kept.data.room.game.features.transferSaga.latestEvent?.outcome,'declined');
- const f=offerFeatures(Date.now()-TRANSFER_OFFER_DURATION_MS-1000);setup(f);
+test('API keeping the player resets his milestones once for the whole world, an unanswered offer lapses without any',async()=>{
+ const withMilestones=(f:GameFeatures)=>{const id=f.transferSaga.pendingOffer!.playerId!;f.career.players[id]={...emptyPlayerStats(),appearances:30,goals:12,minutes:2400};return {f:normalizeGameFeatures(JSON.parse(JSON.stringify(f))),id};};
+ const {f,id}=withMilestones(offerFeatures());assert.ok(f.transferSaga.pendingOffer!.fee>0);
+ const lost=getCareerCard(f.career,getStarXIPlayer(id)!).bonus;assert.ok(lost>0||hasPotential(getStarXIPlayer(id)!));
+ setup(f);
+ // Two seats answer at the same time: exactly one answer counts.
+ const [a,b]=await Promise.all([action('transfer-decline',{},'guest-player-123'),action('transfer-decline',{},'host-player-123')]);
+ assert.deepEqual([a.status,b.status].sort(),[200,409]);
+ const saved=JSON.parse(row.sharedFeaturesJson) as GameFeatures;
+ assert.equal(saved.transferSaga.unhappy.length,0,'no temporary penalty any more');
+ assert.equal(saved.transferSaga.latestEvent?.outcome,'declined');
+ assert.equal(saved.transferSaga.archive.filter(e=>e.outcome==='declined').length,1,'answered once');
+ assert.ok(saved.starXI.ownedIds.includes(id));
+ if(!hasPotential(getStarXIPlayer(id)!)){assert.equal(saved.career.milestoneCards[id],undefined);assert.equal(getCareerCard(normalizeGameFeatures(saved).career,getStarXIPlayer(id)!).bonus,0,'the reset survives the world normalisation');}
+ const late=await action('transfer-accept');assert.equal(late.status,409,'nothing left to sell');
+ const expiring=withMilestones(offerFeatures(Date.now()-TRANSFER_OFFER_DURATION_MS-1000));setup(expiring.f);
  const expired=await action('transfer-insider-event');assert.equal(expired.status,200);
- assert.equal(expired.data.room.game.features.transferSaga.pendingOffer,null);
- assert.equal(expired.data.room.game.features.transferSaga.latestEvent?.headline,'Angebot verfallen');
+ const lapsed=expired.data.room.game.features;
+ assert.equal(lapsed.transferSaga.pendingOffer,null);
+ assert.equal(lapsed.transferSaga.latestEvent?.headline,'Angebot verfallen');
+ assert.equal(lapsed.transferSaga.unhappy.length,0);
+ assert.deepEqual(lapsed.career.milestoneCards[expiring.id],expiring.f.career.milestoneCards[expiring.id],'no reset when nobody answered');
  setup(offerFeatures());const open=await action('transfer-insider-event');
  assert.ok(open.data.room.game.features.transferSaga.pendingOffer,'an open offer stays open');
 });
