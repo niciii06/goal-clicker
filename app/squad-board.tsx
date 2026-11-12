@@ -196,6 +196,7 @@ export function SquadPitchSlot({ features, drag, index, position, x, y, player, 
     <span className="starxi-slot-position">{position}</span><strong>{player?.name ?? 'Offener Platz'}</strong>
     <small>{sentOff ? 'ROTE KARTE · NÄCHSTE PARTIE GESPERRT' : banLabel ? banLabel : injured ? `VERLETZT · FEHLT NOCH ${features.cup.injuredPlayerIds[player?.id ?? '']} SPIELE` : player ? `OVR ${squadCardRating(features, player)} · ${formatStarXIPositions(player)}${detail ? ` · ${detail}` : ''}` : `Nur ${position}`}</small>
     {player && <CareerPlayerBadge features={features} player={player} compact />}{matchRatingBadge(liveRating)}
+    {player && features.starXI.pinnedPlayerIds?.includes(player.id) && <em className="starxi-pin-chip">FIXIERT</em>}
   </button>;
 }
 

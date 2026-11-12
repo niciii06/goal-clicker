@@ -179,3 +179,15 @@ test('co-op: Home keeps only a slim room strip; the world management moved to Cl
   assert.match(page, /featureTab === "club" && <div className="feature-panel">\{coopWorldPanel\}/);
   assert.match(css, /\.coop-inline-room-bar\.compact \{ padding: 8px 14px;/);
 });
+
+test('star-pin pins a starter for the whole world, a second request unpins it, and strangers are refused', async () => {
+  const start = squad();
+  setup(start);
+  const card = start.starXI.ownedIds[0];
+  assert.equal((await post('star-pin', { actionId: 'p-1', starPlayerId: card })).status, 200);
+  assert.deepEqual(features().starXI.pinnedPlayerIds, [card]);
+  assert.equal((await post('star-pin', { actionId: 'p-2', starPlayerId: 'not-a-card' })).status, 409);
+  assert.deepEqual(features().starXI.pinnedPlayerIds, [card], 'a refused request changes nothing');
+  assert.equal((await post('star-pin', { actionId: 'p-3', starPlayerId: card }, GUEST)).status, 200);
+  assert.equal(features().starXI.pinnedPlayerIds, undefined);
+});

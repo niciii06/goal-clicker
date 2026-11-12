@@ -1428,7 +1428,25 @@ export function normalizeStarXIState(value: unknown, blockedPlayerIds: readonly 
   const formationPositions = formation.slots.map((slot) => slot.position);
   const lineupIds = normalizeLineupSlots(ownedIds, source.lineupIds, formationPositions, blockedIds);
   const benchIds = normalizeBenchSlots(ownedIds, lineupIds, source.benchIds, blockedIds);
-  return { ownedIds, lockedPlayerIds, fragments, lineupIds, benchIds, formationId: formation.id, formationPositions };
+  // Pins only count for cards the club still owns (a sold or discarded card loses its pin).
+  const pinned = Array.isArray(source.pinnedPlayerIds) ? uniqueKnownStarIds(source.pinnedPlayerIds).filter((id) => ownedIds.includes(id)).slice(0, STAR_XI_SQUAD_SIZE) : [];
+  return { ownedIds, lockedPlayerIds, ...(pinned.length ? { pinnedPlayerIds: pinned } : {}), fragments, lineupIds, benchIds, formationId: formation.id, formationPositions };
+}
+
+/** At most one pin per starting place. */
+export const MAX_PINNED_STARTERS = STAR_XI_SQUAD_SIZE;
+/** Pins or unpins a card of the club for "Beste Startelf". "not-owned" for a card the club does not have, "limit" when 11 are pinned. */
+export function togglePinnedStarter(features: GameFeatures, playerId: string): "pinned" | "unpinned" | "not-owned" | "limit" {
+  if (!features.starXI.ownedIds.includes(playerId)) return "not-owned";
+  const current = features.starXI.pinnedPlayerIds ?? [];
+  if (current.includes(playerId)) {
+    const next = current.filter((id) => id !== playerId);
+    if (next.length) features.starXI.pinnedPlayerIds = next; else delete features.starXI.pinnedPlayerIds;
+    return "unpinned";
+  }
+  if (current.length >= MAX_PINNED_STARTERS) return "limit";
+  features.starXI.pinnedPlayerIds = [...current, playerId];
+  return "pinned";
 }
 
 export function removeStarXIPlayersFromSquad(state: StarXIState, playerIds: readonly string[], removeFromLineup = true) {
@@ -1546,7 +1564,9 @@ export function getBestStarXISelection(ownedIds: string[], formationPositions: r
   const players = [...new Set(ownedIds)]
     .map((id) => getStarXIPlayer(id))
     .filter((player): player is StarXIPlayer => player !== undefined && !blocked.has(player.id));
-  const ratings = new Map(players.map(player => [player.id, getStarXISelectionRating(player, context)]));
+  // A pinned card counts 1000 more, so the best eleven is built around it whenever it can play a free place.
+  const pinnedIds = new Set(context.pinnedIds ?? []);
+  const ratings = new Map(players.map(player => [player.id, getStarXISelectionRating(player, context) + (pinnedIds.has(player.id) ? 1000 : 0)]));
   const rating = (player: StarXIPlayer) => ratings.get(player.id)!;
   const compare = (a: StarXIPlayer, b: StarXIPlayer) => rating(b) - rating(a) || a.id.localeCompare(b.id);
   const candidateIds = new Set<string>();
@@ -1623,9 +1643,11 @@ export function setBestStarXI(state: StarXIState, blockedPlayerIds: readonly str
   if (context.cup?.active) return state;
   blockedPlayerIds = [...blockedPlayerIds,...(state.lockedPlayerIds?state.ownedIds.filter(id=>!state.lockedPlayerIds!.includes(id)):[])];
   const next = removeStarXIPlayersFromSquad(normalizeStarXIState(state), blockedPlayerIds);
-  const lineupIds = getBestStarXISelection(next.ownedIds, next.formationPositions, blockedPlayerIds, context);
-  const currentScore = next.lineupIds.reduce((sum, id) => sum + (getStarXIPlayer(id) ? getStarXISelectionRating(getStarXIPlayer(id)!, context) : 0), 0);
-  const selectedScore = lineupIds.reduce((sum, id) => sum + (getStarXIPlayer(id) ? getStarXISelectionRating(getStarXIPlayer(id)!, context) : 0), 0);
+  const pinnedIds = next.pinnedPlayerIds ?? [];
+  const lineupIds = getBestStarXISelection(next.ownedIds, next.formationPositions, blockedPlayerIds, { ...context, pinnedIds });
+  const scoreOf = (id: string) => getStarXIPlayer(id) ? getStarXISelectionRating(getStarXIPlayer(id)!, context) + (pinnedIds.includes(id) ? 1000 : 0) : 0;
+  const currentScore = next.lineupIds.reduce((sum, id) => sum + scoreOf(id), 0);
+  const selectedScore = lineupIds.reduce((sum, id) => sum + scoreOf(id), 0);
   if (next.lineupIds.filter(Boolean).length === lineupIds.filter(Boolean).length && Math.abs(currentScore - selectedScore) < 1e-9) lineupIds.splice(0, lineupIds.length, ...next.lineupIds);
   const benchIds = getBestStarXIBenchSelection(next.ownedIds, lineupIds, next.formationPositions, blockedPlayerIds, context);
   return { ...next, lineupIds, benchIds };

@@ -213,6 +213,8 @@ export type StarFormationDefinition = {
 
 export type StarXIState = {
   lockedPlayerIds?: string[];
+  /** Cards the player pinned to the starting eleven: "Beste Startelf" keeps every eligible one in it (absent: none). */
+  pinnedPlayerIds?: string[];
   ownedIds: string[];
   fragments: number;
   lineupIds: string[];
@@ -429,7 +431,7 @@ export type YBPlayerSeed = readonly [sourceId: string, name: string, rating: num
 // Names stay deliberately altered, as requested for the rest of the game.
 export type IconSeed = readonly [id: string, name: string, rating: number, countryCode: string, positions: readonly StarPosition[]];
 
-export type StarXIEvaluationContext = { career?: CareerState; cup?: CupState; minute?: number };
+export type StarXIEvaluationContext = { career?: CareerState; cup?: CupState; minute?: number; /** Pinned starters: the best eleven is built around them. */ pinnedIds?: readonly string[] };
 
 export type CupSubstitutionImpact = {
   cup: CupState;

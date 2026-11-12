@@ -577,6 +577,12 @@
 .starxi-formation-picker select:disabled { cursor: not-allowed; opacity: .55; }
 .starxi-best-button { min-height: 36px; padding: 7px 11px; border: 1px solid rgba(22,132,91,.26); border-radius: 10px; color: color-mix(in oklab, #12683f, var(--text) var(--tone-mix)); cursor: pointer; background: color-mix(in srgb, #22c35c 10%, var(--surface-raised)); font: inherit; font-size: var(--text-footnote); font-weight: 900; white-space: nowrap; transition: 160ms ease; }
 .starxi-best-button:hover:not(:disabled) { color: #fff; background: #16845b; transform: translateY(-1px); }
+.starxi-pin-button { min-height: 44px; padding: 7px 14px; border: 1px solid var(--line); border-radius: 10px; color: var(--text); cursor: pointer; background: var(--surface-raised); font-size: var(--text-footnote); font-weight: 750; }
+.starxi-pin-button:hover:not(:disabled) { border-color: var(--accent); }
+.starxi-pin-button.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.starxi-pin-button:disabled { cursor: not-allowed; opacity: .55; }
+.starxi-pin-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.starxi-pin-chip { display: inline-block; margin-top: 3px; padding: 1px 6px; border-radius: 980px; color: var(--on-accent); background: var(--accent); font-size: var(--text-caption2); font-style: normal; font-weight: 800; letter-spacing: .06em; }
 .starxi-best-button:disabled, .starxi-best-button[aria-disabled="true"] { border-color: var(--line); color: var(--muted); cursor: not-allowed; background: var(--surface-soft); }
 .starxi-pitch { position: relative; min-height: 445px; margin-top: 10px; overflow: hidden; border: 5px solid rgba(255,255,255,.72); border-radius: 19px; background: linear-gradient(145deg, #176a4e, #0f513b 55%, #0a422f); box-shadow: inset 0 0 0 1px rgba(8,49,36,.45), 0 10px 24px rgba(14,68,50,.16); }
 .starxi-pitch::before, .starxi-pitch::after { position: absolute; content: ""; pointer-events: none; }
