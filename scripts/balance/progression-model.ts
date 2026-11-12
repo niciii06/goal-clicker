@@ -46,7 +46,7 @@ export function simulateCareer({ clicksPerSecond = 0, seed = 1, maxHours = 30 }:
   const cards = [WELCOME_RATING, ...Array.from({ length: 10 }, () => 55 + Math.floor(random() * 5))];
   const firstFullElevenMinutes = 1;
   const leagues: LeagueProgress[] = [];
-  let goals = 60, second = 0, league = LEAGUE_COUNT, stamps = 0, dailyIndex = 0, lastPackAt = 0;
+  let goals = 60, second = 0, league = LEAGUE_COUNT, dailyIndex = 0, lastPackAt = 0;
   let nextVar = 60 + random() * 120, nextEvent = 60 + random() * 120, nextDaily = 0;
   let current: LeagueProgress = { league, minutes: 0, packWaits: [], packs: 0, squadRating: 0 };
   let income = getIncomePerSecond(levels, clicksPerSecond);

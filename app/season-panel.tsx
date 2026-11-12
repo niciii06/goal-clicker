@@ -1,6 +1,6 @@
 "use client";
 
-import { getSeasonModeDivisionLabel, getSeasonSchedule, getTournamentRewardPack, SEASON_MODE_DIVISION_COUNT, SEASON_MODE_MATCHES_PER_SEASON, sortSeasonTable } from "./feature-data";
+import { getSeasonModeDivisionLabel, getSeasonSchedule, SEASON_MODE_DIVISION_COUNT, SEASON_MODE_MATCHES_PER_SEASON, sortSeasonTable } from "./feature-data";
 import type { GameFeatures, SeasonResult, SeasonScheduleMatch, SeasonTableRow } from "./feature-data";
 import { getStarXIPlayer } from "./feature-data";
 import { formGuide, promotionOutlook, seasonTopScorers } from "./qol/season-insights";
