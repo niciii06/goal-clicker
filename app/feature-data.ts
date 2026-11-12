@@ -95,7 +95,7 @@ export type GameFeatures = {
   schemaVersion: number;
   /** The one time starter squad after the first STARTER_SQUAD_UNLOCK_CLICKS clicks was handed out (once per club or world). */
   starterSquadGranted: boolean;
-  /** Finished league matches towards the next match stamp pack (0 to MATCH_PACK_STAMP_TARGET - 1). */
+  /** Retired: finished league matches no longer earn a pack (the stamp rule was abolished). Kept only so older saves load unchanged; never read or increased. */
   matchStamps: number;
   earnedPacks: EarnedPack[];
   completedTournamentRuns: string[];
@@ -678,19 +678,6 @@ export const MIN_DRAWABLE_RATING = SCRAP_PACK_MIN_RATING;
 const REWARD_BRACKETS = [[MIN_DRAWABLE_RATING,64],[65,70],[71,79],[80,85],[86,89],[90,99]] as const;
 const REWARD_PERCENTAGES = [[60,30,9,1,0,0],[25,45,25,4.5,.5,0],[5,20,55,18,1.9,.1],[0,5,40,48,6.5,.5],[0,0,20,55,23,2],[0,0,5,50,40,5]] as const;
 export const REWARD_PACKS:readonly StarPackDefinition[] = ['Kleines Prämienpack','Basis-Prämienpack','Solides Prämienpack','Hochwertiges Prämienpack','Premium-Prämienpack','Top-Prämienpack'].map((label,i)=>({id:`reward-${i+1}` as RewardPackId,label,price:0,description:'Eine originale Basiskarte als Turnierprämie. Doppelte Karten geben Fragmente.',odds:REWARD_BRACKETS.map(([minRating,maxRating],b)=>tierBand(minRating,maxRating,REWARD_PERCENTAGES[i][b]/100))}));
-/** Every MATCH_PACK_STAMP_TARGET finished league matches, won or lost, earn a reward pack for the best league reached. */
-export const MATCH_PACK_STAMP_TARGET = 4;
-export function awardMatchStamp(features:GameFeatures, now=Date.now()) {
-  const stamps=clamp(Math.floor(Number(features.matchStamps)||0),0,MATCH_PACK_STAMP_TARGET-1)+1;
-  if(stamps<MATCH_PACK_STAMP_TARGET){features.matchStamps=stamps;return null;}
-  features.matchStamps=0;
-  const pack=getTournamentRewardPack('cup',features.seasonMode.highestDivision);
-  const earned:EarnedPack={id:`stamp-${now}`,packId:pack.id as RewardPackId,earnedAt:now};
-  if(!features.earnedPacks.some(p=>p.id===earned.id))features.earnedPacks.push(earned);
-  addHistory(features,{title:`Matchstempel voll: ${pack.label}`,detail:`${MATCH_PACK_STAMP_TARGET} Ligaspiele gespielt. Das Pack liegt unter Packs & Album bereit.`,tone:'positive'},now);
-  return earned;
-}
-
 /** Highest reward tier (index into REWARD_PACKS) per tournament: the easy Stadionpokal cannot farm the top pack. */
 export const TOURNAMENT_REWARD_TIER_CAP: Record<TournamentId, number> = { stadium:1, champions:3, world:5 };
 /**
@@ -3174,7 +3161,7 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     schemaVersion: GAME_FEATURES_SCHEMA_VERSION,
     // Clubs that already field eleven never need the starter squad.
     starterSquadGranted: source.starterSquadGranted === true || getStarXISelection(normalizedStarXI.ownedIds, normalizedStarXI.lineupIds).length >= STAR_XI_SQUAD_SIZE,
-    matchStamps: clamp(Math.floor(Number(source.matchStamps) || 0), 0, MATCH_PACK_STAMP_TARGET - 1),
+    matchStamps: clamp(Math.floor(Number(source.matchStamps) || 0), 0, 3),
     ...normalizeSaveReceipts(source),
     travel: normalizeTravel(source.travel),
     miniGameRuns: Object.fromEntries(Object.entries(asRecord(source.miniGameRuns)).filter(([key, startedAt]) => /^[a-z]+:[a-z0-9]+$/.test(key) && Number.isFinite(Number(startedAt))).slice(0, 16).map(([key, startedAt]) => [key, Number(startedAt)])),

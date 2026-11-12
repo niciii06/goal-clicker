@@ -7,7 +7,7 @@ import { MINI_GAME_BASE_MAX_REWARD, MINI_GAME_MAX_REWARD_SECONDS, getBulkPurchas
 import { ALBUM_MILESTONES, ALBUM_REWARD_SECONDS, claimAlbumReward, claimAlbumRewards, claimAllAlbumRewards, getAlbumGoalReward, getAlbumGroups } from "../app/career-data.ts";
 import { DAILY_REWARD_DAYS, WORLD_DAILY_KEY, claimDailyReward, getDailyRewardStatus, getPreviousRewardDay, getRewardDay, mergeDailyRewardsForWorld } from "../app/daily-reward.ts";
 import type { RewardPackId, StarXIPlayer } from "../app/feature-data.ts";
-import { MATCH_PACK_STAMP_TARGET, beginSeasonCupMatch, getStarXISelection, pauseGameFeatureTimers, setBestStarXI, MIN_DRAWABLE_RATING, REWARD_PACKS, cardPackRating, getRewardPackOdds, resolveRandomEvent, resolveVarEvent, SCRAP_PACK_PLAYERS, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STARTER_SQUAD_UNLOCK_CLICKS, awardMatchStamp, canStarXIPlayerFillSlot, getSeasonOpponentRating, getStarXIPlayer, grantWelcomePack, initialGameFeatures, maybeGrantStarterSquad, normalizeGameFeatures, openEarnedPack, openEarnedPackDraw, openStarPack } from "../app/feature-data.ts";
+import { beginSeasonCupMatch, getStarXISelection, pauseGameFeatureTimers, setBestStarXI, MIN_DRAWABLE_RATING, REWARD_PACKS, cardPackRating, getRewardPackOdds, resolveRandomEvent, resolveVarEvent, SCRAP_PACK_PLAYERS, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, STARTER_SQUAD_UNLOCK_CLICKS, canStarXIPlayerFillSlot, getSeasonOpponentRating, getStarXIPlayer, grantWelcomePack, initialGameFeatures, maybeGrantStarterSquad, normalizeGameFeatures, openEarnedPack, openEarnedPackDraw, openStarPack } from "../app/feature-data.ts";
 import { prepareCareerMatch, recordCareerMatch } from "../app/career-data.ts";
 import { DEFAULT_FAN_MOOD, FAN_MOOD_RESULT_CHANGE, applyMatchResultToFanMood } from "../app/press-conference.ts";
 import { expectedHomeCrowd } from "../app/ticket-income.ts";
@@ -231,20 +231,20 @@ test("the starter squad reports a complete eleven only when eleven players stand
   assert.equal(result.complete, false);
 });
 
-test("every fourth league match earns a reward pack for the best league reached", () => {
-  const features = initialGameFeatures();
-  features.seasonMode.highestDivision = 9;
-  for (let match = 1; match < MATCH_PACK_STAMP_TARGET; match++) {
-    assert.equal(awardMatchStamp(features, 1000 + match), null);
-    assert.equal(features.matchStamps, match);
+test("league matches no longer earn reward packs: no stamp rule, old counters and packs load unchanged", async () => {
+  const { readFileSync } = await import("node:fs");
+  const featureSource = readFileSync(new URL("../app/feature-data.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(featureSource, /awardMatchStamp|MATCH_PACK_STAMP_TARGET/);
+  for (const file of ["../app/page.tsx", "../app/api/multiplayer/route.ts", "../app/season-panel.tsx"]) {
+    assert.doesNotMatch(readFileSync(new URL(file, import.meta.url), "utf8"), /awardMatchStamp|MATCH_PACK_STAMP_TARGET|Matchstempel/, file);
   }
-  const earned = awardMatchStamp(features, 2000)!;
-  assert.equal(earned.packId, "reward-3");
-  assert.equal(features.matchStamps, 0);
-  assert.deepEqual(features.earnedPacks.map((pack) => pack.id), ["stamp-2000"]);
-  assert.match(features.history.at(-1)!.title, /^Matchstempel voll/);
-  features.matchStamps = 2;
-  assert.equal(normalizeGameFeatures(JSON.parse(JSON.stringify(features))).matchStamps, 2);
+  // A save from before the change: a stamp counter and an unopened stamp pack stay as they are, nothing is added.
+  const features = initialGameFeatures();
+  features.matchStamps = 3;
+  features.earnedPacks = [{ id: "stamp-2000", packId: "reward-3", earnedAt: 2000 }];
+  const loaded = normalizeGameFeatures(JSON.parse(JSON.stringify(features)));
+  assert.equal(loaded.matchStamps, 3);
+  assert.deepEqual(loaded.earnedPacks.map((pack) => pack.id), ["stamp-2000"]);
 });
 
 test("day seven brings a special card pack: no 100 below Liga 3, the normal chance from Liga 3 on", () => {

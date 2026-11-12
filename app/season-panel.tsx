@@ -1,6 +1,6 @@
 "use client";
 
-import { getSeasonModeDivisionLabel, getSeasonSchedule, getTournamentRewardPack, MATCH_PACK_STAMP_TARGET, SEASON_MODE_DIVISION_COUNT, SEASON_MODE_MATCHES_PER_SEASON, sortSeasonTable } from "./feature-data";
+import { getSeasonModeDivisionLabel, getSeasonSchedule, getTournamentRewardPack, SEASON_MODE_DIVISION_COUNT, SEASON_MODE_MATCHES_PER_SEASON, sortSeasonTable } from "./feature-data";
 import type { GameFeatures, SeasonResult, SeasonScheduleMatch, SeasonTableRow } from "./feature-data";
 import { getStarXIPlayer } from "./feature-data";
 import { formGuide, promotionOutlook, seasonTopScorers } from "./qol/season-insights";
@@ -42,7 +42,6 @@ export function SeasonPanel({ features, action }: { features: GameFeatures; /** 
   const showLastSeason = season.matchday === 0 && season.lastMatchAt > 0 && season.lastTable.some((team) => team.played > 0) && !season.hallOfFame;
   return <div className="feature-panel season-hub">
     <div className="feature-panel-heading"><div><p className="eyebrow">SAISON {seasonLabel} / {getSeasonModeDivisionLabel(season.division).toUpperCase()}</p><h3>{season.hallOfFame ? "Hall of Fame erreicht." : `Spieltag ${season.matchday + 1} von ${SEASON_MODE_MATCHES_PER_SEASON}`}</h3></div></div>
-    {!season.hallOfFame && <p className="season-hub-stamps" aria-label="Matchstempel">Matchstempel {features.matchStamps} / {MATCH_PACK_STAMP_TARGET} · beim {MATCH_PACK_STAMP_TARGET}. Ligaspiel gibt es ein {getTournamentRewardPack("cup", season.highestDivision).label}</p>}
     {action && <div className="season-hub-action"><button type="button" className="mode-primary" disabled={action.disabled} onClick={action.onClick}>{action.label}</button>{action.note && <small>{action.note}</small>}</div>}
     {!season.hallOfFame && season.table.some((team) => team.played > 0) && <p className="season-hub-outlook" role="status">{promotionOutlook(season.table, season.results ?? [], season.division)}</p>}
     <StandingsTable table={season.table} results={season.results ?? []} division={season.division} caption="Tabelle" />

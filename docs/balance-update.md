@@ -200,7 +200,7 @@ Ballon-d'Or-Angreifer ab Liga 9: Stufe 1 14,9 min, Stufe 8 142 min. Weltklasse-A
 ### Belohnungen
 
 * **Turnierprämien gedeckelt:** Stadionpokal höchstens Basis-Prämienpack (Stufe 2), Champions Cup höchstens Hochwertiges Prämienpack (Stufe 4), WM bis Top-Prämienpack.
-* **Matchstempel:** Jedes beendete Ligaspiel, auch eine Niederlage, gibt einen Stempel. Beim vierten gibt es ein Prämienpack nach bester Liga. Anzeige im Saisonpanel.
+* **Matchstempel (abgeschafft am 12. November 2026):** Früher gab jedes beendete Ligaspiel einen Stempel, beim vierten ein Prämienpack. Ligaspiele geben keine Packs mehr. Turniersiege geben weiterhin ihr Prämienpack, schon verdiente Packs bleiben öffnbar, ein alter Zähler `matchStamps` im Spielstand wird nur noch gelesen.
 * **Albumziele:** 10, 25 und 50 verschiedene Karten geben einmalig 100, 250 und 500 Fragmente.
 * **Tagesprämie:** Tag 7 gibt ein Gratis Spezialkarten-Pack statt des Basis-Prämienpacks. Unter Liga 3 kommen daraus keine 100er, ab Liga 3 gilt die normale Chance von 8%. Im Koop gibt es die ganze Tagesprämie (Tore und Pack) nur einmal pro Welt und Tag, alle sehen denselben Fortschritt. Alte Welten mit einem Eintrag pro Sitz werden beim Laden zusammengeführt: Hat irgendein Sitz heute abgeholt, gilt die Welt heute als abgeholt; die Serie ist die längste, die noch läuft. Parallele Abholungen schützt das Speichern mit `UPDATE … WHERE shared_state_version = …` (`db.updateRoom`); `tests/rewards-api.test.ts` lässt vier Spieler gleichzeitig abholen und prüft den gespeicherten Kontostand und die gespeicherten Packs.
 * **Liga 1:** Gegner 96, 90, 91, 94, 92 statt 98, 92, 91, 96, 94.

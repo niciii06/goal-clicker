@@ -4,7 +4,7 @@
 import { UPGRADES } from "../../app/game/upgrades";
 import { getBasePassivePower, getCostAtLevel } from "../../app/game/economy";
 import { getPackUnlockLeague, getTournamentUnlockLeague, getUpgradeUnlockLeague, LEAGUE_COUNT } from "../../app/season-progression";
-import { MATCH_PACK_STAMP_TARGET, STAR_PACKS, getSeasonOpponentRating, getTournamentRewardPack, openEarnedPackDraw, resolveRandomEvent, resolveVarEvent } from "../../app/feature-data";
+import { STAR_PACKS, getSeasonOpponentRating, getTournamentRewardPack, openEarnedPackDraw, resolveRandomEvent, resolveVarEvent } from "../../app/feature-data";
 import type { StarPackDefinition, TournamentId } from "../../app/feature-data";
 import { DAILY_REWARD_DAYS, getDailyRewardAmount } from "../../app/daily-reward";
 import { getIncomePerSecond, seededRandom } from "./economy-model";
@@ -102,8 +102,6 @@ export function simulateCareer({ clicksPerSecond = 0, seed = 1, maxHours = 30 }:
       run(TRAVEL_SECONDS + MATCH_SECONDS, false);
       goals += PRESS_SECONDS * income;
       if (match % 2 === 0) goals += homeAttendance(league) * 0.004 * income;
-      stamps += 1;
-      if (stamps >= MATCH_PACK_STAMP_TARGET) { stamps = 0; addCard(drawRating(getTournamentRewardPack("cup", tierOf(league)), random)); }
     }
     // One tournament reward per season, from the best tournament the club may enter.
     const tournament = (["world", "champions", "stadium"] as TournamentId[]).find((id) => getTournamentUnlockLeague(id) >= league)!;
