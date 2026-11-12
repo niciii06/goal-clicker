@@ -2022,6 +2022,8 @@ const STARTER_SQUAD_MAX_RATING = 59;
 export function grantStarterSquad(features: GameFeatures, random: () => number = Math.random) {
   const starXI = normalizeStarXIState(features.starXI);
   const added: StarXIPlayer[] = [];
+  // A brand new club in the tutorial builds its first starting eleven itself: the cards come into the squad, the places stay open.
+  const placeInLineup = !welcomePackOpen(features);
   starXI.lineupIds.forEach((id, index) => {
     if (id) return;
     const fits = (player: StarXIPlayer) => !starXI.ownedIds.includes(player.id) && canStarXIPlayerFillSlot(player.id, index, starXI.formationPositions);
@@ -2030,7 +2032,7 @@ export function grantStarterSquad(features: GameFeatures, random: () => number =
     if (!pool.length) return;
     const player = pool[Math.min(pool.length - 1, Math.floor(clamp(Number(random()) || 0, 0, 0.999999) * pool.length))];
     starXI.ownedIds = [...starXI.ownedIds, player.id];
-    starXI.lineupIds[index] = player.id;
+    if (placeInLineup) starXI.lineupIds[index] = player.id;
     added.push(player);
   });
   features.starXI = starXI;

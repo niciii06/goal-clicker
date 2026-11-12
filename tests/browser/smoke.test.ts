@@ -371,10 +371,11 @@ test('a new player gets the welcome window first (no walkout), then guided tasks
     await ball.scrollIntoViewIfNeeded();
     for (let i = 0; i < 50; i++) await ball.click({ delay: 5 });
     await page.waitForFunction(() => /SCHRITT 2 \/ 5/.test(document.querySelector('.tutorial-coach')?.textContent ?? ''), undefined, { timeout: 10000 });
-    // The shop shows no welcome pack before its step.
-    await openTab(page, 'Packs & Album');
+    // The guided path: only the tab of the step is open, the shop (and its welcome pack) and the co-op mode wait for later.
+    for (const locked of ['Spiele', 'Saison', 'Kader', 'Karriere', 'Packs & Album', 'Club & Mehr']) assert.equal(await page.getByRole('button', { name: locked, exact: true }).first().isDisabled(), true, `${viewport.name}: ${locked} is locked at step 2`);
+    assert.equal(await page.getByRole('button', { name: 'Home', exact: true }).first().isDisabled(), false);
+    assert.equal(await page.getByRole('button', { name: /^Koop Multiplayer/ }).isDisabled(), true, `${viewport.name}: co-op mode waits for the end`);
     assert.equal(await page.getByRole('button', { name: 'Willkommenspack öffnen' }).count(), 0, `${viewport.name}: invisible before its step`);
-    await openTab(page, 'Home');
     // The progress survives a reload.
     await page.waitForTimeout(2500);
     await page.reload({ waitUntil: 'networkidle' });
@@ -392,7 +393,10 @@ test('a new player gets the welcome window first (no walkout), then guided tasks
     assert.equal(await coach.count(), 0);
     assert.equal(JSON.parse((await page.evaluate((key) => localStorage.getItem(key), TUTORIAL_STORAGE_KEY))!).status, 'done');
     await page.waitForTimeout(2500);
-    assert.equal(JSON.parse((await page.evaluate((key) => localStorage.getItem(key), SAVE_KEY))!).features.welcomePack, 'forfeited');
+    const endedSave = JSON.parse((await page.evaluate((key) => localStorage.getItem(key), SAVE_KEY))!);
+    assert.equal(endedSave.features.welcomePack, 'forfeited');
+    assert.equal(endedSave.features.starXI.lineupIds.filter(Boolean).length, 11, `${viewport.name}: ending the tutorial early still leaves a full starting eleven`);
+    assert.equal(await page.getByRole('button', { name: 'Kader', exact: true }).first().isDisabled(), false, `${viewport.name}: the lock is gone`);
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForTimeout(1200);
     assert.equal(await page.getByRole('region', { name: 'Tutorial' }).count(), 0, `${viewport.name}: ended stays ended`);
@@ -414,7 +418,7 @@ test('the welcome pack opens once from the shop at its tutorial step: one walkou
   const features = richFeatures(now);
   features.welcomePack = 'available';
   const { page, problems } = await openWithSave(VIEWPORTS[0], save(features, now));
-  await page.evaluate(([key, value]) => localStorage.setItem(key, value), [TUTORIAL_STORAGE_KEY, JSON.stringify({ status: 'active', done: ['clicks', 'upgrade', 'squad'], visited: ['squad'] })] as [string, string]);
+  await page.evaluate(([key, value]) => localStorage.setItem(key, value), [TUTORIAL_STORAGE_KEY, JSON.stringify({ status: 'active', done: ['clicks', 'upgrade', 'lineup'], visited: ['squad'] })] as [string, string]);
   await page.reload({ waitUntil: 'networkidle' });
   const coach = page.getByRole('region', { name: 'Tutorial' });
   await coach.waitFor();
@@ -429,11 +433,53 @@ test('the welcome pack opens once from the shop at its tutorial step: one walkou
   await page.waitForFunction(() => /SCHRITT 5 \/ 5/.test(document.querySelector('.tutorial-coach')?.textContent ?? ''), undefined, { timeout: 10000 });
   assert.equal(await page.getByRole('article', { name: 'Willkommenspack' }).count(), 0, 'given once');
   await page.waitForTimeout(2500);
+  assert.equal(JSON.parse((await page.evaluate((key) => localStorage.getItem(key), SAVE_KEY))!).features.welcomePack, 'claimed');
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(1200);
-  await openTab(page, 'Packs & Album');
-  assert.equal(await page.getByRole('article', { name: 'Willkommenspack' }).count(), 0, 'not again after a reload');
+  assert.equal(await page.getByRole('button', { name: 'Packs & Album', exact: true }).first().isDisabled(), true, 'the shop closes with its step, the pack is not offered again');
   assert.match(await page.getByRole('region', { name: 'Tutorial' }).innerText(), /SCHRITT 5 \/ 5/);
+  assert.deepEqual(problems, []);
+  await page.close();
+});
+
+test('the first starting eleven is built by the player through the real lineup actions; the guide follows the steps', async () => {
+  const page = await browser.newPage({ viewport: VIEWPORTS[0] });
+  await page.addInitScript('globalThis.__name = (fn) => fn;');
+  const problems: string[] = [];
+  page.on('pageerror', (error) => problems.push(`page error: ${error.message}`));
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  for (let i = 0; i < TUTORIAL_INTRO_PAGES.length - 1; i++) await page.getByRole('dialog').getByRole('button', { name: 'Weiter' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: "Los geht's" }).click();
+  const coach = page.getByRole('region', { name: 'Tutorial' });
+  const ball = page.getByRole('button', { name: 'Fussball anklicken' });
+  for (let i = 0; i < 50; i++) await ball.click({ delay: 5 });
+  await page.waitForFunction(() => /SCHRITT 2 \/ 5/.test(document.querySelector('.tutorial-coach')?.textContent ?? ''), undefined, { timeout: 10000 });
+  // Step 2 asks for an upgrade; the guide moves on to the squad by itself afterwards.
+  assert.match(await page.locator('.app-shell').getAttribute('data-tutorial-step') ?? '', /upgrade/);
+  await page.locator('.shop-card').getByRole('button', { name: /Kaufen|kaufen/ }).first().click();
+  await page.waitForFunction(() => /SCHRITT 3 \/ 5/.test(document.querySelector('.tutorial-coach')?.textContent ?? ''), undefined, { timeout: 10000 });
+  assert.match(page.url(), /\/kader$/, 'the guide opens the squad tab');
+  assert.match(await coach.innerText(), /0 \/ 11/, 'no place is filled for the new club');
+  assert.equal(await page.getByRole('button', { name: 'Spiele', exact: true }).first().isDisabled(), true, 'Spiele waits for its step');
+  assert.deepEqual(await layoutProblems(page), []);
+  // Two places by hand: tap a place, then a fitting card.
+  for (let place = 0; place < 2; place++) {
+    await page.locator('[data-squad-area="lineup"]').nth(place).click();
+    await page.locator('.starxi-reserve-list > div').filter({ hasText: /Auf [A-Z]+ einsetzen/ }).first().locator('button').first().click();
+    await page.waitForFunction((count) => new RegExp(`${count} / 11`).test(document.querySelector('.tutorial-coach')?.textContent ?? ''), place + 1, { timeout: 10000 });
+  }
+  assert.match(await coach.innerText(), /2 \/ 11/);
+  assert.match(await coach.innerText(), /SCHRITT 3 \/ 5/, 'two of eleven places do not finish the step');
+  // The rest through the real "Beste Startelf" action (with its preview); the last place completes the step and the guide goes to the shop.
+  await page.getByRole('button', { name: /Beste Startelf/ }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: /^Übernehmen/ }).click();
+  await page.waitForFunction(() => /SCHRITT 4 \/ 5/.test(document.querySelector('.tutorial-coach')?.textContent ?? ''), undefined, { timeout: 15000 });
+  assert.match(page.url(), /\/packs$/, 'the guide opens the shop for the welcome pack');
+  await page.getByRole('article', { name: 'Willkommenspack' }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Kader', exact: true }).first().isDisabled(), true, 'the squad closes again once its step is done');
+  await page.waitForTimeout(2500);
+  const saved = JSON.parse((await page.evaluate((key) => localStorage.getItem(key), SAVE_KEY))!);
+  assert.equal(saved.features.starXI.lineupIds.filter(Boolean).length, 11);
   assert.deepEqual(problems, []);
   await page.close();
 });

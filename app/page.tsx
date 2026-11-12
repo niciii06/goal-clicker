@@ -23,7 +23,7 @@ import { WHATS_NEW } from "./whats-new";
 import { WhatsNewDialog } from "./whats-new-dialog";
 import { TutorialCoach, TutorialIntroDialog } from "./tutorial-panel";
 import { SeasonTrophyCelebration, getSeasonTitle, type SeasonTitle } from "./season-trophy";
-import { advanceTutorial, currentTutorialStep, finishedTutorial, newTutorial, parseTutorialState, serializeTutorialState, type TutorialState, type TutorialStep } from "./tutorial";
+import { advanceTutorial, currentTutorialStep, finishedTutorial, tutorialAllowedTabs, tutorialStepTab, newTutorial, parseTutorialState, serializeTutorialState, type TutorialState, type TutorialStep } from "./tutorial";
 import { TAB_PATHS, tabForPath } from "./tab-routes";
 import type { RoutedTab } from "./tab-routes";
 import { gameAudioContext, playPackReveal } from "./match-audio";
@@ -360,12 +360,16 @@ function App() {
   const draggingSquadPlayer = squadDrag.dragging;
   // Each tab has its own address; the game page stays mounted, only the history entry changes.
   function openFeatureTab(tab: FeatureTab) {
+    // While the tutorial runs only the tabs of the current step open; the rest belongs to a later step.
+    if (tutorialLockRef.current && !tutorialLockRef.current.includes(primarySectionOf(tab) as RoutedTab)) { showToast("Das kommt in einem späteren Tutorialschritt."); return; }
     // A new main section starts at the top with focus on its heading; a sub tab of the same section keeps the place.
     if (tab !== featureTab && primarySectionOf(tab) !== primarySectionOf(featureTab)) tabFocusPendingRef.current = true;
     setFeatureTabState(tab);
     const path = TAB_PATHS[tab];
     if (typeof window !== "undefined" && tabForPath(window.location.pathname) !== tab) window.history.pushState(null, "", `${path}${window.location.search}${window.location.hash}`);
   }
+  // The tabs the tutorial step allows right now (null: no tutorial lock). A ref, so every way of opening a tab sees the same state.
+  const tutorialLockRef = useRef<readonly RoutedTab[] | null>(null);
   const tabFocusPendingRef = useRef(false);
   useEffect(() => {
     if (!tabFocusPendingRef.current) return;
@@ -2803,7 +2807,7 @@ function App() {
     starterSquadRequestedRef.current = true;
     const announce = (added: number, complete: boolean) => {
       if (!added) return;
-      addFeed(`Starterkader: ${added} Spieler sind neu in deiner Elf.`, "squad");
+      addFeed(complete ? `Starterkader: ${added} Spieler sind neu in deiner Elf.` : `Starterkader: ${added} Spieler warten in deinem Kader auf ihren Platz.`, "squad");
       showToast(complete ? "Startelf komplett! Starte deine erste Partie." : `${added} Starterspieler sind neu in deinem Kader.`);
     };
     const timer = window.setTimeout(() => {
@@ -3203,6 +3207,13 @@ function App() {
 
   function endTutorial() {
     setTutorial({ ...tutorial, status: "done" });
+    // Ending the tutorial early must not leave a club without a starting eleven: the open places get the best fitting cards.
+    setGame((current) => {
+      if (current.features.starXI.lineupIds.filter(Boolean).length >= STAR_XI_SQUAD_SIZE || current.features.cup.active) return current;
+      const features = normalizeGameFeatures(current.features);
+      features.starXI = setBestStarXI(features.starXI, getBestXIUnavailablePlayerIds(features), { career: features.career, cup: features.cup });
+      return { ...current, features };
+    });
   }
 
   /** "Tutorial beenden" and the skip of the welcome window: with an unopened welcome pack the player is asked first. */
@@ -3464,10 +3475,27 @@ function App() {
       }
     }, 0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, tutorial, game.clicks, game.upgrades, featureTab, tutorialCup.active, tutorialCup.mode, tutorialCup.matchStartedAt, game.features.squadLock, game.features.seasonMode.history.length, game.features.seasonMode.lastMatchAt, game.features.welcomePack]);
+  }, [hydrated, tutorial, game.clicks, game.upgrades, featureTab, tutorialCup.active, tutorialCup.mode, tutorialCup.matchStartedAt, game.features.squadLock, game.features.seasonMode.history.length, game.features.seasonMode.lastMatchAt, game.features.welcomePack, game.features.starXI.lineupIds]);
 
   // The shop step of the tutorial unlocks the welcome pack; before that it neither shows nor opens.
   const tutorialStepId = tutorial.status === "active" ? currentTutorialStep(tutorial)?.id : undefined;
+  // Guided path: only the tabs of the current step, no switch to the co-op mode and no layout editing until the tutorial ends.
+  const tutorialAllowed = hydrated && appMode === "single" ? tutorialAllowedTabs(tutorial) : null;
+  tutorialLockRef.current = tutorialAllowed;
+  const tutorialFocusTab = tutorialStepId ? tutorialStepTab(currentTutorialStep(tutorial)!) : null;
+  // The page follows the guide: a new step brings the player to its tab, and a tab outside the lock (address, back button, shortcut) is corrected.
+  const previousTutorialStepRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!hydrated) return;
+    const step = tutorialStepId ? currentTutorialStep(tutorial) : null;
+    const previous = previousTutorialStepRef.current;
+    previousTutorialStepRef.current = tutorialStepId;
+    if (!step || !tutorialAllowed) return;
+    const wanted = tutorialStepTab(step);
+    const outside = !tutorialAllowed.includes(primarySectionOf(featureTab) as RoutedTab);
+    if (outside || (previous !== undefined && previous !== tutorialStepId && wanted !== primarySectionOf(featureTab))) openFeatureTab(wanted);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, tutorialStepId, featureTab]);
   useEffect(() => {
     if (!hydrated || tutorialStepId !== "packs" || game.features.welcomePack !== "pending") return;
     setGame((current) => {
@@ -3553,7 +3581,7 @@ function App() {
   </section> : null;
 
   return (
-    <div className={`app-shell section-${featureTab}${displayGame.features.cup.active && featureTab === "cup" ? " match-in-progress" : ""}`}>
+    <div className={`app-shell section-${featureTab}${displayGame.features.cup.active && featureTab === "cup" ? " match-in-progress" : ""}`} data-tutorial-step={tutorialAllowed ? tutorialStepId : undefined}>
       <header className="topbar">
         <div className="brand-lockup"><div className="brand-ball"><FootballGraphic /></div><div className="brand-copy"><p className="eyebrow">FOOTBALL IDLE CLUB</p><h1>GOAL <span>CLICKER</span></h1></div></div>
         <div className={`header-goals${goalBoostActive ? " goal-boost-active" : ""}`} role="group" aria-label={`Aktueller Kontostand: ${hasInfiniteMoney ? "unbegrenzt" : formatNumber(displayGame.goals)} Tore${goalBoostActive ? `; ${goalBoostLabel}-facher Goalboost noch ${goalBoostCountdown}` : ""}`}><span>{hasInfiniteMoney ? "AZB TESTMODUS" : "AKTUELLER STAND"}</span><strong>{displayBalance}</strong><small>TORE</small>{goalBoostActive && <em className="header-goal-boost">⚡ {goalBoostLabel}× · {goalBoostCountdown}</em>}{seasonMode.prestigeCount > 0 && <em className="header-prestige" title={prestigeBonusLabel(seasonMode.prestigeCount)}><span className="header-prestige-long">Prestige {seasonMode.prestigeCount} · </span>+{prestigeBonusPercent(seasonMode.prestigeCount)} % Tore</em>}{navBadges.season && <button type="button" className="header-prestige-ready" onClick={() => openFeatureTab("season")}>★ Prestige bereit</button>}</div>
@@ -3590,18 +3618,18 @@ function App() {
       </ConfirmDialog>}
       <nav className="mode-switch" aria-label="Spielmodus">
         <button className={appMode === "single" ? "active" : ""} onClick={() => { if (appMode === "coop") setConfirmSingle(true); }}>Singleplayer</button>
-        <button className={appMode === "coop" ? "active" : ""} onClick={() => guest ? setGuestCoopPrompt(true) : setAppMode("coop")}>Koop Multiplayer{guest ? " 🔒" : ""}</button>
+        <button className={appMode === "coop" ? "active" : ""} disabled={tutorial.status === "active" && appMode === "single"} title={tutorial.status === "active" ? "Nach dem Tutorial" : undefined} onClick={() => guest ? setGuestCoopPrompt(true) : setAppMode("coop")}>Koop Multiplayer{guest ? " 🔒" : ""}</button>
       </nav>
       <AccountLink playerId={playerId} onPlayerId={adoptAccountPlayerId} onMessage={accountMessage} />
 
       {hydrated && appMode === "single" && tutorial.status === "active" && <TutorialCoach state={tutorial} game={game} onShow={showTutorialStep} onEnd={requestEndTutorial} />}
       {tutorialEndDialog && <ConfirmDialog title="Tutorial beenden?" confirmLabel="Beenden" cancelLabel="Weiter spielen" onConfirm={confirmEndTutorial} onCancel={() => setTutorialEndDialog(false)}>Wenn du das Tutorial jetzt abbrichst, erhältst du das Willkommenspack nicht.</ConfirmDialog>}
-      {(appMode === 'single' || isCoopLive) && <nav className="section-navigation" aria-label="Hauptnavigation">{primaryTabs.map(tab=><button type="button" key={tab.id} aria-label={tab.label} title={navBadges[tab.id as keyof typeof navBadges]?.join(", ")} aria-current={primarySection===tab.id?'page':undefined} className={primarySection===tab.id?'active':''} onClick={()=>{openFeatureTab(tab.id==='club'&&pendingTransferOffer&&primarySection!=='club'?'fabrizio':tab.id);setLayoutEditMode(false);}}><span className="tab-icon"><Icon name={tab.icon} size={22} />{tab.id==='cup'&&displayGame.features.cup.active&&<i className="tab-live-dot" aria-hidden="true" />}{tab.id==='club'&&pendingTransferOffer&&<i className="tab-live-dot offer" aria-hidden="true" />}{navBadges[tab.id as keyof typeof navBadges]&&!(tab.id==='cup'&&displayGame.features.cup.active)&&!(tab.id==='club'&&pendingTransferOffer)&&<i className="tab-live-dot action" aria-hidden="true" />}</span><span className="tab-label-full">{tab.text ?? tab.label}{tab.id==='cup'&&displayGame.features.cup.active&&<span className="tab-live-badge" aria-hidden="true">LIVE</span>}</span><span className="tab-label-short" aria-hidden="true">{tab.short}</span></button>)}</nav>}
+      {(appMode === 'single' || isCoopLive) && <nav className="section-navigation" aria-label="Hauptnavigation">{primaryTabs.map(tab=>{const tabLocked=Boolean(tutorialAllowed&&!tutorialAllowed.includes(tab.id as RoutedTab));return <button type="button" key={tab.id} aria-label={tab.label} disabled={tabLocked} title={tabLocked?"Kommt in einem späteren Tutorialschritt":navBadges[tab.id as keyof typeof navBadges]?.join(", ")} aria-current={primarySection===tab.id?'page':undefined} className={`${primarySection===tab.id?'active':''}${tabLocked?' tutorial-locked':''}${tutorialFocusTab===tab.id&&primarySection!==tab.id?' tutorial-focus':''}`} onClick={()=>{openFeatureTab(tab.id==='club'&&pendingTransferOffer&&primarySection!=='club'?'fabrizio':tab.id);setLayoutEditMode(false);}}><span className="tab-icon"><Icon name={tab.icon} size={22} />{tab.id==='cup'&&displayGame.features.cup.active&&<i className="tab-live-dot" aria-hidden="true" />}{tab.id==='club'&&pendingTransferOffer&&<i className="tab-live-dot offer" aria-hidden="true" />}{navBadges[tab.id as keyof typeof navBadges]&&!(tab.id==='cup'&&displayGame.features.cup.active)&&!(tab.id==='club'&&pendingTransferOffer)&&<i className="tab-live-dot action" aria-hidden="true" />}</span><span className="tab-label-full">{tab.text ?? tab.label}{tab.id==='cup'&&displayGame.features.cup.active&&<span className="tab-live-badge" aria-hidden="true">LIVE</span>}</span><span className="tab-label-short" aria-hidden="true">{tab.short}</span></button>;})}</nav>}
       {(appMode === "single" || isCoopLive) && <main className={`clicker-layout${isCoopLive ? " coop-clicker-layout" : ""}`}>
         {isCoopLive && coopSession && <div className="coop-inline-room-bar compact"><div><p className="eyebrow">KOOP / {coopSession.room.roomName}</p><strong>{coopSession.code}</strong><span>{occupiedCoopPlayers(coopSession.room).map((player) => player.name).join(" · ")}</span></div><div className="coop-inline-room-actions"><span className={`coop-presence${otherCoopOnline ? " online" : ""}`}><i />{otherCoopOnline ? `${otherCoopOnlineCount} ${otherCoopOnlineCount === 1 ? "MITSPIELER" : "MITSPIELER"} ONLINE` : "MITSPIELER OFFLINE"}</span>{coopBusy && <span className="coop-pending-chip" role="status">Wird gespeichert …</span>}{!coopBusy && coopFailed && <button type="button" className="coop-pending-chip failed" onClick={() => { const failed = coopFailed; setCoopFailed(null); void sendCoopAction(failed.action, failed.extra); }}>Nicht gespeichert · erneut senden</button>}{coopPrestigeVote && hiddenPrestigeVote === coopPrestigeVote.id && <button className="mode-secondary" onClick={() => setHiddenPrestigeVote("")}>Prestige Abstimmung zeigen</button>}<button className="mode-secondary" onClick={() => void shareInvite()}>Einladen</button><button className="mode-secondary" onClick={() => openFeatureTab("club")}>Welt verwalten</button></div></div>}
         <div className={`layout-toolbar${layoutEditMode ? " active" : " compact"}`}>
           {layoutEditMode && <div><p className="eyebrow">ANSICHT / LAYOUT</p><strong>Karten im Raster anordnen.</strong><small>Zieh den Griff. Beim Loslassen rastet jede Karte im nächsten Slot ein. Die Anordnung bleibt auf diesem Gerät gespeichert.</small></div>}
-          <div className="layout-toolbar-actions">{layoutEditMode && <button className="mode-secondary" onClick={resetLayout}>Standard</button>}<button className={layoutEditMode ? "mode-primary" : "mode-secondary"} onClick={() => { setLayoutEditMode((current) => !current); setDraggingLayoutCard(null); setDragOverLayoutCard(null); }}>{layoutEditMode ? "Fertig" : "Ansicht bearbeiten"}</button></div>
+          <div className="layout-toolbar-actions">{layoutEditMode && <button className="mode-secondary" onClick={resetLayout}>Standard</button>}<button className={layoutEditMode ? "mode-primary" : "mode-secondary"} disabled={Boolean(tutorialAllowed)} onClick={() => { setLayoutEditMode((current) => !current); setDraggingLayoutCard(null); setDragOverLayoutCard(null); }}>{layoutEditMode ? "Fertig" : "Ansicht bearbeiten"}</button></div>
         </div>
         <section className={layoutCardClass("hero", "click-zone-card")} style={{ order: layoutOrderNumber("hero") }} onDragOver={(event) => handleLayoutDragOver(event, "hero")} onDrop={(event) => handleLayoutDrop(event, "hero")}>
           {layoutEditMode && <div className="layout-card-handle" draggable onDragStart={(event) => handleLayoutDragStart(event, "hero")} onDragEnd={handleLayoutDragEnd} aria-label="Ball und Turniere verschieben"><span className="layout-handle-grip" aria-hidden="true"><Icon name="grip" size={18} /></span><div><strong>Ball und Turniere</strong><small>ziehen und im Raster ablegen</small></div><div className="layout-order-controls"><button type="button" onClick={(event) => { event.stopPropagation(); moveLayoutCard("hero", -1); }} aria-label="Ballkarte nach oben">↑</button><button type="button" onClick={(event) => { event.stopPropagation(); moveLayoutCard("hero", 1); }} aria-label="Ballkarte nach unten">↓</button></div></div>}

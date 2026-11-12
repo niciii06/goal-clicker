@@ -628,8 +628,8 @@
 .starxi-player-card > b { color: var(--soft); font-size: var(--text-footnote); }
 .starxi-bank-slot { border-style: dashed; color: var(--muted); cursor: pointer; background: color-mix(in srgb, var(--text) 2%, var(--surface-raised)); font: inherit; }
 .starxi-bank-slot:disabled { cursor: not-allowed; opacity: .58; }
-.starxi-bank-slot > span { color: color-mix(in srgb, var(--text) 37%, var(--surface-raised)); background: color-mix(in srgb, var(--text) 6%, var(--surface-raised)); font-size: var(--text-footnote); }
-.starxi-bank-slot small { color: color-mix(in srgb, var(--text) 33%, var(--surface-raised)); font-size: var(--text-footnote); }
+.starxi-bank-slot > span { color: var(--muted); background: color-mix(in srgb, var(--text) 6%, var(--surface-raised)); font-size: var(--text-footnote); }
+.starxi-bank-slot small { color: var(--muted); font-size: var(--text-footnote); }
 .starxi-reserve-controls { display: grid; gap: 8px; margin-top: 11px; }
 .starxi-filter-tools { display: grid; grid-template-columns: minmax(0, 1fr) 132px; gap: 7px; }
 .starxi-search { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; outline: 0; color: var(--text); background: color-mix(in srgb, var(--text) 2%, var(--surface-raised)); font-size: var(--text-footnote); }
@@ -2045,6 +2045,18 @@ button { font: inherit; }
 .section-navigation button .svg-icon { flex: none; width: 20px; height: 20px; }
 .section-navigation button:hover { color: var(--text); background: var(--fill); }
 .section-navigation button.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+/* Tutorial: the tab of the current step pulses, the tabs of later steps are dimmed and cannot be opened. */
+.section-navigation button:disabled { opacity: .38; cursor: not-allowed; }
+.section-navigation button.tutorial-focus { position: relative; color: var(--accent); }
+.section-navigation button.tutorial-focus::after { position: absolute; inset: -3px; border: 2px solid var(--accent); border-radius: inherit; content: ""; pointer-events: none; animation: tutorial-ring 1.6s ease-out infinite; }
+@keyframes tutorial-ring { 0% { opacity: .95; transform: scale(1); } 100% { opacity: 0; transform: scale(1.14); } }
+/* The area the current step is about: a calm outline, no motion. */
+.app-shell[data-tutorial-step="clicks"] .ball-stage,
+.app-shell[data-tutorial-step="upgrade"] .shop-card,
+.app-shell[data-tutorial-step="lineup"] .starxi-pitch-panel,
+.app-shell[data-tutorial-step="packs"] .welcome-pack-card,
+.app-shell[data-tutorial-step="match"] .cup-start { outline: 3px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 4px; border-radius: 18px; }
+@media (prefers-reduced-motion: reduce) { .section-navigation button.tutorial-focus::after { animation: none; opacity: .9; } }
 .section-navigation .tab-icon { position: relative; display: inline-flex; }
 .section-navigation .tab-label-full { display: inline-flex; align-items: center; }
 /* A running match: a LIVE capsule next to the label on wide screens, a badge on the symbol in the phone tab bar. */

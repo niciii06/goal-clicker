@@ -1,11 +1,11 @@
 // The tutorial for a brand new club: a short welcome window, then guided tasks that tick off by themselves.
 // Its progress lives in a synced browser key, so it travels with the account's cloud save like "Was ist neu".
-import { STARTER_SQUAD_UNLOCK_CLICKS, type GameFeatures } from "./feature-data";
+import { STAR_XI_SQUAD_SIZE, STARTER_SQUAD_UNLOCK_CLICKS, type GameFeatures } from "./feature-data";
 import type { RoutedTab } from "./tab-routes";
 
 export type TutorialStatus = "intro" | "active" | "done";
 export type TutorialState = { status: TutorialStatus; done: string[]; visited: string[] };
-export type TutorialGame = { clicks: number; upgrades: Record<string, number>; features: Pick<GameFeatures, "cup" | "seasonMode" | "squadLock" | "welcomePack"> };
+export type TutorialGame = { clicks: number; upgrades: Record<string, number>; features: Pick<GameFeatures, "cup" | "seasonMode" | "squadLock" | "welcomePack" | "starXI"> };
 /** Where "Zeig es mir" leads: a tab, or the ball and the upgrade shop on the home screen. */
 export type TutorialTarget = RoutedTab | "ball" | "shop";
 export type TutorialStep = { id: string; title: string; text: string; target: TutorialTarget; progress?: (game: TutorialGame) => { value: number; goal: number }; isDone: (game: TutorialGame, visited: readonly string[], done: readonly string[]) => boolean };
@@ -37,10 +37,29 @@ export const welcomePackStepDone = (features: Pick<TutorialGame["features"], "we
 export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   { id: "clicks", title: "Klicke auf den Ball", text: `Erziele mit ${STARTER_SQUAD_UNLOCK_CLICKS} Klicks deine ersten Tore. Danach kommt dein Starterkader.`, target: "ball", progress: (game) => ({ value: Math.min(game.clicks, STARTER_SQUAD_UNLOCK_CLICKS), goal: STARTER_SQUAD_UNLOCK_CLICKS }), isDone: (game) => game.clicks >= STARTER_SQUAD_UNLOCK_CLICKS },
   { id: "upgrade", title: "Kaufe eine Verstärkung", text: "Unter Verstärkungen gibst du Tore für mehr Tore pro Klick oder pro Sekunde aus.", target: "shop", isDone: (game) => Object.values(game.upgrades).some((level) => level > 0) },
-  { id: "squad", title: "Schau dir deinen Kader an", text: "Im Reiter Kader siehst du deine Elf und kannst Spieler tauschen.", target: "squad", isDone: (_game, visited) => visited.includes("squad") },
-  { id: "packs", title: "Öffne dein Willkommenspack", text: "Im Packshop wartet ein Geschenk auf dich: Öffne das Willkommenspack und erlebe deinen ersten Walkout.", target: "packs", isDone: (game, _visited, done) => done.includes("squad") && welcomePackStepDone(game.features) },
+  { id: "lineup", title: "Stelle deine Startelf auf", text: `Dein Starterkader wartet im Reiter Kader. Tippe einen Startplatz an und dann eine passende Karte, bis alle ${STAR_XI_SQUAD_SIZE} Plätze besetzt sind.`, target: "squad", progress: (game) => ({ value: Math.min(game.features.starXI.lineupIds.filter(Boolean).length, STAR_XI_SQUAD_SIZE), goal: STAR_XI_SQUAD_SIZE }), isDone: (game) => game.features.starXI.lineupIds.filter(Boolean).length >= STAR_XI_SQUAD_SIZE },
+  { id: "packs", title: "Öffne dein Willkommenspack", text: "Im Packshop wartet ein Geschenk auf dich: Öffne das Willkommenspack und erlebe deinen ersten Walkout.", target: "packs", isDone: (game, _visited, done) => done.includes("lineup") && welcomePackStepDone(game.features) },
   { id: "match", title: "Starte deine erste Saisonpartie", text: "Unter Spiele reist deine Mannschaft los. Starte die Saisonpartie: Siege bringen Punkte, nach 10 Spieltagen steigst du als Erster oder Zweiter auf.", target: "cup", isDone: (game, _visited, done) => done.includes("packs") && hasStartedSeasonMatch(game.features) },
 ];
+
+/**
+ * The tabs a step needs. While the tutorial runs, the navigation offers only these (plus Home); everything else belongs to
+ * a later step, so nobody wanders off the guided path. Ending the tutorial always lifts the lock.
+ */
+const STEP_TABS: Record<string, readonly RoutedTab[]> = {
+  clicks: ["home"],
+  upgrade: ["home"],
+  lineup: ["home", "squad"],
+  packs: ["home", "packs"],
+  match: ["home", "squad", "cup"],
+};
+export function tutorialAllowedTabs(state: TutorialState): readonly RoutedTab[] | null {
+  if (state.status !== "active") return null;
+  const step = currentTutorialStep(state);
+  return step ? STEP_TABS[step.id] ?? ["home"] : null;
+}
+/** The tab (or "home" for the ball and the shop) a step wants the player on. */
+export const tutorialStepTab = (step: TutorialStep): RoutedTab => step.target === "ball" || step.target === "shop" ? "home" : step.target;
 
 const STEP_IDS = new Set(TUTORIAL_STEPS.map((step) => step.id));
 const VISIT_TABS = new Set<string>(["squad", "packs"]);
