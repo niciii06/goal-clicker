@@ -484,6 +484,42 @@ test('the first starting eleven is built by the player through the real lineup a
   await page.close();
 });
 
+test('the standings: Pkt is the last column, every form box names its match on hover, focus and tap', async () => {
+  const now = Date.now();
+  const features = richFeatures(now);
+  const ids = features.seasonMode.table.map((team) => team.id);
+  features.seasonMode.results = [
+    { matchday: 1, homeId: 'club', awayId: ids[1], homeScore: 2, awayScore: 1 },
+    { matchday: 2, homeId: ids[2], awayId: 'club', homeScore: 0, awayScore: 3 },
+    { matchday: 3, homeId: 'club', awayId: ids[3], homeScore: 1, awayScore: 1 },
+  ];
+  for (const viewport of [VIEWPORTS[0], { width: 768, height: 1024 }]) {
+    const { page, problems } = await openWithSave(viewport, save(features, now));
+    await openTab(page, 'Saison');
+    const header = await page.locator('.season-hub-table thead th').allInnerTexts();
+    assert.deepEqual(header.slice(-2), ['Form', 'Pkt'], `${viewport.width}: points last, form directly before`);
+    const chips = page.locator('.season-form-chip');
+    const tip = page.locator('.season-form-tip');
+    await chips.first().hover();
+    assert.equal(await tip.innerText(), `Spieltag 1 · Heim · ${features.club.name} 2:1 ${features.seasonMode.table[1].name}`);
+    const shell = (await page.locator('.season-hub-table-shell').first().boundingBox())!;
+    const box = (await tip.boundingBox())!;
+    assert.ok(box.x >= shell.x - 1 && box.x + box.width <= shell.x + shell.width + 1, `${viewport.width}: the tip is not cut off`);
+    await page.mouse.move(2, 2);
+    assert.equal(await tip.count(), 0, 'it leaves with the mouse');
+    await chips.nth(1).focus();
+    assert.match(await tip.innerText(), /^Spieltag 2 · Auswärts · /);
+    await page.keyboard.press('Escape');
+    assert.equal(await tip.count(), 0, 'Escape closes it');
+    await chips.nth(2).click();
+    assert.match(await tip.innerText(), /^Spieltag 3 · Heim · /);
+    await chips.nth(2).click();
+    assert.equal(await tip.count(), 0, 'a second tap closes it');
+    assert.deepEqual(problems, []);
+    await page.close();
+  }
+});
+
 test('an existing game never sees the tutorial', async () => {
   const now = Date.now();
   const { page, problems } = await openWithSave(VIEWPORTS[1], save(richFeatures(now), now));

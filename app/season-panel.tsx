@@ -7,7 +7,8 @@ import type { GameFeatures, SeasonResult, SeasonScheduleMatch, SeasonTableRow } 
 import { getStarXIPlayer } from "./feature-data";
 import { formMatchLabel, formMatches, promotionOutlook, seasonTopScorers } from "./qol/season-insights";
 
-type FormTip = { key: string; text: string; left: number; top: number };
+/** `mode`: how the tip was opened. Hover and focus come and go by themselves, a tap stays until the next tap or a tap elsewhere. */
+type FormTip = { key: string; text: string; left: number; top: number; mode: "hover" | "focus" | "tap" };
 
 /**
  * The league table. Columns: # Club Sp S U N Tore +/- Form Pkt (points last). Every form box (S, U, N) names its match
@@ -28,12 +29,12 @@ function StandingsTable({ table, results, division, caption }: { table: readonly
     window.addEventListener("resize", close);
     return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", onKey); window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); };
   }, [tip]);
-  function show(button: HTMLElement, key: string, text: string) {
+  function show(button: HTMLElement, key: string, text: string, mode: FormTip["mode"]) {
     const shell = shellRef.current;
     if (!shell) return;
     const box = button.getBoundingClientRect(), outer = shell.getBoundingClientRect();
     const half = Math.min(120, outer.width / 2);
-    setTip({ key, text, left: Math.min(Math.max(box.left + box.width / 2 - outer.left, half), outer.width - half), top: box.top - outer.top });
+    setTip({ key, text, mode, left: Math.min(Math.max(box.left + box.width / 2 - outer.left, half), outer.width - half), top: box.top - outer.top });
   }
   return <div className="season-hub-table-shell" ref={shellRef}>
     <div className="season-hub-table-wrap">
@@ -49,9 +50,9 @@ function StandingsTable({ table, results, division, caption }: { table: readonly
           <td className="season-form" role="group" aria-label={form.length ? `Form von ${team.name}` : `Form von ${team.name}: noch keine Spiele`}>{form.map((match) => {
             const key = `${team.id}:${match.matchday}`, text = formMatchLabel(match, nameOf);
             return <button type="button" key={key} className={`season-form-chip form-${match.letter}`} aria-label={`${match.letter === "S" ? "Sieg" : match.letter === "U" ? "Unentschieden" : "Niederlage"}: ${text}`} aria-describedby={tip?.key === key ? "season-form-tip" : undefined}
-              onMouseEnter={(event) => show(event.currentTarget, key, text)} onMouseLeave={() => setTip((current) => current?.key === key ? null : current)}
-              onFocus={(event) => show(event.currentTarget, key, text)} onBlur={() => setTip((current) => current?.key === key ? null : current)}
-              onClick={(event) => { if (tip?.key === key) setTip(null); else show(event.currentTarget, key, text); }}>{match.letter}</button>;
+              onPointerEnter={(event) => { if (event.pointerType === "mouse") show(event.currentTarget, key, text, "hover"); }} onPointerLeave={(event) => { if (event.pointerType === "mouse") setTip((current) => current?.key === key && current.mode === "hover" ? null : current); }}
+              onFocus={(event) => show(event.currentTarget, key, text, "focus")} onBlur={() => setTip((current) => current?.key === key ? null : current)}
+              onClick={(event) => { if (tip?.key === key && tip.mode === "tap") setTip(null); else show(event.currentTarget, key, text, "tap"); }}>{match.letter}</button>;
           })}</td>
           <td><b>{team.points}</b></td>
         </tr>;
