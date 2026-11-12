@@ -11,6 +11,9 @@ import { getCareerCard } from "./career-data";
 import { getTravelTime } from "./game/clock";
 import { coopRoleLabel } from "./game/coop";
 import type { CoopPrestigeVote, CoopRoom } from "./game/types";
+import { HomeCityPicker } from "./home-city-picker";
+import { HOME_CITIES, homeCityOf } from "./home-cities";
+import type { HomeCityId } from "./home-cities";
 
 /** Goal income bonus in percent after `count` Prestiges: 20, 40, 60, … */
 export const prestigeBonusPercent = (count: number) => Math.round(Math.max(0, count) * PRESTIGE_GOAL_BONUS_PER_LEVEL * 100);
@@ -25,7 +28,7 @@ export function prestigeBonusLabel(prestigeCount: number) {
  * Choose the one normal card that stays and confirm the reset. Cancelling changes nothing; the game state is only
  * touched by onConfirm. `upgradeLevels`: all Club Office levels bought so far, they go back to 0.
  */
-export function PrestigeDialog({ features, goals, upgradeLevels, busy, error, onConfirm, onCancel, voteMembers = 0 }: { features: GameFeatures; goals: number; upgradeLevels: number; busy: boolean; error: string; onConfirm: (keepNormalId: string | null) => void; onCancel: () => void; voteMembers?: number }) {
+export function PrestigeDialog({ features, goals, upgradeLevels, busy, error, onConfirm, onCancel, voteMembers = 0 }: { features: GameFeatures; goals: number; upgradeLevels: number; busy: boolean; error: string; onConfirm: (keepNormalId: string | null, homeCity: HomeCityId) => void; onCancel: () => void; voteMembers?: number }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   useDialogFocus(true, dialogRef, onCancel);
   const specials = getPrestigeRetainedSpecials(features);
@@ -35,6 +38,8 @@ export function PrestigeDialog({ features, goals, upgradeLevels, busy, error, on
   const favorites = new Set(features.favoriteIds ?? []);
   const candidates = [...getPrestigeKeepCandidates(features)].sort((a, b) => Number(favorites.has(b.id)) - Number(favorites.has(a.id)) || ratingOf(b) - ratingOf(a) || a.name.localeCompare(b.name));
   const [keepId, setKeepId] = useState<string | null>(() => candidates[0]?.id ?? null);
+  // The new run may start in another home city: the only moment it can change.
+  const [homeCity, setHomeCity] = useState<HomeCityId>(() => homeCityOf(features.seasonMode.homeCity).id);
   const [search, setSearch] = useState("");
   const query = search.trim().toLocaleLowerCase("de-CH");
   const shown = candidates.filter((player) => !query || player.name.toLocaleLowerCase("de-CH").includes(query) || player.id === keepId);
@@ -55,6 +60,7 @@ export function PrestigeDialog({ features, goals, upgradeLevels, busy, error, on
         <div><dt>Torbonus</dt><dd>+{percent(next - 1)} % → <strong>+{percent(next)} % Tore</strong> auf Klicks und passives Einkommen</dd></div>
         <div><dt>Torkontostand</dt><dd>{formatNumber(goals)} → <strong>0</strong></dd></div>
         <div><dt>Upgrades</dt><dd>{formatNumber(upgradeLevels)} {upgradeLevels === 1 ? "Stufe" : "Stufen"} → <strong>Stufe 0</strong>. Freigeschaltete Upgrades kannst du sofort wieder kaufen.</dd></div>
+        <div><dt>Heimstadt</dt><dd>{homeCityOf(features.seasonMode.homeCity).name} → <strong>{HOME_CITIES[homeCity].name}</strong>. Der neue Lauf startet in den Ligen dieser Stadt, Auswärtsreisen beginnen dort.</dd></div>
         <div><dt>Kader</dt><dd>{features.starXI.ownedIds.length} Karten → <strong>{squadAfter} Karten</strong>. Alle anderen bleiben im Album («Nicht im Kader»).</dd></div>
         <div><dt>Kartenboni</dt><dd>Spezialkarten und die gewählte Karte behalten Meilensteine und Wachstum. Abgegebene Karten verlieren ihre Verbesserungen: Ziehst du sie wieder, starten sie mit ihrer Grundwertung. Statistiken und abgeholte Albumprämien bleiben.</dd></div>
       </dl>
@@ -68,11 +74,12 @@ export function PrestigeDialog({ features, goals, upgradeLevels, busy, error, on
           <b>{ratingOf(player)}</b><span>{player.name}</span><small>{getStarXIPositions(player).join(" / ")}{statusOf(player.id).map((status) => <em key={status} className="prestige-status-chip">{status}</em>)}</small>
         </label>)}
       </fieldset> : <p>Du hast keine normale Karte im Kader. Du startest nur mit deinen Spezialkarten.</p>}
+      <HomeCityPicker value={homeCity} onChange={setHomeCity} name="prestige-home-city" legend="Heimstadt für den neuen Lauf" />
       {voteMembers > 0 && <p className="prestige-vote-note" role="note">Koop Abstimmung: {voteMembers === 1 ? "Dein Mitspieler, der gerade online ist, muss" : `Alle ${voteMembers} Mitspieler, die gerade online sind, müssen`} innerhalb von {PRESTIGE_VOTE_SECONDS} Sekunden zustimmen. Wer offline ist, wird nicht gefragt. Alle sehen deine behaltene Karte.</p>}
       {error && <p className="prestige-error" role="alert">{error}</p>}
       <div className="confirm-dialog-actions">
         <button type="button" className="mode-secondary" onClick={onCancel}>Abbrechen</button>
-        <button type="button" className="mode-primary" disabled={!canConfirm} onClick={() => onConfirm(keepId)}>{candidates.length && !keepId ? "Karte wählen" : voteMembers > 0 ? "Abstimmung starten" : `Prestige ${next} starten`}</button>
+        <button type="button" className="mode-primary" disabled={!canConfirm} onClick={() => onConfirm(keepId, homeCity)}>{candidates.length && !keepId ? "Karte wählen" : voteMembers > 0 ? "Abstimmung starten" : `Prestige ${next} starten`}</button>
       </div>
     </div>
   </div>, document.body);
@@ -104,6 +111,7 @@ export function PrestigeVoteDialog({ vote, room, busy, onApprove, onDecline, onH
       <div id="prestige-vote-description">
         <p>{vote.viewerIsProposer ? "Du hast" : `${vote.proposerName} hat`} Prestige {vote.prestigeCount + 1} für die ganze Welt vorgeschlagen. Der Aufstiegslauf beginnt wieder in Saison 1, der Torkontostand geht auf 0 und alle Upgrades starten wieder bei Stufe 0.</p>
         <dl className="prestige-summary">
+          <div><dt>Heimstadt</dt><dd><strong>{homeCityOf(vote.homeCity).name}</strong></dd></div>
           <div><dt>Behaltene Karte</dt><dd><strong>{card}</strong> und alle Spezialkarten</dd></div>
           <div><dt>Torbonus</dt><dd>+{percent(vote.prestigeCount)} % → <strong>+{percent(vote.prestigeCount + 1)} % Tore</strong></dd></div>
           <div><dt>Zugestimmt</dt><dd>{vote.approvedRoles.map(nameOf).join(", ") || "noch niemand"}</dd></div>

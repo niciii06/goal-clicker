@@ -122,13 +122,15 @@ const FOREIGN_ROAD_LIMIT_KM=900;
 const NO_ROAD_COUNTRIES=['England','Schottland','Irland','Wales'];
 /** Raw door-to-door alternatives before cached partial roads are spliced in. The travel
  * cache tooling (scripts/travel/fetch-real-routes.mts) reads the same legs. */
-export function journeyCandidates(destination:Venue) {
- const start=asHub(HOME_VENUE),end=asHub(destination),km=distanceKm(start,end);
+/** `origin`/`homeStation`: the home ground and rail station of the club (app/home-cities.ts); Bern by default. */
+export function journeyCandidates(destination:Venue,origin:Venue=HOME_VENUE,homeStation:Hub=STATIONS.bern) {
+ const start=asHub(origin),end=asHub(destination),km=distanceKm(start,end);
+ const boardLabel=homeStation.id===STATIONS.bern.id?'Teambus zum Bahnhof Bern':`Teambus zum ${homeStation.name}`;
  const domestic=['Schweiz','Switzerland','CH'].includes(destination.country);
  const road=[ground(start,end,'bus',`Teambus nach ${destination.city}`)];
  if(km<80)return {km,domestic,road,roadAllowed:true,rail:null,air:[] as Segment[][]};
  const station=Object.values(STATIONS).sort((a,b)=>distanceKm(a,end)-distanceKm(b,end))[0];
- const rail=station.id!==STATIONS.bern.id&&distanceKm(station,end)<35?[ground(start,STATIONS.bern,'bus','Teambus zum Bahnhof Bern'),wait(STATIONS.bern,15,'Einsteigen und Warten auf den Zug'),ground(STATIONS.bern,station,'train',`${RAIL_SERVICE[station.id]??'Intercity'} nach ${station.name}`),wait(station,10,'Umsteigen zum Teambus'),ground(station,end,'bus',`Teambus zum ${destination.stadium}`)]:null;
+ const rail=station.id!==homeStation.id&&distanceKm(station,end)<35?[ground(start,homeStation,'bus',boardLabel),wait(homeStation,15,'Einsteigen und Warten auf den Zug'),ground(homeStation,station,'train',`${RAIL_SERVICE[station.id]??'Intercity'} nach ${station.name}`),wait(station,10,'Umsteigen zum Teambus'),ground(station,end,'bus',`Teambus zum ${destination.stadium}`)]:null;
  if(domestic)return {km,domestic,road,roadAllowed:true,rail,air:[] as Segment[][]};
  const nearestAirport=Object.values(AIRPORTS).filter(a=>!['airport-SIN','airport-ZRH','airport-GVA'].includes(a.id)).sort((a,b)=>distanceKm(a,end)-distanceKm(b,end))[0];
  const airport=AIRPORTS[AIRPORT_FOR_VENUE[destination.id]]??(distanceKm(nearestAirport,end)<400?nearestAirport:undefined);
@@ -148,10 +150,10 @@ export function journeyCandidates(destination:Venue) {
 /** The team takes the fastest door-to-door option: the team bus below 80 km and as long as
  * it beats the train or the plane, the train where a direct main line ends near the stadium,
  * and the plane for long distances, overseas and across the Channel. Estimates, no timetable. */
-export function planJourney(destination:Venue,routes:RouteCache=cachedRoutes):JourneyPlan {
+export function planJourney(destination:Venue,routes:RouteCache=cachedRoutes,origin:Venue=HOME_VENUE,homeStation:Hub=STATIONS.bern):JourneyPlan {
  const previous=activeRoutes;activeRoutes=routes;
  try {
-  const {road,roadAllowed,rail,air}=journeyCandidates(destination);
+  const {road,roadAllowed,rail,air}=journeyCandidates(destination,origin,homeStation);
   const options=[...(roadAllowed?[plan(road)]:[]),...(rail?[plan(rail)]:[]),...air.map(plan)];
   return options.reduce((best,option)=>option.realSeconds<best.realSeconds?option:best);
  } finally { activeRoutes=previous; }

@@ -25,6 +25,9 @@ import { getUpgrade } from "../../game/upgrades";
 import { describeReplacements, fillStarXIGaps, movePlayerToEmptyBench, movePlayerToReserve, withBestBench } from "../../game/lineup-tools";
 import { abandonTournamentBlockReason, abandonTournamentRun } from "../../game/tournament-abandon";
 import { applyGamePrestige } from "../../game/prestige";
+import { chooseHomeCity } from "../../feature-data";
+import { isHomeCityId } from "../../home-cities";
+import type { HomeCityId } from "../../home-cities";
 import { getTicketIncome, recordTicketIncome } from "../../ticket-income";
 
 import { answerPressConference, getPressReward } from "../../press-conference";
@@ -262,7 +265,7 @@ function seatChange(room: AnyRoomRow, change: { leaving?: CoopRole; handover?: C
 
 // ---- Prestige vote ----------------------------------------------------------------------------------------
 
-type PrestigeVote = { id: string; proposer: string; proposerName: string; keepNormalId: string | null; prestigeCount: number; createdAt: number; expiresAt: number; required: string[]; approvals: string[] };
+type PrestigeVote = { id: string; proposer: string; proposerName: string; keepNormalId: string | null; homeCity?: HomeCityId; prestigeCount: number; createdAt: number; expiresAt: number; required: string[]; approvals: string[] };
 type PrestigeVoteOutcome = "approved" | "declined" | "cancelled" | "expired" | "failed";
 type PrestigeVoteResult = { id: string; outcome: PrestigeVoteOutcome; by?: string; reason?: string; prestigeCount: number; at: number };
 
@@ -272,7 +275,7 @@ function readPrestigeVote(state: ClickState): PrestigeVote | null {
   const ids = (value: unknown) => Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
   return {
     id: raw.id, proposer: raw.proposer, proposerName: typeof raw.proposerName === "string" ? raw.proposerName : "Mitspieler",
-    keepNormalId: typeof raw.keepNormalId === "string" ? raw.keepNormalId : null, prestigeCount: Number(raw.prestigeCount),
+    keepNormalId: typeof raw.keepNormalId === "string" ? raw.keepNormalId : null, ...(isHomeCityId(raw.homeCity) ? { homeCity: raw.homeCity } : {}), prestigeCount: Number(raw.prestigeCount),
     createdAt: finite(raw.createdAt), expiresAt: Number(raw.expiresAt), required: ids(raw.required), approvals: ids(raw.approvals),
   };
 }
@@ -310,6 +313,7 @@ function prestigeVoteView(room: AnyRoomRow, state: ClickState, now: number, view
     proposerName: vote.proposerName,
     keepNormalId: vote.keepNormalId,
     keepName: keep?.name ?? null,
+    ...(vote.homeCity ? { homeCity: vote.homeCity } : {}),
     prestigeCount: vote.prestigeCount,
     expiresAt: vote.expiresAt,
     expiresInMs: Math.max(0, vote.expiresAt - now),
@@ -333,7 +337,7 @@ function settlePrestigeVote(game: CoopGameState, room: AnyRoomRow, now: number) 
   if (status === "pending") return null;
   if (vote.prestigeCount !== game.features.seasonMode.prestigeCount) return finishPrestigeVote(vote, "cancelled", now);
   if (status === "cancelled" || status === "expired") return finishPrestigeVote(vote, status, now);
-  const result = applyGamePrestige(game, vote.keepNormalId, now, vote.id);
+  const result = applyGamePrestige(game, vote.keepNormalId, now, vote.id, vote.homeCity);
   if (result.duplicate) return finishPrestigeVote(vote, "approved", now);
   if (result.error) return finishPrestigeVote(vote, "failed", now, undefined, result.error);
   Object.assign(game, result.game);
@@ -1107,6 +1111,8 @@ async function handlePost(request: Request) {
       purchaseId?: unknown;
       requestId?: unknown;
       keepNormalId?: unknown;
+      homeCity?: unknown;
+      city?: unknown;
       expectedPrestigeCount?: unknown;
       draft?: unknown;
       direction?: unknown;
@@ -1571,6 +1577,17 @@ async function handlePost(request: Request) {
       return persistGameResponse(db, room, game, timestamp, playerId, role);
     }
 
+    if (action === "home-city") {
+      // One home city per world: the host chooses it before the world's first league match; afterwards it changes
+      // only with a Prestige, which every online member votes on (season-prestige).
+      if (role !== "host") return jsonError("Nur der Host wählt die Heimstadt dieser Welt.", 403);
+      if (!isHomeCityId(payload.city)) return jsonError("Diese Stadt gibt es nicht.", 400);
+      const chosen = chooseHomeCity(game.features, payload.city);
+      if (chosen.error) return jsonError(chosen.error, 409);
+      game.features = chosen.features;
+      return persistGameResponse(db, room, game, timestamp, playerId, role);
+    }
+
     if (action === "star-favorite") {
       const starPlayerId = typeof payload.starPlayerId === "string" ? payload.starPlayerId : "";
       if (!toggleFavoriteCard(game.features, starPlayerId)) return jsonError("Diese Karte gehört nicht zum Club.", 409);
@@ -1820,12 +1837,14 @@ async function handlePost(request: Request) {
       const requestId = typeof payload.requestId === "string" ? payload.requestId.slice(0, 60) : "";
       if (!requestId) return jsonError("Lade die Seite neu, um Prestige zu starten.", 409);
       const keepNormalId = typeof payload.keepNormalId === "string" && payload.keepNormalId ? payload.keepNormalId : null;
+      // The home city of the new run is part of the proposal: every member agrees to both together.
+      const homeCity = isHomeCityId(payload.homeCity) ? payload.homeCity : undefined;
       const now = Date.parse(timestamp);
       const clickState = readClickState(room);
       const openVote = readPrestigeVote(clickState);
       // The same proposal sent again (lost answer): the vote it opened is the answer.
       if (openVote?.id === requestId && openVote.prestigeCount === game.features.seasonMode.prestigeCount) return unchanged({ prestigeVote: "pending" });
-      const result = applyGamePrestige(game, keepNormalId, now, requestId);
+      const result = applyGamePrestige(game, keepNormalId, now, requestId, homeCity);
       if (result.duplicate) return Response.json({ serverNow: Date.now(), room: shapeRoom(room, playerId), role });
       // The room goes along, so the screen that asked shows the Prestige another seat already started.
       if (Number(payload.expectedPrestigeCount) !== game.features.seasonMode.prestigeCount) return Response.json({ error: "Prestige wurde in dieser Welt schon gestartet.", errorCode: "PRESTIGE_ALREADY_STARTED", serverNow: Date.now(), room: shapeRoom(room, playerId), role }, { status: 409 });
@@ -1839,7 +1858,7 @@ async function handlePost(request: Request) {
         Object.assign(game, result.game);
         return persistGameResponse(db, room, game, timestamp, playerId, role, {}, {}, { clickStatePatch: (state) => { delete state[PRESTIGE_VOTE_KEY]; } });
       }
-      const vote: PrestigeVote = { id: requestId, proposer: playerId, proposerName: roomPlayerName(room, role), keepNormalId, prestigeCount: game.features.seasonMode.prestigeCount, createdAt: now, expiresAt: now + PRESTIGE_VOTE_MS, required: others, approvals: [playerId] };
+      const vote: PrestigeVote = { id: requestId, proposer: playerId, proposerName: roomPlayerName(room, role), keepNormalId, ...(homeCity ? { homeCity } : {}), prestigeCount: game.features.seasonMode.prestigeCount, createdAt: now, expiresAt: now + PRESTIGE_VOTE_MS, required: others, approvals: [playerId] };
       return persistGameResponse(db, room, game, timestamp, playerId, role, {}, { prestigeVote: "pending" }, { clickStatePatch: (state) => { state[PRESTIGE_VOTE_KEY] = vote; } });
     }
 

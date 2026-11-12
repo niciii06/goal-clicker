@@ -3,11 +3,17 @@ import { pronounText } from './player-pronouns';
 import { addHistory, getSeasonModeNextOpponent, getTournament, getTournamentOpponentSchedule, getStarXISelection, getOpenTransferSquadVacancies, getStarXIRating, getEligibleEventPlayers, TOURNAMENTS, lockMatchSquad } from './feature-data';
 import type { GameFeatures, TournamentId } from './feature-data';
 import { HOME_VENUE, REGION_LABELS, distanceKm, seasonGeography, tournamentVenue, classifyDestination, VENUES, currentVenue } from './travel-geography';
+import { catalogOf, homeCityOf, homeRegionOf, homeVenueOf } from './home-cities';
+import type { HomeCityId } from './home-cities';
+import { STATIONS } from './journey-routing';
+/** The rail station of a home city, where long team journeys board the train. */
+function homeStationOf(home: unknown) { return STATIONS[homeCityOf(home).station]; }
 import type { Venue } from './travel-geography';
 import { planJourney, gameSeconds, segmentAt, journeyClock } from './journey-routing';
 export { journeyClock };
 import type { JourneyPlan } from './journey-routing';
-export type TravelFixture = { id: string; mode: 'season'|'tournament'; tournamentId: TournamentId; opponentId: string; opponent: string; away: boolean; neutral?: boolean; region: number; venue: Venue; schedule: string[] };
+/** `home`: the home city the journey starts from (app/home-cities.ts); missing means Bern, as for every older fixture. */
+export type TravelFixture = { id: string; mode: 'season'|'tournament'; tournamentId: TournamentId; opponentId: string; opponent: string; away: boolean; neutral?: boolean; region: number; venue: Venue; schedule: string[]; home?: HomeCityId };
 // `delta` changes the arrival in game ms (a jam adds, a fast driver saves); `fine` costs that many seconds of passive income on arrival.
 export type TravelEvent = { id: string; text: string; template?: string; playerId?:string; at: number; delta: number; fine?: number };
 export type Journey = { squadLock?: GameFeatures['squadLock']; plan?: JourneyPlan; origin?: Venue; id: string; fixture: TravelFixture; startedAt: number; baseMs: number; endsAt: number; transport: 'walk'|'bike'|'car'|'bus'|'train'|'plane'; km: number; events: TravelEvent[]; consumed: boolean; counted?: boolean; finesPaid?: boolean };
@@ -28,8 +34,8 @@ function normalizeTravelUnchecked(value: unknown): TravelState {
 }
 export function fixtureFor(features: GameFeatures, mode: 'season'|'tournament', tournamentId: TournamentId='stadium'): TravelFixture {
  if (mode==='season') {
-  const s=features.seasonMode, o=getSeasonModeNextOpponent(s,features.club.name), index=Number(o.id.split('-').at(-1))-1, geo=seasonGeography(s.division,index,s.aiLeagues), saved=s.fixtures?.[s.matchday], away=saved?.away??s.matchday%2===1, venue=away?(saved?.venue??s.table.find(t=>t.id===o.id)?.venue??geo.venue):HOME_VENUE;
-  return {id:`season:${s.prestigeCount}:${features.career.seasonNumber}:${s.division}:${s.matchday}:${s.history.at(-1)?.id||'initial'}`,mode,tournamentId:'stadium',opponentId:o.id,opponent:o.name,away,region:away?classifyDestination(venue):0,venue:features.travel.journey&&!features.travel.journey.consumed&&features.travel.journey.fixture.mode==='season'&&features.travel.journey.fixture.id===`season:${s.prestigeCount}:${features.career.seasonNumber}:${s.division}:${s.matchday}:${s.history.at(-1)?.id||'initial'}`?features.travel.journey.fixture.venue:currentVenue(venue),schedule:[]};
+  const s=features.seasonMode, home=s.homeCity, region=homeRegionOf(home), o=getSeasonModeNextOpponent(s,features.club.name), index=Number(o.id.split('-').at(-1))-1, geo=seasonGeography(s.division,index,s.aiLeagues,catalogOf(home),region), saved=s.fixtures?.[s.matchday], away=saved?.away??s.matchday%2===1, venue=away?(saved?.venue??s.table.find(t=>t.id===o.id)?.venue??geo.venue):homeVenueOf(home);
+  return {id:`season:${s.prestigeCount}:${features.career.seasonNumber}:${s.division}:${s.matchday}:${s.history.at(-1)?.id||'initial'}`,mode,tournamentId:'stadium',opponentId:o.id,opponent:o.name,away,region:away?classifyDestination(venue,false,region):0,...(home?{home}:{}),venue:features.travel.journey&&!features.travel.journey.consumed&&features.travel.journey.fixture.mode==='season'&&features.travel.journey.fixture.id===`season:${s.prestigeCount}:${features.career.seasonNumber}:${s.division}:${s.matchday}:${s.history.at(-1)?.id||'initial'}`?features.travel.journey.fixture.venue:currentVenue(venue),schedule:[]};
  }
  const c=features.cup, t=getTournament(tournamentId)!;
  const id=`cup:${t.id}:${c.pendingNextRound?c.matchStartedAt:c.nextTournamentAt}:${c.pendingNextRound?c.round:0}:${Object.values(c.trophies).reduce((a,b)=>a+b,0)}`;
@@ -41,7 +47,8 @@ export function fixtureFor(features: GameFeatures, mode: 'season'|'tournament', 
  const highest = [...TOURNAMENTS].sort((a,b)=>b.minimumRating-a.minimumRating)[0];
  const neutral = t.id===highest.id && round===t.rounds-1;
  const away=true,venue=neutral?VENUES.wembley:tournamentVenue(o.id);
- return {id,mode,tournamentId:t.id,opponentId:o.id,opponent:o.name,away,neutral,region:away?classifyDestination(venue):0,venue:previous?.id===id&&!features.travel.journey?.consumed?previous.venue:currentVenue(venue),schedule:[...schedule]};
+ const home=features.seasonMode.homeCity;
+ return {id,mode,tournamentId:t.id,opponentId:o.id,opponent:o.name,away,neutral,region:away?classifyDestination(venue,false,homeRegionOf(home)):0,...(home?{home}:{}),venue:previous?.id===id&&!features.travel.journey?.consumed?previous.venue:currentVenue(venue),schedule:[...schedule]};
 }
 function seededRandom(seed:string) { let n=2166136261;for(const c of seed)n=Math.imul(n^c.charCodeAt(0),16777619);return ()=>{n+=0x6D2B79F5;let t=Math.imul(n^(n>>>15),1|n);t^=t+Math.imul(t^(t>>>7),61|t);return ((t^(t>>>14))>>>0)/4294967296;}; }
 // Retained export for historical consumers; these ranges no longer affect timing.
@@ -53,10 +60,11 @@ function validPlan(plan:JourneyPlan,baseMs:number) {
  return Math.abs(total-plan.realSeconds)<.01 && Math.abs(gameSeconds(total,plan.acceleration)*1000-baseMs)<2;
 }
 export function travelTiming(fixture:TravelFixture) {
- const km=fixture.away?distanceKm(HOME_VENUE,fixture.venue):0;
- const category=classifyDestination(fixture.venue,fixture.region===12);
+ const origin=homeVenueOf(fixture.home);
+ const km=fixture.away?distanceKm(origin,fixture.venue):0;
+ const category=classifyDestination(fixture.venue,fixture.region===12,homeRegionOf(fixture.home));
  if(!fixture.away)return {km,transport:'bus' as Journey['transport'],baseMs:0,category,plan:undefined};
- const plan=planJourney(fixture.venue);
+ const plan=planJourney(fixture.venue,undefined,origin,homeStationOf(fixture.home));
  const transport:Journey['transport']=plan.segments.some(s=>s.mode==='plane')?'plane':plan.segments.some(s=>s.mode==='train')?'train':'bus';
  return {km,transport,baseMs:Math.round(gameSeconds(plan.realSeconds,plan.acceleration)*1000),category,plan};
 }
@@ -147,7 +155,7 @@ export function createJourney(fixture:TravelFixture,now:number,random=Math.rando
   const delta=e.speed?-Math.round(realTimeLeft(timing.baseMs,at,events)*(1-1/e.speed)):Math.round(timing.baseMs*Math.max(-MAX_EVENT_SHARE,Math.min(MAX_EVENT_SHARE,e.share)));
   events.push({id:e.id,template:e.text,playerId:player?.id,text:pronounText(e.text.replace('{player}',player?.name??'Die Mannschaft'),player),at,delta,...(e.fine?{fine:e.fine}:{})});
  }}
- return {squadLock:features?{fixtureId:fixture.id,playerIds:[...new Set([...features.starXI.lineupIds,...features.starXI.benchIds].filter(Boolean))],startedAt:now,transferRemaining:Math.max(0,features.transferSaga.nextAt-now),eventRemaining:Math.max(0,features.nextEventAt-now),varRemaining:Math.max(0,features.nextVarAt-now),offerRemaining:features.transferSaga.pendingOffer?Math.max(0,features.transferSaga.pendingOffer.expiresAt-now):0}:undefined,plan:timing.plan,id:fixture.id,origin:HOME_VENUE,fixture:{...fixture,region:timing.category},startedAt:now,baseMs:timing.baseMs,endsAt:now+timing.baseMs+events.reduce((total,e)=>total+e.delta,0),transport:timing.transport,km:timing.km,events,consumed:false};
+ return {squadLock:features?{fixtureId:fixture.id,playerIds:[...new Set([...features.starXI.lineupIds,...features.starXI.benchIds].filter(Boolean))],startedAt:now,transferRemaining:Math.max(0,features.transferSaga.nextAt-now),eventRemaining:Math.max(0,features.nextEventAt-now),varRemaining:Math.max(0,features.nextVarAt-now),offerRemaining:features.transferSaga.pendingOffer?Math.max(0,features.transferSaga.pendingOffer.expiresAt-now):0}:undefined,plan:timing.plan,id:fixture.id,origin:homeVenueOf(fixture.home),fixture:{...fixture,region:timing.category},startedAt:now,baseMs:timing.baseMs,endsAt:now+timing.baseMs+events.reduce((total,e)=>total+e.delta,0),transport:timing.transport,km:timing.km,events,consumed:false};
 }
 export const TRAVEL_EVENT_CHANCE=.7;
 export const TRAVEL_SECOND_EVENT_CHANCE=.3;

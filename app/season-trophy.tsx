@@ -19,7 +19,8 @@ export function getSeasonTitle(entry: SeasonMatchHistoryEntry | null, finalTable
 }
 
 /** The trophy celebration after a league title; in Liga 1 the title also opens the Hall of Fame. */
-export function SeasonTrophyCelebration({ title, clubName, onClose }: { title: SeasonTitle; clubName: string; onClose: () => void }) {
+/** `homeCity`: the club's home city, for the local league names (Bern when missing). */
+export function SeasonTrophyCelebration({ title, clubName, onClose, homeCity }: { title: SeasonTitle; clubName: string; onClose: () => void; homeCity?: string }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   useDialogFocus(true, dialogRef, onClose);
   const hallOfFame = title.division >= SEASON_MODE_DIVISION_COUNT;
@@ -44,7 +45,7 @@ export function SeasonTrophyCelebration({ title, clubName, onClose }: { title: S
         <rect x="30" y="110" width="60" height="18" rx="4" fill="#2b2110" />
         <rect x="40" y="115" width="40" height="8" rx="2" fill="url(#season-trophy-gold)" opacity=".9" />
       </svg>
-      <p className="season-trophy-eyebrow">{hallOfFame ? "HALL OF FAME · MEISTER" : "MEISTER"} · {getSeasonModeDivisionLabel(title.division).toUpperCase()}</p>
+      <p className="season-trophy-eyebrow">{hallOfFame ? "HALL OF FAME · MEISTER" : "MEISTER"} · {getSeasonModeDivisionLabel(title.division, homeCity).toUpperCase()}</p>
       <h2 id="season-trophy-title">{clubName} holt den Titel!</h2>
       <p id="season-trophy-detail">{club.points} {club.points === 1 ? "Punkt" : "Punkte"} · {club.wins} {club.wins === 1 ? "Sieg" : "Siege"}, {club.draws} Remis, {club.losses} {club.losses === 1 ? "Niederlage" : "Niederlagen"} · {club.goalsFor}:{club.goalsAgainst} Tore{lead > 0 ? ` · ${lead} ${lead === 1 ? "Punkt" : "Punkte"} Vorsprung` : ""}</p>
       <p className="season-trophy-note">{hallOfFame ? "Meister der Weltliga: Dein Club steht für immer in der Hall of Fame." : "Platz 1 bringt den Aufstieg: Nächste Saison spielt dein Club eine Liga höher."}</p>

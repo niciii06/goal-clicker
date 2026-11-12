@@ -4,7 +4,7 @@
 // league's table), the own club included. The own club takes the place of whichever club it swaps with, so no league
 // ever gets bigger or smaller.
 import { LEAGUE_MEMBERS, SEASON_CLUBS, defaultAiLeagues, seasonClubsOf } from "./travel-geography";
-import type { AiLeagues } from "./travel-geography";
+import type { AiLeagues, SeasonClub } from "./travel-geography";
 
 const DIVISIONS = 15;
 export const OWN_CLUB_ID = "club";
@@ -13,12 +13,13 @@ export const OWN_CLUB_ID = "club";
 export type AiMove = { clubId: string; name: string; from: number; to: number };
 
 /** A saved assignment is only kept when it fits the own club's division: six per league, five in the own league. */
-export function normalizeAiLeagues(raw: unknown, playerDivision: number): AiLeagues | undefined {
+/** `catalog`: the clubs of the world (app/home-cities.ts worldCatalog); Bern's catalogue by default. */
+export function normalizeAiLeagues(raw: unknown, playerDivision: number, catalog: readonly SeasonClub[] = SEASON_CLUBS): AiLeagues | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
   const source = raw as Record<string, unknown>;
   const result: AiLeagues = {};
   const counts = new Array<number>(DIVISIONS + 1).fill(0);
-  for (const club of SEASON_CLUBS) {
+  for (const club of catalog) {
     const division = Number(source[club.id]);
     if (!Number.isInteger(division) || division < 1 || division > DIVISIONS) return undefined;
     result[club.id] = division;
@@ -35,11 +36,11 @@ export function normalizeAiMoves(raw: unknown): AiMove[] {
   })).filter((move) => move.clubId && move.name && Number.isInteger(move.from) && Number.isInteger(move.to) && move.from >= 1 && move.from <= DIVISIONS && move.to >= 1 && move.to <= DIVISIONS).slice(0, 2 * DIVISIONS);
 }
 
-type Sim = { ratingOf: (division: number, index: number) => number; rollScore: (strength: number, random: () => number) => number; random: () => number };
+type Sim = { catalog?: readonly SeasonClub[]; ratingOf: (division: number, index: number) => number; rollScore: (strength: number, random: () => number) => number; random: () => number };
 
 /** A double round robin between the six AI clubs of a league nobody plays in; the best come first. */
-function simulateRanking(division: number, aiLeagues: AiLeagues, { ratingOf, rollScore, random }: Sim): string[] {
-  const clubs = seasonClubsOf(division, aiLeagues);
+function simulateRanking(division: number, aiLeagues: AiLeagues, { ratingOf, rollScore, random, catalog }: Sim): string[] {
+  const clubs = seasonClubsOf(division, aiLeagues, catalog);
   const rows = clubs.map((club) => ({ id: club.id, points: 0, goalsFor: 0, goalsAgainst: 0 }));
   for (let home = 0; home < rows.length; home++) for (let away = 0; away < rows.length; away++) {
     if (home === away) continue;
@@ -59,17 +60,18 @@ function simulateRanking(division: number, aiLeagues: AiLeagues, { ratingOf, rol
  */
 export function advanceAiLeagues(options: { aiLeagues?: AiLeagues; playerDivision: number; playerLeagueOrder: string[]; ownClubName: string } & Sim) {
   const { playerDivision, playerLeagueOrder } = options;
-  const current: AiLeagues = { ...(options.aiLeagues ?? defaultAiLeagues(playerDivision)) };
+  const catalog = options.catalog ?? SEASON_CLUBS;
+  const current: AiLeagues = { ...(options.aiLeagues ?? defaultAiLeagues(playerDivision, catalog)) };
   const next: AiLeagues = { ...current };
   const moves: AiMove[] = [];
-  const nameOf = new Map(SEASON_CLUBS.map((club) => [club.id, club.name]));
+  const nameOf = new Map(catalog.map((club) => [club.id, club.name]));
   let playerNext = playerDivision;
   const place = (id: string, from: number, to: number) => {
     moves.push({ clubId: id, name: id === OWN_CLUB_ID ? options.ownClubName : nameOf.get(id) ?? id, from, to });
     if (id === OWN_CLUB_ID) playerNext = to; else next[id] = to;
   };
   for (let division = 1; division <= DIVISIONS; division++) {
-    const members = new Set(seasonClubsOf(division, current).map((club) => club.id));
+    const members = new Set(seasonClubsOf(division, current, catalog).map((club) => club.id));
     const real = division === playerDivision && playerLeagueOrder.length === LEAGUE_MEMBERS && playerLeagueOrder.includes(OWN_CLUB_ID) && playerLeagueOrder.every((id) => id === OWN_CLUB_ID || members.has(id));
     const ranking = real ? playerLeagueOrder : simulateRanking(division, current, options);
     if (division < DIVISIONS) place(ranking[0], division, division + 1);
