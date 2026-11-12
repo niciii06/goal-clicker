@@ -68,6 +68,8 @@ export type CoopPrestigeVote = {
   proposerName: string;
   keepNormalId: string | null;
   keepName: string | null;
+  /** Home city of the new run (app/home-cities.ts); missing means the world keeps its city. */
+  homeCity?: string;
   prestigeCount: number;
   expiresAt: number;
   expiresInMs: number;

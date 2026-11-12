@@ -111,36 +111,53 @@ export const LEAGUE_MEMBERS=6;
  * The league of every AI club in a world that never changed a league: the catalogue leagues, except that the sixth
  * club of the own club's league (it takes a seat there) plays in the lowest league, which has no own club then.
  */
-export function defaultAiLeagues(playerDivision:number):AiLeagues {
+export function defaultAiLeagues(playerDivision:number,catalog:readonly SeasonClub[]=SEASON_CLUBS):AiLeagues {
  const own=Math.max(1,Math.min(15,Math.floor(playerDivision)));
  const map:AiLeagues={};
- for(const club of SEASON_CLUBS)map[club.id]=16-club.league;
- if(own!==1){const sixth=EXTRA_CLUBS.find(c=>16-c.league===own);if(sixth)map[sixth.id]=1;}
+ for(const club of catalog)map[club.id]=16-club.league;
+ // The sixth club of a league is its last one in catalogue order (the extra clubs come after the original five).
+ if(own!==1){const sixth=catalog===SEASON_CLUBS?EXTRA_CLUBS.find(c=>16-c.league===own):catalog.filter(c=>16-c.league===own).at(LEAGUE_MEMBERS-1);if(sixth)map[sixth.id]=1;}
  return map;
 }
 /** The AI clubs of a division in stable catalogue order (the original clubs first, so their slots and ratings stay). */
-export function seasonClubsOf(division:number,aiLeagues?:AiLeagues) {
- const map=aiLeagues??defaultAiLeagues(division);
- return SEASON_CLUBS.filter(c=>map[c.id]===division);
+/** `catalog`: the clubs of the world (app/home-cities.ts worldCatalog); the Bern catalogue when none is given. */
+export function seasonClubsOf(division:number,aiLeagues?:AiLeagues,catalog:readonly SeasonClub[]=SEASON_CLUBS) {
+ const map=aiLeagues??defaultAiLeagues(division,catalog);
+ return catalog.filter(c=>map[c.id]===division);
 }
-export function seasonGeography(division:number,index:number,aiLeagues?:AiLeagues) {
+export function seasonGeography(division:number,index:number,aiLeagues?:AiLeagues,catalog:readonly SeasonClub[]=SEASON_CLUBS,home?:HomeRegion) {
  const d=Math.max(1,Math.min(15,Math.floor(division))), i=Math.max(0,Math.min(4,index));
- const club=seasonClubsOf(d,aiLeagues)[i];
+ const club=seasonClubsOf(d,aiLeagues,catalog)[i];
  if(!club)throw new Error(`Fehlender Club in Liga ${16-d}`);
- return {...club,region:classifyDestination(club.venue)};
+ return {...club,region:classifyDestination(club.venue,false,home)};
 }
 export function regionForDivision(division:number) { return DIVISION_REGIONS[Math.max(0,Math.min(14,division-1))]; }
-export function venueForClubName(name:string,division:number,index:number):Venue {
- const current=SEASON_CLUBS.find(c=>c.name===name);if(current)return current.venue;
+export function venueForClubName(name:string,division:number,index:number,catalog:readonly SeasonClub[]=SEASON_CLUBS):Venue {
+ const current=catalog.find(c=>c.name===name)??SEASON_CLUBS.find(c=>c.name===name);if(current)return current.venue;
  const legacy=LEGACY_POOLS.flat().find(([n])=>n===name);if(legacy)return VENUES[legacy[1]];
- return seasonGeography(division,index).venue;
+ return seasonGeography(division,index,undefined,catalog).venue;
 }
 /** Most specific location wins; category 13 is explicitly configured neutral elite venues only.
  * Neighbour countries up to 650 km; farther central Europe uses category 11.
  * Switzerland: Bern <=5/15/40 km, BE canton, adjacent cantons, language region.
  * Unclassified CH venues use category 9. Intercontinental >=9000 km uses 15. */
-export function classifyDestination(v:Venue,eliteNeutral=false) {
- const km=distanceKm(HOME_VENUE,v), ch=['Schweiz','Switzerland','CH'].includes(v.country);
+/**
+ * A home city other than Bern (app/home-cities.ts): its venue, city name, the cantons of its own region, the
+ * neighbouring cantons and its language. Without it the Bern rules below apply unchanged.
+ */
+export type HomeRegion={venue:Venue;city:string;cantons:readonly string[];neighbours:readonly string[];language:'de'|'fr'};
+const FRENCH_OR_ITALIAN_CANTONS=['VD','GE','VS','TI','NE','JU','FR'];
+export function classifyDestination(v:Venue,eliteNeutral=false,home?:HomeRegion) {
+ const km=distanceKm(home?.venue??HOME_VENUE,v), ch=['Schweiz','Switzerland','CH'].includes(v.country);
+ if(ch&&home){
+  // The same steps as for Bern, measured from the chosen home: own city, own region, neighbours, language region.
+  if(v.city===home.city)return km<=5?0:1;
+  if(home.cantons.includes(v.canton??'')){if(km<=15)return 2;if(km<=40)return 3;return 4;}
+  if(home.neighbours.includes(v.canton??'')&&km<=90)return 5;
+  const otherLanguage=home.language==='de'?FRENCH_OR_ITALIAN_CANTONS.includes(v.canton??'')||['Genf','Genève','Sion','Lausanne','Lugano'].includes(v.city):!FRENCH_OR_ITALIAN_CANTONS.includes(v.canton??'')&&!['Genf','Genève','Sion','Lausanne','Lugano'].includes(v.city);
+  if(v.canton||['Zürich','Basel','Winterthur','Luzern','St. Gallen','Genf','Sion','Lausanne','Lugano','Bern','Thun','Biel'].includes(v.city))return otherLanguage?7:6;
+  return 8;
+ }
  if(ch){
   if(v.city==='Bern')return km<=5?0:1;
   if(v.canton==='BE'||['Thun','Biel'].includes(v.city)){if(km<=15)return 2;if(km<=40)return 3;return 4;}

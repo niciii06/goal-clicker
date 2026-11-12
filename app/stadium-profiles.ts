@@ -125,7 +125,8 @@ export function crowdBoost(c: CrowdFactors = {}) {
  */
 export function stadiumProfile(venue: Venue | undefined, options: { homeDivision?: number; fanMood?: number; seed?: string; home?: boolean; crowd?: CrowdFactors } = {}): StadiumProfile {
   const v = venue ?? HOME_VENUE;
-  const own = options.home || v.id === HOME_VENUE.id;
+  // Every home ground (Bern and the other home cities, app/home-cities.ts) has an id starting with "home-".
+  const own = options.home || v.id === HOME_VENUE.id || v.id.startsWith('home-');
   let capacity: number, capacitySource: StadiumProfile['capacitySource'] = 'known', signature: StadiumSignature | undefined;
   const known = KNOWN[v.id] ?? (MILAN_ALIASES.includes(v.stadium) ? KNOWN.milan : undefined);
   if (own) { capacity = homeCapacity(options.homeDivision ?? 1); capacitySource = 'club-growth'; }

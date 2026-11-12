@@ -95,10 +95,24 @@ Echte Clubs spielen nie in der Chaosliga (Division 1). Die bleibt wie in Bern ei
 
 **Bekannte Abweichung Basel:** Die Stadtligen liegen weiter draussen als in Bern, weil OpenStreetMap in Basel Stadt über die Suche nur wenige getrennte Plätze liefert. Insgesamt liegt Basel im Rahmen (Test: Gesamtmittel höchstens 35 % von Bern entfernt). Verbessern lässt sich das mit weiteren belegten Basler Plätzen.
 
+## Im Spiel (Branch `claude/opus-home-city-game`)
+
+* **Neue Spielstände:** Vor dem ersten Ligaspiel zeigt «Spiele» die Karte «Wo steht dein Heimstadion?» mit Bern, Zürich, Basel und Genève. Die Wahl gilt sofort und ist bis zum Anpfiff frei änderbar (`chooseHomeCity`, `getHomeCityBlockReason`).
+* **Alte Spielstände:** Ohne `seasonMode.homeCity` gilt Bern. Bern wird nie gespeichert, ein Berner Spielstand bleibt Byte für Byte wie vorher. Alle Berner Pfade nutzen weiter `SEASON_CLUBS`, `HOME_VENUE` und die bisherigen Reiseregeln.
+* **Prestige:** Der Prestige Dialog bietet die Heimstadt des neuen Laufs an, vorgewählt ist die aktuelle (`applyGamePrestige(..., homeCity)`). Zu einem anderen Zeitpunkt lässt sie sich nicht ändern.
+* **Koop:** eine Stadt pro Welt.
+  * Der Host wählt vor dem ersten Ligaspiel (Aktion `home-city`).
+  * Danach ändert sie sich nur über das Prestige, dessen Abstimmung die Stadt mitführt; alle Mitglieder, die online sind, stimmen beidem zu.
+* **Ligen:** Jede Welt spielt mit dem Katalog ihrer Stadt (`catalogOf`). Weiterhin sechs Clubs pro Liga, ein Aufsteiger und ein Absteiger pro Grenze. Die Liganamen der Divisionen 1 bis 8 sind regional.
+* **Reisen:**
+  * Start am Heimstadion der Stadt, Bahn ab Zürich HB, Basel SBB oder Genève Cornavin.
+  * Die Reisekategorie wird relativ zur Heimat berechnet, die Kategorienamen sind regional.
+  * Strecken ohne Routencache zeigen die getestete Ersatzlinie.
+* **Tests:**
+  * `tests/home-city-game.test.ts`: Altspielstand, Stadtwahl, Ligasystem über drei Saisons, Prestige, Routen.
+  * `tests/home-city-coop.test.ts`: Host Wahl, Abstimmung mit Stadt, Prestige alleine online.
+
 ## Nächste Schritte
 
-1. **Katalog pro Welt:** in `app/season-leagues.ts` (`normalizeAiLeagues`, `advanceAiLeagues`) und `app/travel-geography.ts` (`defaultAiLeagues`, `seasonClubsOf`) `worldCatalog(homeCity)` statt `SEASON_CLUBS`. Dazu `seasonMode.homeCity` optional mit Standard Bern und der Test «alte Spielstände laden identisch».
-2. **Heimpunkt und Reisekategorie relativ zur Heimat:** Vergleichstest Bern, Bahnhof der Heimatstadt.
-3. **Auswahl beim Prestige**, im Koop per Abstimmung. Oberfläche nach den Apple Design Richtlinien.
-4. **Routencache** für die neuen Heimpunkte, sonst die getestete Ersatzlinie.
-5. **Mehr echte Clubs,** sobald weitere offizielle Vereinsseiten den Heimplatz nennen. Der Eintrag kommt in `VERIFIED` im Generator, der Test des belegten Anteils wird angepasst.
+1. **Routencache** für die neuen Heimpunkte (Strassen und Bahn), sonst die Ersatzlinie.
+2. **Mehr echte Clubs,** sobald weitere offizielle Vereinsseiten den Heimplatz nennen.

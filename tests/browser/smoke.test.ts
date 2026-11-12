@@ -608,7 +608,9 @@ test('Prestige opens from the Hall of Fame despite an incomplete squad, cancels 
     assert.match(await dialog.innerText(), /44 Stufen → Stufe 0/);
     assert.deepEqual(await layoutProblems(page), [], `${viewport.name}: Prestige dialog`);
     // The strongest normal card is chosen already (Q71); cancelling changes nothing.
-    assert.equal(await dialog.getByRole('radio', { checked: true }).count(), 1);
+    assert.equal(await dialog.getByRole('group', { name: 'Normale Karte behalten' }).getByRole('radio', { checked: true }).count(), 1);
+    // The home city of the new run starts on the current one (Bern for this save) and changes only here.
+    assert.equal(await dialog.getByRole('group', { name: 'Heimstadt für den neuen Lauf' }).getByRole('radio', { checked: true, name: /Bern/ }).count(), 1);
     assert.equal(await dialog.getByRole('button', { name: 'Prestige 1 starten' }).isEnabled(), true);
     await dialog.getByRole('button', { name: 'Abbrechen' }).click();
     await page.waitForTimeout(2600);

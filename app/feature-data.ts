@@ -19,6 +19,8 @@ import { GAZETTE_CHAMPION_HEADLINES, GAZETTE_EXIT_HEADLINES, TRANSFER_INTERESTED
 import { HOME_VENUE, LEAGUE_LABELS, seasonGeography, venueForClubName } from "./travel-geography";
 import type { AiLeagues } from "./travel-geography";
 import { OWN_CLUB_ID, advanceAiLeagues, normalizeAiLeagues, normalizeAiMoves } from "./season-leagues";
+import { HOME_CITIES, catalogOf, homeRegionOf, homeVenueOf, isHomeCityId, leagueLabelOf } from "./home-cities";
+import type { HomeCityId } from "./home-cities";
 import type { AiMove } from "./season-leagues";
 import { addBroadcastSubstitution, advanceMatchBroadcast, chooseGoalPattern, createMatchBroadcast, normalizeMatchBroadcast, recordedActionRating } from "./match-broadcast";
 import { advanceInteractive, normalizeInteractive, pauseBeforeExtraTime, resumeInteractive, simulationMinute } from "./interactive-match";
@@ -97,6 +99,12 @@ export type SeasonModeState = {
   aiLeagues?: AiLeagues;
   /** The AI clubs that changed league after the last finished season. */
   lastAiMoves?: AiMove[];
+  /**
+   * Home city of this club or co-op world (app/home-cities.ts): its home ground, local leagues up to division 8 and
+   * where journeys start. Missing means Bern (every save from before the home city choice). Chosen before the first
+   * league match of a new game, changed only with a Prestige.
+   */
+  homeCity?: HomeCityId;
 };
 
 export type GameFeatures = {
@@ -785,9 +793,10 @@ const SEASON_OPPONENT_NAMES = [
   "Inter Timeout",
 ] as const;
 
-export function getSeasonModeDivisionLabel(division: number) {
+/** `homeCity`: the saved home city; local league names up to division 8 (Bern without one). */
+export function getSeasonModeDivisionLabel(division: number, homeCity?: unknown) {
   const index = Math.max(1, Math.min(SEASON_MODE_DIVISION_COUNT, Math.floor(Number(division) || 1))) - 1;
-  return `Liga ${15-index} · ${SEASON_DIVISION_LABELS[index] ?? SEASON_DIVISION_LABELS[0]}`;
+  return `Liga ${15-index} · ${homeCity === undefined ? SEASON_DIVISION_LABELS[index] ?? SEASON_DIVISION_LABELS[0] : leagueLabelOf(homeCity, index + 1)}`;
 }
 
 export function getSeasonOpponentRating(division: number, index: number) {
@@ -795,21 +804,23 @@ export function getSeasonOpponentRating(division: number, index: number) {
   return Math.round(clamp(40 + (Math.max(1, division) - 1) * 3.4 + index * 1.5, 40, 99));
 }
 
-function createSeasonTable(division: number, clubName: string, aiLeagues?: AiLeagues): SeasonTableRow[] {
+function createSeasonTable(division: number, clubName: string, aiLeagues?: AiLeagues, homeCity?: HomeCityId): SeasonTableRow[] {
+  const catalog = catalogOf(homeCity), region = homeRegionOf(homeCity);
+  const geo = (index: number) => seasonGeography(division, index, aiLeagues, catalog, region);
   return [
     { id: "club", name: clubName || "FC Goal", rating: 0 },
-    ...SEASON_OPPONENT_NAMES.map((_, index) => ({ id: `season-opponent-${index + 1}`, name: seasonGeography(division, index, aiLeagues).name, clubId: seasonGeography(division, index, aiLeagues).id, venue: seasonGeography(division, index, aiLeagues).venue, rating: getSeasonOpponentRating(division, index + 1) })),
+    ...SEASON_OPPONENT_NAMES.map((_, index) => ({ id: `season-opponent-${index + 1}`, name: geo(index).name, clubId: geo(index).id, venue: geo(index).venue, rating: getSeasonOpponentRating(division, index + 1) })),
   ].map((team) => ({ ...team, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 }));
 }
 
-function normalizeSeasonTable(raw: unknown, division: number, clubName: string, aiLeagues?: AiLeagues) {
+function normalizeSeasonTable(raw: unknown, division: number, clubName: string, aiLeagues?: AiLeagues, homeCity?: HomeCityId) {
   const saved = Array.isArray(raw) ? raw.map(asRecord) : [];
-  return createSeasonTable(division, clubName, aiLeagues).map((fallback) => {
+  return createSeasonTable(division, clubName, aiLeagues, homeCity).map((fallback) => {
     const source = saved.find((candidate) => candidate.id === fallback.id) ?? {};
     return {
       id: fallback.id,
       clubId: typeof source.clubId==='string' ? source.clubId : fallback.clubId,
-      venue: fallback.id==='club' ? HOME_VENUE : source.venue && typeof source.venue==='object' && Number.isFinite(Number(asRecord(source.venue).lat)) && Number.isFinite(Number(asRecord(source.venue).lon)) ? source.venue as Venue : venueForClubName(safeString(source.name,fallback.name),division,Number(fallback.id.split('-').at(-1))-1),
+      venue: fallback.id==='club' ? homeVenueOf(homeCity) : source.venue && typeof source.venue==='object' && Number.isFinite(Number(asRecord(source.venue).lat)) && Number.isFinite(Number(asRecord(source.venue).lon)) ? source.venue as Venue : venueForClubName(safeString(source.name,fallback.name),division,Number(fallback.id.split('-').at(-1))-1,catalogOf(homeCity)),
       name: fallback.id === "club" ? clubName || fallback.name : safeString(source.name, fallback.name).slice(0, 42),
       rating: fallback.id === "club" ? 0 : Math.max(1, Math.min(99, Math.floor(Number(source.rating) || fallback.rating))),
       played: Math.max(0, Math.floor(Number(source.played) || 0)),
@@ -894,14 +905,16 @@ export function getSeasonSchedule(state: SeasonModeState): { matchday: number; p
   });
 }
 
-export function createSeasonFixtures(table:SeasonTableRow[]):SeasonFixture[] {
- return Array.from({length:10},(_,day)=>{const o=table.find(t=>t.id===`season-opponent-${day%5+1}`)!;return {opponentId:o.id,clubId:o.clubId??o.id,away:day%2===1,venue:day%2===1?o.venue!:HOME_VENUE};});
+export function createSeasonFixtures(table:SeasonTableRow[],homeVenue:Venue=HOME_VENUE):SeasonFixture[] {
+ return Array.from({length:10},(_,day)=>{const o=table.find(t=>t.id===`season-opponent-${day%5+1}`)!;return {opponentId:o.id,clubId:o.clubId??o.id,away:day%2===1,venue:day%2===1?o.venue!:homeVenue};});
 }
 
-export function initialSeasonMode(clubName = "FC Goal"): SeasonModeState {
-  const table = createSeasonTable(1, clubName);
+export function initialSeasonMode(clubName = "FC Goal", homeCity?: HomeCityId): SeasonModeState {
+  const city = homeCity && homeCity !== "bern" ? homeCity : undefined;
+  const table = createSeasonTable(1, clubName, undefined, city);
   return {
-    fixtures: createSeasonFixtures(table),
+    ...(city ? { homeCity: city } : {}),
+    fixtures: createSeasonFixtures(table, homeVenueOf(city)),
     division: 1,
     highestDivision: 1,
     matchday: 0,
@@ -940,11 +953,14 @@ export function normalizeSeasonModeState(value: unknown, clubName = "FC Goal", l
       createdAt: Math.max(1, Math.floor(Number(item.createdAt) || Date.now())),
     };
   }).filter((item): item is SeasonMatchHistoryEntry => Boolean(item)).slice(-30);
-  const aiLeagues = normalizeAiLeagues(source.aiLeagues, division);
-  const table = normalizeSeasonTable(source.table, division, clubName, aiLeagues);
-  const lastTable = normalizeSeasonTable(source.lastTable, division, clubName, aiLeagues);
-  const generated=createSeasonFixtures(table);
-  const fixtures=generated.map((fallback,index)=>{const raw=asRecord((Array.isArray(source.fixtures)?source.fixtures:[])[index]);return raw.opponentId===fallback.opponentId&&typeof raw.away==='boolean'?{...fallback,away:raw.away,venue:raw.away?(table.find(t=>t.id===raw.opponentId)?.venue??fallback.venue):HOME_VENUE}:fallback;});
+  // Bern is stored as a missing field, exactly like every save from before the choice.
+  const homeCity = isHomeCityId(source.homeCity) && source.homeCity !== "bern" ? source.homeCity : undefined;
+  const aiLeagues = normalizeAiLeagues(source.aiLeagues, division, catalogOf(homeCity));
+  const table = normalizeSeasonTable(source.table, division, clubName, aiLeagues, homeCity);
+  const lastTable = normalizeSeasonTable(source.lastTable, division, clubName, aiLeagues, homeCity);
+  const homeVenue = homeVenueOf(homeCity);
+  const generated=createSeasonFixtures(table, homeVenue);
+  const fixtures=generated.map((fallback,index)=>{const raw=asRecord((Array.isArray(source.fixtures)?source.fixtures:[])[index]);return raw.opponentId===fallback.opponentId&&typeof raw.away==='boolean'?{...fallback,away:raw.away,venue:raw.away?(table.find(t=>t.id===raw.opponentId)?.venue??fallback.venue):homeVenue}:fallback;});
   const teamIds = new Set(table.map((team) => team.id));
   const readResults = (raw: unknown) => (Array.isArray(raw) ? raw : []).map(asRecord).filter((item) => typeof item.homeId === "string" && typeof item.awayId === "string" && teamIds.has(item.homeId) && teamIds.has(item.awayId) && item.homeId !== item.awayId).map((item): SeasonResult => ({
     matchday: Math.max(1, Math.min(SEASON_MODE_MATCHES_PER_SEASON, Math.floor(Number(item.matchday) || 1))),
@@ -974,6 +990,7 @@ export function normalizeSeasonModeState(value: unknown, clubName = "FC Goal", l
     prestigeCount: Math.max(0, Math.floor(Number(source.prestigeCount) || 0)),
     ...(aiLeagues ? { aiLeagues } : {}),
     lastAiMoves: normalizeAiMoves(source.lastAiMoves),
+    ...(homeCity ? { homeCity } : {}),
   };
 }
 
@@ -1086,9 +1103,9 @@ export function recordSeasonModeMatch(value: unknown, clubScore: number, opponen
   // One club goes up and one goes down across every league boundary, the own club included: it swaps places with the
   // club that goes the other way, so every league keeps six members.
   const aiMovement = completedSeason && !hallOfFame
-    ? advanceAiLeagues({ aiLeagues: state.aiLeagues, playerDivision: state.division, playerLeagueOrder: lastTable.map((team) => (team.id === "club" ? OWN_CLUB_ID : team.clubId ?? "")), ownClubName: clubName || "FC Goal", ratingOf: getSeasonOpponentRating, rollScore: rollSeasonScore, random })
+    ? advanceAiLeagues({ aiLeagues: state.aiLeagues, playerDivision: state.division, playerLeagueOrder: lastTable.map((team) => (team.id === "club" ? OWN_CLUB_ID : team.clubId ?? "")), ownClubName: clubName || "FC Goal", ratingOf: getSeasonOpponentRating, rollScore: rollSeasonScore, random, catalog: catalogOf(state.homeCity) })
     : null;
-  const movedLeagues = aiMovement ? normalizeAiLeagues(aiMovement.aiLeagues, nextDivision) : undefined;
+  const movedLeagues = aiMovement ? normalizeAiLeagues(aiMovement.aiLeagues, nextDivision, catalogOf(state.homeCity)) : undefined;
   const nextAiLeagues = movedLeagues ?? state.aiLeagues;
   const nextState: SeasonModeState = {
     ...state,
@@ -1097,8 +1114,8 @@ export function recordSeasonModeMatch(value: unknown, clubScore: number, opponen
     division: nextDivision,
     highestDivision: nextHighestDivision,
     matchday: completedSeason ? 0 : matchday,
-    table: completedSeason && !hallOfFame ? createSeasonTable(nextDivision, clubName, nextAiLeagues) : lastTable,
-    fixtures: completedSeason && !hallOfFame ? createSeasonFixtures(createSeasonTable(nextDivision,clubName,nextAiLeagues)) : state.fixtures,
+    table: completedSeason && !hallOfFame ? createSeasonTable(nextDivision, clubName, nextAiLeagues, state.homeCity) : lastTable,
+    fixtures: completedSeason && !hallOfFame ? createSeasonFixtures(createSeasonTable(nextDivision,clubName,nextAiLeagues,state.homeCity),homeVenueOf(state.homeCity)) : state.fixtures,
     // A new season starts without results; the finished one stays visible through lastTable.
     results: completedSeason && !hallOfFame ? [] : seasonResults,
     lastTable,
@@ -1132,16 +1149,41 @@ export function playSeasonModeMatch(value: unknown, starRating: number, clubName
   return recordSeasonModeMatch(state, clubScore, opponentScore, clubName, now, random, opponent.id);
 }
 
-export function startSeasonPrestige(value: unknown, clubName = "FC Goal", now = Date.now()) {
+/** Why the home city cannot be chosen right now, or "" when it can: only before the first league match of a new game. */
+export function getHomeCityBlockReason(features: Pick<GameFeatures, "seasonMode" | "cup" | "travel" | "squadLock">) {
+  const season = features.seasonMode;
+  if (season.prestigeCount > 0 || season.division !== 1 || season.matchday !== 0 || season.history.length > 0 || season.highestDivision > 1) return "Die Heimstadt wechselt nur mit einem Prestige.";
+  if (features.cup.active || features.squadLock || (features.travel.journey && !features.travel.journey.consumed)) return "Während eines Spiels oder einer Reise lässt sich die Heimstadt nicht ändern.";
+  return "";
+}
+
+/** Sets the home city of a new game (before its first league match): a fresh first season with the local clubs. */
+export function chooseHomeCity(value: GameFeatures, city: HomeCityId): { features: GameFeatures; error: string } {
+  const features = normalizeGameFeatures(structuredClone(value));
+  if (!HOME_CITIES[city]) return { features: value, error: "Diese Stadt gibt es nicht." };
+  const blocked = getHomeCityBlockReason(features);
+  if (blocked) return { features: value, error: blocked };
+  if ((features.seasonMode.homeCity ?? "bern") === city) return { features, error: "" };
+  features.seasonMode = { ...initialSeasonMode(features.club.name, city), lastMatchAt: features.seasonMode.lastMatchAt };
+  return { features, error: "" };
+}
+
+/** `homeCity`: the home city of the new run (the only moment it can change); the current one when not given. */
+export function startSeasonPrestige(value: unknown, clubName = "FC Goal", now = Date.now(), homeCity?: unknown) {
   const state = normalizeSeasonModeState(value, clubName);
   if (!state.hallOfFame) return state;
-  const freshTable = createSeasonTable(1, clubName);
+  const chosen = isHomeCityId(homeCity) ? homeCity : state.homeCity;
+  const city = chosen && chosen !== "bern" ? chosen : undefined;
+  const { homeCity: _previous, ...rest } = state;
+  void _previous;
+  const freshTable = createSeasonTable(1, clubName, undefined, city);
   return {
-    ...state,
+    ...rest,
+    ...(city ? { homeCity: city } : {}),
     division: 1,
     matchday: 0,
     table: freshTable,
-    fixtures: createSeasonFixtures(freshTable),
+    fixtures: createSeasonFixtures(freshTable, homeVenueOf(city)),
     // The new season replays the same pairings; old scores must not show up as its results.
     results: [],
     lastTable: freshTable,
@@ -1193,7 +1235,7 @@ export function getPrestigeBlockReason(features: GameFeatures) {
  * no injury, ban or lineup reference behind. Callers use applyGamePrestige (app/game/prestige.ts), which also sets
  * the goal balance and every upgrade level to 0 in the same state update, so everything is saved together.
  */
-export function applySeasonPrestige(value: GameFeatures, keepNormalId: string | null, now = Date.now(), requestId = ""): { features: GameFeatures; error: string; duplicate?: boolean } {
+export function applySeasonPrestige(value: GameFeatures, keepNormalId: string | null, now = Date.now(), requestId = "", homeCity?: HomeCityId): { features: GameFeatures; error: string; duplicate?: boolean } {
   // One confirmed Prestige counts once: a retried or repeated request with the same id changes nothing.
   const receipt = requestId ? `prestige:${requestId.slice(0, 60)}` : "";
   if (receipt && value.purchaseReceipts?.includes(receipt)) return { features: value, error: "", duplicate: true };
@@ -1250,7 +1292,7 @@ export function applySeasonPrestige(value: GameFeatures, keepNormalId: string | 
   // History only: the final Hall of Fame table of the run that ends goes into the club chronicle.
   // Ranked like the season table (head-to-head included), also for an older save whose lastTable was stored unsorted.
   archiveHallOfFameBeforePrestige(features, now, sortSeasonTable(features.seasonMode.lastTable, features.seasonMode.lastResults));
-  features.seasonMode = startSeasonPrestige(features.seasonMode, features.club.name, now);
+  features.seasonMode = startSeasonPrestige(features.seasonMode, features.club.name, now, homeCity);
   const keptNormal = keepNormalId ? getStarXIPlayer(keepNormalId)?.name : null;
   addHistory(features, { title: `Prestige ${features.seasonMode.prestigeCount} gestartet`, detail: `Zurück in Saison 1 · Upgrades auf Stufe 0 · ${retained.size} Karten bleiben im Kader${keptNormal ? ` (mit ${keptNormal})` : ""} · +${Math.round(features.seasonMode.prestigeCount * PRESTIGE_GOAL_BONUS_PER_LEVEL * 100)} % Tore`, tone: "positive" }, now);
   return { features, error: "" };

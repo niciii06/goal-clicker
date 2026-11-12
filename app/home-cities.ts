@@ -3,8 +3,8 @@
 // divisions 9 to 15 are the same for every world. Data only: nothing in the game reads this module yet, so every
 // save plays in Bern as before. Bern returns exactly today's catalogue, so old saves stay valid once it is wired in.
 import pitches from "./home-cities/pitches.json";
-import { HOME_VENUE, LEAGUE_LABELS, SEASON_CLUBS } from "./travel-geography";
-import type { SeasonClub, Venue } from "./travel-geography";
+import { HOME_VENUE, LEAGUE_LABELS, REGION_LABELS, SEASON_CLUBS } from "./travel-geography";
+import type { HomeRegion, SeasonClub, Venue } from "./travel-geography";
 
 export const HOME_CITY_IDS = ["bern", "zurich", "basel", "geneve"] as const;
 export type HomeCityId = (typeof HOME_CITY_IDS)[number];
@@ -113,4 +113,55 @@ export function homeCityOf(saved: unknown): HomeCity {
 /** All clubs of a world with this home city: its local clubs plus the common clubs of divisions 9 to 15. */
 export function worldCatalog(city: HomeCityId): SeasonClub[] {
   return [...HOME_CITIES[city].regionalClubs, ...SEASON_CLUBS.filter((club) => 16 - club.league > REGIONAL_DIVISIONS)];
+}
+
+// One catalogue per city, built once. Bern is exactly SEASON_CLUBS (same array), so every Bern code path stays the
+// one of today.
+const CATALOGS: Record<HomeCityId, readonly SeasonClub[]> = { bern: SEASON_CLUBS, zurich: worldCatalog("zurich"), basel: worldCatalog("basel"), geneve: worldCatalog("geneve") };
+
+/** The clubs of a world with the saved home city (Bern for old saves). */
+export function catalogOf(saved: unknown): readonly SeasonClub[] {
+  return CATALOGS[homeCityOf(saved).id];
+}
+
+/** The home venue of a world with the saved home city. */
+export function homeVenueOf(saved: unknown): Venue {
+  return homeCityOf(saved).homeVenue;
+}
+
+const REGIONS: Record<Exclude<HomeCityId, "bern">, Omit<HomeRegion, "venue">> = {
+  zurich: { city: "Zürich", cantons: ["ZH"], neighbours: ["AG", "ZG", "SZ", "SG", "TG", "SH", "LU"], language: "de" },
+  basel: { city: "Basel", cantons: ["BS", "BL"], neighbours: ["AG", "SO", "JU"], language: "de" },
+  geneve: { city: "Genève", cantons: ["GE"], neighbours: ["VD", "VS", "FR"], language: "fr" },
+};
+
+/** The region rules for travel categories (classifyDestination); undefined for Bern, whose rules stay as they are. */
+export function homeRegionOf(saved: unknown): HomeRegion | undefined {
+  const city = homeCityOf(saved);
+  return city.id === "bern" ? undefined : { venue: city.homeVenue, ...REGIONS[city.id] };
+}
+
+const REGION_NAMES: Record<Exclude<HomeCityId, "bern">, readonly string[]> = {
+  zurich: ["Zürcher Quartier", "Stadt Zürich", "Agglomeration Zürich", "Region Zürich", "Kanton Zürich", "Nachbarkantone", "Deutschschweiz", "West- und Südschweiz"],
+  basel: ["Basler Quartier", "Stadt Basel", "Agglomeration Basel", "Region Basel", "Beide Basel", "Nachbarkantone", "Deutschschweiz", "West- und Südschweiz"],
+  geneve: ["Genfer Quartier", "Stadt Genf", "Agglomeration Genf", "Region Genf", "Kanton Genf", "Nachbarkantone", "Westschweiz", "Deutschschweiz und Tessin"],
+};
+
+/** The name of a travel category seen from the home city; categories from 8 on (all of Switzerland, abroad) are shared. */
+export function regionLabelOf(saved: unknown, category: number): string {
+  const city = homeCityOf(saved);
+  const index = Math.max(0, Math.min(REGION_LABELS.length - 1, Math.floor(category)));
+  return city.id !== "bern" && index < 8 ? REGION_NAMES[city.id][index] : REGION_LABELS[index];
+}
+
+/** The league name of a division for the home city: local names up to division 8, the common ones above. */
+export function leagueLabelOf(saved: unknown, division: number): string {
+  const index = Math.max(1, Math.min(LEAGUE_LABELS.length, Math.floor(Number(division) || 1))) - 1;
+  return index < REGIONAL_DIVISIONS ? homeCityOf(saved).leagueLabels[index] : LEAGUE_LABELS[index];
+}
+
+/** Where home matches are played, for match cards: the address for Bern, the ground and city elsewhere. */
+export function homeGroundLabel(saved: unknown): string {
+  const city = homeCityOf(saved);
+  return city.id === "bern" ? "Bümplizstrasse 45, Bern" : `${city.homeVenue.stadium}, ${city.name}`;
 }
