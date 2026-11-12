@@ -91,7 +91,7 @@ test("kick off text uses the real match duration", async () => {
   }
   assert.equal(formatCountdown(seasonMatchDuration(15), 0), "04:00");
   assert.equal(formatCountdown(seasonMatchDuration(3), 0), "03:30");
-  const pageSource = await import("node:fs/promises").then((fs) => fs.readFile(new URL("../app/page.tsx", import.meta.url), "utf8"));
+  const pageSource = await import("node:fs/promises").then((fs) => fs.readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"));
   assert.doesNotMatch(pageSource, /06:00/);
 });
 

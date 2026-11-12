@@ -74,7 +74,7 @@ test('all new cards survive saves, play original positions, receive milestones/u
 test('public pack metadata shows rating odds without the nationality restriction; other pack pools, prices and definitions remain unchanged',()=>{
  const scrap=STAR_PACKS.find(p=>p.id==='scrap')!;assert.equal(scrap.price,15000);assert.equal(scrap.label,'Schrott-Pack');assert.deepEqual(scrap.odds.map(({minRating,maxRating,chance})=>({minRating,maxRating,chance})),SCRAP_RATING_GROUPS);assert.deepEqual(scrap.odds.map(o=>o.label),["Gewöhnlich 55–59","Gewöhnlich 60–64","Gewöhnlich 65–69"]);
  assert.doesNotMatch(JSON.stringify(scrap),/India|Indien|indisch|keine Duplikate|freie Positionen/i);
- const ui=readFileSync(new URL('../app/page.tsx',import.meta.url),'utf8');assert.doesNotMatch(ui,/SCRAP_RATING_GROUPS|FC27_INDIA|60 schwache Schrottkarten/);
+ const ui=readFileSync(new URL('../app/game-app.tsx',import.meta.url),'utf8');assert.doesNotMatch(ui,/SCRAP_RATING_GROUPS|FC27_INDIA|60 schwache Schrottkarten/);
  assert.deepEqual(STAR_PACKS.filter(p=>p.id!=='scrap').map(p=>p.price),[1000000,15000000,100000000,1500000000,10000000000,20000000000]);
  for(const id of ['regional','scout','profi','elite','weltklasse','legend'] as const){const rng=random(8);for(let i=0;i<1000;i++)assert.ok(!SCRAP_PLAYERS.includes(openStarPack(id,[],rng).player));}
 });

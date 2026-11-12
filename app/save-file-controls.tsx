@@ -7,7 +7,7 @@ import { markCloudMetaPlayed } from "./cloud-sync";
 import { summarizeSave } from "./cloud-save-rules";
 import type { CloudSaveKeys, SaveSummary } from "./cloud-save-rules";
 import { collectSaveKeys, downloadSaveFile, parseSaveFile, replaceLocalSave } from "./game/save-export";
-import { resumeLocalPersistence, suspendLocalPersistence } from "./game/storage";
+import { resumeLocalPersistence, suspendLocalPersistence } from "./game/persistence";
 
 const number = (value: number) => Math.floor(value).toLocaleString("de-CH");
 const describe = (summary: SaveSummary | null) => summary ? `${number(summary.totalGoals)} Tore insgesamt, ${number(summary.seasons)} Saisons, ${number(summary.stars)} Sterne` : "kein Spielstand";

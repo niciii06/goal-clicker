@@ -1,7 +1,7 @@
 'use client';
 
 import { goalLabel } from './match-goals';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { formatIncomeDuration, getStarXIPlayer, getStarXIPositions, getUnavailableStarXIPlayerIds, STAR_POSITIONS, STAR_XI_PLAYERS, TOURNAMENTS, TRANSFER_UNHAPPY_PENALTY, transferUnhappyMatches } from './feature-data';
 import type { ChronicleMatchRecord } from './club-chronicle';
@@ -17,7 +17,8 @@ const name = (id: string) => getStarXIPlayer(id)?.name ?? 'Unbekannter Spieler';
 const signed = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}`;
 const nationName = (code: string) => { try { return new Intl.DisplayNames(['de-CH'], { type: 'region' }).of(code) || code; } catch { return code; } };
 
-export function CareerPlayerBadge({ features, player, compact = false }: { features: GameFeatures; player: StarXIPlayer; compact?: boolean }) {
+// Rendered for every card of the squad; pure in its props, so it skips App renders that change nothing here (audit P09).
+export const CareerPlayerBadge = memo(function CareerPlayerBadge({ features, player, compact = false }: { features: GameFeatures; player: StarXIPlayer; compact?: boolean }) {
   const form = getPlayerForm(features.career, player.id), card = getCareerCard(features.career, player), unhappy = transferUnhappyMatches(features, player.id);
   const unhappyLabel = `Unzufrieden · −${TRANSFER_UNHAPPY_PENALTY} OVR · noch ${unhappy} ${unhappy === 1 ? 'Spiel' : 'Spiele'}`;
   if (compact) return <>{form.matches || card.milestone || unhappy ? <span className={`career-pitch-badge ${card.milestone ? 'special' : ''}${unhappy ? ' unhappy' : ''}`} title={`${card.milestone?.label ?? 'Basiskarte'} · ${form.label} · Form ${signed(form.bonus)} OVR${unhappy ? ` · ${unhappyLabel}` : ''}`} style={{ '--career-accent': card.milestone?.accent ?? '#edf3fa' } as CSSProperties}>{unhappy ? '😠 ' : ''}{card.milestone ? '★ ' : ''}{form.matches ? signed(form.bonus) : ''}</span> : null}<DisciplineTags features={features} playerId={player.id} compact /></>;
@@ -28,7 +29,7 @@ export function CareerPlayerBadge({ features, player, compact = false }: { featu
     {unhappy > 0 && <span className="career-form-tag down">😠 {unhappyLabel}</span>}
     <DisciplineTags features={features} playerId={player.id} />
   </span>;
-}
+});
 
 /** Suspensions and yellow card warnings, for example "Gesperrt – 1 Spiel (3 Gelbe Karten)" or "2/3 Gelbe Karten". */
 export function DisciplineTags({ features, playerId, compact = false }: { features: GameFeatures; playerId: string; compact?: boolean }) {

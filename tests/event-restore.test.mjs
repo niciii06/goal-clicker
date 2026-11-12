@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("restored VAR and special events are presented without applying rewards again", async () => {
-  const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const pageSource = await readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8");
   const restoreBlock = pageSource.slice(
     pageSource.indexOf("const next: GameState"),
     pageSource.indexOf("}, []);", pageSource.indexOf("const next: GameState")),
@@ -15,7 +15,7 @@ test("restored VAR and special events are presented without applying rewards aga
 });
 
 test("restored cooperative events are not cleared after presentation", async () => {
-  const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const pageSource = await readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8");
   const resetStart = pageSource.indexOf("useEffect(() => {\n    coopEventRef.current = null;");
   const resetEnd = pageSource.indexOf("\n  }, [activeCoopCode]);", resetStart);
   const resetBlock = pageSource.slice(resetStart, resetEnd);

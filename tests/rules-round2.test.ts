@@ -53,7 +53,7 @@ test("decision 1: a loan still waiting for its match ends when the Hall of Fame 
 });
 
 test("decision 1: solo and co-op end the pending loan with the Hall of Fame match", () => {
-  const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const page = readFileSync(new URL("../app/game-app.tsx", import.meta.url), "utf8");
   const route = readFileSync(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8");
   for (const source of [page, route]) assert.match(source, /finishActiveTransferLoans\([^)]*\{ hallOfFameReached: result\.entry\.seasonOutcome === "hall-of-fame" \}\)/);
 });
@@ -93,7 +93,7 @@ test("decision 5: relegation and promotion again pays no star through recordSeas
   const again = run(relegated.season, 9);
   assert.equal(again.season.division, 4);
   assert.equal(again.reward, 0, "back into Liga 12 pays nothing");
-  const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const page = readFileSync(new URL("../app/game-app.tsx", import.meta.url), "utf8");
   const route = readFileSync(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8");
   assert.match(page, /const seasonReward = result\.starReward;/);
   assert.match(route, /game\.stars = Math\.min\(MAX_SEASON_STARS, game\.stars \+ result\.starReward\);/);

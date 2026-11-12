@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { readStyles } from './helpers/styles.mjs';
 import { STAR_XI_PLAYERS } from '../app/feature-data.ts';
 import { getStarCardTier, getWalkoutPresentation } from '../app/walkout-data.ts';
 
-const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
+const css = readStyles();
 const walkouts = STAR_XI_PLAYERS.filter((player) => !['standard', 'rare'].includes(getStarCardTier(player)));
 const byId = (id: string) => getWalkoutPresentation(STAR_XI_PLAYERS.find((player) => player.id === id)!);
 
