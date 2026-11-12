@@ -2488,3 +2488,16 @@ main :is(h2, h3, h4)[tabindex="-1"]:focus-visible { outline: 3px solid var(--acc
 .chronicle-hof { margin-top: 10px; }
 @media (max-width: 1000px) { .chronicle-totals { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .chronicle-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); } .chronicle-records { grid-template-columns: 1fr; } }
+
+/* Paused match, edit view: one clear heading block, the hint under it, calm spacing from the tab bar (Q: overloaded views). */
+.gc-sub-heading { flex-wrap: nowrap; align-items: flex-start; justify-content: space-between; gap: var(--space-2); }
+.gc-sub-heading-text { display: grid; gap: 2px; min-width: 0; }
+.gc-sub-heading-text h3 { font-size: var(--text-callout); line-height: 1.25; }
+.gc-sub-heading-text span { color: var(--soft); font-size: var(--text-footnote); line-height: 1.4; }
+.gc-sub-panel .gc-sub-heading button { min-height: 44px; min-width: 44px; margin-left: auto; padding: 10px 16px; }
+.gc-sub-panel .gc-sub-confirm button { min-height: 44px; }
+.gc-sub-panel .starxi-lineup-heading { flex-direction: column; align-items: flex-start; gap: 4px; margin-top: var(--space-3); }
+.gc-sub-panel .starxi-lineup-heading small { max-width: 60ch; text-align: left; color: var(--soft); }
+.gc-interactive-pause { margin-top: var(--space-2); }
+.gc-interactive-controls { margin-top: var(--space-3); margin-bottom: var(--space-3); row-gap: var(--space-2); }
+.gc-interactive-controls + .gc-sub-panel, .gc-interactive-pause + .gc-sub-panel { margin-top: 0; }
