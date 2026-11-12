@@ -1,0 +1,11 @@
+{
+  "_comment": "Warning thresholds for scripts/qa/perf-baseline.mjs --check, derived from docs/qa/perf-baseline.md: bytes and requests about 25 percent above the measured baseline, timings about twice the measured value (timings are noisy). Change them together with a new baseline, never to silence a warning.",
+  "mobile:start": { "scriptKB": 820, "totalKB": 1400, "requests": 24, "cls": 0.1, "lcp": 2500 },
+  "mobile:kader": { "scriptKB": 820, "totalKB": 950, "requests": 20, "cls": 0.1, "lcp": 2500 },
+  "mobile:packs": { "scriptKB": 820, "totalKB": 950, "requests": 20, "cls": 0.1, "lcp": 2500 },
+  "mobile:spiele": { "scriptKB": 820, "totalKB": 950, "requests": 20, "cls": 0.1 },
+  "desktop:start": { "scriptKB": 820, "totalKB": 1400, "requests": 24, "cls": 0.1, "lcp": 1200 },
+  "desktop:kader": { "scriptKB": 820, "totalKB": 1400, "requests": 24, "cls": 0.1, "lcp": 1200 },
+  "desktop:packs": { "scriptKB": 820, "totalKB": 1400, "requests": 24, "cls": 0.1, "lcp": 1200 },
+  "desktop:spiele": { "scriptKB": 1200, "totalKB": 1800, "requests": 25, "cls": 0.1, "lcp": 1500 }
+}

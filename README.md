@@ -13,7 +13,7 @@ Aktueller Spielcode mit Spielerpool, Saisons, Walkouts und Multiplayer. Release 
 * [Datenbank und Datenübernahme](docs/supabase-datenbank.md)
 * [Login einrichten (Google oder Benutzername), Profil und Cloud Spielstand](docs/google-login.md)
 
-Verifikation: `npm run typecheck`, `npm run lint`, `npm test` (inklusive `next build`), `npm run test:db` mit einer Testdatenbank; ergänzend `npm run verify:physics`. Ein GitHub Push veröffentlicht nichts: Die ChatGPT Site übernimmt den Stand von `main` erst, wenn der Besitzer sie dazu anweist (siehe [HOSTING.md](HOSTING.md)).
+Verifikation: `npm run typecheck`, `npm run lint`, `npm test` (inklusive `next build`), `npm run test:db` mit einer Testdatenbank; ergänzend `npm run verify:physics`. Performance: `npm run build`, dann `npm run perf:baseline -- --check` misst LCP, CLS, Bytes und Anfragen gegen die Warnschwellen (siehe [docs/qa/perf-baseline.md](docs/qa/perf-baseline.md)). Ein GitHub Push veröffentlicht nichts: Die ChatGPT Site übernimmt den Stand von `main` erst, wenn der Besitzer sie dazu anweist (siehe [HOSTING.md](HOSTING.md)).
 
 Browser Prüfung: `npm run test:browser` startet den Produktionsbuild mit `next start` und prüft mit Chromium alle Tabs auf Desktop und Handy (Fehler, Überlauf, überlappender oder schwer lesbarer Text) sowie Combo, tägliche Prämie, Live Spiel und Pressekonferenz. Der GitHub Workflow führt sie nach `npm test` aus. `npm run test:account` spielt zusätzlich Login, Übernahme der Originalkonten, Profil, Cloud Spielstand mit zwei Geräten und Multiplayer mit zwei Konten durch (Nachbau von Neon Auth, braucht eine Testdatenbank).
 
