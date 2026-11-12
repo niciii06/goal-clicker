@@ -157,3 +157,11 @@ test('Club & Mehr: the club identity is a section of its own, set apart from the
   assert.match(page, /className="club-preview" role="img" aria-label=\{`Vorschau deines Wappens/, 'the badge preview is a picture, not a lookalike button');
   assert.match(css, /\.club-identity \{ margin-top: 16px; padding: 16px; border: 1px solid var\(--line-soft\)/);
 });
+
+test('the iPhone and iPad header is a nearly opaque glass (WebKit only), so logo and icons keep their contrast', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const css = await readFile(new URL('../app/globals.css', import.meta.url), 'utf8');
+  assert.match(css, /@supports \(-webkit-touch-callout: none\) \{\s*\.topbar \{ background: color-mix\(in srgb, var\(--surface-raised\) 94%, transparent\); \}/);
+  // The rule comes after the glass header definition, so it wins on iOS only.
+  assert.ok(css.indexOf('@supports (-webkit-touch-callout: none) {\n  .topbar') > css.indexOf('.topbar { top: 0; margin: 0 calc(var(--space-2) * -1)'));
+});
