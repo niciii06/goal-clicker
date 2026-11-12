@@ -242,10 +242,8 @@ test("every nation on a card has a walkout country and a real flag", async () =>
 });
 
 test("no card reveal can be skipped, and the card type is not shown before the animation ends", async () => {
-  const [pageSource, styleSource] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
-  ]);
+  const pageSource = await readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8");
+  const styleSource = readStyles();
   // The skip button, its timer, state and handler are gone for every card category.
   assert.doesNotMatch(pageSource, /Überspringen|walkoutSkippable|WalkoutSkippable|skipStarReveal|walkoutSkipTimerRef|STAR_WALKOUT_SKIP_AFTER_MS|starRevealSkipped|WALKOUT_SEEN_STORAGE_KEY/);
   assert.doesNotMatch(styleSource, /star-walkout-skip/);
