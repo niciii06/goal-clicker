@@ -921,24 +921,22 @@ test("sale offers pay the card value sixty percent of the time and can be free",
   assert.equal(reloaded.transferSaga.pendingOffer?.fee, 0);
 });
 
-test("keeping a player who wanted to leave makes him weaker for three matches", () => {
+test("keeping a player against a paid offer: no temporary penalty any more (milestone reset, tests/fabrizio-keep-reset.test.ts)", () => {
   const offered = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.31, 0, 0, 0, 0]), 2000);
   const playerId = offered.event!.playerId!;
+  assert.ok(offered.features.transferSaga.pendingOffer!.fee > 0);
   const kept = declineTransferOffer(offered.features, 3000);
   assert.equal(kept.event!.outcome, "declined");
   assert.equal(kept.goalDelta, 0);
   assert.equal(kept.features.starXI.ownedIds.includes(playerId), true);
   assert.equal(kept.features.starXI.lineupIds.includes(playerId), true);
   assert.equal(kept.features.transferSaga.pendingOffer, null);
-  assert.equal(transferUnhappyMatches(kept.features, playerId), TRANSFER_UNHAPPY_MATCHES);
+  assert.equal(transferUnhappyMatches(kept.features, playerId), 0);
   assert.equal(kept.features.transferSaga.archive.at(-1)?.outcome, "declined");
-  // The penalty survives a reload and goes into the match strength.
   const reloaded = normalizeGameFeatures(JSON.parse(JSON.stringify(kept.features)));
-  assert.equal(transferUnhappyMatches(reloaded, playerId), TRANSFER_UNHAPPY_MATCHES);
   reloaded.cup.matchStartedAt = 5000;
   prepareCareerMatch(reloaded);
-  assert.equal(reloaded.cup.careerBonuses?.[playerId], -TRANSFER_UNHAPPY_PENALTY);
-  assert.equal(normalizeGameFeatures(reloaded).cup.careerBonuses?.[playerId], -TRANSFER_UNHAPPY_PENALTY);
+  assert.notEqual(reloaded.cup.careerBonuses?.[playerId], -TRANSFER_UNHAPPY_PENALTY);
   // While the offer is open no new rumour comes, afterwards Fabrizio carries on.
   assert.equal(resolveTransferInsiderEvent(offered.features, sequenceRandom([0.1, 0, 0, 0]), 4000).event, null);
   assert.notEqual(resolveTransferInsiderEvent(kept.features, sequenceRandom([0.1, 0, 0, 0]), 4000).event, null);
@@ -947,7 +945,9 @@ test("keeping a player who wanted to leave makes him weaker for three matches", 
 test("unhappiness wears off after three recorded matches", () => {
   const offered = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.31, 0, 0, 0, 0]), 2000);
   const playerId = offered.event!.playerId!;
+  // Unhappiness only comes from saves before 12 November 2026 now; it still wears off as before.
   let features = declineTransferOffer(offered.features, 3000).features;
+  features.transferSaga.unhappy = [{ playerId, club: "Altclub", matchesLeft: TRANSFER_UNHAPPY_MATCHES }];
   for (let match = 1; match <= TRANSFER_UNHAPPY_MATCHES; match++) {
     features.cup.active = false;
     features.cup.matchStartedAt = 10000 * match;
@@ -958,19 +958,20 @@ test("unhappiness wears off after three recorded matches", () => {
   assert.ok(features.history.some((entry) => /wieder zufrieden/.test(entry.title)));
   // The same match counted twice does not wear it off faster.
   const again = declineTransferOffer(resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.31, 0, 0, 0, 0]), 2000).features, 3000).features;
+  again.transferSaga.unhappy = [{ playerId, club: "Altclub", matchesLeft: TRANSFER_UNHAPPY_MATCHES }];
   again.cup.matchStartedAt = 7000; again.cup.careerMatchId = "career:same";
   recordCareerMatch(again, 7001); recordCareerMatch(again, 7002);
   assert.equal(transferUnhappyMatches(again, playerId), TRANSFER_UNHAPPY_MATCHES - 1);
 });
 
-test("an unanswered offer runs out as declined, but its clock stops for matches, journeys and closed tabs", () => {
+test("an unanswered offer lapses without consequence, but its clock stops for matches, journeys and closed tabs", () => {
   const offered = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.31, 0, 0, 0, 0]), 2000).features;
   const expiresAt = offered.transferSaga.pendingOffer!.expiresAt;
   assert.equal(expireTransferOffer(offered, expiresAt - 1).event, null);
   const expired = expireTransferOffer(offered, expiresAt);
   assert.equal(expired.event?.outcome, "declined");
   assert.equal(expired.event?.headline, "Angebot verfallen");
-  assert.equal(transferUnhappyMatches(expired.features, expired.event!.playerId!), TRANSFER_UNHAPPY_MATCHES);
+  assert.equal(transferUnhappyMatches(expired.features, expired.event!.playerId!), 0);
 
   // A closed tab adds its time to the offer.
   assert.equal(pauseGameFeatureTimers(offered, 60000).transferSaga.pendingOffer!.expiresAt, expiresAt + 60000);
