@@ -1,7 +1,8 @@
 // Service worker of the installable app. Pages and the API always come from the network, because the game needs
 // the login and the cloud save; without a connection a page request shows offline.html. Hashed build files, icons
 // and stadium sounds never change, so they are served from the cache once loaded.
-const VERSION = "v1";
+// Bumped with the green app icons so installed copies drop the cached blue ones.
+const VERSION = "v2";
 const STATIC_CACHE = `goal-clicker-static-${VERSION}`;
 const OFFLINE_CACHE = `goal-clicker-offline-${VERSION}`;
 const OFFLINE_URL = "/offline.html";

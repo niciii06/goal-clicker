@@ -1,5 +1,6 @@
 // Renders the app icons for the web app manifest from public/favicon.svg. Run once after changing the favicon:
 // node scripts/pwa-icons.mjs
+// The background is the brand green (--accent in app/globals.css, light theme).
 import { readFile, writeFile } from "node:fs/promises";
 import sharp from "sharp";
 
@@ -12,5 +13,8 @@ for (const size of [192, 512]) {
 
 // Maskable icons may be cut to a circle, so the ball sits in the inner 80% on a full bleed background.
 const ball = favicon.replace(/<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "").replace(/<rect[^>]*\/>/, "");
-const maskable = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#0071e3"/><g transform="translate(32 32) scale(0.72) translate(-32 -32)">${ball}</g></svg>`;
+const maskable = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#0a7d43"/><g transform="translate(32 32) scale(0.72) translate(-32 -32)">${ball}</g></svg>`;
 await writeFile(out("icon-maskable-512.png"), await sharp(Buffer.from(maskable), { density: 72 * 8 }).resize(512, 512).png().toBuffer());
+
+// iOS rounds the corners itself and fills transparent pixels black, so the home screen icon is a full bleed square.
+await writeFile(new URL("../public/apple-touch-icon.png", import.meta.url), await sharp(Buffer.from(maskable), { density: 72 * 3 }).resize(180, 180).png().toBuffer());

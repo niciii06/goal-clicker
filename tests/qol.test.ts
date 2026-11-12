@@ -30,7 +30,7 @@ test('open actions: daily reward, unopened packs, Fabrizio offer and the tab tit
   assert.equal(actions.find((action) => action.id === 'packs')?.section, 'packs');
   assert.deepEqual(Object.keys(sectionBadges(actions)).sort(), ['home', 'packs']);
   assert.equal(appBadgeCount(actions), 2);
-  assert.equal(statusTitle('Home', features, NOW, actions), '🎁 Prämie bereit · Home · Goal Clicker');
+  assert.equal(statusTitle('Home', features, NOW, actions), 'Prämie bereit · Home · Goal Clicker');
   assert.equal(statusTitle('Home', features, NOW, []), 'Home · Goal Clicker');
 });
 
@@ -38,7 +38,7 @@ test('tab title shows the live score and minute', () => {
   const features = initialGameFeatures();
   features.cup = { ...features.cup, active: true, phase: 'regular', homeScore: 2, awayScore: 1, matchStartedAt: NOW - 120_000, matchEndsAt: NOW + 120_000 };
   const title = statusTitle('Spiele', features, NOW, []);
-  assert.match(title, /^⚽ 2:1 · \d+′ · Goal Clicker$/);
+  assert.match(title, /^2:1 · \d+′ · Goal Clicker$/);
 });
 
 test('mini games are ready again only after they were played', () => {
@@ -161,4 +161,19 @@ test('lineup changes and the rating after a move', () => {
   assert.equal(formatRatingDelta(2), '+2 OVR');
   assert.equal(formatRatingDelta(-1), '−1 OVR');
   assert.equal(formatRatingDelta(0), '± 0 OVR');
+});
+
+test('the browser tab title never contains an emoji or symbol, in every state', () => {
+  const noPictograph = (title: string) => assert.doesNotMatch(title, /[\p{Extended_Pictographic}✓✔]/u, title);
+  const live = (extra: object) => ({ ...initialGameFeatures(), cup: { ...initialGameFeatures().cup, active: true, matchStartedAt: NOW - 120_000, matchEndsAt: NOW + 120_000, ...extra } });
+  noPictograph(statusTitle('Spiele', live({ phase: 'regular', homeScore: 0, awayScore: 0 }), NOW, []));
+  noPictograph(statusTitle('Spiele', live({ phase: 'extra-time', homeScore: 1, awayScore: 1 }), NOW, []));
+  const penalties = statusTitle('Spiele', live({ phase: 'penalties', homeScore: 1, awayScore: 1, penaltyHomeScore: 3, penaltyAwayScore: 2 }), NOW, []);
+  noPictograph(penalties);
+  assert.match(penalties, /^1:1 · Elfmeterschiessen 3:2 · Goal Clicker$/);
+  for (const id of ['journey', 'daily', 'packs'] as const) {
+    const title = statusTitle('Home', initialGameFeatures(), NOW, [{ id, count: 1, section: 'home', label: id } as never]);
+    noPictograph(title);
+    assert.ok(title.endsWith('Home · Goal Clicker'), title);
+  }
 });

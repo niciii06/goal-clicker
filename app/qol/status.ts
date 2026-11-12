@@ -74,17 +74,17 @@ export function appBadgeCount(actions: readonly OpenAction[]) {
   return actions.filter((action) => action.id !== "minigame").reduce((sum, action) => sum + action.count, 0);
 }
 
-/** The browser tab title: a live match first, then an arrived journey, then a ready reward, else the tab name. */
+/** The browser tab title, always plain text (no emoji): a live match first, then an arrived journey, then a ready reward, else the tab name. */
 export function statusTitle(tabTitle: string | undefined, features: GameFeatures, now: number, actions: readonly OpenAction[]) {
   const base = tabTitle ? `${tabTitle} · Goal Clicker` : "Goal Clicker";
   const cup = features.cup;
   if (cup.active) {
-    if (cup.phase === "penalties") return `⚽ ${cup.homeScore}:${cup.awayScore} · Elfmeterschiessen ${cup.penaltyHomeScore}:${cup.penaltyAwayScore} · Goal Clicker`;
-    return `⚽ ${cup.homeScore}:${cup.awayScore} · ${getCupMatchMinute(cup, now)}′ · Goal Clicker`;
+    if (cup.phase === "penalties") return `${cup.homeScore}:${cup.awayScore} · Elfmeterschiessen ${cup.penaltyHomeScore}:${cup.penaltyAwayScore} · Goal Clicker`;
+    return `${cup.homeScore}:${cup.awayScore} · ${getCupMatchMinute(cup, now)}′ · Goal Clicker`;
   }
-  if (actions.some((action) => action.id === "journey")) return `✓ Angekommen · ${base}`;
-  if (actions.some((action) => action.id === "daily")) return `🎁 Prämie bereit · ${base}`;
-  if (actions.some((action) => action.id === "packs")) return `🎁 Pack bereit · ${base}`;
+  if (actions.some((action) => action.id === "journey")) return `Angekommen · ${base}`;
+  if (actions.some((action) => action.id === "daily")) return `Prämie bereit · ${base}`;
+  if (actions.some((action) => action.id === "packs")) return `Pack bereit · ${base}`;
   return base;
 }
 
