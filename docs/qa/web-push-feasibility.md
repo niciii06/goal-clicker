@@ -33,7 +33,27 @@ Punkt 2 und 3 sind die Kostenfrage: Ein Zeitgeber ist bei Gratisplänen meist st
 * **Am ehesten machbar** wäre allein «Reise angekommen» per Push, weil der Server die Ankunftszeit kennt. Dafür braucht es trotzdem einen Zeitgeber und eine Abonnement Tabelle; der Nutzen ist klein.
 * **Kostenlos und sofort verfügbar** ist die Variante innerhalb der offenen App (Fortschrittsanzeige, Matchscore) und die bestehenden lokalen Mitteilungen im Hintergrund. Ein Dynamic Island Widget geht nicht ohne native App und ist ausgeschlossen.
 
+## Vergleich unter der Bedingung CHF 0 (bestätigt von Nicolas, absolut)
+
+Verbindlich: keine bezahlten Dienste, keine Upgrades, keine neue Infrastruktur, keine Live Änderung.
+
+| | Lokale Mitteilungen (vorhanden) | Nur «Reise angekommen» per Push |
+|---|---|---|
+| Zusätzliche Kosten | CHF 0, nichts wird versendet | **nicht belegbar** |
+| Neue Infrastruktur | keine | Zeitgeber oder Hintergrundjob, Abonnement Tabelle (Datenbank), VAPID Schlüssel, Versand an den Apple Push Dienst |
+| Funktioniert bei geschlossener App | **Nein**, die Seite muss laufen. iOS hält Web Apps im Hintergrund nach kurzer Zeit an; die Mitteilung kommt zuverlässig nur, solange die App offen oder gerade erst verlassen ist. | Ja, das wäre der Gewinn |
+| Datengrundlage | lokal, korrekt | Ankunftszeit aus dem Reisejournal, korrekt |
+| Aus dem Code belegt | ja (`app/qol/notifications.ts`) | nur die Datengrundlage, nicht die Kosten |
+
+**Fehlende Belege für den Push, die nur mit Zugriff auf Hosting und Datenbank zu klären sind:**
+
+1. Bietet ChatGPT Sites (die Produktionsplattform laut README) geplante Aufgaben oder Hintergrundjobs im jetzigen Plan, und gehören sie zu den Gratis Leistungen? Im Repo gibt es dafür keine Konfiguration (weder Cron noch Scheduler), und die Plattform Grenzen sind aus dem Code nicht lesbar.
+2. Darf ein Serverteil ausgehende Verbindungen zum Apple Push Dienst aufbauen und Schlüssel speichern?
+3. Wie viel Spielraum hat das Neon Gratisbudget (Rechenzeit, Egress) für die zusätzliche Tabelle und die Prüfläufe? Das ist Teil der offenen Neon Tickets.
+
+**Empfehlung:** Keine Implementierung. Der Nachweis, dass der Push innerhalb der vorhandenen Gratis Leistungen liegt, fehlt, also bleibt das Ticket eine Idee. Die lokalen Mitteilungen bleiben, wie sie sind. Ein Auslöser ohne Server, etwa der Notification Trigger der Browser, ist auf dem iPhone nicht verfügbar und kommt nicht in Frage.
+
 ## Entscheidung für Nicolas
 
 1. Reicht dir der Stand mit lokalen Mitteilungen (offene oder installierte App im Hintergrund)? Dann bleibt alles wie es ist.
-2. Soll ein Push nur für «Reise angekommen» geprüft werden? Dazu müsste zuerst geklärt werden, ob Hosting und Neon einen Zeitgeber und die Zusatzlast im Gratisplan erlauben (braucht deinen Zugang, kein Zugriff aus dieser Sitzung).
+2. Sollen die drei fehlenden Belege oben bei Gelegenheit mit deinem Zugang geklärt werden? Erst wenn alle drei mit «ja, ohne Kosten» beantwortet sind, wäre ein Push nur für «Reise angekommen» eine Umsetzung wert.
