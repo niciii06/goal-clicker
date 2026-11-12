@@ -1,24 +1,64 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+
 import { getSeasonModeDivisionLabel, getSeasonSchedule, SEASON_MODE_DIVISION_COUNT, SEASON_MODE_MATCHES_PER_SEASON, sortSeasonTable } from "./feature-data";
 import type { GameFeatures, SeasonResult, SeasonScheduleMatch, SeasonTableRow } from "./feature-data";
 import { getStarXIPlayer } from "./feature-data";
-import { formGuide, promotionOutlook, seasonTopScorers } from "./qol/season-insights";
+import { formMatchLabel, formMatches, promotionOutlook, seasonTopScorers } from "./qol/season-insights";
 
+type FormTip = { key: string; text: string; left: number; top: number };
+
+/**
+ * The league table. Columns: # Club Sp S U N Tore +/- Form Pkt (points last). Every form box (S, U, N) names its match
+ * on hover, keyboard focus or tap. The tip sits outside the horizontally scrolling table, so it is never cut off.
+ */
 function StandingsTable({ table, results, division, caption }: { table: readonly SeasonTableRow[]; results: readonly SeasonResult[]; division: number; caption: string }) {
   const rows = sortSeasonTable(table, results), top = division >= SEASON_MODE_DIVISION_COUNT;
-  return <div className="season-hub-table-wrap">
+  const nameOf = (teamId: string) => table.find((team) => team.id === teamId)?.name ?? "Unbekannt";
+  const shellRef = useRef<HTMLDivElement>(null);
+  const [tip, setTip] = useState<FormTip | null>(null);
+  useEffect(() => {
+    if (!tip) return;
+    const close = (event: Event) => { if (event.type !== "pointerdown" || !(event.target as Element | null)?.closest?.(".season-form-chip")) setTip(null); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setTip(null); };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", onKey); window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); };
+  }, [tip]);
+  function show(button: HTMLElement, key: string, text: string) {
+    const shell = shellRef.current;
+    if (!shell) return;
+    const box = button.getBoundingClientRect(), outer = shell.getBoundingClientRect();
+    const half = Math.min(120, outer.width / 2);
+    setTip({ key, text, left: Math.min(Math.max(box.left + box.width / 2 - outer.left, half), outer.width - half), top: box.top - outer.top });
+  }
+  return <div className="season-hub-table-shell" ref={shellRef}>
+    <div className="season-hub-table-wrap">
     <table className="season-hub-table">
       <caption>{caption}</caption>
-      <thead><tr><th scope="col">#</th><th scope="col">Club</th><th scope="col" title="Spiele">Sp</th><th scope="col" title="Siege">S</th><th scope="col" title="Unentschieden">U</th><th scope="col" title="Niederlagen">N</th><th scope="col">Tore</th><th scope="col" title="Tordifferenz">+/-</th><th scope="col">Pkt</th><th scope="col" className="season-form-head">Form</th></tr></thead>
+      <thead><tr><th scope="col">#</th><th scope="col">Club</th><th scope="col" title="Spiele">Sp</th><th scope="col" title="Siege">S</th><th scope="col" title="Unentschieden">U</th><th scope="col" title="Niederlagen">N</th><th scope="col">Tore</th><th scope="col" title="Tordifferenz">+/-</th><th scope="col" className="season-form-head">Form</th><th scope="col" title="Punkte">Pkt</th></tr></thead>
       <tbody>{rows.map((team, index) => {
         const zone = top ? (index === 0 ? "hall-of-fame" : index >= rows.length - 2 ? "relegation" : "") : index < 2 ? "promotion" : index >= rows.length - 2 && division > 1 ? "relegation" : "";
         const diff = team.goalsFor - team.goalsAgainst;
+        const form = formMatches(team.id, results);
         return <tr key={team.id} className={`${zone}${team.id === "club" ? " club" : ""}`}>
-          <td>{index + 1}</td><th scope="row">{team.name}</th><td>{team.played}</td><td>{team.wins}</td><td>{team.draws}</td><td>{team.losses}</td><td>{team.goalsFor}:{team.goalsAgainst}</td><td>{diff > 0 ? `+${diff}` : diff}</td><td><b>{team.points}</b></td><td className="season-form" aria-label={`Form: ${formGuide(team.id, results).join(" ") || "noch keine Spiele"}`}>{formGuide(team.id, results).map((letter, index) => <i key={index} className={`form-${letter}`}>{letter}</i>)}</td>
+          <td>{index + 1}</td><th scope="row">{team.name}</th><td>{team.played}</td><td>{team.wins}</td><td>{team.draws}</td><td>{team.losses}</td><td>{team.goalsFor}:{team.goalsAgainst}</td><td>{diff > 0 ? `+${diff}` : diff}</td>
+          <td className="season-form" role="group" aria-label={form.length ? `Form von ${team.name}` : `Form von ${team.name}: noch keine Spiele`}>{form.map((match) => {
+            const key = `${team.id}:${match.matchday}`, text = formMatchLabel(match, nameOf);
+            return <button type="button" key={key} className={`season-form-chip form-${match.letter}`} aria-label={`${match.letter === "S" ? "Sieg" : match.letter === "U" ? "Unentschieden" : "Niederlage"}: ${text}`} aria-describedby={tip?.key === key ? "season-form-tip" : undefined}
+              onMouseEnter={(event) => show(event.currentTarget, key, text)} onMouseLeave={() => setTip((current) => current?.key === key ? null : current)}
+              onFocus={(event) => show(event.currentTarget, key, text)} onBlur={() => setTip((current) => current?.key === key ? null : current)}
+              onClick={(event) => { if (tip?.key === key) setTip(null); else show(event.currentTarget, key, text); }}>{match.letter}</button>;
+          })}</td>
+          <td><b>{team.points}</b></td>
         </tr>;
       })}</tbody>
     </table>
+    </div>
+    {tip && <div id="season-form-tip" role="tooltip" className="season-form-tip" style={{ left: tip.left, top: tip.top }}>{tip.text}</div>}
     <p className="season-hub-legend"><span className={top ? "hall-of-fame" : "promotion"}>{top ? "Platz 1: Hall of Fame" : "Platz 1 und 2: Aufstieg"}</span>{division > 1 && <span className="relegation">Platz 5 und 6: Abstieg</span>}<small className="season-hub-tie-break">Bei gleich vielen Punkten zählen Tordifferenz, erzielte Tore und danach die direkten Begegnungen.</small></p>
   </div>;
 }

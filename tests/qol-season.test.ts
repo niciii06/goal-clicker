@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { initialGameFeatures, normalizeGameFeatures, SEASON_MODE_DIVISION_COUNT } from '../app/feature-data.ts';
 import type { SeasonResult, SeasonTableRow } from '../app/feature-data.ts';
-import { formGuide, promotionOutlook, seasonTopScorers } from '../app/qol/season-insights.ts';
+import { formGuide, formMatches, formMatchLabel, promotionOutlook, seasonTopScorers } from '../app/qol/season-insights.ts';
+import { SeasonPanel } from '../app/season-panel.tsx';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { createElement } from 'react';
 import { abandonTournamentRun, canAbandonTournament } from '../app/game/tournament-abandon.ts';
 import { filterHistory, historyActors, historyTopic } from '../app/qol/history-filter.ts';
 import { inviteUrl, joinCodeFromSearch, shortcutFor } from '../app/qol/invite.ts';
@@ -113,4 +116,35 @@ test('favourites: only own cards, saved optionally, old saves unchanged', () => 
   toggleFavoriteCard(features, id);
   assert.equal('favoriteIds' in features, false);
   assert.equal('favoriteIds' in normalizeGameFeatures(initialGameFeatures()), false);
+});
+
+test('form boxes name their real match: matchday, home or away, opponent and result', () => {
+  const results: SeasonResult[] = [
+    { matchday: 1, homeId: 'club', awayId: 'a', homeScore: 2, awayScore: 0 },
+    { matchday: 2, homeId: 'b', awayId: 'club', homeScore: 1, awayScore: 1 },
+    { matchday: 5, homeId: 'c', awayId: 'club', homeScore: 1, awayScore: 2 },
+  ];
+  const names: Record<string, string> = { club: 'FC Goal', a: 'FC Aarau', b: 'FC Basel', c: 'FC Luzern' };
+  const nameOf = (id: string) => names[id];
+  const matches = formMatches('club', results);
+  assert.deepEqual(matches.map((match) => match.letter), ['S', 'U', 'S'], 'letters and order are unchanged');
+  assert.deepEqual(formGuide('club', results), matches.map((match) => match.letter));
+  assert.equal(formMatchLabel(matches[2], nameOf), 'Spieltag 5 · Auswärts · FC Luzern 1:2 FC Goal');
+  assert.equal(formMatchLabel(matches[0], nameOf), 'Spieltag 1 · Heim · FC Goal 2:0 FC Aarau');
+  assert.equal(matches[1].opponentId, 'b');
+  // Only the last five matches count, never invented ones.
+  const many: SeasonResult[] = Array.from({ length: 8 }, (_, index) => ({ matchday: index + 1, homeId: 'club', awayId: 'a', homeScore: 1, awayScore: 0 }));
+  assert.deepEqual(formMatches('club', many).map((match) => match.matchday), [4, 5, 6, 7, 8]);
+});
+
+test('the season table ends with Form, then Pkt (points last)', () => {
+  const features = initialGameFeatures();
+  features.seasonMode.results = [{ matchday: 1, homeId: 'club', awayId: features.seasonMode.table[1].id, homeScore: 3, awayScore: 1 }];
+  const html = renderToStaticMarkup(createElement(SeasonPanel, { features }));
+  const header = html.match(/<thead>[\s\S]*?<\/thead>/)![0];
+  const labels = [...header.matchAll(/<th[^>]*>([^<]+)<\/th>/g)].map((match) => match[1]);
+  assert.deepEqual(labels, ['#', 'Club', 'Sp', 'S', 'U', 'N', 'Tore', '+/-', 'Form', 'Pkt']);
+  // Every body row follows the same order: the form cell (buttons) comes directly before the points cell.
+  for (const body of html.match(/<tr class="[^"]*">[\s\S]*?<\/tr>/g) ?? []) assert.match(body, /<\/td><td><b>\d+<\/b><\/td><\/tr>$/);
+  assert.match(html, /<button type="button" class="season-form-chip form-S" aria-label="Sieg: Spieltag 1 · Heim · /);
 });

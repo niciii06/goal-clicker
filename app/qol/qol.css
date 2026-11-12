@@ -99,10 +99,16 @@
 .season-hub-action small { color: var(--soft); }
 .season-hub-outlook { margin: 4px 0 10px; font-weight: 700; }
 .season-form { white-space: nowrap; }
-.season-form i { display: inline-block; width: 16px; height: 16px; margin-right: 2px; border-radius: 4px; color: #fff; font-size: 10px; font-style: normal; font-weight: 800; line-height: 16px; text-align: center; }
+.season-form-chip { position: relative; display: inline-block; width: 20px; height: 20px; margin: 0 2px 0 0; padding: 0; border: 0; border-radius: 5px; color: #fff; font: inherit; font-size: 11px; font-weight: 800; line-height: 20px; text-align: center; cursor: pointer; }
+/* A larger touch area than the box itself: 44 points tall, without widening the row. */
+.season-form-chip::after { position: absolute; inset: -12px -2px; content: ""; }
+.season-form-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .season-form .form-S { background: #16845b; }
-.season-form .form-U { background: #8e8e93; }
-.season-form .form-N { background: #d12c54; }
+.season-form .form-U { background: #6d6d72; }
+.season-form .form-N { background: #c4284d; }
+@media (pointer: coarse) { .season-form-chip { width: 24px; height: 24px; margin-right: 4px; line-height: 24px; } }
+.season-hub-table-shell { position: relative; }
+.season-form-tip { position: absolute; z-index: 20; width: max-content; max-width: min(240px, 100%); padding: 8px 10px; border-radius: 10px; background: var(--text); color: var(--surface); box-shadow: 0 6px 20px rgba(0,0,0,.25); font-size: var(--text-caption2); font-weight: 650; line-height: 1.35; pointer-events: none; transform: translate(-50%, calc(-100% - 8px)); text-align: center; }
 .season-hub-scorers { display: grid; gap: 4px; margin: 6px 0 0; padding-left: 20px; }
 .season-hub-scorers li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
 .season-hub-scorers span { color: var(--soft); font-size: var(--text-caption2); }
