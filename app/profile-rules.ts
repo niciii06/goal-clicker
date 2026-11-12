@@ -1,4 +1,10 @@
 // Rules for usernames, display names and passwords. The forms and the API share them.
+import { SOURCE_LOCALE } from "./i18n/locales";
+import { translator } from "./i18n/translate";
+
+/** Validation messages, German until a language choice exists (docs/i18n-plan.md). */
+const t = translator(SOURCE_LOCALE);
+
 export const USERNAME_MIN = 3;
 export const USERNAME_MAX = 20;
 export const DISPLAY_NAME_MIN = 2;
@@ -23,10 +29,10 @@ export function usernameKey(username: string) {
 
 export function usernameError(username: string): string | null {
   const value = username.trim();
-  if (value.length < USERNAME_MIN) return `Der Benutzername braucht mindestens ${USERNAME_MIN} Zeichen.`;
-  if (value.length > USERNAME_MAX) return `Der Benutzername darf höchstens ${USERNAME_MAX} Zeichen haben.`;
-  if (!/^[A-Za-z0-9_]+$/.test(value)) return "Erlaubt sind nur Buchstaben ohne Umlaute, Zahlen und _.";
-  if (RESERVED_USERNAMES.has(value.toLowerCase())) return "Dieser Benutzername ist reserviert.";
+  if (value.length < USERNAME_MIN) return t("profile.usernameTooShort", { min: USERNAME_MIN });
+  if (value.length > USERNAME_MAX) return t("profile.usernameTooLong", { max: USERNAME_MAX });
+  if (!/^[A-Za-z0-9_]+$/.test(value)) return t("profile.usernameCharacters");
+  if (RESERVED_USERNAMES.has(value.toLowerCase())) return t("profile.usernameReserved");
   return null;
 }
 
@@ -37,14 +43,14 @@ export function cleanDisplayName(name: string) {
 
 export function displayNameError(name: string): string | null {
   const value = cleanDisplayName(name);
-  if (value.length < DISPLAY_NAME_MIN) return `Der Anzeigename braucht mindestens ${DISPLAY_NAME_MIN} Zeichen.`;
-  if (value.length > DISPLAY_NAME_MAX) return `Der Anzeigename darf höchstens ${DISPLAY_NAME_MAX} Zeichen haben.`;
+  if (value.length < DISPLAY_NAME_MIN) return t("profile.displayNameTooShort", { min: DISPLAY_NAME_MIN });
+  if (value.length > DISPLAY_NAME_MAX) return t("profile.displayNameTooLong", { max: DISPLAY_NAME_MAX });
   return null;
 }
 
 export function passwordError(password: string): string | null {
-  if (password.length < PASSWORD_MIN) return `Das Passwort braucht mindestens ${PASSWORD_MIN} Zeichen.`;
-  if (new TextEncoder().encode(password).length > PASSWORD_MAX) return `Das Passwort darf höchstens ${PASSWORD_MAX} Zeichen haben.`;
+  if (password.length < PASSWORD_MIN) return t("profile.passwordTooShort", { min: PASSWORD_MIN });
+  if (new TextEncoder().encode(password).length > PASSWORD_MAX) return t("profile.passwordTooLong", { max: PASSWORD_MAX });
   return null;
 }
 

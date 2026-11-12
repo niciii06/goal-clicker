@@ -27,6 +27,11 @@ import { cleanCloudSaveKeys, MAX_CLOUD_SAVE_REQUEST_BYTES, serializeCloudSaveKey
 import { STORAGE_KEY } from "./game/constants";
 import { cleanDisplayName, displayNameError, nextUsernameChangeAt, PASSWORD_LOGIN_DOMAIN, passwordError, usernameChangeCutoff, usernameError, usernameKey } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
+import { SOURCE_LOCALE } from "./i18n/locales";
+import { translator } from "./i18n/translate";
+
+/** Every answer of this API is German until a language choice exists (docs/i18n-plan.md). */
+const t = translator(SOURCE_LOCALE);
 
 type Store = Pick<GoalClickerDatabase,
   | "getProfile" | "getProfileByUsername" | "isUsernameTaken" | "createProfile" | "updateDisplayName" | "changeUsername"
@@ -80,7 +85,7 @@ const json = (body: unknown, status = 200, setCookies: readonly string[] = []) =
 const MAX_PROFILE_BODY_BYTES = 4096;
 /** How long a verified proof of ownership may be turned into the new login. */
 const CLAIM_MS = 10 * 60_000;
-const INVALID_LOGIN = { error: "Benutzername oder Passwort stimmt nicht.", errorCode: "INVALID_LOGIN" };
+const INVALID_LOGIN = { error: t("account.invalidLogin"), errorCode: "INVALID_LOGIN" };
 const loginEmail = () => `p-${randomUUID()}@${PASSWORD_LOGIN_DOMAIN}`;
 const PASSWORD_METHODS = new Set(["password", "legacy-password", "owner-code"]);
 
@@ -103,13 +108,13 @@ function cloudSaveBody(save: (Omit<CloudSave, "saveJson"> & { saveJson: string |
 
 function failure(error: unknown) {
   if (error instanceof RequestBodyTooLargeError) return json({ error: error.message }, 413);
-  if (error instanceof SyntaxError) return json({ error: "Die Anfrage ist ungültig." }, 400);
-  if (error instanceof AuthUnavailableError) return json({ error: "Die Anmeldung kann gerade nicht geprüft werden. Bitte versuche es gleich nochmal.", errorCode: "AUTH_UNAVAILABLE" }, 503);
-  return json({ error: "Der Server ist gerade nicht erreichbar. Bitte versuche es gleich nochmal." }, 503);
+  if (error instanceof SyntaxError) return json({ error: t("request.invalid") }, 400);
+  if (error instanceof AuthUnavailableError) return json({ error: t("account.authUnavailable"), errorCode: "AUTH_UNAVAILABLE" }, 503);
+  return json({ error: t("server.unavailable") }, 503);
 }
 
-const notConfigured = () => json({ error: "Der Login ist auf diesem Server nicht eingerichtet.", errorCode: "AUTH_NOT_CONFIGURED" }, 503);
-const crossSite = () => json({ error: "Nicht erlaubt.", errorCode: "CROSS_SITE" }, 403);
+const notConfigured = () => json({ error: t("account.notConfigured"), errorCode: "AUTH_NOT_CONFIGURED" }, 503);
+const crossSite = () => json({ error: t("request.crossSite"), errorCode: "CROSS_SITE" }, 403);
 
 type Account = { session: AuthSession; accountId: string; method: string };
 
@@ -122,7 +127,7 @@ async function withAccount(request: Request, deps: AccountApiDeps, { fresh }: { 
   if (request.method !== "GET" && !sameOrigin(request)) return crossSite();
   try {
     const session = await deps.getSession(request, { fresh });
-    if (!session) return json({ error: "Bitte melde dich an.", errorCode: "LOGIN_REQUIRED" }, 401);
+    if (!session) return json({ error: t("account.loginRequired"), errorCode: "LOGIN_REQUIRED" }, 401);
     const account = await deps.lookupAccount(session);
     if (!account.ok) return json({ error: account.error, errorCode: account.errorCode }, account.status);
     return await handler({ session, accountId: account.accountId, method: account.method });
@@ -158,8 +163,8 @@ export function createProfileResponse(request: Request, deps = defaults) {
     if (invalid) return json({ error: invalid, errorCode: "INVALID" }, 400);
     // Never replaces a profile: an original account keeps its own (createProfile does nothing on an existing row).
     const result = await deps.db().createProfile(accountId, username, displayName, deps.now().toISOString());
-    if (result.reason === "taken") return json({ error: "Dieser Benutzername ist schon vergeben.", errorCode: "USERNAME_TAKEN" }, 409);
-    if (!result.profile) return json({ error: "Dein Konto hat schon ein Profil.", errorCode: "PROFILE_EXISTS" }, 409);
+    if (result.reason === "taken") return json({ error: t("account.usernameTaken"), errorCode: "USERNAME_TAKEN" }, 409);
+    if (!result.profile) return json({ error: t("account.profileExists"), errorCode: "PROFILE_EXISTS" }, 409);
     return json({ profile: publicProfile(result.profile) }, 201);
   });
 }
@@ -170,7 +175,7 @@ export function updateProfileResponse(request: Request, deps = defaults) {
     const store = deps.db();
     const now = deps.now();
     const current = await store.getProfile(accountId);
-    if (!current) return json({ error: "Lege zuerst ein Profil an.", errorCode: "PROFILE_MISSING" }, 404);
+    if (!current) return json({ error: t("account.profileMissing"), errorCode: "PROFILE_MISSING" }, 404);
     let profile: Profile = current;
     // Validate every field before the first write, so a rejected request changes nothing.
     const displayName = typeof body.displayName === "string" ? cleanDisplayName(body.displayName) : null;
@@ -180,9 +185,9 @@ export function updateProfileResponse(request: Request, deps = defaults) {
     // The username can still be refused by the database (taken, too soon), so it goes first.
     if (username !== null) {
       const result = await store.changeUsername(accountId, username, now.toISOString(), usernameChangeCutoff(now));
-      if (result.reason === "taken") return json({ error: "Dieser Benutzername ist schon vergeben.", errorCode: "USERNAME_TAKEN", profile: publicProfile(profile) }, 409);
-      if (result.reason === "too-soon") return json({ error: "Den Benutzernamen kannst du nur alle 30 Tage ändern.", errorCode: "USERNAME_TOO_SOON", profile: publicProfile(profile) }, 409);
-      if (!result.profile) return json({ error: "Lege zuerst ein Profil an.", errorCode: "PROFILE_MISSING" }, 404);
+      if (result.reason === "taken") return json({ error: t("account.usernameTaken"), errorCode: "USERNAME_TAKEN", profile: publicProfile(profile) }, 409);
+      if (result.reason === "too-soon") return json({ error: t("account.usernameTooSoon"), errorCode: "USERNAME_TOO_SOON", profile: publicProfile(profile) }, 409);
+      if (!result.profile) return json({ error: t("account.profileMissing"), errorCode: "PROFILE_MISSING" }, 404);
       profile = result.profile;
     }
     if (displayName !== null) profile = await store.updateDisplayName(accountId, displayName, now.toISOString()) ?? profile;
@@ -195,7 +200,7 @@ const DELETION_REQUESTED = {
   dataDeleted: true,
   loginDeleted: false,
   loginDeletionPending: true,
-  message: "Profil und Spielstand sind gelöscht. Dein Login ist gesperrt und wird vom Besitzer des Spiels endgültig entfernt.",
+  message: t("account.deleted"),
 };
 
 /**
@@ -217,10 +222,10 @@ export function deleteProfileResponse(request: Request, deps = defaults) {
     try {
       const body = await readJsonBody<{ confirm?: unknown; password?: unknown }>(request, MAX_PROFILE_BODY_BYTES);
       const session = await deps.getSession(request, { fresh: true });
-      if (!session) return json({ error: "Bitte melde dich an.", errorCode: "LOGIN_REQUIRED" }, 401);
+      if (!session) return json({ error: t("account.loginRequired"), errorCode: "LOGIN_REQUIRED" }, 401);
       const store = deps.db();
       const identity = await store.getIdentity(session.issuer, session.subject);
-      if (!identity) return json({ error: "Dieser Login gehört zu keinem Spielerkonto.", errorCode: "ACCOUNT_SETUP_REQUIRED" }, 409);
+      if (!identity) return json({ error: t("account.setupRequired"), errorCode: "ACCOUNT_SETUP_REQUIRED" }, 409);
       const accountId = identity.accountId;
       const now = deps.now().toISOString();
       const origin = publicOrigin(request);
@@ -228,7 +233,7 @@ export function deleteProfileResponse(request: Request, deps = defaults) {
       if (!identity.deletedAt) {
         const profile = await store.getProfile(accountId);
         const confirm = typeof body.confirm === "string" ? usernameKey(body.confirm) : "";
-        if (profile && confirm !== profile.usernameKey) return json({ error: "Zur Bestätigung den Benutzernamen eintippen.", errorCode: "CONFIRM_REQUIRED" }, 400);
+        if (profile && confirm !== profile.usernameKey) return json({ error: t("account.confirmRequired"), errorCode: "CONFIRM_REQUIRED" }, 400);
       }
       const password = typeof body.password === "string" && body.password ? body.password : undefined;
       // The game data goes first, in one transaction that also marks the login: if anything after it fails, no
@@ -267,7 +272,7 @@ export function usernameAvailabilityResponse(request: Request, deps = defaults) 
     const session = await deps.getSession(request).catch(() => null);
     const own = session ? await deps.lookupAccount(session).catch(() => null) : null;
     const taken = await deps.db().isUsernameTaken(usernameKey(username), own?.ok ? own.accountId : undefined);
-    return json(taken ? { available: false, error: "Dieser Benutzername ist schon vergeben." } : { available: true });
+    return json(taken ? { available: false, error: t("account.usernameTaken") } : { available: true });
   });
 }
 
@@ -287,12 +292,12 @@ export function registerResponse(request: Request, deps = defaults) {
     const limited = await deps.rateLimit(request, "register");
     if (limited) return limited;
     const store = deps.db();
-    const taken = { error: "Dieser Benutzername ist schon vergeben.", errorCode: "USERNAME_TAKEN" };
+    const taken = { error: t("account.usernameTaken"), errorCode: "USERNAME_TAKEN" };
     if (await store.isUsernameTaken(usernameKey(username))) return json(taken, 409);
     const origin = publicOrigin(request);
     const email = loginEmail();
     const login = await deps.neon.signUp(email, password, displayName, origin);
-    if (!login.ok) return login.reason === "rate-limited" ? json({ error: "Zu viele Versuche. Bitte warte ein paar Minuten.", errorCode: "RATE_LIMITED" }, 429) : json({ error: "Das Konto konnte nicht erstellt werden.", errorCode: "SIGNUP_FAILED" }, 503);
+    if (!login.ok) return login.reason === "rate-limited" ? json({ error: t("request.rateLimited"), errorCode: "RATE_LIMITED" }, 429) : json({ error: t("account.signupFailed"), errorCode: "SIGNUP_FAILED" }, 503);
     const issuer = deps.issuer();
     const accountId = deps.newId();
     // Neon Auth cannot delete the new login itself (no self service deletion): it is locked instead, its session
@@ -306,7 +311,7 @@ export function registerResponse(request: Request, deps = defaults) {
     };
     try {
       const bound = await store.bindIdentity({ issuer, subject: login.subject, accountId, method: "password", loginEmail: email, createdAt: deps.now().toISOString() });
-      if (!bound.ok) { await undo(); return json({ error: "Das Konto konnte nicht erstellt werden.", errorCode: "SIGNUP_FAILED" }, 503); }
+      if (!bound.ok) { await undo(); return json({ error: t("account.signupFailed"), errorCode: "SIGNUP_FAILED" }, 503); }
       const result = await store.createProfile(accountId, username, displayName, deps.now().toISOString(), null);
       if (!result.profile) {
         // A parallel registration took the name between the check and now; the new login must not stay behind.
@@ -356,16 +361,16 @@ export function loginResponse(request: Request, deps = defaults) {
       const login = await deps.neon.signIn(identity.loginEmail, password, origin);
       if (login.ok && login.subject === identity.subject) { await deps.legacy.retire?.(profile.userId); return json({ signedIn: true }, 200, browserSetCookies(login.setCookies)); }
       if (login.ok) { await deps.neon.signOut(login.sessionCookie, origin); return json(INVALID_LOGIN, 401); }
-      if (login.reason === "rate-limited") return json({ error: "Zu viele Versuche. Bitte warte ein paar Minuten.", errorCode: "RATE_LIMITED" }, 429);
+      if (login.reason === "rate-limited") return json({ error: t("request.rateLimited"), errorCode: "RATE_LIMITED" }, 429);
       return json(INVALID_LOGIN, 401);
     }
     // No Neon login yet: only an original username account (it still has its old generated address) can be recovered.
     if (!profile.loginEmail) return json(INVALID_LOGIN, 401);
     if (!(await isLegacyPasswordAccount(store, profile.userId))) return json(INVALID_LOGIN, 401);
-    if (!deps.legacy.configured()) return json({ error: "Dein Konto muss einmalig übernommen werden, das ist gerade nicht möglich. Bitte melde dich beim Besitzer des Spiels.", errorCode: "RECOVERY_UNAVAILABLE" }, 503);
+    if (!deps.legacy.configured()) return json({ error: t("account.recoveryNotConfigured"), errorCode: "RECOVERY_UNAVAILABLE" }, 503);
     const check = await deps.legacy.verify(profile.loginEmail, password);
-    if (check.result === "rate-limited") return json({ error: "Zu viele Versuche. Bitte warte ein paar Minuten.", errorCode: "RATE_LIMITED" }, 429);
-    if (check.result === "unavailable") return json({ error: "Dein Konto muss einmalig übernommen werden, die sichere Passwortübernahme ist gerade nicht erreichbar. Bitte versuche es später nochmal.", errorCode: "RECOVERY_UNAVAILABLE" }, 503);
+    if (check.result === "rate-limited") return json({ error: t("request.rateLimited"), errorCode: "RATE_LIMITED" }, 429);
+    if (check.result === "unavailable") return json({ error: t("account.recoveryUnreachable"), errorCode: "RECOVERY_UNAVAILABLE" }, 503);
     // The proof must be for exactly this account.
     if (check.result !== "valid" || check.userId !== profile.userId) return json(INVALID_LOGIN, 401);
     return migratePasswordLogin(deps, { accountId: profile.userId, password, name: profile.displayName, method: "legacy-password", origin });
@@ -376,7 +381,7 @@ async function isLegacyPasswordAccount(store: Store, accountId: string) {
   return (await store.listLegacyIdentities(accountId)).some((identity) => identity.provider === "email" && identity.providerSubject === accountId);
 }
 
-const RECOVERY_FAILED = { error: "Die Übernahme deines Kontos hat nicht geklappt. Es wurde nichts verändert. Bitte versuche es nochmal.", errorCode: "RECOVERY_FAILED" };
+const RECOVERY_FAILED = { error: t("account.recoveryFailed"), errorCode: "RECOVERY_FAILED" };
 
 /**
  * Creates the new username login for an original account after a verified proof and binds it, exactly once.
@@ -410,7 +415,7 @@ async function migratePasswordLogin(deps: AccountApiDeps, values: { accountId: s
     claim = rotated;
     login = await deps.neon.signUp(claim.destinationEmail, values.password, values.name, values.origin);
   }
-  if (!login.ok) return login.reason === "rate-limited" ? json({ error: "Zu viele Versuche. Bitte warte ein paar Minuten.", errorCode: "RATE_LIMITED" }, 429) : json(RECOVERY_FAILED, 503);
+  if (!login.ok) return login.reason === "rate-limited" ? json({ error: t("request.rateLimited"), errorCode: "RATE_LIMITED" }, 429) : json(RECOVERY_FAILED, 503);
   let completion: RecoveryCompletion;
   try {
     completion = await store.completeRecovery({ accountId: values.accountId, issuer, subject: login.subject, loginEmail: claim.destinationEmail, method: values.method, now: deps.now().toISOString(), codeHash: values.codeHash });
@@ -422,7 +427,7 @@ async function migratePasswordLogin(deps: AccountApiDeps, values: { accountId: s
   if (!completion.ok) {
     await deps.neon.signOut(login.sessionCookie, values.origin);
     const expired = completion.reason === "expired" || completion.reason === "code-used";
-    return json(expired ? { error: "Die Übernahme ist abgelaufen. Bitte melde dich nochmal an.", errorCode: "RECOVERY_EXPIRED" } : RECOVERY_FAILED, 409);
+    return json(expired ? { error: t("account.recoveryExpired"), errorCode: "RECOVERY_EXPIRED" } : RECOVERY_FAILED, 409);
   }
   await deps.legacy.retire?.(values.accountId);
   return json({ signedIn: true, recovered: true }, 200, browserSetCookies(login.setCookies));
@@ -443,7 +448,7 @@ export function recoveryCodeResponse(request: Request, deps = defaults) {
     if (invalidPassword) return json({ error: invalidPassword, errorCode: "INVALID" }, 400);
     const limited = await deps.rateLimit(request, "recovery", usernameKey(username));
     if (limited) return limited;
-    const refused = json({ error: "Benutzername oder Wiederherstellungscode stimmt nicht.", errorCode: "INVALID_CODE" }, 401);
+    const refused = json({ error: t("account.invalidCode"), errorCode: "INVALID_CODE" }, 401);
     if (!username || code.length < 16 || code.length > 64) return refused;
     const store = deps.db();
     const issuer = deps.issuer();
@@ -451,7 +456,7 @@ export function recoveryCodeResponse(request: Request, deps = defaults) {
     const codeHash = hashRecoveryCode(code);
     const stored = await store.findRecoveryCode(codeHash, issuer, deps.now().toISOString());
     if (!target || !stored || stored.accountId !== target.profile.userId) return refused;
-    if (target.identity) return json({ error: "Dieses Konto hat schon einen Login. Melde dich normal an.", errorCode: "ALREADY_RECOVERED" }, 409);
+    if (target.identity) return json({ error: t("account.alreadyRecovered"), errorCode: "ALREADY_RECOVERED" }, 409);
     return migratePasswordLogin(deps, { accountId: target.profile.userId, password, name: target.profile.displayName, method: "owner-code", origin: publicOrigin(request), codeHash });
   });
 }
@@ -470,12 +475,12 @@ export function putCloudSaveResponse(request: Request, deps = defaults) {
   return withAccount(request, deps, { fresh: false }, async ({ accountId, session }) => {
     const body = await readJsonBody<{ baseVersion?: unknown; keys?: unknown; active?: unknown; schemaVersion?: unknown }>(request, MAX_CLOUD_SAVE_REQUEST_BYTES);
     const baseVersion = Number(body.baseVersion);
-    if (!Number.isSafeInteger(baseVersion) || baseVersion < 0) return json({ error: "Die Spielstand Version fehlt.", errorCode: "INVALID" }, 400);
+    if (!Number.isSafeInteger(baseVersion) || baseVersion < 0) return json({ error: t("save.versionMissing"), errorCode: "INVALID" }, 400);
     const keys = cleanCloudSaveKeys(body.keys);
-    if (!keys) return json({ error: "Der Spielstand ist unvollständig.", errorCode: "INVALID" }, 400);
+    if (!keys) return json({ error: t("save.incomplete"), errorCode: "INVALID" }, 400);
     if (baseVersion === 0) {
       const fresh = await deps.getSession(request, { fresh: true });
-      if (!fresh || fresh.subject !== session.subject) return json({ error: "Dieses Konto gibt es nicht mehr. Bitte melde dich neu an.", errorCode: "LOGIN_REQUIRED" }, 401);
+      if (!fresh || fresh.subject !== session.subject) return json({ error: t("account.gone"), errorCode: "LOGIN_REQUIRED" }, 401);
     }
     const store = deps.db();
     // A client that says which game schema it writes must not replace a save from a newer version of the game
@@ -483,11 +488,11 @@ export function putCloudSaveResponse(request: Request, deps = defaults) {
     const schemaVersion = Number(body.schemaVersion);
     if (body.schemaVersion !== undefined && Number.isFinite(schemaVersion) && store.getCloudSaveSchemaVersion) {
       const stored = await store.getCloudSaveSchemaVersion(accountId, STORAGE_KEY).catch(() => 0);
-      if (stored > schemaVersion) return json({ error: "Dein Spielstand wurde mit einer neueren Version gespeichert. Bitte lade die Seite neu.", errorCode: "SAVE_SCHEMA_NEWER", schemaVersion: stored }, 409);
+      if (stored > schemaVersion) return json({ error: t("save.schemaNewer"), errorCode: "SAVE_SCHEMA_NEWER", schemaVersion: stored }, 409);
     }
     const result = await store.putCloudSave(accountId, serializeCloudSaveKeys(keys), baseVersion, deps.now().toISOString(), body.active !== false);
     if (result.save) return json({ version: result.save.version, updatedAt: result.save.updatedAt });
-    return json({ error: "Auf einem anderen Gerät wurde inzwischen weitergespielt.", errorCode: "SAVE_CONFLICT", ...cloudSaveBody(result.conflict) }, 409);
+    return json({ error: t("save.conflict"), errorCode: "SAVE_CONFLICT", ...cloudSaveBody(result.conflict) }, 409);
   });
 }
 
@@ -511,13 +516,13 @@ export async function accountSessionResponse(request: Request, deps: SessionDeps
     const body = await readJsonBody<{ playerId?: unknown; checkGoogle?: unknown }>(request, 4096);
     const claimed = typeof body.playerId === "string" && body.playerId.trim().length >= 8 ? body.playerId.trim().slice(0, 80) : "";
     const session = await deps.getSession(request, { fresh: true });
-    if (!session) return json({ signedIn: false, error: "Nicht angemeldet.", errorCode: "LOGIN_REQUIRED" }, 401);
+    if (!session) return json({ signedIn: false, error: t("account.notSignedIn"), errorCode: "LOGIN_REQUIRED" }, 401);
     const origin = publicOrigin(request);
     const account = await deps.resolveAccount(session, origin);
     if (!account.ok) return json({ signedIn: true, error: account.error, errorCode: account.errorCode }, account.status);
     const google = body.checkGoogle === true ? await deps.checkGoogle(session, account.accountId, origin) : undefined;
     const playerId = claimed ? await deps.linkPlayer({ session, accountId: account.accountId }, claimed) : null;
-    if (claimed && !playerId) return json({ error: "Diese Spieler-ID gehört bereits zu einem anderen Konto.", errorCode: "PLAYER_TAKEN" }, 409);
+    if (claimed && !playerId) return json({ error: t("account.playerTaken"), errorCode: "PLAYER_TAKEN" }, 409);
     const passwordLogin = PASSWORD_METHODS.has(account.method);
     return json({ signedIn: true, accountId: account.accountId, email: passwordLogin ? null : session.email, passwordLogin, suggestedName: session.name, created: account.created, ...(google ? { google } : {}), ...(playerId ? { playerId } : {}) }, 200, browserSetCookies(session.refreshCookies ?? []));
   } catch (error) {

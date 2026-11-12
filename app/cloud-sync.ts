@@ -12,6 +12,8 @@ import { bumpSaveRevision, localSaveFailed } from "./game/save-revision";
 import { isSaveFromNewerVersion, NEWER_VERSION_MESSAGE, uploadSchemaVersion } from "./game/save-schema";
 import { compareStoredGameProgress, parseStoredGame } from "./save-safety";
 import { isAway } from "./activity";
+import { SOURCE_LOCALE } from "./i18n/locales";
+import { translate } from "./i18n/translate";
 
 /** Which account and save version this browser's localStorage belongs to, and whether it was played since. */
 export const CLOUD_META_KEY = "goalClickerCloudMetaV1";
@@ -36,9 +38,9 @@ export function cloudPlayedSince(cloud: CloudSaveState, baseVersion: number) {
 export type SyncStatus = "saved" | "saving" | "offline" | "failed";
 
 /** Shown with the "failed" status when the browser storage cannot hold the save from the cloud. */
-export const STORAGE_FULL_MESSAGE = "Gerätespeicher voll. Bitte Speicher freigeben oder Spielstand als Datei sichern.";
+export const STORAGE_FULL_MESSAGE = translate(SOURCE_LOCALE, "sync.storageFull");
 /** Shown with the "failed" status when the save is larger than the cloud accepts. */
-export const SAVE_TOO_LARGE_MESSAGE = "Der Spielstand ist zu gross für die Cloud und wird nur auf diesem Gerät gespeichert. Bitte sichere ihn als Datei.";
+export const SAVE_TOO_LARGE_MESSAGE = translate(SOURCE_LOCALE, "sync.saveTooLarge");
 export { NEWER_VERSION_MESSAGE };
 
 // Played progress is uploaded once a minute while the tab is visible and someone is at it (and always when the
