@@ -468,6 +468,23 @@ export function claimAllAlbumRewards(features: GameFeatures) {
 }
 
 /**
+ * Fabrizio: a player kept against a paid offer starts his milestones again (owner's decision of 12 November 2026,
+ * replacing the old -2 OVR for three matches). Only this card changes: its unlocked milestones go, and the
+ * statistics it has now become its milestone baseline, so normalizing the save never unlocks them again from old
+ * matches; only new matches count. Lifetime statistics, form, reports, awards and the album stay. Special cards
+ * with a potential collect no milestones and keep their growth and upgrades untouched (`special`).
+ * Returns the rating bonus the card lost. Mutates `career`.
+ */
+export function resetCardMilestones(career: CareerState, player: StarXIPlayer): { bonusLost: number; special: boolean } {
+  if (hasPotential(player)) return { bonusLost: 0, special: true };
+  const bonusLost = getCareerCard(career, player).bonus;
+  delete career.milestoneCards[player.id];
+  const stats = career.players[player.id] ?? emptyPlayerStats();
+  career.milestoneBase = { ...(career.milestoneBase ?? {}), [player.id]: Object.fromEntries(MILESTONE_METRICS.map((metric) => [metric, Math.floor(stats[metric])])) as MilestoneStats };
+  return { bonusLost, special: false };
+}
+
+/**
  * Prestige: every card that does not stay loses what it earned. Its milestones go, and the statistics it has now
  * become its milestone and growth baseline, so a copy obtained later starts at its base rating and earns everything
  * again. The history (`players`, reports, awards) and the album stay; retained cards keep everything.
