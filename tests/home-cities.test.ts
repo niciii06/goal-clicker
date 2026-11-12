@@ -60,7 +60,8 @@ test('real clubs only with their own website as source and never in the Chaoslig
   for (const id of OTHERS) for (const club of HOME_CITIES[id].regionalClubs) {
     if (club.clubSource) {
       realNames.add(club.name);
-      assert.match(club.clubSource.url, /^https:\/\/www\.[a-z0-9-]+\.ch\/$/, club.name);
+      assert.match(club.clubSource.url, /^https:\/\/(www\.)?[a-z0-9-]+\.ch\/$/, club.name);
+      if (club.clubSource.placeUrl) assert.match(club.clubSource.placeUrl, /^https:\/\/agfc\.ch\/fr\/stades\//, club.name);
       assert.ok(club.clubSource.quote.length > 10, club.name);
       assert.equal(club.fictional, undefined, club.name);
       assert.equal(club.venue.verification, 'stadium');
@@ -72,7 +73,7 @@ test('real clubs only with their own website as source and never in the Chaoslig
   }
   // Documented share per city (docs/home-cities-data.md).
   const share = Object.fromEntries(OTHERS.map((id) => [id, HOME_CITIES[id].regionalClubs.filter((c) => c.clubSource).length]));
-  assert.deepEqual(share, { zurich: 1, basel: 3, geneve: 0 });
+  assert.deepEqual(share, { zurich: 1, basel: 3, geneve: 2 });
   // Fictional names never copy a real club of the catalogue or a verified one, and are unique within a world.
   const catalogNames = new Set(SEASON_CLUBS.map((c) => c.name));
   for (const id of OTHERS) {

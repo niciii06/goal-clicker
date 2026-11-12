@@ -1463,7 +1463,7 @@
      },
      {
       "ground": {
-       "name": "Centre sportif du Signal",
+       "name": "Stade municipal de Bernex",
        "osm": "way/60116974",
        "lat": 46.17237,
        "lon": 6.07255,
@@ -1471,7 +1471,13 @@
        "canton": "GE",
        "kind": "sports_centre"
       },
-      "distanceKm": 6.55
+      "distanceKm": 6.55,
+      "real": {
+       "name": "Signal FC Bernex-Confignon",
+       "source": "https://www.fcsignal.ch/",
+       "quote": "Heimspiel: Stade municipal de Bernex, Terrain principal A",
+       "place": "https://agfc.ch/fr/stades/stade-de-bernex-210-1685907035"
+      }
      },
      {
       "ground": {
@@ -1549,18 +1555,6 @@
      },
      {
       "ground": {
-       "name": "Centre sportif des Vergers",
-       "osm": "relation/4779155",
-       "lat": 46.23393,
-       "lon": 6.0699,
-       "municipality": "Meyrin",
-       "canton": "GE",
-       "kind": "sports_centre"
-      },
-      "distanceKm": 8.93
-     },
-     {
-      "ground": {
        "name": "Centre sportif de Vernier",
        "osm": "way/87345756",
        "lat": 46.21933,
@@ -1570,6 +1564,18 @@
        "kind": "sports_centre"
       },
       "distanceKm": 7.1
+     },
+     {
+      "ground": {
+       "name": "Centre sportif du Blanché",
+       "osm": "way/72599054",
+       "lat": 46.24074,
+       "lon": 6.13017,
+       "municipality": "Le Grand-Saconnex",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 6.99
      },
      {
       "ground": {
@@ -1659,15 +1665,15 @@
      },
      {
       "ground": {
-       "name": "Centre sportif du Blanché",
-       "osm": "way/72599054",
-       "lat": 46.24074,
-       "lon": 6.13017,
-       "municipality": "Le Grand-Saconnex",
+       "name": "Stade d'Aïre",
+       "osm": "way/217904303",
+       "lat": 46.19831,
+       "lon": 6.09342,
+       "municipality": "Vernier",
        "canton": "GE",
        "kind": "sports_centre"
       },
-      "distanceKm": 6.99
+      "distanceKm": 5.25
      }
     ],
     "7": [
@@ -1685,18 +1691,6 @@
      },
      {
       "ground": {
-       "name": "Stade d'Aïre",
-       "osm": "way/217904303",
-       "lat": 46.19831,
-       "lon": 6.09342,
-       "municipality": "Vernier",
-       "canton": "GE",
-       "kind": "sports_centre"
-      },
-      "distanceKm": 5.25
-     },
-     {
-      "ground": {
        "name": "Stade de Belle-Idée",
        "osm": "way/513370037",
        "lat": 46.20773,
@@ -1706,6 +1700,24 @@
        "kind": "stadium"
       },
       "distanceKm": 4.73
+     },
+     {
+      "ground": {
+       "name": "Stade des Arbères",
+       "osm": "relation/4779155",
+       "lat": 46.23393,
+       "lon": 6.0699,
+       "municipality": "Meyrin",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 8.93,
+      "real": {
+       "name": "Meyrin FC",
+       "source": "https://meyrinfc.ch/",
+       "quote": "Secrétariat Stade des Arbères, Avenue Louis-Rendu 11, 1217 Meyrin",
+       "place": "https://agfc.ch/fr/stades/stade-des-arberes-186-1685907035"
+      }
      },
      {
       "ground": {

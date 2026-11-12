@@ -33,15 +33,23 @@ Die Verbände (football.ch, FVRZ, FVNWS, ACGF) untersagen maschinellen Zugriff a
 | Basel | FC Amicitia Riehen | fcamicitia.ch: «ein Zuhause auf der Sportanlage Grendelmatte», Grendelgasse 21, Riehen | Division 2 |
 | Basel | FC Pratteln | fcpratteln.ch: «Clubhaus und Sportanlage: Sportanlage in den Sandgruben, Giebenacherstrasse 14» | Division 4 |
 | Basel | SC Dornach | scdornach.ch: «Erneuerung der Fussballplätze im Gigersloch» | Division 8 |
+| Genève | Signal FC Bernex-Confignon | fcsignal.ch: Heimspiel im «Stade municipal de Bernex». Platz laut AGFC Platzverzeichnis: Chemin du Signal 31, Bernex, 110 m vom OSM Objekt «Centre sportif du Signal» | Division 4 |
+| Genève | Meyrin FC | meyrinfc.ch: «Secrétariat Stade des Arbères, Avenue Louis-Rendu 11, 1217 Meyrin». AGFC Platzverzeichnis: gleiche Adresse, 30 m vom OSM Objekt «Centre sportif des Vergers» | Division 7 |
 
-**Belegt, aber nicht platziert,** weil der Platz in OpenStreetMap nicht auffindbar ist:
-* FC Allschwil («Sportanlage im Brüel»)
-* Signal FC Bernex-Confignon (Heimspiel «Stade municipal de Bernex»)
+**Hinweise von Nicolas, geprüft am 12. November 2026:**
 
-**Nicht belegt:**
+| Hinweis | Ergebnis |
+| --- | --- |
+| FC Allschwil, Sportanlage im Brüel | Vereinsseite: «Hegenheimermattweg 132, 4123 Allschwil». Der Hauspunkt 132 liegt beim «Restaurant im Brüel», ein kartiertes Spielfeld lässt sich dort aber nicht bestätigen. Deshalb **nicht platziert**. |
+| SV Muttenz, Margelacker | Die Quelle ist das Matchcenter des Verbands (FVNWS); maschinelle Zugriffe sind dort untersagt, daher nicht abgerufen. Die eigene Seite (svmuttenz.ch) nennt den Platz nicht. **Nicht belegt.** |
+| FC Choulex | fcchoulex.ch war nicht erreichbar. **Nicht belegt.** |
+| Meyrin FC, Stade des Arbères | **Belegt**, siehe Tabelle. |
+| Genfer Platzverzeichnis (agfc.ch) | Bestätigt die Plätze von Meyrin FC und Signal FC. Es ordnet keine Teams zu und wird deshalb nur als zweite Quelle für den Platz verwendet. |
+
+**Weitere Prüfungen:**
 * Étoile Carouge: Profiklub, gehört nicht in eine Regionalliga.
 * Kloten, Altstetten, Witikon: Platz genannt, aber nicht als Heimspielort.
-* Nicht erreichbar: Red Star, Seefeld, Concordia, Black Stars, Muttenz, Lancy, Onex, Vernier, Meyrin.
+* Nicht erreichbar: Red Star, Seefeld, Concordia, Black Stars, Lancy, Onex, Vernier.
 
 **Belegter Anteil der 47 lokalen Clubs:**
 
@@ -49,7 +57,7 @@ Die Verbände (football.ch, FVRZ, FVNWS, ACGF) untersagen maschinellen Zugriff a
 | --- | --- | --- |
 | Zürich | 1 | 46 |
 | Basel | 3 | 44 |
-| Genève | 0 | 47 |
+| Genève | 2 | 45 |
 | Bern | unverändert | wie heute |
 
 Echte Clubs spielen nie in der Chaosliga (Division 1). Die bleibt wie in Bern eine Spassliga fiktiver Clubs.
@@ -81,9 +89,9 @@ Echte Clubs spielen nie in der Chaosliga (Division 1). Die bleibt wie in Bern ei
 | Stadt | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Bern | 1,2 | 2,1 | 2,6 | 9,3 | 13,6 | 31,8 | 12,7 | 23,6 |
-| Zürich | 1,4 | 3,5 | 6,0 | 10,2 | 13,6 | 30,9 | 14,5 | 24,3 |
-| Basel | 3,7 | 8,2 | 14,2 | 17,2 | 22,1 | 22,7 | 12,2 | 18,1 |
-| Genève | 2,0 | 3,6 | 4,4 | 9,4 | 13,8 | 26,4 | 11,8 | 22,9 |
+| Zürich | 1,8 | 3,2 | 6,0 | 10,2 | 13,6 | 30,9 | 14,5 | 24,3 |
+| Basel | 4,8 | 7,3 | 14,2 | 17,2 | 22,1 | 22,7 | 12,2 | 18,1 |
+| Genève | 2,0 | 3,6 | 4,4 | 9,4 | 13,5 | 26,1 | 12,4 | 22,9 |
 
 **Bekannte Abweichung Basel:** Die Stadtligen liegen weiter draussen als in Bern, weil OpenStreetMap in Basel Stadt über die Suche nur wenige getrennte Plätze liefert. Insgesamt liegt Basel im Rahmen (Test: Gesamtmittel höchstens 35 % von Bern entfernt). Verbessern lässt sich das mit weiteren belegten Basler Plätzen.
 

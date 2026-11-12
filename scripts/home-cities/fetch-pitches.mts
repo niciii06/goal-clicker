@@ -109,11 +109,16 @@ function toGround(raw: Record<string, unknown>): Ground | null {
  * associations (football.ch, FVRZ, FVNWS, ACGF) refuse automated access, so their pages were not used; Nominatim
  * only gives the ground's position, never the club. `ground` finds the ground in the cached Nominatim answers.
  */
-const VERIFIED: { city: string; name: string; source: string; quote: string; ground: { query: string; osm: string } }[] = [
+// `place`: a second, independent source for the ground (the Geneva pitch directory of the AGFC), where the club's own
+// page names the venue but the map object needed confirming.
+// `stadium`: the venue's name as the club and the directory give it, where the map object is the larger complex.
+const VERIFIED: { city: string; name: string; source: string; quote: string; place?: string; stadium?: string; ground: { query: string; osm: string } }[] = [
   { city: 'zurich', name: 'FC Oerlikon/Polizei ZH', source: 'https://www.fcop.ch/', quote: 'Heimplatz: Sportanlage Neudorf', ground: { query: 'Sportanlage Neudorf Zürich', osm: 'way/998173254' } },
   { city: 'basel', name: 'FC Amicitia Riehen', source: 'https://www.fcamicitia.ch/', quote: 'ein Zuhause auf der Sportanlage Grendelmatte (Grendelgasse 21, 4125 Riehen)', ground: { query: 'Grendelmatte Riehen', osm: 'way/867046393' } },
   { city: 'basel', name: 'FC Pratteln', source: 'https://www.fcpratteln.ch/', quote: 'Clubhaus und Sportanlage: Sportanlage in den Sandgruben, Giebenacherstrasse 14, 4133 Pratteln', ground: { query: 'Giebenacherstrasse 14, 4133 Pratteln', osm: 'way/1033559231' } },
   { city: 'basel', name: 'SC Dornach', source: 'https://www.scdornach.ch/', quote: 'Erneuerung der Fussballplätze im Gigersloch', ground: { query: 'Gigersloch Dornach', osm: 'relation/17929969' } },
+  { city: 'geneve', name: 'Meyrin FC', source: 'https://meyrinfc.ch/', quote: 'Secrétariat Stade des Arbères, Avenue Louis-Rendu 11, 1217 Meyrin', place: 'https://agfc.ch/fr/stades/stade-des-arberes-186-1685907035', stadium: 'Stade des Arbères', ground: { query: 'Centre sportif Meyrin', osm: 'relation/4779155' } },
+  { city: 'geneve', name: 'Signal FC Bernex-Confignon', source: 'https://www.fcsignal.ch/', quote: 'Heimspiel: Stade municipal de Bernex, Terrain principal A', place: 'https://agfc.ch/fr/stades/stade-de-bernex-210-1685907035', stadium: 'Stade municipal de Bernex', ground: { query: 'Centre sportif Bernex', osm: 'way/60116974' } },
 ];
 
 // Bern's league geography is the model: every slot of divisions 1 to 8 has the distance of the Bern club in it (from
@@ -126,7 +131,7 @@ for (let division = 1; division <= 8; division++) {
   bernProfile[division] = geo.seasonClubsOf(division, geo.defaultAiLeagues(1)).filter((club) => club.league === 16 - division)
     .map((club) => km(geo.HOME_VENUE, club.venue)).sort((a, b) => a - b);
 }
-type Slot = { ground: Ground; distanceKm: number; real?: { name: string; source: string; quote: string }; shared?: boolean };
+type Slot = { ground: Ground; distanceKm: number; real?: { name: string; source: string; quote: string; place?: string }; shared?: boolean };
 const output: Record<string, { canton: string; home: Ground; divisions: Record<string, Slot[]> }> = {};
 for (const plan of PLANS) {
   const home = (await search(plan.home.query)).map(toGround).find((g) => g && g.name.includes(plan.home.nameIncludes));
@@ -138,11 +143,11 @@ for (const plan of PLANS) {
     const raw = (await search(club.ground.query)).find((r) => `${r.osm_type}/${r.osm_id}` === club.ground.osm);
     if (!raw) throw new Error(`${club.name}: ground ${club.ground.osm} not in the Nominatim answer`);
     const address = (raw.address ?? {}) as Record<string, string>;
-    const ground: Ground = { name: String(raw.name || club.quote.split(':').at(-1)!.split(',')[0].trim()), osm: club.ground.osm, lat: Number(Number(raw.lat).toFixed(5)), lon: Number(Number(raw.lon).toFixed(5)), municipality: address.city || address.town || address.village || address.municipality || '', canton: (address['ISO3166-2-lvl4'] || '').replace('CH-', ''), kind: String(raw.type) };
+    const ground: Ground = { name: club.stadium ?? String(raw.name || club.quote.split(':').at(-1)!.split(',')[0].trim()), osm: club.ground.osm, lat: Number(Number(raw.lat).toFixed(5)), lon: Number(Number(raw.lon).toFixed(5)), municipality: address.city || address.town || address.village || address.municipality || '', canton: (address['ISO3166-2-lvl4'] || '').replace('CH-', ''), kind: String(raw.type) };
     const distance = km(home, ground);
     // The Chaosliga (division 1) stays a joke league of fictional clubs, as in Bern: real clubs start in division 2.
     const best = slots.filter((s) => !s.slot && s.division >= 2).sort((a, b) => Math.abs(a.target - distance) - Math.abs(b.target - distance))[0];
-    best.slot = { ground, distanceKm: Number(distance.toFixed(2)), real: { name: club.name, source: club.source, quote: club.quote } };
+    best.slot = { ground, distanceKm: Number(distance.toFixed(2)), real: { name: club.name, source: club.source, quote: club.quote, ...(club.place ? { place: club.place } : {}) } };
     taken.push(ground);
   }
   const pool: Ground[] = [];
