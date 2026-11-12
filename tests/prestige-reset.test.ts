@@ -379,3 +379,40 @@ test('11 co-op: reloading the room keeps every upgrade at 0 and the card baselin
   assert.deepEqual(JSON.parse(row.sharedStateBackupJson).upgrades, {});
   assert.equal(applySeasonPrestige(storedFeatures(), KEEPER_NORMAL, NOW, 'x').error.length > 0, true);
 });
+
+// A card loaned out to another club (Fabrizio's "Leihe"): the game only knows loaned-out cards of the own club
+// (transferSaga.loans); there is no borrowed-in card. The loaned card is still in the club (and can be chosen).
+function withLoan(game: GameState, playerId: string) {
+  game.features.transferSaga.loans = [{ playerId, club: 'Leihclub', status: 'active', tournamentId: null, createdAt: NOW - 1000 }];
+  game.features.starXI = setBestStarXI(game.features.starXI, [playerId], { career: game.features.career });
+  return normalizeRuntimeGame(roundTrip(game));
+}
+
+test('12 a loaned out card can be chosen to stay: it keeps its improvements and its loan, but is not in the eleven until it is back', () => {
+  const game = withLoan(hallOfFameGame(), ALEXIA);
+  assert.ok(game.features.transferSaga.loans.some((loan) => loan.playerId === ALEXIA));
+  assert.ok(!game.features.starXI.lineupIds.includes(ALEXIA) && !game.features.starXI.benchIds.includes(ALEXIA), 'a loaned card plays nowhere');
+  const after = soloPrestige(game, ALEXIA);
+  const features = normalizeGameFeatures(roundTrip(after.features));
+  assert.ok(features.starXI.ownedIds.includes(ALEXIA), 'still owned');
+  assert.equal(rating(features, ALEXIA), 94, 'keeps her improvements');
+  assert.deepEqual(features.transferSaga.loans.map((loan) => loan.playerId), [ALEXIA], 'the loan of a kept card stays');
+  assert.ok(!features.starXI.lineupIds.includes(ALEXIA) && !features.starXI.benchIds.includes(ALEXIA), 'she cannot be in the eleven while loaned out');
+  for (const special of SPECIALS) assert.ok(features.starXI.ownedIds.includes(special), special);
+  assert.ok(features.career.collectedIds.includes(ALEXIA), 'album');
+  // The loan ends later as it always does: the card is available again.
+  features.transferSaga.loans = [];
+  const back = setBestStarXI(features.starXI, [], { career: features.career });
+  assert.ok(back.lineupIds.includes(ALEXIA), 'after the loan she is back in the eleven');
+});
+
+test('13 a loaned out card that is not chosen leaves with its loan: gone from the squad, no loan left, improvements reset', () => {
+  const game = withLoan(hallOfFameGame(), ALEXIA);
+  const after = soloPrestige(game, KEEPER_NORMAL);
+  const features = normalizeGameFeatures(roundTrip(after.features));
+  assert.ok(!features.starXI.ownedIds.includes(ALEXIA), 'not kept');
+  assert.deepEqual(features.transferSaga.loans, [], 'no loan of a discarded card remains');
+  assert.ok(features.career.collectedIds.includes(ALEXIA), 'she stays in the album');
+  assert.equal(features.career.milestoneCards?.[ALEXIA], undefined, 'her improvements are gone');
+  assert.ok(features.starXI.ownedIds.includes(KEEPER_NORMAL));
+});
