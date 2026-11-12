@@ -2,7 +2,21 @@
 
 Stand 12. November 2026, Branch `claude/determined-cannon-6u5msx`. Notion: «Zentrales Übersetzungssystem: Englisch zuerst, später FR und ES» (Opus, P1).
 
-**Was es jetzt gibt:** ein kleines, eigenes Übersetzungsfundament in neuen Dateien, mit Tests. **Was es nicht gibt:** keine Sprachwahl, keine englische Oberfläche, keine geänderte bestehende Datei. Deutsch ist die einzige eingeschaltete Sprache; das Spiel sieht genau gleich aus wie vorher.
+**Was es jetzt gibt:** ein kleines, eigenes Übersetzungsfundament, mit Tests, und als erster Schritt laufen alle Meldungen der Konto und Cloud Save API, die Prüfmeldungen für Benutzername, Anzeigename und Passwort sowie die Sync und Update Meldungen über den Katalog. **Was es nicht gibt:** keine Sprachwahl und keine englische Oberfläche. Deutsch ist die einzige eingeschaltete Sprache; jede Meldung ist Byte für Byte dieselbe wie vorher.
+
+## Schritt 1: Konto, Cloud Save und Prüfmeldungen (Branch `claude/opus-i18n-account-messages`)
+
+| Datei | Änderung |
+| --- | --- |
+| `app/account-api.ts` | 29 verschiedene Meldungen lesen den Katalog (`t("account.…")`, `t("save.…")`, `t("request.…")`); Fehlercodes und Statuscodes unverändert. |
+| `app/profile-rules.ts` | 8 Prüfmeldungen mit Platzhaltern (`{min}`, `{max}`); Server und Formular teilen sie wie bisher. |
+| `app/cloud-sync.ts`, `app/game/save-schema.ts`, `app/multiplayer-protocol.ts` | Die vier gemeinsamen Meldungskonstanten lesen den Katalog. |
+| `app/i18n/messages/de.ts`, `en.ts` | Die Meldungen auf Deutsch (Quelle) und Englisch. |
+| `tests/i18n-account.test.ts` | Deutsche Texte eingefroren aus `main` 383421b, Englisch vollständig mit gleichen Platzhaltern, keine eigenen deutschen Meldungen mehr in den zwei Dateien, Antworten der Save API und Prüfungen unverändert. |
+
+Nachweise beim Umbau: `account-api.ts` mit den Katalogtexten zurückersetzt ist Byte für Byte gleich der Datei auf `main`; `profile-rules.ts` alt und neu liefern auf 57 Eingaben dieselben Meldungen; die vier Konstanten sind gleich.
+
+Diese Dateien sind auf Sonnets Branch (Stand `28416b4`) nicht geändert.
 
 ## Dateien
 
@@ -13,10 +27,11 @@ Stand 12. November 2026, Branch `claude/determined-cannon-6u5msx`. Notion: «Zen
 | `app/i18n/messages/en.ts` | Englischer Katalog (britisches Englisch), nur für die Startschlüssel. |
 | `app/i18n/translate.ts` | `translate`, `translator`: Platzhalter `{name}`, Mehrzahl über `Intl.PluralRules`, Zahlen im Format der Sprache, Rückfall auf Deutsch je Schlüssel, Lückenbericht je Sprache. |
 | `tests/i18n.test.ts` | 8 Tests, siehe unten. |
+| `tests/i18n-account.test.ts` | 5 Tests für Schritt 1. |
 | `scripts/i18n/inventory.mjs` | Schätzt, wie viele deutsche Texte noch direkt im Code stehen und welche in Spielstände geschrieben werden. |
 
 ```bash
-node --import tsx --test tests/i18n.test.ts
+node --import tsx --test tests/i18n.test.ts tests/i18n-account.test.ts
 ```
 
 ```bash
@@ -31,9 +46,9 @@ Die Tests prüfen:
 * Fehlende Übersetzungen fallen je Schlüssel auf Deutsch zurück, samt deutschem Zahlenformat.
 * Mehrzahl richtig für Deutsch und Englisch; ein fehlender Wert bleibt als `{count}` sichtbar statt zu verschwinden.
 * Kein Katalog hat Schlüssel, die Deutsch nicht kennt, und jede Übersetzung behält die Platzhalter.
-* `page.tsx`, `game-app.tsx` und `layout.tsx` importieren das Fundament noch nicht.
+* Ausserhalb von `app/i18n` liest oder speichert nichts eine Sprache, und wer übersetzt, übersetzt nur in die Quellsprache. `page.tsx`, `game-app.tsx` und `layout.tsx` importieren das Fundament nicht.
 
-`tests/i18n.test.ts` steht noch nicht in `npm run test:unit`, weil `package.json` auf Sonnets Branch geändert ist. Nachtragen nach dem Zusammenführen.
+`tests/i18n.test.ts` und `tests/i18n-account.test.ts` stehen noch nicht in `npm run test:unit`, weil `package.json` auf Sonnets Branch geändert ist. Nachtragen nach dem Zusammenführen.
 
 ## Umfang laut Inventar
 
@@ -42,7 +57,7 @@ Rund **1760 deutsche Texte in 88 Dateien** (Schätzung; Spielernamen in den Kart
 ## Blocker für eine echte Umstellung
 
 1. **Deutscher Text wird in Spielstände und Welten geschrieben.** Verlaufseinträge (`addHistory`, rund 57 Stellen), Zeitungsschlagzeilen und Pressetexte landen als fertiger deutscher Satz im Spielstand und in `coop_rooms.shared_features_json`. Ein englischer Spieler sähe alte Einträge weiter auf Deutsch, und in einer Koopwelt mit zwei Sprachen schreibt jeder in seiner. Lösung braucht eine Formatentscheidung (Schlüssel plus Werte statt Text speichern, alte Einträge bleiben Text) und eine Migration im Spielstand.
-2. **Server schickt deutsche Fehlermeldungen.** `account-api.ts` und die Multiplayer Route liefern `error` als deutschen Satz, teils mit `errorCode`, aber derselbe Code steht für verschiedene Sätze (zum Beispiel `INVALID`). Für Englisch braucht es eindeutige Codes je Meldung oder Übersetzung auf dem Server.
+2. **Server schickt deutsche Fehlermeldungen.** `account-api.ts` liest sie jetzt aus dem Katalog, liefert aber weiter den deutschen Satz. Derselbe `errorCode` steht teils für verschiedene Sätze (zum Beispiel `INVALID` für «Die Spielstand Version fehlt.» und «Der Spielstand ist unvollständig.»), und manche Antworten haben keinen Code («Die Anfrage ist ungültig.», «Der Server ist gerade nicht erreichbar.»). Die Multiplayer Route (rund 140 Texte) ist auf Sonnets Branch geändert und noch nicht umgestellt.
 3. **Gekoppelte Dateien.** Die grossen Textmengen liegen in Dateien, an denen Sonnet arbeitet. Eine schrittweise Umstellung geht erst nach dem Zusammenführen ohne Konflikte.
 4. **Englischer Fussballwortschatz und Ton** sind nicht festgelegt (Liga, Pokal, Fragmente, Packnamen).
 
@@ -66,7 +81,7 @@ Rund **1760 deutsche Texte in 88 Dateien** (Schätzung; Spielernamen in den Kart
 
 ## Vorgeschlagene Reihenfolge nach Freigabe
 
-1. Kleine, gemeinsame Texte zuerst (Sync und Update Meldungen, Bestätigungsdialoge, Kontofenster), jeweils mit Test «deutsch wortgleich».
+1. Kleine, gemeinsame Texte zuerst. Erledigt in Schritt 1: Sync und Update Meldungen, Konto und Save API, Prüfmeldungen. Offen: Bestätigungsdialoge, `account-panel.tsx`, `account-gate.tsx` (Sonnet).
 2. Fehlercodes vereinheitlichen (Entscheidung C).
 3. Speicherformat für Verlauf und Schlagzeilen (Entscheidung B) mit Migration und Tests für alte Spielstände.
 4. Grosse Oberflächen (`game-app.tsx`, Karriere, Saison, Reise) Datei für Datei.

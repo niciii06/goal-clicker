@@ -4,8 +4,10 @@
 import { GAME_FEATURES_SCHEMA_VERSION } from "../features/schema-version";
 import { readGameSchemaVersion, readSaveSchemaVersion } from "../cloud-save-rules";
 import type { CloudSaveKeys } from "../cloud-save-rules";
+import { SOURCE_LOCALE } from "../i18n/locales";
+import { translate } from "../i18n/translate";
 
-export const NEWER_VERSION_MESSAGE = "Neue Version verfügbar, bitte neu laden. Dein Spielstand wurde mit einer neueren Version gespeichert und bleibt unverändert.";
+export const NEWER_VERSION_MESSAGE = translate(SOURCE_LOCALE, "update.newerSave");
 
 /** Whether the raw stored game (STORAGE_KEY text) comes from a newer version of the game than this one. */
 export function isGameFromNewerVersion(game: string | null | undefined, supported = GAME_FEATURES_SCHEMA_VERSION) {
