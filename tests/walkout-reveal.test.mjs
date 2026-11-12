@@ -239,3 +239,20 @@ test("every nation on a card has a walkout country and a real flag", async () =>
     assert.ok(flags.has(code), `flag missing for ${code}`);
   }
 });
+
+test("no card reveal can be skipped, and the card type is not shown before the animation ends", async () => {
+  const [pageSource, styleSource] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  // The skip button, its timer, state and handler are gone for every card category.
+  assert.doesNotMatch(pageSource, /Überspringen|walkoutSkippable|WalkoutSkippable|skipStarReveal|walkoutSkipTimerRef|STAR_WALKOUT_SKIP_AFTER_MS|starRevealSkipped|WALKOUT_SEEN_STORAGE_KEY/);
+  assert.doesNotMatch(styleSource, /star-walkout-skip/);
+  // The tier label (86+, 90+, Icon, Legendary, rare range) and the description only carry text once the reveal is ready.
+  assert.match(pageSource, /!starWalkoutReady \? "\\u00a0" : starRevealIsLegendary/);
+  assert.match(pageSource, /\{starWalkoutReady \? "SELTENE KARTE · 80 BIS 85" : "\\u00a0"\}/);
+  assert.equal((pageSource.match(/!starWalkoutReady \? "\\u00a0" : `\$\{/g) ?? []).length, 2, "walkout and rare descriptions wait for the end");
+  assert.match(styleSource, /\.star-reveal-walkout-label\.pending \{ visibility: hidden; \}/);
+  // The way out after the reveal stays: the continue button is enabled only once the reveal is ready.
+  assert.match(pageSource, /disabled=\{!starWalkoutReady\} onClick=\{dismissStarReveal\}/);
+});

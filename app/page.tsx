@@ -161,8 +161,6 @@ const STAR_TOP_WALKOUT_READY_MS = 10900;
 /** With reduced motion the reveal skips its animations and is ready almost at once. */
 const STAR_REVEAL_REDUCED_MOTION_READY_MS = 700;
 /** A player who has seen one walkout may skip the next ones after this long. */
-const STAR_WALKOUT_SKIP_AFTER_MS = 2000;
-const WALKOUT_SEEN_STORAGE_KEY = "goal-clicker-walkout-seen";
 
 function prefersReducedMotion() {
   try { return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; }
@@ -393,8 +391,6 @@ function App() {
   const [seasonTitle, setSeasonTitle] = useState<SeasonTitle | null>(null);
   const [starReveal, setStarReveal] = useState<StarPackReveal | null>(null);
   const [starWalkoutReady, setStarWalkoutReady] = useState(false);
-  const [walkoutSkippable, setWalkoutSkippable] = useState(false);
-  const [starRevealSkipped, setStarRevealSkipped] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   useEffect(() => {
     let query: MediaQueryList;
@@ -452,7 +448,6 @@ function App() {
   const clubGoalRef = useRef<string | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const starRevealTimerRef = useRef<number | null>(null);
-  const walkoutSkipTimerRef = useRef<number | null>(null);
   const cupCardTimerRef = useRef<number | null>(null);
   const seasonHistoryRef = useRef<string | null>(null);
   const feedIdRef = useRef(2);
@@ -652,11 +647,7 @@ function App() {
   const starRevealIsIconic = starRevealTier === "icon";
   const starRevealIsLegendary = starRevealTier === "legendary";
   const starRevealIsRare = starRevealTier === "rare";
-  const starRevealTrollActive = Boolean(starReveal?.troll && starRevealIsWalkout && starRevealAge < PACK_TROLL_INTRO_MS && !reducedMotion && !starRevealSkipped);
-  useEffect(() => {
-    if (!starWalkoutReady || !starReveal || (!starRevealIsWalkout && !starRevealIsRare)) return;
-    try { window.localStorage.setItem(WALKOUT_SEEN_STORAGE_KEY, "1"); } catch { /* storage blocked */ }
-  }, [starWalkoutReady, starReveal, starRevealIsWalkout, starRevealIsRare]);
+  const starRevealTrollActive = Boolean(starReveal?.troll && starRevealIsWalkout && starRevealAge < PACK_TROLL_INTRO_MS && !reducedMotion);
   // Honest reveal button (Q19): where the new card is now, and whether putting it into the eleven raises the rating.
   const revealPlacement = useMemo(() => {
     if (!starReveal || starReveal.duplicate) return null;
@@ -842,7 +833,7 @@ function App() {
     const dialog = starRevealDialogRef.current;
     if (!dialog || dialog.contains(document.activeElement)) { if (starWalkoutReady) dialog?.querySelector<HTMLElement>(".star-walkout-dismiss:not([disabled]), .event-takeover-dismiss:not([disabled])")?.focus(); return; }
     (dialog.querySelector<HTMLElement>("button:not([disabled])") ?? dialog).focus();
-  }, [starReveal, starWalkoutReady, walkoutSkippable]);
+  }, [starReveal, starWalkoutReady]);
   // One persistent live region: the goal counter and combo are not live (they change several times a second);
   // toasts and rank milestones are announced here instead.
   const [srAnnouncement, setSrAnnouncement] = useState("");
@@ -1328,17 +1319,10 @@ function App() {
       const tier = getStarCardTier(reveal.player);
       if (tier === "walkout" || tier === "icon" || tier === "legendary") vibrate([90, 50, 90, 50, 260]);
       setStarWalkoutReady(false);
-      setWalkoutSkippable(false);
-      setStarRevealSkipped(false);
       starRevealTimerRef.current = window.setTimeout(() => {
         setStarWalkoutReady(true);
         starRevealTimerRef.current = null;
       }, revealDuration - elapsed);
-      if (walkoutSkipTimerRef.current) window.clearTimeout(walkoutSkipTimerRef.current);
-      walkoutSkipTimerRef.current = null;
-      let seen = false;
-      try { seen = window.localStorage.getItem(WALKOUT_SEEN_STORAGE_KEY) === "1"; } catch { /* storage blocked */ }
-      if (seen && revealDuration - elapsed > STAR_WALKOUT_SKIP_AFTER_MS) walkoutSkipTimerRef.current = window.setTimeout(() => { setWalkoutSkippable(true); walkoutSkipTimerRef.current = null; }, Math.max(0, STAR_WALKOUT_SKIP_AFTER_MS - elapsed));
       return;
     }
     setStarWalkoutReady(true);
@@ -1351,23 +1335,9 @@ function App() {
     packSoundRef.current = null;
     if (starRevealTimerRef.current) window.clearTimeout(starRevealTimerRef.current);
     starRevealTimerRef.current = null;
-    if (walkoutSkipTimerRef.current) window.clearTimeout(walkoutSkipTimerRef.current);
-    walkoutSkipTimerRef.current = null;
-    setWalkoutSkippable(false);
-    setStarRevealSkipped(false);
     setStarWalkoutReady(false);
     setStarReveal(null);
     continueOpenAll();
-  }
-
-  /** Skips the rest of a walkout or rare reveal: the card shows at once, ready to take over. */
-  function skipStarReveal() {
-    if (starRevealTimerRef.current) window.clearTimeout(starRevealTimerRef.current);
-    starRevealTimerRef.current = null;
-    setWalkoutSkippable(false);
-    setStarRevealSkipped(true);
-    setStarRevealLag(24 * 60 * 60 * 1000);
-    setStarWalkoutReady(true);
   }
 
   function finishStarWalkout(event: AnimationEvent<HTMLDivElement>) {
@@ -3823,7 +3793,8 @@ function App() {
       {starReveal && <div ref={starRevealDialogRef} tabIndex={-1} className={`star-reveal${starRevealIsWalkout ? " walkout-active" : ""}${starRevealIsRare ? " rare-active" : ""}`} role="dialog" aria-modal="true" aria-label={starRevealIsCustomDraw ? "Spezialkarte gezogen" : "Star Pack geöffnet"}>
         <div className={`star-reveal-card${starRevealIsWalkout ? " star-reveal-walkout" : ""}${starWalkoutIsTop ? " star-reveal-top-walkout" : ""}${starRevealIsIconic ? " star-reveal-iconic" : ""}${starRevealIsLegendary ? " star-reveal-legendary" : ""}${starRevealIsRare ? " star-reveal-rare" : ""}`} style={{ borderColor: `${starReveal.player.accent}55` }}>
           {starRevealIsWalkout ? <>
-            <span className="star-reveal-walkout-label">{starRevealTrollActive ? "WALKOUT? · ETWAS KOMMT" : starRevealIsLegendary ? "LEGENDÄRER WALKOUT · EINZIGARTIG" : starRevealIsIconic ? "ICON WALKOUT · SILBER" : starWalkoutIsTop ? "TOP WALKOUT · 90+" : "WALKOUT · 86+"}</span>
+            {/* The tier (86+, 90+, Icon, Legendary) is a spoiler: its label appears only once the walkout is over. */}
+            <span className={`star-reveal-walkout-label${starWalkoutReady || starRevealTrollActive ? "" : " pending"}`} aria-hidden={!starWalkoutReady && !starRevealTrollActive}>{starRevealTrollActive ? "WALKOUT? · ETWAS KOMMT" : !starWalkoutReady ? "\u00a0" : starRevealIsLegendary ? "LEGENDÄRER WALKOUT · EINZIGARTIG" : starRevealIsIconic ? "ICON WALKOUT · SILBER" : starWalkoutIsTop ? "TOP WALKOUT · 90+" : "WALKOUT · 86+"}</span>
             <span className="star-reveal-kicker">{starRevealTrollActive ? "STADION / FALSCHE SPUR" : starRevealIsCustomDraw ? "ZUFALLSZUG / STADION ENTHÜLLUNG" : `${starReveal.packName} / STADION ENTHÜLLUNG`}</span>
             {starRevealTrollActive ? <div className="star-pack-troll-stage" aria-live="assertive"><div className="star-pack-troll-mascot" aria-hidden="true"><i className="mascot-ear left" /><i className="mascot-ear right" /><span>GC</span><b>⚽</b></div><strong>Das Maskottchen!</strong><small>Falscher Walkout. Die echte Karte kommt sofort.</small></div> : <div className="star-walkout-stage" aria-live="assertive" style={starWalkoutStyle}>
               <div className="star-walkout-pyro" aria-hidden="true">{Array.from({ length: starWalkoutIsTop ? 17 : 11 }, (_, index) => <i key={index} style={{ "--pyro-index": index } as CSSProperties} />)}</div>
@@ -3835,21 +3806,19 @@ function App() {
                 <div className="star-walkout-nameplate"><span><WalkoutCountryFlag compact code={starWalkoutPresentation.countryCode} country={starWalkoutPresentation.country} /> {starWalkoutPresentation.countryCode} · {formatStarXIPositions(starReveal.player)}</span><h2>{starReveal.player.name}</h2></div>
               </>}
             </div>}
-            <p className={`star-walkout-copy${starWalkoutReady ? " ready" : ""}`}>{starRevealTrollActive ? "Das Stadion wurde kurz getrollt. Gleich beginnt der echte Walkout." : `${isCoopLive ? `${starReveal.openedBy} hat ${starRevealAction}. ` : ""}${starReveal.duplicate ? `Doppelt gezogen. Du bekommst automatisch ${formatNumber(starReveal.fragmentCompensation)} Fragmente für Custom-Karten.` : `${formatStarXIPositions(starReveal.player)} · Rating ${starReveal.player.rating}. Der Walkout gehört jetzt deinem Club.`}`}</p>
+            <p className={`star-walkout-copy${starWalkoutReady ? " ready" : ""}`}>{starRevealTrollActive ? "Das Stadion wurde kurz getrollt. Gleich beginnt der echte Walkout." : !starWalkoutReady ? "\u00a0" : `${isCoopLive ? `${starReveal.openedBy} hat ${starRevealAction}. ` : ""}${starReveal.duplicate ? `Doppelt gezogen. Du bekommst automatisch ${formatNumber(starReveal.fragmentCompensation)} Fragmente für Custom-Karten.` : `${formatStarXIPositions(starReveal.player)} · Rating ${starReveal.player.rating}. Der Walkout gehört jetzt deinem Club.`}`}</p>
             <span className={`star-reveal-status star-walkout-status${starWalkoutReady ? " ready" : ""}`}>{starRevealTrollActive ? "PACK TROLL" : starWalkoutReady ? starReveal.duplicate ? "DOPPELT · FRAGMENTE" : starRevealIsLegendary ? "LEGENDÄR · STAR XI" : starRevealIsIconic ? "ICON · STAR XI" : "WALKOUT · STAR XI" : "WALKOUT LÄUFT"}</span>
-            {walkoutSkippable && !starWalkoutReady && <button type="button" className="mode-secondary star-walkout-skip" onClick={skipStarReveal}>Überspringen</button>}
             {starWalkoutReady && !starRevealTrollActive && revealLineupButton}
             <button className={`event-takeover-dismiss star-walkout-dismiss${starWalkoutReady ? " ready" : ""}`} disabled={!starWalkoutReady} onClick={dismissStarReveal}>{starRevealTrollActive ? "Maskottchen läuft …" : starWalkoutReady ? revealContinueLabel : "Walkout läuft …"}</button>
           </> : starRevealIsRare ? <>
-            <span className="star-reveal-walkout-label">SELTENE KARTE · 80 BIS 85</span>
+            <span className={`star-reveal-walkout-label${starWalkoutReady ? "" : " pending"}`} aria-hidden={!starWalkoutReady}>{starWalkoutReady ? "SELTENE KARTE · 80 BIS 85" : "\u00a0"}</span>
             <span className="star-reveal-kicker">{starRevealKicker}</span>
             <div className="star-rare-stage" style={starWalkoutStyle} aria-live="assertive">
               <div className="star-rare-sparkles" aria-hidden="true">{Array.from({ length: 18 }, (_, index) => <i key={index} style={{ left: `${(index * 37) % 96}%`, top: `${8 + (index * 23) % 78}%`, animationDelay: `calc(${index * 70}ms + var(--rare-delay, 0ms))` }} />)}</div>
               <div className="star-rare-card"><StarXIPositionBadges player={starReveal.player} variant="rare" /><strong>{starReveal.player.rating}</strong><small>SELTEN</small><h2>{starReveal.player.name}</h2></div>
             </div>
-            <p className={`star-walkout-copy${starWalkoutReady ? " ready" : ""}`}>{`${isCoopLive ? `${starReveal.openedBy} hat ${starRevealAction}. ` : ""}${starReveal.duplicate ? `Doppelt gezogen. Du bekommst automatisch ${formatNumber(starReveal.fragmentCompensation)} Fragmente für Custom-Karten.` : `${formatStarXIPositions(starReveal.player)} · Rating ${starReveal.player.rating}. Seltene Karte für deinen Club.`}`}</p>
+            <p className={`star-walkout-copy${starWalkoutReady ? " ready" : ""}`}>{!starWalkoutReady ? "\u00a0" : `${isCoopLive ? `${starReveal.openedBy} hat ${starRevealAction}. ` : ""}${starReveal.duplicate ? `Doppelt gezogen. Du bekommst automatisch ${formatNumber(starReveal.fragmentCompensation)} Fragmente für Custom-Karten.` : `${formatStarXIPositions(starReveal.player)} · Rating ${starReveal.player.rating}. Seltene Karte für deinen Club.`}`}</p>
             <span className={`star-reveal-status star-walkout-status${starWalkoutReady ? " ready" : ""}`}>{starWalkoutReady ? starReveal.duplicate ? "DOPPELT · FRAGMENTE" : "SELTEN · STAR XI" : "SELTENE KARTE"}</span>
-            {walkoutSkippable && !starWalkoutReady && <button type="button" className="mode-secondary star-walkout-skip" onClick={skipStarReveal}>Überspringen</button>}
             {starWalkoutReady && !starRevealTrollActive && revealLineupButton}
             <button className={`event-takeover-dismiss star-walkout-dismiss${starWalkoutReady ? " ready" : ""}`} disabled={!starWalkoutReady} onClick={dismissStarReveal}>{starWalkoutReady ? revealContinueLabel : "Karte wird enthüllt …"}</button>
           </> : <>

@@ -1143,7 +1143,8 @@ button { font: inherit; }
 .star-reveal.walkout-active { z-index: 45; background: radial-gradient(circle at 50% 46%, rgba(8,55,104,.55), rgba(2,5,12,.96) 68%); backdrop-filter: blur(24px) saturate(155%); animation: star-walkout-overlay 480ms ease both; }
 .star-reveal-walkout { width: min(760px, 100%); padding: 27px 34px 25px; border-color: rgba(255,220,113,.74) !important; background: linear-gradient(160deg, #162849, #08101f 56%, #03070f); box-shadow: 0 38px 130px rgba(0,0,0,.72), 0 0 95px rgba(0,113,227,.25), inset 0 1px 0 rgba(255,255,255,.2); animation: star-walkout-in 720ms cubic-bezier(.16,1,.3,1); }
 .star-reveal-iconic { border-color: rgba(238,245,252,.95) !important; background: linear-gradient(150deg, #edf2f7, #77828e 20%, #1b222b 56%, #06090e); box-shadow: 0 38px 140px rgba(0,0,0,.76), 0 0 125px rgba(215,228,240,.38), inset 0 1px 0 rgba(255,255,255,.62); }
-.star-reveal-iconic .star-reveal-walkout-label { border-color: rgba(240,247,255,.7); color: #f5f8fb; background: rgba(225,235,245,.16); }
+.star-reveal-iconic .star-reveal-walkout-label.pending { visibility: hidden; }
+.star-reveal-walkout-label { border-color: rgba(240,247,255,.7); color: #f5f8fb; background: rgba(225,235,245,.16); }
 .star-reveal-iconic .star-walkout-stage { border-color: rgba(232,241,250,.5); box-shadow: inset 0 -45px 75px rgba(0,0,0,.78), inset 0 0 65px rgba(220,235,248,.2), 0 0 34px rgba(220,235,248,.13); }
 .star-reveal-legendary { border-color: rgba(255,226,125,.98) !important; background: linear-gradient(152deg, #6a501a, #21170a 35%, #07090e 68%); box-shadow: 0 38px 145px rgba(0,0,0,.78), 0 0 140px rgba(255,193,44,.43), inset 0 1px 0 rgba(255,255,255,.38); }
 .star-reveal-legendary .star-reveal-walkout-label { border-color: rgba(255,226,125,.88); color: #fff0af; background: rgba(255,199,55,.2); box-shadow: 0 0 24px rgba(255,198,50,.18); }
@@ -2359,7 +2360,6 @@ button { font: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .star-walkout-avatar-wrap { animation-duration: 1ms !important; animation-delay: 0ms !important; }
 }
-.star-walkout-skip { justify-self: center; min-height: 44px; margin-bottom: 8px; }
 .feature-tab-offer-dot { display: inline-block; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%; background: #b37f00; vertical-align: middle; }
 main :is(h2, h3, h4)[tabindex="-1"]:focus { outline: none; }
 main :is(h2, h3, h4)[tabindex="-1"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
