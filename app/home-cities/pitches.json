@@ -1,0 +1,1833 @@
+{
+ "source": "OpenStreetMap contributors via Nominatim (ODbL); clubs: their official websites",
+ "generatedAt": "2026-11-12",
+ "cities": {
+  "zurich": {
+   "canton": "ZH",
+   "home": {
+    "name": "Schul- und Sportanlage Apfelbaum",
+    "osm": "way/60797435",
+    "lat": 47.40683,
+    "lon": 8.55522,
+    "municipality": "Zürich",
+    "canton": "ZH",
+    "kind": "school-sports"
+   },
+   "divisions": {
+    "1": [
+     {
+      "ground": {
+       "name": "Sportanlage Liguster",
+       "osm": "way/87836919",
+       "lat": 47.40641,
+       "lon": 8.54254,
+       "municipality": "Zürich",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 0.96
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Steinkluppe",
+       "osm": "way/1395533609",
+       "lat": 47.40032,
+       "lon": 8.54084,
+       "municipality": "Zürich",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 1.3
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Au",
+       "osm": "way/1549284862",
+       "lat": 47.42192,
+       "lon": 8.57082,
+       "municipality": "Glattbrugg",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 2.05
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Katzenbach",
+       "osm": "way/31856294",
+       "lat": 47.4247,
+       "lon": 8.54696,
+       "municipality": "Zürich",
+       "canton": "ZH",
+       "kind": "pitch"
+      },
+      "distanceKm": 2.08
+     },
+     {
+      "ground": {
+       "name": "Schul- und Sportanlage Buchwiesen",
+       "osm": "way/251207184",
+       "lat": 47.42716,
+       "lon": 8.54085,
+       "municipality": "Zürich",
+       "canton": "ZH",
+       "kind": "school-sports"
+      },
+      "distanceKm": 2.51
+     }
+    ],
+    "2": [
+     {
+      "ground": {
+       "name": "Sportanlage Neudorf",
+       "osm": "way/998173254",
+       "lat": 47.41152,
+       "lon": 8.55689,
+       "municipality": "Zürich",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 0.54,
+      "real": {
+       "name": "FC Oerlikon/Polizei ZH",
+       "source": "https://www.fcop.ch/",
+       "quote": "Heimplatz: Sportanlage Neudorf"
+      }
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Eichrain",
+       "osm": "way/251223683",
+       "lat": 47.42929,
+       "lon": 8.54877,
+       "municipality": "Zürich",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 2.54
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Halden Opfikon",
+       "osm": "way/1060945073",
+       "lat": 47.43087,
+       "lon": 8.5701,
+       "municipality": "Glattbrugg",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 2.9
+     },
+     {
+      "ground": {
+       "name": "Schul- und Sportanlage Schauenberg",
+       "osm": "way/427294441",
+       "lat": 47.414,
+       "lon": 8.51073,
+       "municipality": "Zürich",
+       "canton": "ZH",
+       "kind": "school-sports"
+      },
+      "distanceKm": 3.44
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Sonnenberg",
+       "osm": "way/373700421",
+       "lat": 47.36878,
+       "lon": 8.57238,
+       "municipality": "Zürich",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 4.42
+     },
+     {
+      "ground": {
+       "name": "Fussball- Sportplatz Heuel",
+       "osm": "way/38907482",
+       "lat": 47.45048,
+       "lon": 8.52549,
+       "municipality": "Rümlang",
+       "canton": "ZH",
+       "kind": "pitch"
+      },
+      "distanceKm": 5.34
+     }
+    ],
+    "3": [
+     {
+      "ground": {
+       "name": "Fussball- Sportplatz Heuel Platz 2",
+       "osm": "way/38907472",
+       "lat": 47.45004,
+       "lon": 8.52329,
+       "municipality": "Rümlang",
+       "canton": "ZH",
+       "kind": "pitch"
+      },
+      "distanceKm": 5.37
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Witikon",
+       "osm": "way/127252570",
+       "lat": 47.36229,
+       "lon": 8.59673,
+       "municipality": "Zürich",
+       "canton": "ZH",
+       "kind": "pitch"
+      },
+      "distanceKm": 5.86
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Letzi",
+       "osm": "way/53560489",
+       "lat": 47.37146,
+       "lon": 8.49618,
+       "municipality": "Zürich",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 5.93
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Dürrbach",
+       "osm": "way/1501002498",
+       "lat": 47.40849,
+       "lon": 8.63534,
+       "municipality": "Brüttisellen",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 6.03
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Allmend Brunau",
+       "osm": "way/542204257",
+       "lat": 47.35394,
+       "lon": 8.52208,
+       "municipality": "Zürich",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 6.39
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Halsrüti",
+       "osm": "way/45876720",
+       "lat": 47.42138,
+       "lon": 8.63824,
+       "municipality": "Brüttisellen",
+       "canton": "ZH",
+       "kind": "pitch"
+      },
+      "distanceKm": 6.45
+     }
+    ],
+    "4": [
+     {
+      "ground": {
+       "name": "Sportplatz Allmend",
+       "osm": "way/270084219",
+       "lat": 47.37199,
+       "lon": 8.45961,
+       "municipality": "Waldegg",
+       "canton": "ZH",
+       "kind": "pitch"
+      },
+      "distanceKm": 8.17
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Rüterwis",
+       "osm": "way/61692264",
+       "lat": 47.3374,
+       "lon": 8.60003,
+       "municipality": "Zollikon",
+       "canton": "ZH",
+       "kind": "pitch"
+      },
+      "distanceKm": 8.43
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Sürenloo",
+       "osm": "way/817106674",
+       "lat": 47.36353,
+       "lon": 8.457,
+       "municipality": "Waldegg",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 8.82
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Sonnau",
+       "osm": "way/1414909144",
+       "lat": 47.32543,
+       "lon": 8.52862,
+       "municipality": "Adliswil",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 9.27
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Langacker",
+       "osm": "way/1142199271",
+       "lat": 47.29253,
+       "lon": 8.61368,
+       "municipality": "Herrliberg",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 13.45
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Brand",
+       "osm": "node/2810439686",
+       "lat": 47.28861,
+       "lon": 8.55141,
+       "municipality": "Thalwil",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 13.15
+     }
+    ],
+    "5": [
+     {
+      "ground": {
+       "name": "Fussball-Sportanlage Dornau",
+       "osm": "way/323153186",
+       "lat": 47.41035,
+       "lon": 8.41129,
+       "municipality": "Weiningen (ZH)",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 10.84
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Mettmenriet",
+       "osm": "way/158853268",
+       "lat": 47.51209,
+       "lon": 8.54554,
+       "municipality": "Bülach",
+       "canton": "ZH",
+       "kind": "pitch"
+      },
+      "distanceKm": 11.73
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Hätschen",
+       "osm": "way/1274356497",
+       "lat": 47.4001,
+       "lon": 8.39281,
+       "municipality": "Dietikon",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 12.25
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Fondli",
+       "osm": "way/1110877684",
+       "lat": 47.40812,
+       "lon": 8.38562,
+       "municipality": "Dietikon",
+       "canton": "ZH",
+       "kind": "pitch"
+      },
+      "distanceKm": 12.76
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Schlag",
+       "osm": "way/310720729",
+       "lat": 47.29791,
+       "lon": 8.44042,
+       "municipality": "Hedingen",
+       "canton": "ZH",
+       "kind": "pitch"
+      },
+      "distanceKm": 14.88
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Scharten",
+       "osm": "way/111196277",
+       "lat": 47.4702,
+       "lon": 8.31992,
+       "municipality": "Wettingen",
+       "canton": "AG",
+       "kind": "pitch"
+      },
+      "distanceKm": 19.05
+     }
+    ],
+    "6": [
+     {
+      "ground": {
+       "name": "Sportanlage Meierwiesen",
+       "osm": "way/245489515",
+       "lat": 47.31493,
+       "lon": 8.80174,
+       "municipality": "Wetzikon (ZH)",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 21.19
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Im See",
+       "osm": "way/36957475",
+       "lat": 47.49572,
+       "lon": 8.87011,
+       "municipality": "Elgg",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 25.66
+     },
+     {
+      "ground": {
+       "name": "Sportplatz, Fussball",
+       "osm": "way/229759003",
+       "lat": 47.1312,
+       "lon": 8.58653,
+       "municipality": "Unterägeri",
+       "canton": "ZG",
+       "kind": "pitch"
+      },
+      "distanceKm": 30.74
+     },
+     {
+      "ground": {
+       "name": "Sportplatz",
+       "osm": "way/788904684",
+       "lat": 47.67422,
+       "lon": 8.62835,
+       "municipality": "Uhwiesen",
+       "canton": "ZH",
+       "kind": "pitch"
+      },
+      "distanceKm": 30.23
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Walchwil",
+       "osm": "node/7476854167",
+       "lat": 47.09846,
+       "lon": 8.51638,
+       "municipality": "Walchwil",
+       "canton": "ZG",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 34.41
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Rüti",
+       "osm": "way/420503805",
+       "lat": 47.45381,
+       "lon": 9.12317,
+       "municipality": "Uzwil",
+       "canton": "SG",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 43.04
+     }
+    ],
+    "7": [
+     {
+      "ground": {
+       "name": "Sportanlage Brunnenmoos",
+       "osm": "way/1536613605",
+       "lat": 47.31953,
+       "lon": 8.54334,
+       "municipality": "Kilchberg (ZH)",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 9.75
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Gheid",
+       "osm": "way/32989180",
+       "lat": 47.44918,
+       "lon": 8.44151,
+       "municipality": "Buchs (ZH)",
+       "canton": "ZH",
+       "kind": "pitch"
+      },
+      "distanceKm": 9.76
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Tüfi",
+       "osm": "way/35962441",
+       "lat": 47.32058,
+       "lon": 8.52808,
+       "municipality": "Adliswil",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 9.81
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Heusser-Staub",
+       "osm": "way/29109917",
+       "lat": 47.34425,
+       "lon": 8.72618,
+       "municipality": "Uster",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 14.63
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Buchholz",
+       "osm": "way/24754979",
+       "lat": 47.35903,
+       "lon": 8.7262,
+       "municipality": "Uster",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 13.93
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Rain",
+       "osm": "way/242161213",
+       "lat": 47.23381,
+       "lon": 8.84221,
+       "municipality": "Rapperswil-Jona",
+       "canton": "SG",
+       "kind": "pitch"
+      },
+      "distanceKm": 28.95
+     }
+    ],
+    "8": [
+     {
+      "ground": {
+       "name": "Sportplatz Kantonsschule Limmattal",
+       "osm": "way/149905621",
+       "lat": 47.39376,
+       "lon": 8.42505,
+       "municipality": "Urdorf",
+       "canton": "ZH",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 9.9
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Waffenplatz",
+       "osm": "way/34608788",
+       "lat": 47.35601,
+       "lon": 8.32835,
+       "municipality": "Bremgarten",
+       "canton": "AG",
+       "kind": "pitch"
+      },
+      "distanceKm": 17.99
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Eschenmoos (Nebenplatz)",
+       "osm": "way/116354555",
+       "lat": 47.37748,
+       "lon": 8.23877,
+       "municipality": "Dottikon",
+       "canton": "AG",
+       "kind": "pitch"
+      },
+      "distanceKm": 24.04
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Schelmengrube",
+       "osm": "way/370202502",
+       "lat": 47.62401,
+       "lon": 8.79605,
+       "municipality": "Oberstammheim",
+       "canton": "ZH",
+       "kind": "pitch"
+      },
+      "distanceKm": 30.17
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Eggen",
+       "osm": "way/88193904",
+       "lat": 47.68615,
+       "lon": 8.63459,
+       "municipality": "Flurlingen",
+       "canton": "ZH",
+       "kind": "pitch"
+      },
+      "distanceKm": 31.63
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Schwarzbrüneli",
+       "osm": "way/96396955",
+       "lat": 47.68643,
+       "lon": 8.64704,
+       "municipality": "Langwiesen",
+       "canton": "ZH",
+       "kind": "pitch"
+      },
+      "distanceKm": 31.84
+     }
+    ]
+   }
+  },
+  "basel": {
+   "canton": "BS",
+   "home": {
+    "name": "Sportplatz Rheinacker",
+    "osm": "way/264987005",
+    "lat": 47.56493,
+    "lon": 7.62812,
+    "municipality": "Basel",
+    "canton": "BS",
+    "kind": "pitch"
+   },
+   "divisions": {
+    "1": [
+     {
+      "ground": {
+       "name": "Sportanlage Bäumlihof",
+       "osm": "way/126134346",
+       "lat": 47.56839,
+       "lon": 7.62775,
+       "municipality": "Riehen",
+       "canton": "BS",
+       "kind": "stadium"
+      },
+      "distanceKm": 0.39
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Buschweilerhof",
+       "osm": "way/39976253",
+       "lat": 47.55941,
+       "lon": 7.5625,
+       "municipality": "Basel",
+       "canton": "BS",
+       "kind": "pitch"
+      },
+      "distanceKm": 4.96
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Welschenmatt",
+       "osm": "way/162844443",
+       "lat": 47.5152,
+       "lon": 7.61387,
+       "municipality": "Münchenstein",
+       "canton": "BL",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 5.63
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Au",
+       "osm": "way/29312043",
+       "lat": 47.5139,
+       "lon": 7.61158,
+       "municipality": "Münchenstein",
+       "canton": "BL",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 5.81
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Arlesheim",
+       "osm": "relation/9225955",
+       "lat": 47.49992,
+       "lon": 7.60846,
+       "municipality": "Arlesheim",
+       "canton": "BL",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 7.38
+     }
+    ],
+    "2": [
+     {
+      "ground": {
+       "name": "Sportplatz am Rhein",
+       "osm": "way/620784479",
+       "lat": 47.54068,
+       "lon": 7.72066,
+       "municipality": "Kaiseraugst",
+       "canton": "AG",
+       "kind": "pitch"
+      },
+      "distanceKm": 7.45
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Dorf",
+       "osm": "way/620776322",
+       "lat": 47.53989,
+       "lon": 7.72267,
+       "municipality": "Kaiseraugst",
+       "canton": "AG",
+       "kind": "pitch"
+      },
+      "distanceKm": 7.62
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Einschlag",
+       "osm": "way/62163687",
+       "lat": 47.4931,
+       "lon": 7.60084,
+       "municipality": "Reinach",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 8.25
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Grendelmatte",
+       "osm": "way/867046393",
+       "lat": 47.58008,
+       "lon": 7.63822,
+       "municipality": "Riehen",
+       "canton": "BS",
+       "kind": "stadium"
+      },
+      "distanceKm": 1.85,
+      "real": {
+       "name": "FC Amicitia Riehen",
+       "source": "https://www.fcamicitia.ch/",
+       "quote": "ein Zuhause auf der Sportanlage Grendelmatte (Grendelgasse 21, 4125 Riehen)"
+      }
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Im Liner",
+       "osm": "way/40393001",
+       "lat": 47.53498,
+       "lon": 7.73586,
+       "municipality": "Kaiseraugst",
+       "canton": "AG",
+       "kind": "pitch"
+      },
+      "distanceKm": 8.74
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Mühlacker",
+       "osm": "way/332242589",
+       "lat": 47.50166,
+       "lon": 7.71835,
+       "municipality": "Frenkendorf",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 9.77
+     }
+    ],
+    "3": [
+     {
+      "ground": {
+       "name": "Sportanlage Löhrenacker",
+       "osm": "node/2132935004",
+       "lat": 47.47308,
+       "lon": 7.58813,
+       "municipality": "Aesch",
+       "canton": "BL",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 10.65
+     },
+     {
+      "ground": {
+       "name": "Sportplatz",
+       "osm": "way/145112797",
+       "lat": 47.45818,
+       "lon": 7.59091,
+       "municipality": "Pfeffingen",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 12.19
+     },
+     {
+      "ground": {
+       "name": "Sportplatz",
+       "osm": "way/58723459",
+       "lat": 47.5284,
+       "lon": 7.81215,
+       "municipality": "Magden",
+       "canton": "AG",
+       "kind": "pitch"
+      },
+      "distanceKm": 14.4
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Sappeten",
+       "osm": "way/249210426",
+       "lat": 47.45307,
+       "lon": 7.74114,
+       "municipality": "Bubendorf",
+       "canton": "BL",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 15.06
+     },
+     {
+      "ground": {
+       "name": "Schul- und Sportanlage Steinli/Storeboden",
+       "osm": "way/110444114",
+       "lat": 47.56928,
+       "lon": 7.8429,
+       "municipality": "Möhlin",
+       "canton": "AG",
+       "kind": "school-sports"
+      },
+      "distanceKm": 16.12
+     },
+     {
+      "ground": {
+       "name": "Sportplatz",
+       "osm": "way/992696774",
+       "lat": 47.44455,
+       "lon": 7.4985,
+       "municipality": "Dittingen",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 16.55
+     }
+    ],
+    "4": [
+     {
+      "ground": {
+       "name": "Sportplatz",
+       "osm": "way/507019245",
+       "lat": 47.41432,
+       "lon": 7.71616,
+       "municipality": "Arboldswil",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 18.01
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Grien",
+       "osm": "way/1135372726",
+       "lat": 47.41029,
+       "lon": 7.53796,
+       "municipality": "Breitenbach",
+       "canton": "SO",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 18.48
+     },
+     {
+      "ground": {
+       "name": "Sportanlage in den Sandgruben",
+       "osm": "way/1033559231",
+       "lat": 47.52556,
+       "lon": 7.70661,
+       "municipality": "Pratteln",
+       "canton": "BL",
+       "kind": "pavilion"
+      },
+      "distanceKm": 7.34,
+      "real": {
+       "name": "FC Pratteln",
+       "source": "https://www.fcpratteln.ch/",
+       "quote": "Clubhaus und Sportanlage: Sportanlage in den Sandgruben, Giebenacherstrasse 14, 4133 Pratteln"
+      }
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Seichel",
+       "osm": "way/283141521",
+       "lat": 47.39387,
+       "lon": 7.63152,
+       "municipality": "Nunningen",
+       "canton": "SO",
+       "kind": "pitch"
+      },
+      "distanceKm": 19.02
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Buenacher",
+       "osm": "relation/4472843",
+       "lat": 47.56343,
+       "lon": 7.89598,
+       "municipality": "Wallbach",
+       "canton": "AG",
+       "kind": "pitch"
+      },
+      "distanceKm": 20.1
+     },
+     {
+      "ground": {
+       "name": "Sportplatz MZH",
+       "osm": "way/203887658",
+       "lat": 47.46302,
+       "lon": 7.8522,
+       "municipality": "Gelterkinden",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 20.29
+     }
+    ],
+    "5": [
+     {
+      "ground": {
+       "name": "Sportplatz",
+       "osm": "way/27199062",
+       "lat": 47.42148,
+       "lon": 7.81024,
+       "municipality": "Diegten",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 21.02
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Bennwil",
+       "osm": "way/39987890",
+       "lat": 47.40608,
+       "lon": 7.78577,
+       "municipality": "Bennwil",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 21.27
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Kipp Fussballplatz Wolfstiege",
+       "osm": "way/54106153",
+       "lat": 47.45706,
+       "lon": 7.87076,
+       "municipality": "Gelterkinden",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 21.82
+     },
+     {
+      "ground": {
+       "name": "Sportplatz",
+       "osm": "way/410068913",
+       "lat": 47.41264,
+       "lon": 7.81169,
+       "municipality": "Diegten",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 21.84
+     },
+     {
+      "ground": {
+       "name": "Sportplatz",
+       "osm": "way/27094255",
+       "lat": 47.41364,
+       "lon": 7.8376,
+       "municipality": "Känerkinden",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 23.04
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Buckten",
+       "osm": "way/28335311",
+       "lat": 47.41381,
+       "lon": 7.8444,
+       "municipality": "Buckten",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 23.38
+     }
+    ],
+    "6": [
+     {
+      "ground": {
+       "name": "Sportplatz",
+       "osm": "way/231422741",
+       "lat": 47.44082,
+       "lon": 7.90522,
+       "municipality": "Wenslingen",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 24.97
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Buckten",
+       "osm": "way/28335311",
+       "lat": 47.41381,
+       "lon": 7.8444,
+       "municipality": "Buckten",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 23.38,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Sportplatz",
+       "osm": "way/27094255",
+       "lat": 47.41364,
+       "lon": 7.8376,
+       "municipality": "Känerkinden",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 23.04,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Sportplatz",
+       "osm": "way/410068913",
+       "lat": 47.41264,
+       "lon": 7.81169,
+       "municipality": "Diegten",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 21.84,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Kipp Fussballplatz Wolfstiege",
+       "osm": "way/54106153",
+       "lat": 47.45706,
+       "lon": 7.87076,
+       "municipality": "Gelterkinden",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 21.82,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Bennwil",
+       "osm": "way/39987890",
+       "lat": 47.40608,
+       "lon": 7.78577,
+       "municipality": "Bennwil",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 21.27,
+      "shared": true
+     }
+    ],
+    "7": [
+     {
+      "ground": {
+       "name": "Sportplatz Buschweilerhof",
+       "osm": "way/39976253",
+       "lat": 47.55941,
+       "lon": 7.5625,
+       "municipality": "Basel",
+       "canton": "BS",
+       "kind": "pitch"
+      },
+      "distanceKm": 4.96,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Au",
+       "osm": "way/29312043",
+       "lat": 47.5139,
+       "lon": 7.61158,
+       "municipality": "Münchenstein",
+       "canton": "BL",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 5.81,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Einschlag",
+       "osm": "way/62163687",
+       "lat": 47.4931,
+       "lon": 7.60084,
+       "municipality": "Reinach",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 8.25,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Sportplatz",
+       "osm": "way/58723459",
+       "lat": 47.5284,
+       "lon": 7.81215,
+       "municipality": "Magden",
+       "canton": "AG",
+       "kind": "pitch"
+      },
+      "distanceKm": 14.4,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Sappeten",
+       "osm": "way/249210426",
+       "lat": 47.45307,
+       "lon": 7.74114,
+       "municipality": "Bubendorf",
+       "canton": "BL",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 15.06,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Sportplatz",
+       "osm": "way/231422741",
+       "lat": 47.44082,
+       "lon": 7.90522,
+       "municipality": "Wenslingen",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 24.97,
+      "shared": true
+     }
+    ],
+    "8": [
+     {
+      "ground": {
+       "name": "Sportanlage Gigersloch",
+       "osm": "relation/17929969",
+       "lat": 47.47446,
+       "lon": 7.61411,
+       "municipality": "Dornach",
+       "canton": "SO",
+       "kind": "recreation_ground"
+      },
+      "distanceKm": 10.11,
+      "real": {
+       "name": "SC Dornach",
+       "source": "https://www.scdornach.ch/",
+       "quote": "Erneuerung der Fussballplätze im Gigersloch"
+      }
+     },
+     {
+      "ground": {
+       "name": "Sportplatz",
+       "osm": "way/507019245",
+       "lat": 47.41432,
+       "lon": 7.71616,
+       "municipality": "Arboldswil",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 18.01,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Sportplatz",
+       "osm": "way/27199062",
+       "lat": 47.42148,
+       "lon": 7.81024,
+       "municipality": "Diegten",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 21.02,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Sportplatz MZH",
+       "osm": "way/203887658",
+       "lat": 47.46302,
+       "lon": 7.8522,
+       "municipality": "Gelterkinden",
+       "canton": "BL",
+       "kind": "pitch"
+      },
+      "distanceKm": 20.29,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Sportanlage Buenacher",
+       "osm": "relation/4472843",
+       "lat": 47.56343,
+       "lon": 7.89598,
+       "municipality": "Wallbach",
+       "canton": "AG",
+       "kind": "pitch"
+      },
+      "distanceKm": 20.1,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Sportplatz Seichel",
+       "osm": "way/283141521",
+       "lat": 47.39387,
+       "lon": 7.63152,
+       "municipality": "Nunningen",
+       "canton": "SO",
+       "kind": "pitch"
+      },
+      "distanceKm": 19.02,
+      "shared": true
+     }
+    ]
+   }
+  },
+  "geneve": {
+   "canton": "GE",
+   "home": {
+    "name": "Centre Sportif du Bout du Monde",
+    "osm": "relation/1669684",
+    "lat": 46.18066,
+    "lon": 6.15672,
+    "municipality": "Genève",
+    "canton": "GE",
+    "kind": "sports_centre"
+   },
+   "divisions": {
+    "1": [
+     {
+      "ground": {
+       "name": "Centre sportif et terrains multisports de Pinchat",
+       "osm": "way/88803204",
+       "lat": 46.1804,
+       "lon": 6.14954,
+       "municipality": "Carouge",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 0.55
+     },
+     {
+      "ground": {
+       "name": "Centre sportif des Pervenches",
+       "osm": "node/1958300387",
+       "lat": 46.18724,
+       "lon": 6.13637,
+       "municipality": "Carouge",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 1.73
+     },
+     {
+      "ground": {
+       "name": "Centre sportif des Vernets",
+       "osm": "relation/2205752",
+       "lat": 46.19472,
+       "lon": 6.13377,
+       "municipality": "Genève",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 2.36
+     },
+     {
+      "ground": {
+       "name": "Centre sportif de la Queue-d'Arve",
+       "osm": "way/83087972",
+       "lat": 46.19639,
+       "lon": 6.13147,
+       "municipality": "Genève",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 2.61
+     },
+     {
+      "ground": {
+       "name": "Stade de Richemont",
+       "osm": "way/45773392",
+       "lat": 46.20377,
+       "lon": 6.1697,
+       "municipality": "Genève",
+       "canton": "GE",
+       "kind": "stadium"
+      },
+      "distanceKm": 2.76
+     }
+    ],
+    "2": [
+     {
+      "ground": {
+       "name": "Stade des Trois-Chêne",
+       "osm": "way/45742098",
+       "lat": 46.19145,
+       "lon": 6.1904,
+       "municipality": "Chêne-Bourg",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 2.86
+     },
+     {
+      "ground": {
+       "name": "Centre sportif de Sous-Moulin",
+       "osm": "way/134279144",
+       "lat": 46.18919,
+       "lon": 6.19293,
+       "municipality": "Thônex",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 2.94
+     },
+     {
+      "ground": {
+       "name": "Stade de Frontenex",
+       "osm": "way/45749584",
+       "lat": 46.2066,
+       "lon": 6.17646,
+       "municipality": "Cologny",
+       "canton": "GE",
+       "kind": "stadium"
+      },
+      "distanceKm": 3.26
+     },
+     {
+      "ground": {
+       "name": "Stade des Fraisiers",
+       "osm": "way/113254643",
+       "lat": 46.17541,
+       "lon": 6.11241,
+       "municipality": "Lancy",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 3.46
+     },
+     {
+      "ground": {
+       "name": "Centre Sportif de Cologny",
+       "osm": "way/201265323",
+       "lat": 46.20608,
+       "lon": 6.1856,
+       "municipality": "Cologny",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 3.6
+     },
+     {
+      "ground": {
+       "name": "Centre sportif du Bois-des-Frères",
+       "osm": "way/83427700",
+       "lat": 46.21064,
+       "lon": 6.10501,
+       "municipality": "Vernier",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 5.19
+     }
+    ],
+    "3": [
+     {
+      "ground": {
+       "name": "Stade de Lancy-Florimont",
+       "osm": "way/49775607",
+       "lat": 46.19351,
+       "lon": 6.11318,
+       "municipality": "Lancy",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 3.64
+     },
+     {
+      "ground": {
+       "name": "Centre sportif des Cherpines",
+       "osm": "way/445745167",
+       "lat": 46.17348,
+       "lon": 6.10265,
+       "municipality": "Plan-les-Ouates",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 4.24
+     },
+     {
+      "ground": {
+       "name": "Stade des Tattes",
+       "osm": "way/84980955",
+       "lat": 46.19408,
+       "lon": 6.10267,
+       "municipality": "Onex",
+       "canton": "GE",
+       "kind": "pitch"
+      },
+      "distanceKm": 4.42
+     },
+     {
+      "ground": {
+       "name": "Centre sportif de Varembé",
+       "osm": "relation/2529555",
+       "lat": 46.21837,
+       "lon": 6.13547,
+       "municipality": "Genève",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 4.5
+     },
+     {
+      "ground": {
+       "name": "Stade Municipal",
+       "osm": "way/85232937",
+       "lat": 46.18486,
+       "lon": 6.09656,
+       "municipality": "Onex",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 4.66
+     },
+     {
+      "ground": {
+       "name": "Stade des Libellules",
+       "osm": "way/83427861",
+       "lat": 46.20772,
+       "lon": 6.10709,
+       "municipality": "Vernier",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 4.86
+     }
+    ],
+    "4": [
+     {
+      "ground": {
+       "name": "Centre sportif de Cointrin",
+       "osm": "relation/2953463",
+       "lat": 46.2263,
+       "lon": 6.10406,
+       "municipality": "Meyrin",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 6.49
+     },
+     {
+      "ground": {
+       "name": "Centre sportif du Signal",
+       "osm": "way/60116974",
+       "lat": 46.17237,
+       "lon": 6.07255,
+       "municipality": "Bernex",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 6.55
+     },
+     {
+      "ground": {
+       "name": "Stade de la Californie",
+       "osm": "way/136792451",
+       "lat": 46.24132,
+       "lon": 6.20692,
+       "municipality": "Vésenaz",
+       "canton": "GE",
+       "kind": "pitch"
+      },
+      "distanceKm": 7.77
+     },
+     {
+      "ground": {
+       "name": "Centre sportif de Rouelbeau",
+       "osm": "way/46124980",
+       "lat": 46.24394,
+       "lon": 6.219,
+       "municipality": "Meinier",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 8.51
+     },
+     {
+      "ground": {
+       "name": "Terrain de football des Tattes",
+       "osm": "way/48759136",
+       "lat": 46.2896,
+       "lon": 6.2468,
+       "municipality": "Hermance",
+       "canton": "GE",
+       "kind": "pitch"
+      },
+      "distanceKm": 13.95
+     },
+     {
+      "ground": {
+       "name": "Centre Sportif de Versoix",
+       "osm": "way/172991138",
+       "lat": 46.29629,
+       "lon": 6.15424,
+       "municipality": "Versoix",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 12.86
+     }
+    ],
+    "5": [
+     {
+      "ground": {
+       "name": "Stade Municipal de Versoix",
+       "osm": "way/173093154",
+       "lat": 46.28484,
+       "lon": 6.1593,
+       "municipality": "Versoix",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 11.59
+     },
+     {
+      "ground": {
+       "name": "Stade Marc Burdet",
+       "osm": "way/170813985",
+       "lat": 46.26778,
+       "lon": 6.12674,
+       "municipality": "Bossy",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 9.96
+     },
+     {
+      "ground": {
+       "name": "Centre sportif des Vergers",
+       "osm": "relation/4779155",
+       "lat": 46.23393,
+       "lon": 6.0699,
+       "municipality": "Meyrin",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 8.93
+     },
+     {
+      "ground": {
+       "name": "Centre sportif de Vernier",
+       "osm": "way/87345756",
+       "lat": 46.21933,
+       "lon": 6.08334,
+       "municipality": "Vernier",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 7.1
+     },
+     {
+      "ground": {
+       "name": "3 Terrain de Football",
+       "osm": "way/245395549",
+       "lat": 46.37207,
+       "lon": 6.22652,
+       "municipality": "Nyon",
+       "canton": "VD",
+       "kind": "pitch"
+      },
+      "distanceKm": 21.95
+     },
+     {
+      "ground": {
+       "name": "Stade de Marens",
+       "osm": "way/163490845",
+       "lat": 46.386,
+       "lon": 6.22594,
+       "municipality": "Nyon",
+       "canton": "VD",
+       "kind": "pitch"
+      },
+      "distanceKm": 23.44
+     }
+    ],
+    "6": [
+     {
+      "ground": {
+       "name": "Stade des Abériaux",
+       "osm": "way/208334660",
+       "lat": 46.39271,
+       "lon": 6.25523,
+       "municipality": "Prangins",
+       "canton": "VD",
+       "kind": "pitch"
+      },
+      "distanceKm": 24.76
+     },
+     {
+      "ground": {
+       "name": "Stade Charles Gorgerat",
+       "osm": "way/624281724",
+       "lat": 46.40723,
+       "lon": 6.17926,
+       "municipality": "Gingins",
+       "canton": "VD",
+       "kind": "pitch"
+      },
+      "distanceKm": 25.25
+     },
+     {
+      "ground": {
+       "name": "Stade de la Perrausaz",
+       "osm": "way/442026047",
+       "lat": 46.45071,
+       "lon": 6.29414,
+       "municipality": "Bursins",
+       "canton": "VD",
+       "kind": "pitch"
+      },
+      "distanceKm": 31.83
+     },
+     {
+      "ground": {
+       "name": "Centre sportif En Bord",
+       "osm": "way/287774279",
+       "lat": 46.42794,
+       "lon": 6.27481,
+       "municipality": "Gland",
+       "canton": "VD",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 28.95
+     },
+     {
+      "ground": {
+       "name": "Centre sportif de Marcy",
+       "osm": "way/973331662",
+       "lat": 46.48453,
+       "lon": 6.45056,
+       "municipality": "Saint-Prex",
+       "canton": "VD",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 40.63
+     },
+     {
+      "ground": {
+       "name": "Centre sportif du Blanché",
+       "osm": "way/72599054",
+       "lat": 46.24074,
+       "lon": 6.13017,
+       "municipality": "Le Grand-Saconnex",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 6.99
+     }
+    ],
+    "7": [
+     {
+      "ground": {
+       "name": "Stade de Balexert",
+       "osm": "way/82328913",
+       "lat": 46.21438,
+       "lon": 6.10913,
+       "municipality": "Vernier",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 5.24
+     },
+     {
+      "ground": {
+       "name": "Stade d'Aïre",
+       "osm": "way/217904303",
+       "lat": 46.19831,
+       "lon": 6.09342,
+       "municipality": "Vernier",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 5.25
+     },
+     {
+      "ground": {
+       "name": "Stade de Belle-Idée",
+       "osm": "way/513370037",
+       "lat": 46.20773,
+       "lon": 6.20404,
+       "municipality": "Chêne-Bourg",
+       "canton": "GE",
+       "kind": "stadium"
+      },
+      "distanceKm": 4.73
+     },
+     {
+      "ground": {
+       "name": "Terrain de football des Tattes",
+       "osm": "way/48759136",
+       "lat": 46.2896,
+       "lon": 6.2468,
+       "municipality": "Hermance",
+       "canton": "GE",
+       "kind": "pitch"
+      },
+      "distanceKm": 13.95,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Centre Sportif de Versoix",
+       "osm": "way/172991138",
+       "lat": 46.29629,
+       "lon": 6.15424,
+       "municipality": "Versoix",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 12.86,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Centre sportif En Bord",
+       "osm": "way/287774279",
+       "lat": 46.42794,
+       "lon": 6.27481,
+       "municipality": "Gland",
+       "canton": "VD",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 28.95,
+      "shared": true
+     }
+    ],
+    "8": [
+     {
+      "ground": {
+       "name": "Stade Marc Burdet",
+       "osm": "way/170813985",
+       "lat": 46.26778,
+       "lon": 6.12674,
+       "municipality": "Bossy",
+       "canton": "GE",
+       "kind": "sports_centre"
+      },
+      "distanceKm": 9.96,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "3 Terrain de Football",
+       "osm": "way/245395549",
+       "lat": 46.37207,
+       "lon": 6.22652,
+       "municipality": "Nyon",
+       "canton": "VD",
+       "kind": "pitch"
+      },
+      "distanceKm": 21.95,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Stade de Marens",
+       "osm": "way/163490845",
+       "lat": 46.386,
+       "lon": 6.22594,
+       "municipality": "Nyon",
+       "canton": "VD",
+       "kind": "pitch"
+      },
+      "distanceKm": 23.44,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Stade Charles Gorgerat",
+       "osm": "way/624281724",
+       "lat": 46.40723,
+       "lon": 6.17926,
+       "municipality": "Gingins",
+       "canton": "VD",
+       "kind": "pitch"
+      },
+      "distanceKm": 25.25,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Stade de la Perrausaz",
+       "osm": "way/442026047",
+       "lat": 46.45071,
+       "lon": 6.29414,
+       "municipality": "Bursins",
+       "canton": "VD",
+       "kind": "pitch"
+      },
+      "distanceKm": 31.83,
+      "shared": true
+     },
+     {
+      "ground": {
+       "name": "Stade des Abériaux",
+       "osm": "way/208334660",
+       "lat": 46.39271,
+       "lon": 6.25523,
+       "municipality": "Prangins",
+       "canton": "VD",
+       "kind": "pitch"
+      },
+      "distanceKm": 24.76,
+      "shared": true
+     }
+    ]
+   }
+  }
+ }
+}
