@@ -30,7 +30,7 @@ test('Pfuschi is positionless, bench-only, excluded from ratings/automatic XI an
  const di=getStarXIPlayer('star-di-certo')!;assert.equal(di.rating,80);assert.equal(di.potential,100);assert.deepEqual(getStarXIPositions(di),['LV','RV']);assert.equal(di.countryCode,'CH');
  const look=getWalkoutPresentation(di);assert.equal(look.countryCode,'CH');assert.equal(look.glasses,true);assert.equal(look.cap,'backwards');
  // Both remain reachable in the existing custom-card draw, with no automatic grant.
- for(const id of [p.id,di.id]){let found=false;for(const rarity of [.01,.5])for(let i=0;i<200;i++){const rolls=[rarity,(i+.5)/200];const result=drawRandomStarXICustomCard({...initialGameFeatures().starXI,fragments:STAR_XI_RANDOM_CUSTOM_CARD_COST},()=>rolls.shift() ?? 0);if(result.player?.id===id)found=true;}assert.ok(found);}
+ for(const id of [p.id,di.id]){let found=false;for(let i=0;i<200;i++){const roll=(i+.5)/200;const result=drawRandomStarXICustomCard({...initialGameFeatures().starXI,fragments:STAR_XI_RANDOM_CUSTOM_CARD_COST},()=>roll);if(result.player?.id===id)found=true;}assert.ok(found);}
 });
 test('timer remainders survive reload on the way; the squad stays open until kick-off and is fixed from then on',()=>{
  const f=ready(),outsider=STAR_XI_PLAYERS.find(p=>!f.starXI.lineupIds.includes(p.id)&&!f.starXI.benchIds.includes(p.id)&&canStarXIPlayerFillSlot(p.id,0,f.starXI.formationPositions))!;

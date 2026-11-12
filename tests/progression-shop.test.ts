@@ -3,7 +3,7 @@ import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { cardPackRating, initialGameFeatures, normalizeGameFeatures, purchaseSpecialCardPack, getSpecialCardPackOdds, SPECIAL_CARD_PACK, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, setBestStarXI, beginSeasonCupMatch, getStarXISelection, advanceCupMatch, resumeCupMatch } from '../app/feature-data';
+import { initialGameFeatures, normalizeGameFeatures, purchaseSpecialCardPack, getSpecialCardPackOdds, SPECIAL_CARD_PACK, STAR_XI_CUSTOM_PLAYERS, STAR_XI_PLAYERS, setBestStarXI, beginSeasonCupMatch, getStarXISelection, advanceCupMatch, resumeCupMatch } from '../app/feature-data';
 import { getReachedLeague, hasReachedLeague, isLeagueContentUnlocked, leagueForTier, getPackUnlockLeague, getTournamentUnlockLeague, getFormationUnlockLeague, getUpgradeUnlockLeague } from '../app/season-progression';
 import { prepareCareerMatch, recordCareerMatch } from '../app/career-data';
 import { PlayerStatsSummary } from '../app/career-panels';
@@ -58,8 +58,8 @@ test('displayed requirements and purchase checks use the same league rules', asy
 });
 
 test('fragments buy the special card pack exactly once per purchase', () => {
-  // A roll of 0 lands in the rare 100 group and on its first card.
-  const firstHundred = STAR_XI_CUSTOM_PLAYERS.find(p => cardPackRating(p) === 100)!;
+  // A roll of 0 lands on the first special card: every card owns an equal slice of the roll.
+  const firstHundred = STAR_XI_CUSTOM_PLAYERS[0];
   const f = initialGameFeatures(1000);
   f.starXI.fragments = 120000;
   const ownedBefore = f.starXI.ownedIds.length;
@@ -100,7 +100,8 @@ test('insufficient fragments and live matches block the purchase without side ef
   assert.equal(f.starXI.fragments, SPECIAL_CARD_PACK.price);
   const odds = getSpecialCardPackOdds([]);
   assert.equal(odds.total, STAR_XI_CUSTOM_PLAYERS.length);
-  assert.ok(Math.abs(odds.hundredChance - 0.08) < 1e-12);
+  assert.ok(Math.abs(odds.each - 1 / STAR_XI_CUSTOM_PLAYERS.length) < 1e-12, 'every special card has the same chance');
+  assert.equal(odds.duplicate, 0);
   assert.ok(Math.abs(odds.newCard - 1) < 1e-12);
 });
 

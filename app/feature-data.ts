@@ -618,8 +618,6 @@ const STAR_XI_PLAYER_BY_ID = new Map(STAR_XI_PLAYERS.map((player) => [player.id,
 
 export const STAR_XI_CUSTOM_PLAYERS = STAR_XI_PLAYERS.filter((player) => player.isCustom === true);
 export const STAR_XI_RANDOM_CUSTOM_CARD_COST = 50000;
-/** Share of special card pack draws that award a 100 rated special card. */
-export const SPECIAL_PACK_HUNDRED_CHANCE = 0.08;
 // A duplicate special card refunds at most a tenth of the pack, so duplicates never pay for the next draw.
 const CUSTOM_DUPLICATE_COMPENSATION_CAP = STAR_XI_RANDOM_CUSTOM_CARD_COST / 10;
 
@@ -633,13 +631,14 @@ export function cardPackRating(player: StarXIPlayer) {
   return player.packRating ?? player.rating;
 }
 
+/**
+ * A special card that sits in the rating band 100. There is no "100 card" category any more: the special card pack
+ * draws every special card with the same chance (see drawRandomStarXICustomCard). This test only serves the rating
+ * row 100 of the regular packs and the one time repairs of old saves (schema 6 and 8) below.
+ */
 function isHundredSpecialCard(player: StarXIPlayer) {
   return player.isCustom === true && cardPackRating(player) >= 100;
 }
-const SPECIAL_PACK_GROUPS = [
-  { chance: SPECIAL_PACK_HUNDRED_CHANCE, players: STAR_XI_CUSTOM_PLAYERS.filter(isHundredSpecialCard) },
-  { chance: 1 - SPECIAL_PACK_HUNDRED_CHANCE, players: STAR_XI_CUSTOM_PLAYERS.filter((player) => !isHundredSpecialCard(player)) },
-].filter((group) => group.players.length);
 
 /** Picks by `packWeight` (default 1); `roll` is in [0, 1). */
 function pickByPackWeight<T extends { packWeight?: number }>(candidates: readonly T[], roll: number) {
@@ -720,14 +719,10 @@ function calculateRewardPackOdds(id:RewardPackId,players:readonly StarXIPlayer[]
  const total=groups.reduce((sum,o)=>sum+o.chance,0);if(!total)throw new Error('Keine gültigen Prämienkarten verfügbar.');
  return groups.map(o=>({...o,chance:o.chance/total}));
 }
-/** 100 rated special cards come only from Liga 3 on, also from a free special card pack. */
-export function canDrawHundredSpecialCards(highestDivision:number) {
-  return hasReachedLeague(getPackUnlockLeague(SPECIAL_CARD_PACK.id), leagueForTier(Math.floor(Number(highestDivision))||1));
-}
 /** The draw of an earned pack: a reward pack like a shop pack, a special card pack for free. */
 export function openEarnedPackDraw(packId:EarnedPackId, ownedIds:string[], highestDivision:number, random=Math.random):StarPackOpening {
   if(packId!=='special')return openStarPack(packId,ownedIds,random);
-  const draw=drawRandomStarXICustomCard({...initialGameFeatures().starXI,ownedIds:[...ownedIds]},random,{free:true,allowHundred:canDrawHundredSpecialCards(highestDivision)});
+  const draw=drawRandomStarXICustomCard({...initialGameFeatures().starXI,ownedIds:[...ownedIds]},random,{free:true});
   return {packId:'legend',packName:SPECIAL_CARD_PACK.label,player:draw.player!,duplicate:draw.duplicate,fragmentCompensation:draw.fragmentCompensation,source:'custom-draw'};
 }
 const earnedOpeningMatches=(earned:EarnedPack,opening:StarPackOpening)=>earned.packId==='special'?opening.source==='custom-draw'&&Boolean(opening.player?.isCustom):opening.packId===earned.packId;
@@ -736,8 +731,6 @@ export function openEarnedPack(features:GameFeatures,id:string,now=Date.now(),ra
  if(!earned||earned.opening||features.cup.active)return null;
  const opening=canonical??openEarnedPackDraw(earned.packId,features.starXI.ownedIds,features.seasonMode.highestDivision,random);
  if(!earnedOpeningMatches(earned,opening)||!getStarXIPlayer(opening.player.id))return null;
- // A free special card pack below Liga 3 never hands out a 100.
- if(earned.packId==='special'&&!canDrawHundredSpecialCards(features.seasonMode.highestDivision)&&isHundredSpecialCard(getStarXIPlayer(opening.player.id)!))return null;
  // Duplicate compensation is decided against the collection at application time.
  const player=getStarXIPlayer(opening.player.id)!,duplicate=features.starXI.ownedIds.includes(player.id);
  const result={...opening,player,duplicate,fragmentCompensation:duplicate?getStarXIFragmentCompensation(player):0};
@@ -1260,19 +1253,19 @@ export function getStarXIPlayer(id: string) {
   return STAR_XI_PLAYER_BY_ID.get(id);
 }
 
-/** `free`: an earned pack that costs no fragments. `allowHundred: false` draws only the special cards below 100. */
-export function drawRandomStarXICustomCard(state: StarXIState, random = Math.random, options: { free?: boolean; allowHundred?: boolean } = {}) {
+/**
+ * One draw of the special card pack, bought or free (`free`: an earned pack that costs no fragments). Every special
+ * card has exactly the same chance, 1 in N: no rating, owner status or pack weight changes it, and duplicates stay
+ * possible (the chance of a duplicate is simply the share of special cards already owned).
+ */
+export function drawRandomStarXICustomCard(state: StarXIState, random = Math.random, options: { free?: boolean } = {}) {
   const next = normalizeStarXIState(state);
   const cost = options.free ? 0 : STAR_XI_RANDOM_CUSTOM_CARD_COST;
   if (next.fragments < cost || STAR_XI_CUSTOM_PLAYERS.length === 0) {
     return { state: next, drawn: false, cost, player: null, duplicate: false, fragmentCompensation: 0, source: "custom-draw" as const };
   }
-  // First the rarity (8% for a 100 rated card), then the card within it by pack weight.
-  const groups = options.allowHundred === false ? SPECIAL_PACK_GROUPS.filter((group) => !group.players.some(isHundredSpecialCard)) : SPECIAL_PACK_GROUPS;
-  const groupTotal = groups.reduce((sum, group) => sum + group.chance, 0);
-  let groupRoll = clamp(Number(random()) || 0, 0, 0.999999999) * groupTotal;
-  const group = groups.find((entry) => (groupRoll -= entry.chance) < 0) ?? groups[groups.length - 1];
-  const player = pickByPackWeight(group.players, clamp(Number(random()) || 0, 0, 0.999999999));
+  const roll = clamp(Number(random()) || 0, 0, 0.999999999);
+  const player = STAR_XI_CUSTOM_PLAYERS[Math.floor(roll * STAR_XI_CUSTOM_PLAYERS.length)];
   const duplicate = next.ownedIds.includes(player.id);
   next.fragments -= cost;
   const fragmentCompensation = duplicate ? getStarXIFragmentCompensation(player) : 0;
@@ -1298,25 +1291,22 @@ export const SPECIAL_CARD_PACK = {
   label: "Spezialkarten-Pack",
   price: STAR_XI_RANDOM_CUSTOM_CARD_COST,
   currency: "fragments" as const,
-  description: "Eine zufällige Spezialkarte, nur 8% sind 100er. Doppelte Karten geben ein paar Fragmente zurück.",
+  description: "Eine zufällige Spezialkarte, jede Spezialkarte ist gleich wahrscheinlich. Doppelte Karten geben ein paar Fragmente zurück.",
 };
 export const PURCHASE_RECEIPT_LIMIT = 50;
 
-/** Chance of every special card in one pack draw, from the rarity groups and pack weights. */
+/** Chance of every special card in one pack draw: the same 1 in N for all of them. */
 export function getSpecialCardChances() {
-  const groupTotal = SPECIAL_PACK_GROUPS.reduce((sum, group) => sum + group.chance, 0);
-  return new Map(SPECIAL_PACK_GROUPS.flatMap((group) => {
-    const weightTotal = group.players.reduce((sum, player) => sum + Math.max(0.0001, player.packWeight ?? 1), 0);
-    return group.players.map((player) => [player.id, group.chance / groupTotal * Math.max(0.0001, player.packWeight ?? 1) / weightTotal] as const);
-  }));
+  const chance = 1 / Math.max(1, STAR_XI_CUSTOM_PLAYERS.length);
+  return new Map(STAR_XI_CUSTOM_PLAYERS.map((player) => [player.id, chance] as const));
 }
 
+/** What the special card pack shows: the number of cards, the chance of each, and how likely a new or a double card is. */
 export function getSpecialCardPackOdds(ownedIds: readonly string[] = []) {
-  const chances = getSpecialCardChances();
   const total = STAR_XI_CUSTOM_PLAYERS.length;
-  const missingPlayers = STAR_XI_CUSTOM_PLAYERS.filter((player) => !ownedIds.includes(player.id));
-  const hundredChance = STAR_XI_CUSTOM_PLAYERS.filter(isHundredSpecialCard).reduce((sum, player) => sum + (chances.get(player.id) ?? 0), 0);
-  return { total, missing: missingPlayers.length, hundredChance, newCard: missingPlayers.reduce((sum, player) => sum + (chances.get(player.id) ?? 0), 0) };
+  const missing = STAR_XI_CUSTOM_PLAYERS.filter((player) => !ownedIds.includes(player.id)).length;
+  const each = total ? 1 / total : 0;
+  return { total, missing, each, newCard: missing * each, duplicate: (total - missing) * each };
 }
 
 export type SpecialPackPurchase = { ok: true; reveal: StarPackReveal } | { ok: false; error: string; duplicateRequest?: boolean };

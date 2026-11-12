@@ -5,7 +5,7 @@ import { capGoalsAfterRebalance, getBasePassivePower, REBALANCED_FEATURES_SCHEMA
 import { STORAGE_KEY, WHATS_NEW_STORAGE_KEY } from "../app/game/constants.ts";
 import { cleanCloudSaveKeys } from "../app/cloud-save-rules.ts";
 import { WHATS_NEW } from "../app/whats-new.ts";
-import { STAR_XI_PLAYERS, cardPackRating, GAME_FEATURES_SCHEMA_VERSION, grantWelcomePack, WELCOME_PACK_LABEL, drawRandomStarXICustomCard, getSpecialCardChances, getStarXIPlayer, getTournamentRewardPack, initialGameFeatures, normalizeGameFeatures, SPECIAL_PACK_HUNDRED_CHANCE, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_RANDOM_CUSTOM_CARD_COST } from "../app/feature-data.ts";
+import { STAR_XI_PLAYERS, cardPackRating, GAME_FEATURES_SCHEMA_VERSION, grantWelcomePack, WELCOME_PACK_LABEL, drawRandomStarXICustomCard, getSpecialCardChances, getStarXIPlayer, getTournamentRewardPack, initialGameFeatures, normalizeGameFeatures, STAR_PACKS, STAR_XI_CUSTOM_PLAYERS, STAR_XI_RANDOM_CUSTOM_CARD_COST } from "../app/feature-data.ts";
 import { getPackUnlockLeague, getUpgradeUnlockLeague } from "../app/season-progression.ts";
 import { getCareerCard } from "../app/career-data.ts";
 import { getFirstLevelPayback, medianSavingMinutes, simulateEconomy } from "../scripts/balance/economy-model.ts";
@@ -31,7 +31,7 @@ test("Flurin Fabrice is one of the 100 rated special cards", () => {
   assert.ok(hundredIds.includes(flurin.id));
 });
 
-test("the special card pack awards a 100 rated card in 8% of draws, weighted by pack weight", () => {
+test("the special card pack draws every special card with exactly the same chance, whatever its rating or pack weight", () => {
   const random = seededRandom();
   const counts = new Map<string, number>();
   const draws = 200000;
@@ -39,17 +39,14 @@ test("the special card pack awards a 100 rated card in 8% of draws, weighted by 
     const result = drawRandomStarXICustomCard({ ...initialGameFeatures().starXI, fragments: STAR_XI_RANDOM_CUSTOM_CARD_COST }, random);
     counts.set(result.player!.id, (counts.get(result.player!.id) ?? 0) + 1);
   }
-  const hundredShare = hundredIds.reduce((sum, id) => sum + (counts.get(id) ?? 0), 0) / draws;
-  assert.equal(SPECIAL_PACK_HUNDRED_CHANCE, 0.08);
-  assert.ok(Math.abs(hundredShare - 0.08) < 0.004, `100 rated share ${hundredShare}`);
   const chances = getSpecialCardChances();
+  const each = 1 / STAR_XI_CUSTOM_PLAYERS.length;
   assert.ok(Math.abs([...chances.values()].reduce((sum, chance) => sum + chance, 0) - 1) < 1e-12);
   for (const player of STAR_XI_CUSTOM_PLAYERS) {
-    const expected = chances.get(player.id)!;
-    assert.ok(Math.abs((counts.get(player.id) ?? 0) / draws - expected) < Math.max(0.001, 6 * Math.sqrt(expected * (1 - expected) / draws)), player.id);
+    assert.equal(chances.get(player.id), each, `${player.id} shows 1 in ${STAR_XI_CUSTOM_PLAYERS.length}`);
+    assert.ok(Math.abs((counts.get(player.id) ?? 0) / draws - each) < 6 * Math.sqrt(each * (1 - each) / draws), player.id);
   }
-  // Every 100 rated card is equally rare and gets the legendary walkout.
-  assert.equal(new Set(hundredIds.map((id) => chances.get(id)!.toFixed(12))).size, 1);
+  // The former 100 category is gone: the 100 rated cards are simply special cards like the others.
   assert.ok(hundredIds.every((id) => getStarXIPlayer(id)!.cardType === "legendary"));
 });
 

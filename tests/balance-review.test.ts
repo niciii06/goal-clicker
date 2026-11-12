@@ -247,25 +247,26 @@ test("league matches no longer earn reward packs: no stamp rule, old counters an
   assert.deepEqual(loaded.earnedPacks.map((pack) => pack.id), ["stamp-2000"]);
 });
 
-test("day seven brings a special card pack: no 100 below Liga 3, the normal chance from Liga 3 on", () => {
+test("day seven brings a special card pack: every special card has the same chance in every league, also the free pack", () => {
   assert.equal(DAILY_REWARD_DAYS[6].pack, "special");
   const random = seededRandom(77);
+  let hundreds = 0;
   for (let index = 0; index < 2000; index++) {
     const opening = openEarnedPackDraw("special", [], 12, random);
     assert.ok(opening.player.isCustom);
-    assert.ok(cardPackRating(opening.player) < 100, "no 100 below Liga 3");
+    if (cardPackRating(opening.player) >= 100) hundreds++;
   }
-  // A low roll is the 100 group, and from Liga 3 on it is open.
-  assert.equal(cardPackRating(openEarnedPackDraw("special", [], 13, () => 0.01).player), 100);
-  assert.ok(cardPackRating(openEarnedPackDraw("special", [], 12, () => 0.01).player) < 100);
-  // The free pack is opened once, costs no fragments and refuses a 100 handed in below Liga 3.
+  // No league lock: the 100 rated special cards are simply 8 of the 10 special cards (80 % of the draws).
+  assert.ok(hundreds / 2000 > 0.74 && hundreds / 2000 < 0.86, `${hundreds}`);
+  const slice = (STAR_XI_CUSTOM_PLAYERS.findIndex((player) => cardPackRating(player) === 100) + 0.5) / STAR_XI_CUSTOM_PLAYERS.length;
+  assert.equal(cardPackRating(openEarnedPackDraw("special", [], 13, () => slice).player), 100);
+  assert.equal(cardPackRating(openEarnedPackDraw("special", [], 12, () => slice).player), 100);
+  // The free pack is opened once and costs no fragments.
   const features = initialGameFeatures();
   features.seasonMode.highestDivision = 5;
   features.earnedPacks = [{ id: "daily-solo-2026-10-30", packId: "special", earnedAt: 1 }];
-  const hundred = STAR_XI_CUSTOM_PLAYERS.find((player) => cardPackRating(player) === 100)!;
-  assert.equal(openEarnedPack(features, "daily-solo-2026-10-30", 2, Math.random, { packId: "legend", packName: "x", player: hundred, duplicate: false, fragmentCompensation: 0, source: "custom-draw" }), null);
   const reveal = openEarnedPack(features, "daily-solo-2026-10-30", 2, seededRandom(5))!;
-  assert.ok(reveal.player.isCustom && cardPackRating(reveal.player) < 100);
+  assert.ok(reveal.player.isCustom);
   assert.equal(features.starXI.fragments, 0);
   assert.equal(openEarnedPack(features, "daily-solo-2026-10-30", 3), null);
   // The earned special pack and its opening survive a reload.

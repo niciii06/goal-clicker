@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { GROWTH_POINTS_PER_LEVEL, MATCH_RESULT_POINTS, emptyPlayerStats, getCareerCard, getSpecialGrowth, normalizeCareerState } from '../app/career-data.ts';
-import { STAR_XI_CUSTOM_PLAYERS, cardPackRating, resolveCupPenalty, getSpecialCardPackOdds, getStarXIFragmentCompensation, getStarXIPlayer, initialGameFeatures, normalizeGameFeatures, SPECIAL_PACK_HUNDRED_CHANCE } from '../app/feature-data.ts';
+import { STAR_XI_CUSTOM_PLAYERS, cardPackRating, resolveCupPenalty, getSpecialCardPackOdds, getStarXIFragmentCompensation, getStarXIPlayer, initialGameFeatures, normalizeGameFeatures } from '../app/feature-data.ts';
 
 const stats = (points: number, appearances = 0, goals = 0) => ({ ...emptyPlayerStats(), points, appearances, goals });
 
@@ -16,8 +16,8 @@ test('all ten special cards start at 80 with potential 100, their pack tier and 
   assert.deepEqual(STAR_XI_CUSTOM_PLAYERS.filter((card) => cardPackRating(card) === 67).map((card) => card.id).sort(), ['star-benxli', 'star-pfuschi']);
   const pfuschi = getStarXIPlayer('star-pfuschi')!;
   assert.equal(pfuschi.benchOnly, true);
-  // Rarity, chance and duplicate compensation of the special card pack did not change.
-  assert.equal(getSpecialCardPackOdds().hundredChance.toFixed(6), SPECIAL_PACK_HUNDRED_CHANCE.toFixed(6));
+  // Every special card has the same chance (no 100 category); the duplicate compensation did not change.
+  assert.equal(getSpecialCardPackOdds().each.toFixed(6), (1 / STAR_XI_CUSTOM_PLAYERS.length).toFixed(6));
   assert.equal(getStarXIFragmentCompensation(getStarXIPlayer('star-di-certo')!), 5000);
   assert.equal(getStarXIFragmentCompensation(pfuschi), 600);
 });
