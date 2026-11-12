@@ -164,3 +164,18 @@ test('cup-abandon is refused while the world travels to the next round; a world 
   const season = await post('travel-start', { actionId: 't-2', mode: 'season' });
   assert.notEqual(season.data.error, 'Schliesse zuerst die bereits begonnene Auswärtsreise ab.');
 });
+
+test('co-op: Home keeps only a slim room strip; the world management moved to Club & Mehr with every action kept', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const [page, css] = await Promise.all([readFile(new URL('../app/page.tsx', import.meta.url), 'utf8'), readFile(new URL('../app/globals.css', import.meta.url), 'utf8')]);
+  const homeStrip = page.slice(page.indexOf('<div className="coop-inline-room-bar compact">'), page.indexOf('<div className={`layout-toolbar'));
+  // Above the game: status, code, who is online, saving state, invite and one way to the management. Nothing big.
+  for (const wanted of ['coop-presence', 'coop-pending-chip', 'Einladen', 'Welt verwalten', 'openFeatureTab("club")']) assert.ok(homeStrip.includes(wanted), wanted);
+  for (const moved of ['WELT VERWALTEN', 'coop-world-tools', 'MITGLIEDER', 'Name speichern', 'Raum löschen', 'Code kopieren', 'Verlassen']) assert.ok(!homeStrip.includes(moved), `${moved} no longer on Home`);
+  // The panel under Club & Mehr still has everything, with the same role checks (rename and delete for the host).
+  const panel = page.slice(page.indexOf('const coopWorldPanel'), page.indexOf('\n  return (\n', page.indexOf('const coopWorldPanel')));
+  for (const kept of ['WELT VERWALTEN', 'Name speichern', 'MITGLIEDER', 'Entfernen', 'Platz freigeben', 'Code kopieren', 'Einladen', 'Raum löschen', 'Verlassen']) assert.ok(panel.includes(kept), kept);
+  assert.match(panel, /coopSession\.role === "host" && <button className="mode-secondary danger" onClick=\{\(\) => void deleteCoopRoom\(coopSession\.code\)\}>Raum löschen/);
+  assert.match(page, /featureTab === "club" && <div className="feature-panel">\{coopWorldPanel\}/);
+  assert.match(css, /\.coop-inline-room-bar\.compact \{ padding: 8px 14px;/);
+});

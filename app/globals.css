@@ -948,6 +948,12 @@ button { font: inherit; }
 .coop-side-code { display: block; color: var(--text); font-size: 24px; font-weight: 760; letter-spacing: .12em; line-height: 1; }
 .coop-inline-room-bar { display: flex; grid-column: 1 / -1; align-items: center; justify-content: space-between; gap: 18px; padding: 13px 16px; border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent); border-radius: 17px; background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 5%, var(--surface-raised)), var(--surface-raised) 75%); }
 .coop-inline-room-bar > div:first-child { min-width: 0; }
+/* Home: one slim strip. The full management sits in Club & Mehr (.coop-world-panel). */
+.coop-inline-room-bar.compact { padding: 8px 14px; gap: 12px; }
+.coop-inline-room-bar.compact strong { font-size: 17px; }
+.coop-inline-room-bar.compact span:not(.coop-live-badge):not(.coop-presence) { margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coop-world-panel { display: grid; gap: 12px; margin-bottom: 16px; }
+.coop-inline-room-bar.static { grid-column: auto; }
 .coop-inline-room-bar strong { display: block; color: var(--text); font-size: 23px; font-weight: 760; letter-spacing: .12em; line-height: 1; }
 .coop-inline-room-bar span:not(.coop-live-badge) { display: block; margin-top: 5px; color: var(--soft); font-size: var(--text-footnote); }
 .coop-inline-room-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 7px; }
