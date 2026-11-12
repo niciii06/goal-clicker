@@ -53,3 +53,9 @@ next-env.d.ts
 # database exports and archives (private data)
 /d1-export*.sql
 d1-archive-*.json
+
+# local test, build and audit output (new logs are not versioned; committed evidence under docs/qa stays as it is)
+*.log
+/test-results/
+/playwright-report/
+/docs/qa/**/*.log
