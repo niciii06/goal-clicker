@@ -21,7 +21,7 @@ export type SimCheckpoint = { time:number; rng:number; sequence:number; players:
 export type SimAction = { id:string; kind:'pass'|'carry'|'cross'|'interception'|'tackle'|'shot'|'restart'|'red'|'yellow'|'injury'|'foul'; start:number; end:number; side:'club'|'opponent'; actor:string; target?:string; from:SimPoint; to:SimPoint; outcome:'success'|'lost'|'save'|'wide'|'blocked'|'goal'; assist?:string; style?:PassStyle|'dribble'|'hold'|'save'|'parry'; setPiece?:SetPiece; note?:string;
  /** Expected goals of a shot: the chance it had to go in. */
  xg?:number; before:SimCheckpoint; after:SimCheckpoint };
-export type InteractiveMatch = { version:2; id:string; seed:number; time:number; committed:SimCheckpoint; buffer:SimAction[]; recent:SimAction[]; generation:number; status:'running'|'editing'|'halftime'|'completed'; halftimeDone:boolean; pauseRequested:boolean; clubFormation:string; opponentFormation:string; strategy:CupStrategyId; opponentStrategy:CupStrategyId };
+export type InteractiveMatch = { version:2; id:string; seed:number; time:number; committed:SimCheckpoint; buffer:SimAction[]; recent:SimAction[]; generation:number; status:'running'|'editing'|'halftime'|'completed'; halftimeDone:boolean; /** Extra time: the break at 105 minutes has been taken (absent in matches saved before it existed). */ extraHalftimeDone?:boolean; pauseRequested:boolean; clubFormation:string; opponentFormation:string; strategy:CupStrategyId; opponentStrategy:CupStrategyId };
 const clamp=(v:number,a:number,b:number)=>Math.max(a,Math.min(b,v));
 const dist=(a:SimPoint,b:SimPoint)=>Math.hypot(a.x-b.x,a.y-b.y);
 const point=(p:SimPoint):SimPoint=>({x:p.x,y:p.y});
@@ -320,7 +320,7 @@ function prepare(sim:InteractiveMatch,start:SimCheckpoint):SimAction {
  let actor=activeOf(c).find(p=>p.id===c.owner)??activeOf(c,c.possession)[0];
  if(!actor)throw new Error('Kein aktiver Ballbesitzer');
  c.owner=actor.id;c.possession=actor.side;
- const boundary=c.time<2700?2700:c.time<5400?5400:7200,remaining=Math.max(1,boundary-c.time);
+ const boundary=c.time<2700?2700:c.time<5400?5400:c.time<6300?6300:7200,remaining=Math.max(1,boundary-c.time);
  let play:Play;
  if(c.restart)play=kickoffPlay(c,actor);
  else if(c.setPiece&&!c.setPieceReady)play=setPieceSetup(c,actor);
@@ -347,6 +347,19 @@ function prepare(sim:InteractiveMatch,start:SimCheckpoint):SimAction {
  return {id,kind:play.kind,start:before.time,end,side:actor.side,actor:actor.id,target:play.target?.id,from:point(before.ball),to:point(c.ball),outcome:play.outcome,assist:play.assist,style:play.style,setPiece:play.setPiece,note:play.offsideId?`offside:${play.offsideId}`:play.note,...(play.xg!==undefined?{xg:play.xg}:{}),before,after:c};
 }
 export function refill(sim:InteractiveMatch){let tail=sim.buffer.at(-1)?.after??sim.committed;while(tail.time<Math.min(sim.time+75,sim.time<2700?2700:sim.time<5400?5400:7200)){const action=prepare(sim,tail);sim.buffer.push(action);tail=action.after;}}
+/** Both teams change ends and the game restarts from the centre; the finished play keeps its own end state. */
+function changeEnds(sim:InteractiveMatch,kickoffSide:SimPlayer['side']){
+ sim.committed=structuredClone(sim.committed);
+ for(const p of sim.committed.players){p.anchor={x:105-p.anchor.x,y:68-p.anchor.y};}sim.committed.direction*=-1;kickoff(sim.committed,kickoffSide);sim.buffer=[];
+}
+/** After a drawn 90 minutes: the match stops before extra time starts, like at half time, until the player continues. */
+export function pauseBeforeExtraTime(cup:CupState):CupState {
+ const next=structuredClone(cup),sim=next.simulation;
+ if(!sim)return next;
+ sim.status='halftime';changeEnds(sim,'club');
+ next.matchPaused=true;next.lastResult='90 Minuten vorbei, es steht unentschieden. Wechsel prüfen, danach geht es in die Verlängerung.';
+ return next;
+}
 export function advanceInteractive(cup:CupState,now:number):CupState {
  const next=structuredClone(cup),sim=next.simulation!;
  if(sim.status!=='running'||next.matchPaused)return next;
@@ -404,10 +417,13 @@ export function advanceInteractive(cup:CupState,now:number):CupState {
   }
   next.broadcast.fitness=Object.fromEntries(sim.committed.players.map(p=>[p.id,p.fitness]));next.broadcast.fitnessMinute=minute;
   if(a.end===2700&&!sim.halftimeDone){sim.halftimeDone=true;sim.status='halftime';
-   // Copy first: the finished play keeps its own end state, the second half starts from a new one.
-   sim.committed=structuredClone(sim.committed);
-   for(const p of sim.committed.players){p.anchor={x:105-p.anchor.x,y:68-p.anchor.y};}sim.committed.direction*=-1;kickoff(sim.committed,'opponent');sim.buffer=[];
+   changeEnds(sim,'opponent');
    next.matchPaused=true;next.lastResult='Halbzeit. Wechsel prüfen, danach weiterspielen.';break;
+  }
+  // Extra time has its own break after 15 minutes (105′), taken once like the half time.
+  if(a.end===6300&&next.phase==='extra-time'&&!sim.extraHalftimeDone){sim.extraHalftimeDone=true;sim.status='halftime';
+   changeEnds(sim,'opponent');
+   next.matchPaused=true;next.lastResult='Halbzeit der Verlängerung. Wechsel prüfen, danach weiterspielen.';break;
   }
   if(next.matchPaused)break;
   // No editing pause once the final whistle is due; the match simply ends.

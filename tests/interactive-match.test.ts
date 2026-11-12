@@ -226,3 +226,45 @@ test('a five minute match with extra time reaches the final whistle at 120 minut
  }
  assert.ok(found>0,'at least one seed went to extra time');
 });
+
+// Extra time: a drawn knockout match stops at 90' and again at 105' like at half time, until the player continues.
+function drawnTournamentMatch(){
+ for(let seed=900;seed<1300;seed++){
+  const f=fixture(seed);f.cup.mode='tournament' as typeof f.cup.mode;f.cup.regularDurationMs=300000;f.cup.matchEndsAt=f.cup.matchStartedAt+300000;f.cup.opponentRating=99;f.cup.simulation=createInteractiveMatch(f.cup,f.starXI.lineupIds,f.starXI.formationId);
+  // Play the 90 regular minutes like a player (continue every pause: half time, injuries) until the match is drawn.
+  let now=f.cup.matchStartedAt;
+  for(let i=0;i<3000&&f.cup.active&&f.cup.phase==='regular';i++){
+   if(f.cup.matchPaused)f.cup=resumeCupMatch(f.cup,f.cup.lastTickAt);
+   now=Math.max(now,f.cup.lastTickAt)+1000;
+   f.cup=advanceCupMatch(f.cup,85,now,Math.random,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions).cup;
+  }
+  if(f.cup.phase==='extra-time')return f;
+ }
+ throw new Error('no drawn match found');
+}
+const step=(f:ReturnType<typeof fixture>,ms:number)=>{f.cup=advanceCupMatch(f.cup,85,Math.min(f.cup.matchEndsAt+ms,f.cup.lastTickAt+ms),Math.random,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions).cup;};
+test('a drawn knockout match pauses at 90 before extra time and stays paused until the player continues',()=>{
+ const f=drawnTournamentMatch(),score=[f.cup.homeScore,f.cup.awayScore];
+ assert.equal(f.cup.phase,'extra-time');assert.ok(f.cup.matchPaused);assert.equal(f.cup.simulation!.status,'halftime');assert.equal(f.cup.simulation!.time,5400);
+ // Hidden tab, long inactivity, reload and cloud save: nothing plays on, nothing is skipped.
+ const before=JSON.stringify(f.cup.simulation);step(f,3600000);assert.equal(f.cup.simulation!.time,5400);assert.deepEqual([f.cup.homeScore,f.cup.awayScore],score);assert.equal(JSON.stringify(f.cup.simulation),before);
+ const reloaded=normalizeGameFeatures(JSON.parse(JSON.stringify(f)));assert.ok(reloaded.cup.matchPaused);assert.equal(reloaded.cup.phase,'extra-time');assert.equal(reloaded.cup.simulation!.time,5400);
+ // After the player continues, extra time runs from 90 and does not pause a second time before 105.
+ f.cup=resumeCupMatch(f.cup,f.cup.lastTickAt+5000);assert.ok(!f.cup.matchPaused);assert.equal(f.cup.simulation!.status,'running');
+});
+test('extra time pauses once more at 105 and never plays through unconfirmed to 120 or penalties',()=>{
+ const f=drawnTournamentMatch();f.cup=resumeCupMatch(f.cup,f.cup.lastTickAt);
+ let guard=0;while(f.cup.active&&!f.cup.matchPaused&&f.cup.phase==='extra-time'&&guard++<400)step(f,60000);
+ assert.ok(f.cup.matchPaused,'paused instead of ending');assert.equal(f.cup.phase,'extra-time');assert.equal(f.cup.simulation!.status,'halftime');assert.equal(f.cup.simulation!.time,6300);assert.equal(f.cup.simulation!.extraHalftimeDone,true);
+ const score=[f.cup.homeScore,f.cup.awayScore];step(f,3600000);assert.equal(f.cup.simulation!.time,6300);assert.deepEqual([f.cup.homeScore,f.cup.awayScore],score);
+ const reloaded=normalizeGameFeatures(JSON.parse(JSON.stringify(f)));assert.ok(reloaded.cup.matchPaused);assert.equal(reloaded.cup.simulation!.time,6300);
+ // Continuing plays the second extra-time half exactly once, then the match ends (decision or penalties).
+ f.cup=resumeCupMatch(f.cup,f.cup.lastTickAt);guard=0;while(f.cup.active&&!f.cup.matchPaused&&f.cup.phase==='extra-time'&&guard++<400)step(f,60000);
+ assert.ok(!f.cup.matchPaused||f.cup.phase!=='extra-time','no third pause');assert.ok(!f.cup.active||f.cup.phase==='penalties'||f.cup.simulation!.time>6300);
+});
+test('regular decided matches and season matches get no extra pause; only the 45 minute half time exists',()=>{
+ const f=fixture(31);let pauses=0,guard=0;
+ while(f.cup.active&&guard++<1000){if(f.cup.matchPaused){pauses++;assert.equal(f.cup.simulation!.time,2700);f.cup=resumeCupMatch(f.cup,f.cup.lastTickAt);}
+  step(f,120000);}
+ assert.ok(!f.cup.active);assert.equal(pauses,1);assert.ok(f.cup.phase!=='extra-time');
+});

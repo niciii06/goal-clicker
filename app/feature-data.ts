@@ -18,7 +18,7 @@ import { FC27_INDIA_PROFILES, SCRAP_PACK_MIN_RATING, SCRAP_RATING_GROUPS, drawSc
 import { GAZETTE_CHAMPION_HEADLINES, GAZETTE_EXIT_HEADLINES, TRANSFER_INTERESTED_CLUBS, transferClubsForRating } from "./features/news-data";
 import { HOME_VENUE, LEAGUE_LABELS, seasonGeography, venueForClubName } from "./travel-geography";
 import { addBroadcastSubstitution, advanceMatchBroadcast, chooseGoalPattern, createMatchBroadcast, normalizeMatchBroadcast, recordedActionRating } from "./match-broadcast";
-import { advanceInteractive, normalizeInteractive, resumeInteractive, simulationMinute } from "./interactive-match";
+import { advanceInteractive, normalizeInteractive, pauseBeforeExtraTime, resumeInteractive, simulationMinute } from "./interactive-match";
 import { emptyTravel, normalizeTravel } from "./travel-data";
 import { getCareerCard, getPlayerForm, initialCareerState, normalizeCareerState, rebaseCareerForPrestige } from "./career-data";
 import { getPackUnlockLeague, hasReachedLeague, leagueForTier } from "./season-progression";
@@ -2396,7 +2396,8 @@ export function advanceCupMatch(cup: CupState, starRating: number, now = Date.no
       next.simulation!.status='completed';
       return finishCupRound(next, starRating, next.homeScore > next.awayScore, now, false);
     }
-    if(cup.phase === 'regular') return {cup:{...next,phase:'extra-time' as const,matchEndsAt:cup.matchEndsAt+getCupRegularDurationMs(cup)/3,lastResult:'Verlängerung bis 120′.'},...baseResult};
+    // Drawn after 90 minutes: extra time starts only once the player continues (same pause as at half time).
+    if(cup.phase === 'regular') return {cup:pauseBeforeExtraTime({...next,phase:'extra-time' as const,matchEndsAt:cup.matchEndsAt+getCupRegularDurationMs(cup)/3}),...baseResult};
     next.simulation!.status='completed';
     return {cup:{...next,phase:'penalties' as const,penaltyTurn:'home' as const,lastResult:'Elfmeterschiessen. Wähle eine Richtung.'},...baseResult};
   }
