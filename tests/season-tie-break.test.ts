@@ -84,7 +84,7 @@ test("old saves without lastResults rank the running table with its results", ()
 });
 
 test("the trophy and the season panel use the same ranking (the separate result card on Spiele is gone)", () => {
-  const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const page = readFileSync(new URL("../app/game-app.tsx", import.meta.url), "utf8");
   const panel = readFileSync(new URL("../app/season-panel.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(page, /seasonStandingsAnnouncement/);
   assert.match(page, /getSeasonTitle\(latest, displayGame\.features\.seasonMode\.lastTable, displayGame\.features\.seasonMode\.lastResults\)/);

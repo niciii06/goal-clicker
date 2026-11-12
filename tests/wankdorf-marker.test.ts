@@ -10,7 +10,7 @@ test('the Wankdorf anchor lies on the stadium, not in the nearby forest or at th
  assert.ok(km(VENUES.bern,{lat:46.948,lon:7.4474})>2,'not the city centre');
 });
 test('every saved road route into Bern ends within 100 m of the Wankdorf anchor or is not a route to Wankdorf',()=>{
- const routes=((cache as any).routes??cache) as Record<string,{points:{lat:number;lon:number}[]}>;
+ const routes=((cache as { routes?: unknown }).routes??cache) as Record<string,{points:{lat:number;lon:number}[]}>;
  const toWankdorf=Object.entries(routes).filter(([key])=>key.startsWith('bus:')&&km(routes[key].points.at(-1)!,VENUES.bern)<.1);
  assert.ok(toWankdorf.length>=1);
  for(const [,route] of toWankdorf)assert.ok(km(route.points.at(-1)!,VENUES.bern)<.1);

@@ -33,6 +33,7 @@ import type { ClubChronicle } from "./club-chronicle";
 import { normalizeWeeklyGoals, notePackOpened } from "./weekly-goals";
 import type { WeeklyGoalsState } from "./weekly-goals";
 import { pronounText } from "./player-pronouns";
+import { GAME_FEATURES_SCHEMA_VERSION } from "./features/schema-version";
 export type { ClubProfile, CoopMission, CupCardEvent, CupGoalEvent, CupInjuryEvent, CupMatchMode, CupMatchPhase, CupPenaltyEvent, CupState, CupStrategyId, CupSubstitutionImpact, EarnedPack, EarnedPackId, GoalBoostState, HistoryTone, MatchChange, MatchHistoryEntry, MissionKind, MissionProgressSource, PenaltyDirection, RandomEvent, RewardPackId, SeasonFixture, SeasonMatchHistoryEntry, SeasonTableRow, StarFormationDefinition, StarFormationId, StarFormationSlot, StarPackDefinition, StarPackId, StarPackOdds, StarPackOpening, StarPackReveal, StarXIEvaluationContext, StarXIPlayer, StarXIState, TournamentCompletionSummary, TournamentDefinition, TournamentGazetteIssue, TournamentId, TournamentOpponent, TransferInsiderEvent, TransferInsiderOutcome, TransferLoan, TransferMarketState, TransferPlayer, TransferOffer, TransferSagaState, TransferSquadVacancy, TransferUnhappyPlayer } from "./features/types";
 export { STAR_FORMATIONS, STAR_POSITIONS, STAR_POSITION_NAMES, STAR_XI_FORMATION_POSITIONS, TOURNAMENTS, TOURNAMENT_OPPONENT_MULTIPLIER, TRANSFER_PLAYERS, YB_FC26_SOURCE_IDS, getStarFormation } from "./features/catalog";
 
@@ -205,8 +206,7 @@ export const STAR_PACK_ROLL_DURATION_MS = 8000;
 export const STAR_XI_SQUAD_SIZE = 11;
 export const STAR_XI_BENCH_SIZE = 12;
 export const STAR_XI_MAX_SUBSTITUTIONS = 5;
-// 9 (6 November 2026): weekly goals and the club chronicle. Older clients would drop both, so they must not save over it.
-export const GAME_FEATURES_SCHEMA_VERSION = 9;
+export { GAME_FEATURES_SCHEMA_VERSION };
 export const SEASON_MODE_DIVISION_COUNT = 15;
 export const SEASON_MODE_MATCHES_PER_SEASON = 10;
 export const SEASON_MODE_TABLE_SIZE = 6;

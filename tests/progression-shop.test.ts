@@ -49,7 +49,7 @@ test('unlocks are permanent: relegation and old saves keep their entitlements', 
 });
 
 test('displayed requirements and purchase checks use the same league rules', async () => {
-  const [page, api] = await Promise.all([readFile(new URL('../app/page.tsx', import.meta.url), 'utf8'), readFile(new URL('../app/api/multiplayer/route.ts', import.meta.url), 'utf8')]);
+  const [page, api] = await Promise.all([readFile(new URL('../app/game-app.tsx', import.meta.url), 'utf8'), readFile(new URL('../app/api/multiplayer/route.ts', import.meta.url), 'utf8')]);
   assert.doesNotMatch(page, /Ab Saison|in Saison \$\{unlock|Freischaltung in Saison|SAISON \$\{unlock/);
   assert.match(page, /Verfügbar ab Liga \$\{unlockLeague\}/);
   assert.doesNotMatch(api, /in Saison \$\{(?:upgrade|formation|pack|tournament)Unlock/);

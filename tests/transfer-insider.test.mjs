@@ -6,7 +6,7 @@ test("Fabrizio Romario transfer events are wired through singleplayer and coop",
   const [featureSource, apiSource, pageSource] = await Promise.all([
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(featureSource, /TRANSFER_LOAN_CHANCE = 0\.30/);
@@ -35,7 +35,7 @@ test("Fabrizio Romario transfer events are wired through singleplayer and coop",
 test("loaned players disappear from every squad list without looking suspended", async () => {
   const [featureSource, pageSource] = await Promise.all([
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(featureSource, /normalizeStarXIState\(features\.starXI, blockedPlayerIds\)/);
@@ -47,7 +47,7 @@ test("loaned players disappear from every squad list without looking suspended",
 test("Fabrizio stays available while the player transfer market is closed", async () => {
   const [apiSource, pageSource, routesSource] = await Promise.all([
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/tab-routes.ts", import.meta.url), "utf8"),
   ]);
 

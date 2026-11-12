@@ -1,0 +1,194 @@
+/* Co-op: game mode choice, lobby, saved worlds and the shared team view. Split from globals.css (audit P14); imported in this order by app/layout.tsx. */
+@media (min-width: 1201px) {
+  .coop-clicker-layout > .coop-inline-room-bar { grid-column: 1 / -1; grid-row: 1; }
+  .coop-clicker-layout > .click-zone-card { grid-row: 2; }
+  .coop-clicker-layout > .shop-card { grid-row: 2; }
+  .coop-clicker-layout > .side-column { grid-row: 2; }
+  .coop-clicker-layout > .feature-card { grid-column: 1 / 3; grid-row: 3; }
+}
+.saved-rooms { grid-column: 1 / -1; padding: 16px; border: 1px solid var(--line-soft); border-radius: 17px; background: var(--surface-raised); }
+.saved-rooms-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.saved-rooms-heading h3 { margin: 0; color: var(--text); font-size: 18px; font-weight: 700; letter-spacing: -.045em; }
+.saved-room-list { display: grid; gap: 7px; margin-top: 13px; }
+.saved-room-row { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: stretch; gap: 8px; width: 100%; padding: 7px; border: 1px solid var(--line-soft); border-radius: 14px; background: var(--surface-soft); transition: 160ms ease; }
+.saved-room-row.other-online { border-color: rgba(52,199,89,.38); background: linear-gradient(100deg, color-mix(in srgb, #22c340 7%, var(--surface-raised)), var(--surface-raised)); box-shadow: inset 3px 0 0 var(--green); }
+.saved-room-main { display: grid; grid-template-columns: 78px minmax(0,1fr) auto auto; align-items: center; gap: 12px; min-width: 0; padding: 5px; border: 0; border-radius: 10px; color: var(--text); cursor: pointer; background: transparent; text-align: left; transition: 160ms ease; }
+.saved-room-main:hover:not(:disabled) { background: color-mix(in srgb, var(--surface-raised) 72%, transparent); }
+.saved-room-main:disabled { cursor: wait; opacity: .6; }
+.saved-room-code { color: var(--accent); font-size: var(--text-footnote); font-weight: 800; letter-spacing: .12em; }
+.saved-room-copy { min-width: 0; }
+.saved-room-copy strong, .saved-room-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-room-copy strong { font-size: var(--text-footnote); font-weight: 700; }
+.saved-room-copy small { margin-top: 4px; color: var(--muted); font-size: var(--text-footnote); }
+.saved-room-open { color: var(--accent); font-size: var(--text-footnote); font-weight: 800; white-space: nowrap; }
+.saved-room-presence { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: var(--text-footnote); font-weight: 800; letter-spacing: .08em; white-space: nowrap; }
+.saved-room-presence i, .coop-presence i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, var(--text) 32%, var(--surface-raised)); }
+.saved-room-presence.online { color: color-mix(in oklab, #218943, var(--text) var(--tone-mix)); }
+.saved-room-presence.online i, .coop-presence.online i { background: var(--green); box-shadow: 0 0 0 3px rgba(52,199,89,.14); }
+.saved-room-delete { align-self: center; padding: 0 10px; border: 1px solid rgba(209,44,84,.16); border-radius: 9px; color: color-mix(in oklab, #b52a4c, var(--text) var(--tone-mix)); cursor: pointer; background: color-mix(in srgb, #e6002e 4%, var(--surface-raised)); font-size: var(--text-footnote); font-weight: 800; }
+.saved-room-delete:hover:not(:disabled), .mode-secondary.danger:hover:not(:disabled) { border-color: rgba(209,44,84,.34); color: #fff; background: #d12c54; }
+.saved-rooms-note { margin: 12px 0 0; color: var(--muted); font-size: var(--text-footnote); line-height: 1.4; }
+.coop-presence { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 980px; color: var(--muted); background: color-mix(in srgb, var(--text) 6%, var(--surface-raised)); font-size: var(--text-footnote); font-weight: 800; letter-spacing: .08em; white-space: nowrap; }
+.coop-presence.online { color: color-mix(in oklab, #218943, var(--text) var(--tone-mix)); background: color-mix(in srgb, #22c340 7%, var(--surface-raised)); }
+.mode-secondary.danger { border-color: rgba(209,44,84,.18); color: color-mix(in oklab, #b52a4c, var(--text) var(--tone-mix)); background: color-mix(in srgb, #e6002e 4%, var(--surface-raised)); }
+.club-form .mode-input { width: 100%; margin-top: -8px; }
+.transfer-insider-card .transfer-offer-actions .mode-secondary { border-color: var(--tx-secondary-border); color: var(--tx-secondary-text); background: var(--tx-secondary-bg); }
+.transfer-insider-card .event-takeover-dismiss { color: var(--tx-dismiss-text); background: var(--tx-dismiss-bg); }
+.transfer-insider-card .event-takeover-dismiss:hover { background: var(--tx-dismiss-hover); }
+@media (min-width: 1201px) {
+  .coop-clicker-layout { grid-template-areas: "room room room" "hero shop side" "feature shop side"; }
+  .coop-clicker-layout > .coop-inline-room-bar { grid-area: room; grid-column: auto; grid-row: auto; }
+}
+@media (min-width: 781px) and (max-width: 1200px) {
+  .coop-clicker-layout { grid-template-areas: "room room" "hero shop" "feature shop" "side side"; }
+  .coop-clicker-layout > .coop-inline-room-bar { grid-area: room; grid-column: auto; grid-row: auto; }
+}
+@media (max-width: 780px) {
+  .coop-clicker-layout { grid-template-areas: "room" "hero" "shop" "feature" "side"; }
+  .coop-clicker-layout > .coop-inline-room-bar { grid-area: room; grid-column: auto; grid-row: auto; }
+}
+.mode-page { display: grid; max-width: 980px; margin: 0 auto; padding-top: 22px; }
+.mode-card { min-width: 0; padding: 27px; border: 1px solid color-mix(in srgb, var(--text) 8%, transparent); border-radius: 25px; background: var(--surface); box-shadow: 0 16px 45px rgba(29,29,31,.07); backdrop-filter: blur(18px); }
+.mode-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.mode-card-heading h2 { margin: 0; color: var(--text); font-size: clamp(32px, 5vw, 52px); font-weight: 720; letter-spacing: -.07em; line-height: .98; }
+.mode-card-heading p:not(.eyebrow) { max-width: 560px; margin: 13px 0 0; color: var(--soft); font-size: var(--text-footnote); line-height: 1.45; }
+.mode-card-icon { display: grid; width: 54px; height: 54px; flex: 0 0 auto; place-items: center; border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent); border-radius: 17px; color: var(--accent); background: var(--accent-soft); }
+.mode-input::placeholder { color: color-mix(in srgb, var(--text) 33%, var(--surface-raised)); }
+.mode-input:focus { border-color: color-mix(in srgb, var(--accent) 48%, transparent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 10%, transparent); }
+.mode-primary { border: 1px solid var(--accent); color: var(--on-accent); background: var(--accent); }
+.mode-primary:hover:not(:disabled) { background: var(--accent); box-shadow: 0 7px 18px color-mix(in srgb, var(--accent) 20%, transparent); transform: translateY(-1px); }
+.mode-secondary { border: 1px solid var(--line); color: var(--soft); background: var(--surface-raised); }
+.mode-secondary:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 34%, transparent); color: var(--accent); background: var(--accent-soft); }
+.mode-primary:disabled, .mode-secondary:disabled { color: color-mix(in srgb, var(--text) 38%, var(--surface-raised)); cursor: not-allowed; border-color: var(--line-soft); background: color-mix(in srgb, var(--text) 6%, var(--surface-raised)); box-shadow: none; transform: none; }
+.mode-secondary.quiet { color: var(--muted); }
+.mode-message { margin: 13px 0 0; color: var(--accent); font-size: var(--text-footnote); line-height: 1.4; }
+.coop-name-field label { display: block; margin-bottom: 7px; color: var(--soft); font-size: var(--text-footnote); font-weight: 750; }
+.coop-name-field small { display: block; margin-top: 6px; color: var(--muted); font-size: var(--text-footnote); }
+.coop-lobby { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 13px; margin-top: 27px; }
+.coop-lobby-panel { display: grid; grid-template-columns: 33px minmax(0,1fr); grid-template-rows: 1fr auto auto; align-items: start; gap: 11px; padding: 16px; border: 1px solid var(--line-soft); border-radius: 17px; background: var(--surface-soft); }
+.coop-lobby-panel h3 { margin: 0; color: var(--text); font-size: var(--text-body); font-weight: 700; letter-spacing: -.04em; }
+.coop-lobby-panel p:not(.eyebrow) { margin: 7px 0 0; color: var(--soft); font-size: var(--text-footnote); line-height: 1.45; }
+.coop-lobby-panel .mode-primary, .coop-lobby-panel .mode-secondary { grid-column: 1 / -1; justify-self: stretch; min-height: 50px; margin-top: 4px; }
+.coop-lobby-panel .code-input { grid-column: 1 / -1; min-height: 54px; padding-inline: 18px; color: var(--text); font-size: 20px; font-weight: 750; letter-spacing: .22em; text-align: center; }
+.coop-panel-number { display: grid; width: 31px; height: 31px; place-items: center; border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); border-radius: 10px; color: var(--accent); background: var(--accent-soft); font-size: var(--text-footnote); font-weight: 800; }
+.coop-name-field { grid-column: 1 / -1; padding: 16px; border: 1px solid color-mix(in srgb, var(--accent) 15%, transparent); border-radius: 17px; background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 3%, var(--surface-raised)), var(--surface-raised) 75%); }
+.coop-room { margin-top: 27px; }
+.coop-room-bar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px; border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent); border-radius: 17px; background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 5%, var(--surface-raised)), var(--surface-raised) 75%); }
+.coop-room-bar > div:first-child { min-width: 0; }
+.coop-room-bar .eyebrow { margin-bottom: 7px; }
+.coop-room-bar span { display: block; margin-top: 7px; color: var(--soft); font-size: var(--text-footnote); }
+.coop-code { display: block; color: var(--text); font-size: 30px; font-weight: 760; letter-spacing: .12em; line-height: 1; }
+.coop-room-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+.coop-score-hero { display: flex; align-items: center; justify-content: space-between; gap: 17px; margin-top: 13px; padding: 24px; border-radius: 18px; color: #fff; background: #101918; box-shadow: 0 12px 28px rgba(16,25,24,.16); }
+.coop-score-hero > div span, .coop-score-hero > div small { display: block; color: rgba(255,255,255,.58); font-size: var(--text-caption2); font-weight: 750; letter-spacing: .12em; }
+.coop-score-hero > div strong { display: block; margin: 8px 0 5px; color: #fff; font-size: clamp(34px, 7vw, 60px); font-weight: 700; letter-spacing: -.08em; line-height: .9; }
+.coop-score-hero > div small { color: rgba(255,255,255,.54); font-size: var(--text-caption2); font-weight: 500; letter-spacing: 0; }
+.coop-click-button { display: grid; min-width: 145px; justify-items: center; gap: 5px; padding: 14px 17px; border: 1px solid rgba(255,255,255,.22); border-radius: 15px; color: #fff; cursor: pointer; background: #1c654a; box-shadow: 0 8px 18px rgba(0,0,0,.18); transition: 160ms ease; }
+.coop-click-button:hover:not(:disabled) { background: #257b5b; transform: translateY(-1px); }
+.coop-click-button:active:not(:disabled) { transform: scale(.97); }
+.coop-click-button:disabled { cursor: not-allowed; opacity: .62; }
+.coop-click-button span { font-size: var(--text-caption2); font-weight: 800; letter-spacing: .14em; }
+.coop-click-button small { color: rgba(255,255,255,.65); font-size: var(--text-caption2); }
+.coop-players { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; margin-top: 13px; }
+.coop-player-card { display: grid; gap: 5px; padding: 13px; border: 1px solid var(--line-soft); border-radius: 14px; background: var(--surface-soft); }
+.coop-player-card.you { border-color: color-mix(in srgb, var(--accent) 25%, transparent); background: var(--accent-soft); }
+.coop-player-tag { color: var(--accent); font-size: var(--text-footnote); font-weight: 800; letter-spacing: .12em; }
+.coop-player-card strong { overflow: hidden; color: var(--text); font-size: var(--text-footnote); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.coop-player-card small { color: var(--muted); font-size: var(--text-footnote); }
+.coop-upgrades { margin-top: 18px; padding: 16px; border: 1px solid var(--line-soft); border-radius: 17px; background: var(--surface-raised); }
+.coop-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.coop-section-heading h3 { margin: 0; color: var(--text); font-size: 19px; font-weight: 700; letter-spacing: -.05em; }
+.coop-section-heading > span { padding: 6px 8px; border-radius: 980px; color: color-mix(in oklab, #268b45, var(--text) var(--tone-mix)); background: color-mix(in srgb, #22c340 7%, var(--surface-raised)); font-size: var(--text-footnote); font-weight: 800; letter-spacing: .08em; white-space: nowrap; }
+.coop-rule { margin: 8px 0 13px; color: var(--muted); font-size: var(--text-footnote); line-height: 1.4; }
+.coop-upgrade-list { display: grid; gap: 7px; }
+.coop-upgrade-row { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line-soft); }
+.coop-upgrade-row:first-child { border-top: 0; }
+.coop-upgrade-row strong, .coop-upgrade-row small { display: block; }
+.coop-upgrade-row strong { color: var(--text); font-size: var(--text-footnote); font-weight: 700; }
+.coop-upgrade-row small { margin-top: 4px; color: var(--muted); font-size: var(--text-footnote); }
+.coop-upgrade-row button { min-width: 76px; font-size: var(--text-footnote); line-height: 1.15; }
+.coop-upgrade-row button small { margin-top: 3px; font-size: var(--text-footnote); }
+.coop-mode-page { max-width: 1240px; }
+.coop-card.is-live { padding-bottom: 24px; }
+.coop-clicker-layout { padding-top: 22px; }
+.coop-waiting-state { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 18px; margin-top: 27px; padding: 30px; border: 1px dashed color-mix(in srgb, var(--accent) 28%, transparent); border-radius: 22px; background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 4%, var(--surface-raised)), var(--surface-raised) 70%); }
+.coop-waiting-icon { display: grid; width: 58px; height: 58px; place-items: center; border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); border-radius: 18px; color: var(--accent); background: var(--accent-soft); }
+.coop-waiting-state h3 { margin: 0; color: var(--text); font-size: 24px; font-weight: 720; letter-spacing: -.055em; }
+.coop-waiting-state p:not(.eyebrow) { max-width: 560px; margin: 8px 0 0; color: var(--soft); font-size: var(--text-footnote); line-height: 1.5; }
+.coop-waiting-players { grid-column: 1 / -1; margin-top: 2px; }
+.coop-player-card.online:not(.you) { border-color: rgba(40,167,69,.34); background: color-mix(in srgb, #22c353 7%, var(--surface-raised)); box-shadow: inset 3px 0 0 #34a853; }
+.coop-player-card.online:not(.you) .coop-player-tag { color: color-mix(in oklab, #21883f, var(--text) var(--tone-mix)); }
+.coop-player-card.waiting { border-style: dashed; background: color-mix(in srgb, var(--text) 2%, var(--surface-raised)); }
+.coop-live-upgrade-list { max-height: none; padding-right: 0; }
+.coop-live-badge { margin-left: auto; padding: 6px 8px; border-radius: 980px; color: color-mix(in oklab, #268b45, var(--text) var(--tone-mix)); background: color-mix(in srgb, #22c340 7%, var(--surface-raised)); font-size: var(--text-footnote); font-weight: 800; letter-spacing: .08em; }
+.coop-team-total { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.coop-team-total span { color: var(--muted); font-size: var(--text-footnote); font-weight: 750; letter-spacing: .08em; }
+.coop-team-total strong { color: var(--accent); font-size: var(--text-footnote); }
+.coop-room-side .mode-secondary { width: 100%; margin-top: 12px; }
+.coop-side-copy { margin: -3px 0 13px; color: var(--soft); font-size: var(--text-footnote); line-height: 1.45; }
+.coop-side-code { display: block; color: var(--text); font-size: 24px; font-weight: 760; letter-spacing: .12em; line-height: 1; }
+.coop-inline-room-bar { display: flex; grid-column: 1 / -1; align-items: center; justify-content: space-between; gap: 18px; padding: 13px 16px; border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent); border-radius: 17px; background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 5%, var(--surface-raised)), var(--surface-raised) 75%); }
+.coop-inline-room-bar > div:first-child { min-width: 0; }
+/* Home: one slim strip. The full management sits in Club & Mehr (.coop-world-panel). */
+.coop-inline-room-bar.compact { padding: 8px 14px; gap: 12px; }
+.coop-inline-room-bar.compact strong { font-size: 17px; }
+.coop-inline-room-bar.compact span:not(.coop-live-badge):not(.coop-presence) { margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coop-world-panel { display: grid; gap: 12px; margin-bottom: 16px; }
+.coop-inline-room-bar.static { grid-column: auto; }
+.coop-inline-room-bar strong { display: block; color: var(--text); font-size: 23px; font-weight: 760; letter-spacing: .12em; line-height: 1; }
+.coop-inline-room-bar span:not(.coop-live-badge) { display: block; margin-top: 5px; color: var(--soft); font-size: var(--text-footnote); }
+.coop-inline-room-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 7px; }
+@media (max-width: 780px) {.mode-page { padding-top: 16px; }.mode-card { padding: 20px; }.mode-card-heading h2 { font-size: 37px; }.coop-lobby { grid-template-columns: 1fr; }.coop-name-field { grid-column: auto; max-width: none; }.coop-score-hero { padding: 19px; }.coop-click-button { min-width: 132px; } }
+.clicker-layout > .coop-inline-room-bar { grid-column: 1 / -1 !important; grid-row: auto !important; order: -1 !important; }
+.side-column.layout-card .coop-team-card { grid-column: 1 / -1; }
+.saved-room-copy strong { font-size: var(--text-footnote); }
+.saved-room-copy small, .saved-rooms-note { font-size: var(--text-footnote); }
+.saved-room-presence, .coop-presence, .coop-live-badge { font-size: var(--text-footnote); }
+@media (max-width: 780px) {
+  .layout-toolbar-actions .mode-primary, .layout-toolbar-actions .mode-secondary { min-width: 100px; }
+}
+@media (max-width: 780px) { .coop-inline-room-bar { align-items: flex-start; flex-direction: column; }.coop-inline-room-actions { justify-content: flex-start; } }
+@media (max-width: 540px) {.coop-lobby { margin-top: 21px; }.coop-lobby-panel { padding: 13px; }.coop-room { margin-top: 21px; }.coop-room-bar { display: block; padding: 14px; }.coop-code { font-size: 26px; }.coop-room-actions { justify-content: flex-start; margin-top: 14px; }.coop-score-hero { display: block; padding: 17px; }.coop-score-hero > div strong { font-size: 45px; }.coop-click-button { width: 100%; margin-top: 17px; }.coop-players { grid-template-columns: 1fr; }.coop-upgrades { padding: 13px; }.coop-section-heading { display: block; }.coop-section-heading > span { display: inline-block; margin-top: 8px; }.coop-upgrade-row button { min-width: 70px; } }
+.coop-lobby-panel .room-name-input { grid-column: 1 / -1; min-height: 54px; padding-inline: 18px; font-size: var(--text-body); font-weight: 680; }
+.coop-world-tools { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0,1fr); gap: 12px; padding: 14px; border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent); border-radius: 18px; background: color-mix(in srgb, var(--surface-raised) 92%, transparent); box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 6%, transparent); }
+.coop-world-tools.waiting { margin-top: 12px; }
+.coop-world-tools > div { min-width: 0; }
+.coop-world-tools .eyebrow { margin-bottom: 8px; }
+.coop-world-tools strong { color: var(--text); font-size: 14px; }
+.coop-tool-input { display: flex; align-items: center; gap: 7px; }
+.coop-tool-input .mode-input { min-width: 0; min-height: 42px; font-size: var(--text-footnote); font-weight: 650; }
+.coop-tool-input button { flex: 0 0 auto; min-height: 42px; }
+@media (max-width: 720px) {
+  .coop-world-tools { grid-template-columns: 1fr; }
+  .coop-tool-input { align-items: stretch; flex-direction: column; }
+}
+.app-shell:not(.section-home) .coop-world-tools{display:none}
+.account-form .mode-primary, .account-form .mode-secondary { min-height: 44px; font-size: var(--text-footnote); }
+.account-field .mode-input { min-height: 44px; font-size: 16px; }
+.account-field .account-password { position: relative; display: block; color: inherit; font-size: inherit; font-weight: inherit; }
+.account-password .mode-input { width: 100%; padding-right: 48px; }
+.account-password-toggle { position: absolute; top: 0; right: 0; display: grid; width: 44px; height: 100%; min-height: 44px; place-items: center; padding: 0; border: 0; border-radius: 0 12px 12px 0; background: transparent; color: var(--soft); cursor: pointer; }
+.account-password-toggle:hover { color: var(--text); }
+.account-password-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.account-password-toggle[aria-pressed="true"] { color: var(--accent); }
+.profile-row .mode-input { min-height: 40px; font-size: 14px; }
+.coop-name-field .coop-name-label { display: block; margin-bottom: 5px; color: var(--soft); font-size: var(--text-footnote); font-weight: 750; }
+.coop-name-field strong { color: var(--text); font-size: 16px; }
+.mode-switch { margin-top: var(--space-4); border-radius: var(--radius-pill); }
+.mode-switch button { border-radius: var(--radius-pill); }
+/* Buttons in three weights: filled for the main action, tinted for secondary actions, gray for quiet ones. */
+.mode-primary, .mode-secondary { min-height: var(--tap); padding: 0 var(--space-5); border-radius: var(--radius-pill); font-size: var(--text-subhead); font-weight: 600; }
+.mode-primary { border-color: var(--accent); }
+.mode-primary:hover:not(:disabled) { box-shadow: none; filter: brightness(1.06); transform: none; }
+.mode-secondary { border-color: transparent; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.mode-secondary:hover:not(:disabled) { border-color: transparent; color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.mode-secondary.quiet { color: var(--text); background: var(--fill); }
+.mode-primary:disabled, .mode-secondary:disabled { border-color: transparent; color: color-mix(in srgb, var(--text) 40%, transparent); background: var(--fill); }
+.mode-input { min-height: var(--tap); border-color: transparent; border-radius: var(--radius-sm); background: var(--fill); font-size: var(--text-body); }
+.mode-input:focus { border-color: var(--accent); background: var(--surface-raised); }
+.coop-members { display: grid; gap: 8px; }
+.coop-members ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.coop-members li { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.coop-members li > span { display: grid; min-width: 0; overflow-wrap: anywhere; }
+.coop-members small { color: var(--soft); font-size: var(--text-footnote); }
+.coop-members > button { justify-self: start; }

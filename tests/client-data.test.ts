@@ -42,7 +42,7 @@ test('browser builds resolve the slim and lazy copies through package.json impor
 });
 
 test('the page only loads the route cache once the Spiele tab is open (P12)', async () => {
-  const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  const page = await readFile(new URL('../app/game-app.tsx', import.meta.url), 'utf8');
   const effects = page.split('\n').filter((line) => line.includes('loadRouteCache()'));
   assert.equal(effects.length, 1);
   assert.match(effects[0], /if \(!routesWanted\) return;/);

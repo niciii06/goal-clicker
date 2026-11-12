@@ -1,0 +1,181 @@
+/* Album and collection: career cards, milestones, custom cards, achievements, discipline tags. Split from globals.css (audit P14); imported in this order by app/layout.tsx. */
+.custom-card-shop { margin-top: 17px; padding: 15px; border: 1px solid rgba(198,146,20,.22); border-radius: 17px; background: linear-gradient(145deg, color-mix(in srgb, #e69900 6%, var(--surface-raised)), var(--surface-raised) 70%); }
+.custom-card-shop-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.custom-card-shop-heading h4 { margin: 0; color: var(--text); font-size: 16px; font-weight: 740; letter-spacing: -.045em; }
+.custom-card-shop-heading small { display: block; max-width: 540px; margin-top: 5px; color: var(--muted); font-size: var(--text-footnote); line-height: 1.4; }
+.custom-card-shop-heading > span { flex: 0 0 auto; padding: 7px 9px; border-radius: 980px; color: color-mix(in oklab, #745300, var(--text) var(--tone-mix)); background: color-mix(in srgb, #e6b500 25%, var(--surface-raised)); font-size: var(--text-footnote); font-weight: 900; letter-spacing: .07em; white-space: nowrap; }
+.custom-card-draw-row { display: flex; align-items: center; justify-content: space-between; gap: 13px; margin-top: 12px; padding: 11px 12px; border: 1px solid rgba(198,146,20,.2); border-radius: 13px; background: color-mix(in srgb, var(--surface-raised) 82%, transparent); }
+.custom-card-draw-row strong, .custom-card-draw-row small { display: block; }
+.custom-card-draw-row strong { color: var(--text); font-size: var(--text-footnote); font-weight: 760; }
+.custom-card-draw-row small { margin-top: 3px; color: var(--muted); font-size: var(--text-footnote); }
+.custom-card-draw-row .feature-buy-button { flex: 0 0 auto; border-color: rgba(198,146,20,.3); color: color-mix(in oklab, #745300, var(--text) var(--tone-mix)); background: color-mix(in srgb, #e6af00 14%, var(--surface-raised)); }
+.custom-card-draw-row .feature-buy-button:hover:not(:disabled) { color: #fff; background: #a67800; }
+.custom-card-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.custom-card { min-width: 0; padding: 11px; border: 1px solid rgba(198,146,20,.18); border-top: 3px solid var(--custom-accent); border-radius: 13px; background: color-mix(in srgb, var(--surface-raised) 88%, transparent); box-shadow: 0 7px 18px rgba(91,61,0,.05); }
+.custom-card.owned { opacity: .68; }
+.custom-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.custom-card-top span { color: color-mix(in oklab, #8a6500, var(--text) var(--tone-mix)); font-size: var(--text-footnote); font-weight: 900; letter-spacing: .12em; }
+.custom-card-top b { color: var(--custom-accent-text, var(--custom-accent)); font-size: 18px; font-weight: 850; letter-spacing: -.07em; }
+.custom-card > strong, .custom-card > small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.custom-card > strong { margin-top: 9px; color: var(--text); font-size: var(--text-footnote); font-weight: 760; }
+.custom-card > small { margin-top: 4px; color: var(--muted); font-size: var(--text-footnote); }
+.custom-card > p { min-height: 25px; margin: 9px 0 0; color: var(--soft); font-size: var(--text-footnote); line-height: 1.35; }
+.custom-card .feature-buy-button { width: 100%; margin-top: 9px; border-color: rgba(198,146,20,.3); color: color-mix(in oklab, #745300, var(--text) var(--tone-mix)); background: color-mix(in srgb, #e6af00 14%, var(--surface-raised)); }
+.custom-card .feature-buy-button:hover:not(:disabled) { color: #fff; background: #a67800; }
+.career-badges { display: grid; justify-items: end; gap: 8px; }
+.achievement-count { margin-left: auto; color: var(--muted); font-size: var(--text-footnote); font-weight: 700; }
+.achievement-list { display: grid; gap: 4px; }
+.achievement-card .achievement-list { max-height: 340px; overflow-y: auto; padding-right: 3px; scrollbar-color: color-mix(in srgb, var(--text) 24%, var(--surface-raised)) transparent; scrollbar-width: thin; }
+.achievement-row { display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px solid var(--line-soft); }
+.achievement-row:first-child { border-top: 0; }
+.achievement-row > span { display: grid; width: 23px; height: 23px; place-items: center; color: var(--muted); }
+.achievement-row.unlocked > span { color: var(--accent); }
+.achievement-row strong { color: var(--soft); font-size: var(--text-footnote); font-weight: 650; }
+.achievement-row small { display: block; margin-top: 2px; color: var(--muted); font-size: var(--text-footnote); }
+.achievement-row em { color: var(--muted); font-size: var(--text-footnote); font-style: normal; font-weight: 700; }
+.achievement-row.unlocked em { color: var(--accent); }
+@media (max-width: 540px) {.career-badges { display: flex; align-items: center; justify-content: flex-start; margin-top: 14px; } }
+@media (max-width: 540px) {
+  .custom-card-shop-heading { display: block; }
+  .custom-card-shop-heading > span { display: inline-block; margin-top: 10px; }
+  .custom-card-draw-row { align-items: stretch; flex-direction: column; }
+  .custom-card-draw-row .feature-buy-button { width: 100%; }
+}
+/* Career update: readable reports, permanent card collection, and derby history. */
+.career-panel { display: grid; gap: 18px; }
+.career-panel .career-section { margin-top: 0; }
+.career-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.career-heading select, .career-album-filters select { max-width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--text); background: var(--surface-soft); font: inherit; font-size: var(--text-footnote); }
+.career-note, .career-empty { color: var(--soft); font-size: var(--text-footnote); line-height: 1.6; margin: 12px 0 16px; }
+.career-empty { padding: 20px; border-radius: 12px; background: var(--surface-soft); }
+.career-rating-list { display: grid; gap: 6px; }
+.career-rating-row { border: 1px solid var(--line-soft); background: var(--surface-soft); border-radius: 12px; }
+.career-rating-row.motm { border-color: #e3c47c; background: color-mix(in srgb, #e6ac00 6%, var(--surface-raised)); }
+.career-rating-row summary { padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 16px; cursor: pointer; list-style: none; }
+.career-rating-row summary::-webkit-details-marker { display: none; }
+.career-rating-row summary strong, .career-rating-row summary small { display: block; }
+.career-rating-row strong { font-size: var(--text-footnote); line-height: 1.4; }
+.career-rating-row small { color: var(--soft); margin-top: 4px; font-size: var(--text-footnote); }
+.career-rating-row em { display: inline-block; margin-left: 8px; color: color-mix(in oklab, #946300, var(--text) var(--tone-mix)); font-size: var(--text-footnote); font-style: normal; }
+.career-rating-row summary > b { font-size: 21px; white-space: nowrap; }
+.career-rating-row summary > b span { color: var(--muted); font-size: var(--text-footnote); }
+.career-rating-details { padding: 4px 14px 14px; border-top: 1px solid var(--line-soft); }
+.career-rating-details > div { display: flex; justify-content: space-between; gap: 14px; padding-top: 8px; font-size: var(--text-footnote); }
+.career-rating-details > p { margin: 12px 0 0; color: var(--muted); font-size: var(--text-footnote); line-height: 1.5; }
+.career-section .up { color: color-mix(in oklab, #16845b, var(--text) var(--tone-mix)); }
+.career-section .down { color: color-mix(in oklab, #b52a4c, var(--text) var(--tone-mix)); }
+.career-form-list { display: grid; gap: 6px; max-height: 440px; overflow-y: auto; margin-top: 12px; }
+.career-form-list > button { display: flex; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid var(--line-soft); border-radius: 12px; background: var(--surface-soft); text-align: left; cursor: pointer; }
+.career-form-list > button.selected { border-color: var(--accent); background: var(--accent-soft); }
+.career-form-list strong { display: block; font-size: var(--text-footnote); }
+.career-form-list small { display: block; margin-top: 4px; color: var(--soft); font-size: var(--text-footnote); }
+.career-form-values { text-align: right; flex-shrink: 0; }
+.career-form-values b { font-size: var(--text-footnote); }
+.career-player-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 5px; line-height: 1.4; }
+.career-special-tag, .career-form-tag { display: inline-block; padding: 3px 6px; border-radius: 5px; font-size: var(--text-footnote); font-weight: 750; font-style: normal; background: color-mix(in srgb, var(--text) 6%, var(--surface-raised)); color: var(--soft); }
+.career-special-tag { background: var(--career-accent); color: var(--text); }
+.career-form-tag.up { background: color-mix(in srgb, #22c36d 12%, var(--surface-raised)); color: color-mix(in oklab, #116c49, var(--text) var(--tone-mix)); }
+.career-form-tag.down { background: color-mix(in srgb, #e60022 8%, var(--surface-raised)); color: color-mix(in oklab, #a62647, var(--text) var(--tone-mix)); }
+.starxi-pitch-slot .career-player-badges { justify-content: center; }
+.starxi-pitch-slot .career-player-badges span { font-size: var(--text-caption2); padding: 2px 4px; }
+.career-milestone-grid, .career-award-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
+.career-milestone-card { display: grid; gap: 9px; padding: 18px; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 16px; }
+.career-milestone-card.unlocked { background: linear-gradient(145deg,var(--surface-raised),var(--career-accent)); border-color: var(--career-accent); }
+.career-milestone-card > span { font-size: var(--text-footnote); font-weight: 800; letter-spacing: .08em; }
+.career-milestone-card > strong { font-size: 16px; }
+.career-milestone-card > b { font-size: 35px; line-height: 1; }
+.career-milestone-card small { font-size: var(--text-footnote); line-height: 1.4; color: var(--soft); }
+.career-milestone-card b small { font-size: var(--text-footnote); }
+.career-section progress { width: 100%; height: 6px; border: 0; border-radius: 8px; appearance: none; overflow: hidden; background: color-mix(in srgb, var(--text) 9%, var(--surface-raised)); }
+.career-section progress::-webkit-progress-bar { background: color-mix(in srgb, var(--text) 9%, var(--surface-raised)); }
+.career-section progress::-webkit-progress-value { background: var(--accent); }
+.career-section progress::-moz-progress-bar { background: var(--accent); }
+.career-section .career-album-progress { margin-top: 16px; height: 9px; }
+.career-award { display: grid; gap: 10px; padding: 18px; border-radius: 14px; background: color-mix(in srgb, #c59921 8%, var(--surface-raised)); border: 1px solid color-mix(in srgb, #c39722 27%, var(--surface-raised)); }
+.career-award > span { font-size: var(--text-footnote); color: color-mix(in oklab, #946300, var(--text) var(--tone-mix)); font-weight: 750; }
+.career-award > strong { font-size: 16px; line-height: 1.35; }
+.career-award > small { font-size: var(--text-footnote); color: var(--soft); line-height: 1.5; }
+.career-rival-list { display: grid; gap: 8px; max-height: 480px; overflow-y: auto; }
+.career-rival-list article { display: flex; justify-content: space-between; gap: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
+.career-rival-list article.active { background: color-mix(in srgb, #e64800 6%, var(--surface-raised)); border-color: color-mix(in srgb, #c65c1f 36%, var(--surface-raised)); }
+.career-rival-list article span, .career-rival-list article strong, .career-rival-list article small { display: block; }
+.career-rival-list article span { font-size: var(--text-footnote); font-weight: 800; color: color-mix(in oklab, #ba4c1b, var(--text) var(--tone-mix)); margin-bottom: 6px; }
+.career-rival-list article strong { font-size: 14px; }
+.career-rival-list article small { font-size: var(--text-footnote); line-height: 1.5; color: var(--soft); margin-top: 5px; }
+.career-rival-record { text-align: right; }
+.career-rival-record b { font-size: var(--text-footnote); }
+.career-derby-banner { padding: 14px; margin: 12px 0; border: 1px solid color-mix(in srgb, #c65c1f 36%, var(--surface-raised)); border-radius: 12px; background: color-mix(in srgb, #e64800 6%, var(--surface-raised)); font-size: var(--text-footnote); line-height: 1.5; }
+.career-derby-banner strong { display: block; color: color-mix(in oklab, #ba4c1b, var(--text) var(--tone-mix)); }
+.career-album-filters { display: grid; grid-template-columns: 2fr repeat(4,1fr) auto; gap: 8px; margin: 16px 0; }
+.career-album-switch { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 6px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); cursor: pointer; }
+.career-album-switch input { flex: none; width: 36px; height: 20px; margin: 0; appearance: none; border-radius: var(--radius-pill); background: var(--line); cursor: pointer; transition: background 160ms ease; position: relative; }
+.career-album-switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--surface-raised); box-shadow: 0 1px 3px rgba(15,20,25,.25); transition: transform 160ms ease; }
+.career-album-switch input:checked { background: var(--accent); }
+.career-album-switch input:checked::after { transform: translateX(16px); }
+.career-album-switch input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.career-album-switch span { display: grid; min-width: 0; line-height: 1.2; }
+.career-album-switch strong { color: var(--text); font-size: var(--text-footnote); }
+.career-album-switch small { color: var(--soft); font-size: var(--text-caption1, 12px); }
+.career-album-card.missing { background: var(--surface-soft); border-style: dashed; }
+.career-album-card.missing > b { color: color-mix(in srgb, var(--text) 47%, var(--surface-raised)); }
+.career-album-card.milestone { background: linear-gradient(145deg,var(--surface-raised),var(--career-accent)); }
+.career-album-card > span { font-size: var(--text-footnote); font-weight: 800; letter-spacing: .035em; }
+.career-album-card > b { font-size: 34px; line-height: 1; margin-top: 5px; }
+.career-album-card > strong { font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+.career-album-card > small { font-size: var(--text-footnote); line-height: 1.5; color: var(--soft); }
+.career-album-card > em { font-size: var(--text-footnote); font-style: normal; font-weight: 800; }
+.career-pagination { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 18px; }
+.career-pagination button { padding: 9px 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); font-size: var(--text-footnote); cursor: pointer; }
+.career-pagination button:disabled { opacity: .45; cursor: default; }
+.career-pagination > span { text-align: center; font-size: var(--text-footnote); color: var(--soft); }
+.career-album-rewards article { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--line-soft); border-radius: 12px; background: var(--surface-soft); }
+.career-album-rewards article > div { min-width: 0; flex: 1; }
+.career-album-rewards strong { font-size: var(--text-footnote); display: block; }
+.career-album-rewards small { font-size: var(--text-footnote); color: var(--soft); display: block; margin: 5px 0 8px; }
+.career-album-rewards button { flex-shrink: 0; font-size: var(--text-footnote); }
+.career-album-rewards + button { margin-top: 14px; }
+.career-section button:focus-visible, .career-section summary:focus-visible, .career-section select:focus-visible, .career-section input:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 1000px) { .career-album-filters { grid-template-columns: repeat(2,minmax(0,1fr)); } .career-album-filters > input, .career-album-filters > .career-album-switch { grid-column: 1/-1; } .career-milestone-grid, .career-award-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+.career-pitch-badge { position: absolute; right: -5px; top: -7px; padding: 2px 4px; border-radius: 5px; background: color-mix(in srgb, var(--accent) 7%, var(--surface-raised)); color: color-mix(in oklab, #253144, var(--text) var(--tone-mix)); font-size: var(--text-footnote); font-weight: 800; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,.15); }
+.career-pitch-badge.special { background: var(--career-accent); }
+.career-pitch-badge.unhappy { background: color-mix(in srgb, #e60022 14%, var(--surface-raised)); }
+.career-player-badges:empty { display: none; }
+.career-toolbar{display:flex;gap:8px;align-items:start;flex-wrap:wrap;margin:12px 0}
+.career-toolbar>.mode-input{flex:1;min-width:150px}
+.career-toolbar select,.career-filters input{padding:10px;border-radius:9px;background:color-mix(in oklab, var(--accent) 62%, var(--text));color:color-mix(in srgb, var(--accent) 7%, var(--surface-raised));border:1px solid color-mix(in srgb, var(--surface-raised) 13%, transparent);max-width:100%}
+.career-filters{flex:1;min-width:150px}
+.career-filters summary{cursor:pointer;padding:10px}
+.career-filters>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px;background:color-mix(in oklab, var(--accent) 62%, var(--text));border-radius:12px}
+.career-form-list{max-height:430px;overflow:auto}
+.archive-match .career-rating-list{margin-top:12px}
+.archive-match .career-rating-row summary{padding:8px}
+@media(max-width:700px){.career-toolbar{display:grid;grid-template-columns:1fr}.career-filters>div{grid-template-columns:1fr}}
+/* Preserve the existing light club theme outside the dark live pitch. */
+.career-toolbar select,.career-filters input{background:var(--surface-raised);color:var(--text);border-color:var(--line)}
+.career-filters>div{background:var(--surface-soft)}
+.career-filters button{padding:8px;border:1px solid var(--line);border-radius:9px;color:var(--text);background:var(--surface-raised)}
+/* Player statistics next to the milestones. */
+.player-stats-summary { margin: 4px 0 12px; padding: 12px; border: 1px solid var(--line-soft); border-radius: 14px; background: var(--surface-raised); }
+.player-stats-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.player-stats-heading strong { color: var(--text); font-size: var(--text-footnote); font-weight: 760; }
+.player-stats-heading div { display: flex; gap: 4px; }
+.player-stats-heading button { min-height: 32px; padding: 5px 10px; border: 1px solid var(--line-soft); border-radius: 980px; background: var(--surface-soft); color: var(--text); font-size: var(--text-footnote); font-weight: 650; cursor: pointer; }
+.player-stats-heading button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.player-stats-summary dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 10px 0 6px; }
+.player-stats-summary dl div { min-width: 0; padding: 9px 10px; border-radius: 12px; background: var(--surface-soft); text-align: right; }
+.player-stats-summary dt { color: var(--muted); font-size: var(--text-footnote); font-weight: 750; letter-spacing: .04em; text-align: left; }
+.player-stats-summary dd { margin: 2px 0 0; color: var(--text); font-size: 24px; font-weight: 780; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
+.player-stats-summary small { color: var(--muted); font-size: var(--text-footnote); line-height: 1.4; }
+/* Yellow card accumulation and suspensions. */
+.discipline-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; margin: 2px 4px 0 0; padding: 2px 7px; border-radius: 980px; font-size: var(--text-footnote); font-weight: 750; line-height: 1.3; white-space: normal; overflow-wrap: anywhere; }
+.discipline-tag::before { content: ""; flex: 0 0 auto; width: 6px; height: 8px; border-radius: 1.5px; background: #f5c400; }
+.discipline-tag.banned { color: color-mix(in oklab, #8a1c1c, var(--text) var(--tone-mix)); background: color-mix(in srgb, #d31212 10%, var(--surface-raised)); }
+.discipline-tag.banned::before { background: #d92d20; }
+.discipline-tag.warning { color: color-mix(in oklab, #6b4e00, var(--text) var(--tone-mix)); background: color-mix(in srgb, #e6bc00 23%, var(--surface-raised)); }
+.discipline-tag.info { color: color-mix(in srgb, var(--text) 68%, var(--surface-raised)); background: color-mix(in srgb, var(--text) 5%, var(--surface-raised)); }
+.starxi-pitch-slot .discipline-tag { margin: 2px auto 0; font-size: var(--text-caption2); padding: 1px 5px; white-space: nowrap; }
+.discipline-warning { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0; padding: 11px 13px; border: 1px solid #f3d36b; border-radius: 13px; background: color-mix(in srgb, #e69900 6%, var(--surface-raised)); color: color-mix(in oklab, #5b4300, var(--text) var(--tone-mix)); font-size: var(--text-footnote); line-height: 1.45; }
+.discipline-warning strong { display: block; color: color-mix(in oklab, #3d2e00, var(--text) var(--tone-mix)); }
+.career-view-switch { display: inline-flex; gap: 4px; margin: 0 0 14px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); max-width: 100%; flex-wrap: wrap; }
+.career-view-switch button { padding: 8px 14px; border: 0; border-radius: 9px; color: var(--soft); background: transparent; font: inherit; font-size: var(--text-footnote); font-weight: 700; cursor: pointer; }
+.career-view-switch button[aria-pressed="true"] { color: var(--text); background: var(--surface-raised); box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 14%, transparent); }

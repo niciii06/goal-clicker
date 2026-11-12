@@ -1,17 +1,18 @@
 // Small presentational components and icons of the game page.
-import type { ErrorInfo, ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { IconName, StarXIPositionBadgeVariant } from "./types";
-import { COOP_ROOM_KEY } from "./constants";
-import { Component } from "react";
+import { memo } from "react";
 import { getStarXIPositions } from "../feature-data";
+export { GameErrorBoundary } from "./error-boundary";
 
-export function StarXIPositionBadges({ player, variant = "reveal" }: { player: Parameters<typeof getStarXIPositions>[0]; variant?: StarXIPositionBadgeVariant }) {
+// Pure leaves rendered many times per App render are memoized (audit P09).
+export const StarXIPositionBadges = memo(function StarXIPositionBadges({ player, variant = "reveal" }: { player: Parameters<typeof getStarXIPositions>[0]; variant?: StarXIPositionBadgeVariant }) {
   if(player.benchOnly)return <span className="starxi-position-badge">{player.symbol} Nur Bank</span>;
   const positions = player.id === "star-goat-nicu" ? ["Alle Positionen"] : getStarXIPositions(player);
   return <span className={`starxi-position-badges starxi-position-badges-${variant}`} aria-label={`Positionen: ${positions.join(", ")}`}>
     {positions.map((position) => <span key={position}>{position === "Alle Positionen" ? "ALLE POSITIONEN" : position}</span>)}
   </span>;
-}
+});
 
 export function iconPaths(name: IconName): ReactNode {
   const stroke = { stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
@@ -50,40 +51,11 @@ export function iconPaths(name: IconName): ReactNode {
   }
 }
 
-export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
+export const Icon = memo(function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   return <svg className="svg-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">{iconPaths(name)}</svg>;
-}
+});
 
-export function FootballGraphic() {
+export const FootballGraphic = memo(function FootballGraphic() {
   return <svg viewBox="0 0 100 100" className="hero-football" aria-hidden="true"><circle cx="50" cy="50" r="43" fill="#f3f5ef"/><path d="M50 30 63 39l-5 15H42l-5-15 13-9Z" fill="#101918"/><path d="m50 30-6-12M63 39l16-5M58 54l9 15M42 54l-9 15M37 39 21 34" stroke="#101918" strokeWidth="4" strokeLinecap="round"/><circle cx="50" cy="50" r="43" fill="none" stroke="#b6c2b9" strokeWidth="2"/></svg>;
-}
+});
 
-export class GameErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; message: string }> {
-  state = { hasError: false, message: "" };
-
-  static getDerivedStateFromError(error: unknown) {
-    return { hasError: true, message: error instanceof Error ? error.message : "Unbekannter Startfehler" };
-  }
-
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("Goal Clicker konnte den Spielstand nicht darstellen.", error, info);
-  }
-
-  private reload = () => window.location.reload();
-
-  private returnToSingleplayer = () => {
-    localStorage.removeItem(COOP_ROOM_KEY);
-    window.location.reload();
-  };
-
-  private repair = () => {
-    if (!window.confirm("Wirklich alle lokalen Goal-Clicker-Daten löschen und komplett neu starten?")) return;
-    for (const key of Object.keys(localStorage)) if (key.startsWith("goalClicker")) localStorage.removeItem(key);
-    window.location.reload();
-  };
-
-  render() {
-    if (!this.state.hasError) return this.props.children;
-    return <main className="game-recovery"><section><span className="eyebrow">GOAL CLICKER / WIEDERHERSTELLUNG</span><h1>Das Spiel konnte nicht gestartet werden.</h1><p>Dein gespeicherter Spielstand bleibt erhalten. Lade zuerst nochmals oder wechsle zum Singleplayer. Löschen passiert nur noch nach deiner ausdrücklichen Bestätigung.</p><small className="game-recovery-code">Fehler: {this.state.message}</small><div><button type="button" className="mode-secondary" onClick={this.reload}>Nochmals laden</button><button type="button" className="mode-secondary" onClick={this.returnToSingleplayer}>Zum Singleplayer</button><button type="button" className="mode-primary" onClick={this.repair}>Komplett neu starten</button></div></section></main>;
-  }
-}

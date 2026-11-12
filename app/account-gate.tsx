@@ -14,7 +14,7 @@ import { cleanCloudSaveKeys, summarizeSave } from "./cloud-save-rules";
 import type { SaveSummary } from "./cloud-save-rules";
 import { PLAYER_NAME_KEY } from "./game/constants";
 import { isSaveFromNewerVersion } from "./game/save-schema";
-import { resumeLocalPersistence, suspendLocalPersistence } from "./game/storage";
+import { resumeLocalPersistence, suspendLocalPersistence } from "./game/persistence";
 import { exportCurrentSave } from "./save-file-controls";
 import { cleanDisplayName, DISPLAY_NAME_MAX, displayNameError, PASSWORD_MAX, PASSWORD_MIN, passwordError, USERNAME_MAX, usernameError } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
