@@ -77,12 +77,12 @@ function MatchLine({ match }: { match: SeasonScheduleMatch }) {
 /** "1" for a single place, "5 und 6" for a range of places. */
 const placesLabel = (first: number, last: number) => (first === last ? `${first}` : `${first} und ${last}`);
 
-/** The AI clubs that changed league after the last season: the same number goes up and down at every boundary. */
+/** The clubs that changed league after the last season, the own club included: one goes up and one goes down at every boundary. */
 function AiMovesList({ moves }: { moves: NonNullable<GameFeatures["seasonMode"]["lastAiMoves"]> }) {
   const up = moves.filter((move) => move.to > move.from), down = moves.filter((move) => move.to < move.from);
   const league = (division: number) => `Liga ${16 - division}`;
-  const list = (items: typeof moves, label: string) => <div><h5>{label} ({items.length})</h5><ul>{items.map((move) => <li key={move.clubId}><span>{move.name}</span><small>{league(move.from)} → {league(move.to)}</small></li>)}</ul></div>;
-  return <details className="season-hub-last season-ai-moves"><summary>Auf und Abstieg der anderen Vereine</summary><div className="season-ai-moves-grid">{list(up, "Aufsteiger")}{list(down, "Absteiger")}</div></details>;
+  const list = (items: typeof moves, label: string) => <div><h5>{label} ({items.length})</h5><ul>{items.map((move) => <li key={move.clubId}><span>{move.name}{move.clubId === "club" ? " (du)" : ""}</span><small>{league(move.from)} → {league(move.to)}</small></li>)}</ul></div>;
+  return <details className="season-hub-last season-ai-moves"><summary>Auf und Abstieg dieser Saison</summary><div className="season-ai-moves-grid">{list(up, "Aufsteiger")}{list(down, "Absteiger")}</div></details>;
 }
 
 export function SeasonPanel({ features, action }: { features: GameFeatures; /** Q46: start the next match or Prestige right here. */ action?: { label: string; disabled: boolean; note?: string; onClick: () => void } }) {

@@ -84,12 +84,44 @@ const FICTIONAL = FICTIONAL_NAMES.map((name,i):SeasonClub=>({id:`geo-1-${i+1}`,n
 for(const club of FICTIONAL){const record=STADIUM_AUDIT.fictional.find(r=>r.venueId===club.venue.id);if(record)club.venue={...club.venue,registeredStadium:club.venue.stadium,stadium:record.osmName||'Fussballplatz Bern',lat:record.lat,lon:record.lon,verification:'pitch-fallback',source:record.source,coordinateSource:record.source,coordinateNote:'Fiktiver Club auf einem realen kartierten Fussballfeld.'};}
 const WORLD_IDS=['world-real-madreto','world-fc-barceloneta','world-liverpuhl-fc','world-manchester-cite','world-bayern-muenchan'];
 const WORLD = LEGACY_POOLS[7].map(([name,key],i):SeasonClub=>({id:WORLD_IDS[i],name,league:1,venue:VENUES[key]}));
-export const SEASON_CLUBS: SeasonClub[] = [...FICTIONAL,...SWISS_CLUBS as SeasonClub[],...WORLD];
-/** Which league (division) each AI club plays in this world; clubs that are not listed play in their catalogue league. */
+const BASE_CLUBS: SeasonClub[] = [...FICTIONAL,...SWISS_CLUBS as SeasonClub[],...WORLD];
+/** The first club of a league lends its audited ground to a fictional sixth club (ground sharing, no new geodata). */
+const groundOfLeague=(league:number)=>BASE_CLUBS.find(c=>c.league===league)!.venue;
+const fictionalSixth=(league:number,name:string):SeasonClub=>({id:`extra-${league}-${name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'')}`,name,league,fictional:true,venue:groundOfLeague(league)});
+/**
+ * The sixth club of every league except the lowest (where the own club starts). Real clubs only where the catalogue
+ * already holds their audited stadium (Grasshopper Club at the Letzigrund, FC Winterthur at the Schützenwiese);
+ * the others are explicitly fictional and share the audited ground of a club of their league, so every ground and
+ * every route stays source backed. Placed after the original clubs, so the original five of a league keep their slots.
+ */
+const EXTRA_CLUBS: SeasonClub[] = [
+ {id:'world-paris-saint-german',name:'Paris Saint German',league:1,venue:VENUES.paris},
+ {id:'extra-2-grasshopper',name:'Grasshopper Club Zürich',league:2,venue:VENUES.zurich},
+ {id:'extra-3-winterthur',name:'FC Winterthur',league:3,venue:VENUES.winterthur},
+ fictionalSixth(4,'FC Alpenfestung'),fictionalSixth(5,'FC Gotthard Murmeltiere'),fictionalSixth(6,'FC Léman Mouettes'),fictionalSixth(7,'FC Zürisee Böötler'),
+ fictionalSixth(8,'FC Röstigraben United'),fictionalSixth(9,'FC Seeland Hechte'),fictionalSixth(10,'FC Emmental Käsekicker'),fictionalSixth(11,'FC Gürbetal Kickers'),
+ fictionalSixth(12,'FC Worblental Rangers'),fictionalSixth(13,'SC Marzili Bern'),fictionalSixth(14,'FC Aarefüchse Bern'),
+];
+export const SEASON_CLUBS: SeasonClub[] = [...BASE_CLUBS,...EXTRA_CLUBS];
+/** Which league (division) each AI club plays in this world; see defaultAiLeagues for clubs that are not listed. */
 export type AiLeagues=Record<string,number>;
-/** The five AI clubs of a division, in stable catalogue order (the club slots keep their ratings and travel data). */
+/** Every league has six members: five AI clubs where the own club plays, six AI clubs everywhere else. */
+export const LEAGUE_MEMBERS=6;
+/**
+ * The league of every AI club in a world that never changed a league: the catalogue leagues, except that the sixth
+ * club of the own club's league (it takes a seat there) plays in the lowest league, which has no own club then.
+ */
+export function defaultAiLeagues(playerDivision:number):AiLeagues {
+ const own=Math.max(1,Math.min(15,Math.floor(playerDivision)));
+ const map:AiLeagues={};
+ for(const club of SEASON_CLUBS)map[club.id]=16-club.league;
+ if(own!==1){const sixth=EXTRA_CLUBS.find(c=>16-c.league===own);if(sixth)map[sixth.id]=1;}
+ return map;
+}
+/** The AI clubs of a division in stable catalogue order (the original clubs first, so their slots and ratings stay). */
 export function seasonClubsOf(division:number,aiLeagues?:AiLeagues) {
- return SEASON_CLUBS.filter(c=>(aiLeagues?.[c.id]??16-c.league)===division);
+ const map=aiLeagues??defaultAiLeagues(division);
+ return SEASON_CLUBS.filter(c=>map[c.id]===division);
 }
 export function seasonGeography(division:number,index:number,aiLeagues?:AiLeagues) {
  const d=Math.max(1,Math.min(15,Math.floor(division))), i=Math.max(0,Math.min(4,index));

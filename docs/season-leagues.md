@@ -1,21 +1,34 @@
-# Auf und Abstieg der KI Vereine
+# Auf und Abstieg: ein Platz hoch, ein Platz runter, strikter Tausch
 
-Entscheid von Nicolas (12. November 2026): Pro Saison und Ligagrenze steigt **ein** Verein auf und **einer** ab, für alle Vereine inklusive des eigenen Clubs. Konstanten: `SEASON_PROMOTION_PLACES` und `SEASON_RELEGATION_PLACES` in `app/feature-data.ts` (beide 1).
+Entscheid von Nicolas (12. November 2026): Pro Saison und Ligagrenze steigt **ein** Club auf und **einer** ab, für alle Clubs inklusive des eigenen. Konstanten: `SEASON_PROMOTION_PLACES` und `SEASON_RELEGATION_PLACES` in `app/feature-data.ts` (beide 1). Logik: `app/season-leagues.ts`.
 
-## Regeln
+## Ligen mit je sechs Mitgliedern
 
-* **Eigener Club:** Platz 1 steigt auf, nur der letzte Platz (6) steigt ab. In Liga 15 ist Platz 1 die Hall of Fame, die unterste Liga kennt keinen Abstieg. Platz 2 bis 5 bleiben.
-* **KI Vereine:** An jeder der 14 Grenzen steigt der beste KI Verein der unteren Liga auf und der schlechteste KI Verein der oberen Liga ab. Zuerst werden alle Tabellen berechnet, dann bewegen sich alle Vereine gleichzeitig (niemand wechselt zweimal). Jede Liga behält fünf KI Vereine, die Ligagrössen bleiben gleich.
-* **Tabellen:** In der Liga des eigenen Clubs gilt die echte Abschlusstabelle (ohne den eigenen Club). Alle anderen Ligen werden einmal pro Saison simuliert (Hin und Rückspiel der fünf Vereine, Stärke wie die Liga Plätze, Zufall aus der Saisonziehung) und im Spielstand festgehalten. Neuladen ändert das Ergebnis nicht.
-* **Folge für die Liga des eigenen Clubs:** Gewinnt der eigene Club die Liga, steigt zusätzlich der beste KI Verein dieser Liga auf. Sonst bekäme die obere Liga nur vier KI Vereine neben dem eigenen Club oder die untere Liga sechs. Das gilt umgekehrt für den letzten Platz.
-* **Identität:** Verein, Stadion, Reisedaten und Spieler Pool bleiben, es ändert sich nur die Liga. Die Stärke folgt dem Platz in der Liga (wie bisher).
+* Jede der 15 Ligen hat **sechs Mitglieder**. In der Liga des eigenen Clubs sind es fünf KI Clubs plus der eigene Club (10 Spiele gegen fünf Gegner), in allen anderen Ligen sechs KI Clubs.
+* Dafür hat der Katalog 89 statt 75 Clubs: **ein neuer Club in jeder Liga ausser der untersten** (dort beginnt der eigene Club, fünf KI Clubs). Die ursprünglichen fünf Clubs einer Liga behalten ihre Plätze und Stärken, die neuen stehen am Ende.
+
+| Liga | Neuer Club | Spielort |
+|---|---|---|
+| 1 | Paris Saint German (Parodie wie die übrige Weltliga) | Stadion Paris aus dem Katalog |
+| 2 | Grasshopper Club Zürich (echt) | Letzigrund (geprüfter Katalogeintrag) |
+| 3 | FC Winterthur (echt) | Schützenwiese (geprüfter Katalogeintrag) |
+| 4 bis 14 | FC Alpenfestung, FC Gotthard Murmeltiere, FC Léman Mouettes, FC Zürisee Böötler, FC Röstigraben United, FC Seeland Hechte, FC Emmental Käsekicker, FC Gürbetal Kickers, FC Worblental Rangers, SC Marzili Bern, FC Aarefüchse Bern (**fiktiv**, `fictional: true`) | teilen den geprüften Platz des ersten Clubs ihrer Liga |
+
+**Warum fiktiv:** Spielort und Route jedes Clubs sind quellengestützt (OSM Fussballfeld, Routencache). Für echte Amateurclubs hätte ich Plätze und Routen neu beschaffen müssen. Die öffentlichen Kartendienste lieferten aus dieser Umgebung keine verlässlichen Felder (Overpass war nicht erreichbar, die Suche in Nominatim fand für viele Orte keine Fussballfelder). Eine falsche Zuordnung eines echten Clubs zu einem Platz wollte ich nicht erfinden. Die Namen lassen sich später ersetzen, ohne die Mechanik zu ändern (`EXTRA_CLUBS` in `app/travel-geography.ts`).
+
+## Der Tausch
+
+* Pro Grenze (14) steigt der Erste der unteren Liga auf und der Letzte der oberen Liga ab: **insgesamt 28 Bewegungen pro Saison**, der eigene Club zählt mit.
+* In der Liga des eigenen Clubs gilt die echte Tabelle (inklusive des eigenen Clubs), alle anderen Ligen werden einmal beim Saisonende simuliert (Hin und Rückspiel der sechs Clubs, Stärke nach Ligaplatz) und im Spielstand festgehalten.
+* **Gewinnt der eigene Club**, belegt er den einzigen Aufstiegsplatz und tauscht mit dem Club, der aus der oberen Liga absteigt. Es steigt **kein zusätzlicher KI Club** auf. Beim letzten Platz ist es umgekehrt. Platz 2 bis 5 bleiben, dann bewegen sich zwei KI Clubs der eigenen Liga.
+* Alle Bewegungen werden aus den Endtabellen berechnet, bevor ein Club wechselt, niemand wechselt zweimal. In Liga 15 ist Platz 1 die Hall of Fame (dann bewegt sich nichts, der Lauf endet), unterhalb der untersten Liga gibt es keinen Abstieg.
+* Identität, Stadion, Reisedaten und Spieler Pool eines Clubs bleiben, es ändert sich nur die Liga. Die Stärke folgt dem Platz in der Liga (wie bisher).
 
 ## Speicherung und alte Spielstände
 
-* `seasonMode.aiLeagues` (Verein zu Liga) und `seasonMode.lastAiMoves` (Bewegungen der letzten Saison) sind optional. Fehlt `aiLeagues`, spielt jeder Verein in seiner Katalogliga, ein alter Spielstand lädt unverändert.
-* Ungültige Daten (fehlende Vereine, falsche Ligagrösse) werden verworfen und fallen auf den Katalog zurück.
-* Eine laufende Saison behält ihre Tabelle; die neue Regel gilt ab dem Ende der Saison. Die Markierungen in der Tabelle (Platz 1 grün, letzter Platz rot) und die Hinweise folgen der neuen Zahl sofort.
-* Ein neuer Prestige Lauf beginnt wieder in den Katalogligen (`startSeasonPrestige` löscht die Zuordnung). Prestige und Hall of Fame Regeln sind sonst unverändert.
-* Koop: Die Zuordnung liegt im gemeinsamen Spielstand der Welt und wird einmal beim Saisonende festgelegt.
+* `seasonMode.aiLeagues` (Club zu Liga) und `seasonMode.lastAiMoves` (Bewegungen der letzten Saison, der eigene Club mit `clubId: "club"`) sind optional.
+* Fehlt `aiLeagues` (alter Spielstand, neue Welt), gilt `defaultAiLeagues(division)`: Katalogligen, der sechste Club der eigenen Liga spielt in der untersten Liga. Die fünf bisherigen Gegner und alle gespeicherten Tabellen bleiben unverändert. Ein Spielstand speichert die Zuordnung erst beim ersten Saisonende.
+* Eine Zuordnung, die nicht zur aktuellen Division passt (falsche Anzahl, fehlende Clubs, das frühere Fünf Clubs Modell), wird verworfen und fällt auf den Standard zurück.
+* Eine laufende Saison behält ihre Tabelle, die Regel gilt ab dem Saisonende. Prestige startet wieder mit den Standardligen (`startSeasonPrestige`). Koop: Die Zuordnung liegt im gemeinsamen Spielstand und wird einmal beim Saisonende festgelegt.
 
-Tests: `tests/ai-promotion-relegation.test.ts`.
+Tests: `tests/ai-promotion-relegation.test.ts`, `tests/master-update.test.ts` (89 Clubs), die Reise Tests (`travel-route-geometry`, `stadium-audit`) prüfen die neuen Clubs mit.

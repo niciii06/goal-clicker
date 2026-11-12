@@ -5,8 +5,8 @@ import { SEASON_CLUBS, classifyDestination, HOME_VENUE, VENUES, seasonGeography,
 import { fixtureFor, createJourney, TRAVEL_RANGES, journeyView, normalizeTravel, travelTiming, consumeTravel } from '../app/travel-data.ts';
 function random(seed=849){return()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};}
 function ready(){const f=initialGameFeatures();f.starXI=setBestStarXI({...f.starXI,ownedIds:STAR_XI_PLAYERS.map(p=>p.id)});return f;}
-test('75 distinct opponents populate exactly fifteen six-team leagues, local to international',()=>{
- assert.equal(SEASON_CLUBS.length,75);assert.equal(new Set(SEASON_CLUBS.map(c=>c.id)).size,75);assert.equal(new Set(SEASON_CLUBS.map(c=>c.name)).size,75);
+test('89 distinct clubs (75 original and one more per league above the lowest) populate fifteen six-team leagues, local to international',()=>{
+ assert.equal(SEASON_CLUBS.length,89);assert.equal(new Set(SEASON_CLUBS.map(c=>c.id)).size,89);assert.equal(new Set(SEASON_CLUBS.map(c=>c.name)).size,89);
  for(let d=1;d<=15;d++){const s=normalizeSeasonModeState({division:d});assert.equal(s.table.length,6);for(let i=0;i<5;i++){const c=seasonGeography(d,i);assert.equal(c.league,16-d);if(d===1)assert.ok(c.fictional);else if(d<15)assert.equal(c.venue.country,'Schweiz');else assert.notEqual(c.venue.country,'Schweiz');assert.ok(c.venue.source);assert.ok(Number.isFinite(c.venue.lat)&&Math.abs(c.venue.lat)<85);}}
  assert.ok(SEASON_CLUBS.some(c=>c.league===1&&c.name.includes('Barcelon')));assert.ok(SEASON_CLUBS.some(c=>c.league===1&&c.name.includes('Madreto')));
 });

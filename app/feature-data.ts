@@ -18,7 +18,7 @@ import { FC27_INDIA_PROFILES, SCRAP_PACK_MIN_RATING, SCRAP_RATING_GROUPS, drawSc
 import { GAZETTE_CHAMPION_HEADLINES, GAZETTE_EXIT_HEADLINES, TRANSFER_INTERESTED_CLUBS, transferClubsForRating } from "./features/news-data";
 import { HOME_VENUE, LEAGUE_LABELS, seasonGeography, venueForClubName } from "./travel-geography";
 import type { AiLeagues } from "./travel-geography";
-import { advanceAiLeagues, normalizeAiLeagues, normalizeAiMoves } from "./season-leagues";
+import { OWN_CLUB_ID, advanceAiLeagues, normalizeAiLeagues, normalizeAiMoves } from "./season-leagues";
 import type { AiMove } from "./season-leagues";
 import { addBroadcastSubstitution, advanceMatchBroadcast, chooseGoalPattern, createMatchBroadcast, normalizeMatchBroadcast, recordedActionRating } from "./match-broadcast";
 import { advanceInteractive, normalizeInteractive, pauseBeforeExtraTime, resumeInteractive, simulationMinute } from "./interactive-match";
@@ -210,7 +210,7 @@ export const GAME_FEATURES_SCHEMA_VERSION = 9;
 export const SEASON_MODE_DIVISION_COUNT = 15;
 export const SEASON_MODE_MATCHES_PER_SEASON = 10;
 export const SEASON_MODE_TABLE_SIZE = 6;
-/** Owner decision 12 Nov 2026: one place goes up and one goes down across every league boundary, for every club including the own one. The same count moves AI clubs. */
+/** Owner decision 12 Nov 2026: one place goes up and one goes down across every league boundary, for every club including the own one (a strict one for one swap). */
 export const SEASON_PROMOTION_PLACES = 1;
 export const SEASON_RELEGATION_PLACES = 1;
 export const TRANSFER_EVENT_MIN_DELAY_MS = 480000;
@@ -940,7 +940,7 @@ export function normalizeSeasonModeState(value: unknown, clubName = "FC Goal", l
       createdAt: Math.max(1, Math.floor(Number(item.createdAt) || Date.now())),
     };
   }).filter((item): item is SeasonMatchHistoryEntry => Boolean(item)).slice(-30);
-  const aiLeagues = normalizeAiLeagues(source.aiLeagues);
+  const aiLeagues = normalizeAiLeagues(source.aiLeagues, division);
   const table = normalizeSeasonTable(source.table, division, clubName, aiLeagues);
   const lastTable = normalizeSeasonTable(source.lastTable, division, clubName, aiLeagues);
   const generated=createSeasonFixtures(table);
@@ -1083,15 +1083,17 @@ export function recordSeasonModeMatch(value: unknown, clubScore: number, opponen
     // Only for the season's completion (club chronicle); the stored history does not keep it.
     ...(completedSeason ? { finalTable: lastTable } : {}),
   };
-  // The AI clubs move too: as many up from the lower league as go down from the upper one (the relegation places).
+  // One club goes up and one goes down across every league boundary, the own club included: it swaps places with the
+  // club that goes the other way, so every league keeps six members.
   const aiMovement = completedSeason && !hallOfFame
-    ? advanceAiLeagues({ aiLeagues: state.aiLeagues, playerDivision: state.division, playerLeagueAiOrder: lastTable.filter((team) => team.id !== "club").map((team) => team.clubId ?? ""), places: SEASON_RELEGATION_PLACES, ratingOf: getSeasonOpponentRating, rollScore: rollSeasonScore, random })
+    ? advanceAiLeagues({ aiLeagues: state.aiLeagues, playerDivision: state.division, playerLeagueOrder: lastTable.map((team) => (team.id === "club" ? OWN_CLUB_ID : team.clubId ?? "")), ownClubName: clubName || "FC Goal", ratingOf: getSeasonOpponentRating, rollScore: rollSeasonScore, random })
     : null;
-  const nextAiLeagues = aiMovement ? aiMovement.aiLeagues : state.aiLeagues;
+  const movedLeagues = aiMovement ? normalizeAiLeagues(aiMovement.aiLeagues, nextDivision) : undefined;
+  const nextAiLeagues = movedLeagues ?? state.aiLeagues;
   const nextState: SeasonModeState = {
     ...state,
     aiLeagues: nextAiLeagues,
-    ...(aiMovement ? { lastAiMoves: aiMovement.moves } : {}),
+    ...(aiMovement && movedLeagues ? { lastAiMoves: aiMovement.moves } : {}),
     division: nextDivision,
     highestDivision: nextHighestDivision,
     matchday: completedSeason ? 0 : matchday,
