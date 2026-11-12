@@ -33,6 +33,8 @@ wal_level = replica
 archive_mode = on
 archive_command = 'test ! -f $wal/%f && cp %p $wal/%f'
 archive_timeout = 0
+shared_preload_libraries = 'pg_stat_statements'
+pg_stat_statements.track = all
 EOF
 }
 
