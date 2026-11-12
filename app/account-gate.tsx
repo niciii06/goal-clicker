@@ -425,6 +425,37 @@ function FinishDeletion({ message }: { message: string }) {
   </>;
 }
 
+/**
+ * A password field with an eye button on its right: masked by default, one tap shows the characters of this field only,
+ * another hides them again. The state is local to the field (a new form starts masked), is never stored and does not
+ * touch the value, the focus or the cursor position. The button is no submit button and keeps password managers working.
+ */
+export function PasswordInput({ fieldName, value, onChange, autoComplete, minLength }: { fieldName: string; value: string; onChange: (next: string) => void; autoComplete: string; minLength?: number }) {
+  const [shown, setShown] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const caretRef = useRef<[number, number] | null>(null);
+  useEffect(() => {
+    const input = inputRef.current, caret = caretRef.current;
+    caretRef.current = null;
+    if (!input || !caret) return;
+    // The browser resets the selection when the field type changes; put it back after that has happened.
+    const restore = () => { input.focus(); try { input.setSelectionRange(caret[0], caret[1]); } catch { /* not supported for this input type */ } };
+    restore();
+    const frame = window.requestAnimationFrame(restore);
+    return () => window.cancelAnimationFrame(frame);
+  }, [shown]);
+  return <span className="account-password">
+    <input ref={inputRef} className="mode-input" type={shown ? "text" : "password"} autoComplete={autoComplete} autoCapitalize="none" spellCheck={false} minLength={minLength} maxLength={PASSWORD_MAX} required value={value} onChange={(event) => onChange(event.target.value)} />
+    <button type="button" className="account-password-toggle" aria-label={`${fieldName} ${shown ? "verbergen" : "anzeigen"}`} aria-pressed={shown}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={() => { const input = inputRef.current; caretRef.current = [input?.selectionStart ?? value.length, input?.selectionEnd ?? value.length]; setShown((current) => !current); }}>
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" />{shown && <path d="M4 4l16 16" />}
+      </svg>
+    </button>
+  </span>;
+}
+
 function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSignedIn: () => void; onGuest: () => void }) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
@@ -476,8 +507,8 @@ function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSigne
       {mode === "register" && <UsernameHint check={check} />}
       {mode === "register" && <><label className="account-field"><span>Anzeigename</span><input className="mode-input" autoComplete="nickname" maxLength={DISPLAY_NAME_MAX} required value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
         <small className="account-hint">So heisst du im Spiel und im Multiplayer. Jederzeit änderbar.</small></>}
-      <label className="account-field"><span>{mode === "register" ? `Passwort (mindestens ${PASSWORD_MIN} Zeichen)` : "Passwort"}</span><input className="mode-input" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? undefined : PASSWORD_MIN} maxLength={PASSWORD_MAX} required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-      {mode !== "login" && <label className="account-field"><span>Passwort wiederholen</span><input className="mode-input" type="password" autoComplete="new-password" maxLength={PASSWORD_MAX} required value={passwordRepeat} onChange={(event) => setPasswordRepeat(event.target.value)} /></label>}
+      <label className="account-field"><span>{mode === "register" ? `Passwort (mindestens ${PASSWORD_MIN} Zeichen)` : "Passwort"}</span><PasswordInput key={`password-${mode}`} fieldName="Passwort" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? undefined : PASSWORD_MIN} value={password} onChange={setPassword} /></label>
+      {mode !== "login" && <label className="account-field"><span>Passwort wiederholen</span><PasswordInput fieldName="Passwort wiederholen" autoComplete="new-password" value={passwordRepeat} onChange={setPasswordRepeat} /></label>}
       {mode === "register" && <small className="account-hint">Merk dir dein Passwort gut: Ohne E-Mail Adresse lässt es sich nicht zurücksetzen.</small>}
       <button type="submit" className="mode-primary" disabled={busy || (mode === "register" && check.blocked)}>{mode === "login" ? "Anmelden" : "Konto erstellen"}</button>
     </form>

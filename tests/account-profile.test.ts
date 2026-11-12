@@ -341,3 +341,19 @@ test('while the login is checked the start screen shows an animated ball, not on
   const keyframes = css.match(/@keyframes account-boot-bounce \{[\s\S]*?\n\}/)![0];
   assert.doesNotMatch(keyframes, /\b(top|left|margin|width|height)\s*:/);
 });
+
+test('password fields start masked and carry an accessible eye button that is no submit button', async () => {
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const { createElement } = await import('react');
+  const { readFile } = await import('node:fs/promises');
+  const { PasswordInput } = await import('../app/account-gate.tsx');
+  const html = renderToStaticMarkup(createElement(PasswordInput, { fieldName: 'Passwort wiederholen', value: 'geheim', onChange: () => undefined, autoComplete: 'new-password' }));
+  assert.match(html, /<input[^>]*type="password"/, 'masked by default');
+  assert.match(html, /<button type="button" class="account-password-toggle" aria-label="Passwort wiederholen anzeigen" aria-pressed="false"/);
+  assert.match(html, /autoComplete|autocomplete="new-password"/i, 'password managers keep working');
+  const source = await readFile(new URL('../app/account-gate.tsx', import.meta.url), 'utf8');
+  // Login, register and the repeat field all use it; nothing stores the visibility or the password.
+  assert.equal((source.match(/<PasswordInput /g) ?? []).length, 2);
+  assert.doesNotMatch(source, /type="password"/);
+  assert.doesNotMatch(source.slice(source.indexOf('export function PasswordInput'), source.indexOf('function LoginForm(')), /localStorage|sessionStorage|console\./);
+});
