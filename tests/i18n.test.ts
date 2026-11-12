@@ -1,7 +1,8 @@
 // Translation foundation (app/i18n, docs/i18n-plan.md): German stays exactly as today, only German is enabled,
 // and every other language falls back to German key by key.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import test from 'node:test';
 import { CATALOGS, catalogGaps, placeholders, translate, translator } from '../app/i18n/translate.ts';
 import { ENABLED_LOCALES, LOCALE_STORAGE_KEY, LOCALES, readStoredLocale, resolveLocale, storeLocale } from '../app/i18n/locales.ts';
@@ -10,11 +11,17 @@ import { STORAGE_FULL_MESSAGE, SAVE_TOO_LARGE_MESSAGE } from '../app/cloud-sync.
 import { NEWER_VERSION_MESSAGE } from '../app/game/save-schema.ts';
 import { MULTIPLAYER_UPDATE_MESSAGE } from '../app/multiplayer-protocol.ts';
 
-test('the German catalog has exactly the wording the game shows today', () => {
-  assert.equal(translate('de', 'sync.storageFull'), STORAGE_FULL_MESSAGE);
-  assert.equal(translate('de', 'sync.saveTooLarge'), SAVE_TOO_LARGE_MESSAGE);
-  assert.equal(translate('de', 'update.newerSave'), NEWER_VERSION_MESSAGE);
-  assert.equal(translate('de', 'update.multiplayer'), MULTIPLAYER_UPDATE_MESSAGE);
+test('the German catalog has exactly the wording the game showed before the catalog', () => {
+  // Frozen copies of the texts as they stood in the code (main 383421b): the constants now read the catalog,
+  // so comparing with them alone would prove nothing.
+  assert.equal(translate('de', 'sync.storageFull'), 'Gerätespeicher voll. Bitte Speicher freigeben oder Spielstand als Datei sichern.');
+  assert.equal(translate('de', 'sync.saveTooLarge'), 'Der Spielstand ist zu gross für die Cloud und wird nur auf diesem Gerät gespeichert. Bitte sichere ihn als Datei.');
+  assert.equal(translate('de', 'update.newerSave'), 'Neue Version verfügbar, bitte neu laden. Dein Spielstand wurde mit einer neueren Version gespeichert und bleibt unverändert.');
+  assert.equal(translate('de', 'update.multiplayer'), 'Eine neue Goal Clicker Version ist verfügbar. Lade die Seite einmal neu. Dein Raum und Spielstand bleiben vollständig erhalten.');
+  assert.equal(STORAGE_FULL_MESSAGE, translate('de', 'sync.storageFull'));
+  assert.equal(SAVE_TOO_LARGE_MESSAGE, translate('de', 'sync.saveTooLarge'));
+  assert.equal(NEWER_VERSION_MESSAGE, translate('de', 'update.newerSave'));
+  assert.equal(MULTIPLAYER_UPDATE_MESSAGE, translate('de', 'update.multiplayer'));
   // The refund line of a duplicate special card (feature-data.ts) with the Swiss number format it uses.
   assert.equal(translate('de', 'pack.fragmentsBack', { amount: 12500 }), `+${(12500).toLocaleString('de-CH')} Fragmente zurück.`);
 });
@@ -82,7 +89,21 @@ test('every catalog only uses German keys and keeps the placeholders of each mes
   assert.deepEqual(catalogGaps('en').missing, [], 'English covers the seeded keys');
 });
 
-test('nothing in the game imports the translation layer yet (no partial language switch)', () => {
-  const app = ['app/page.tsx', 'app/game-app.tsx', 'app/layout.tsx'];
-  for (const file of app) assert.doesNotMatch(readFileSync(file, 'utf8'), /i18n\//, file);
+test('no language choice is wired: nothing outside app/i18n reads or stores a language', () => {
+  const files: string[] = [];
+  (function walk(dir: string) {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) { if (path !== join('app', 'i18n')) walk(path); } else if (/\.(ts|tsx)$/.test(entry.name)) files.push(path);
+    }
+  })('app');
+  for (const file of files) {
+    const text = readFileSync(file, 'utf8');
+    assert.doesNotMatch(text, /resolveLocale|storeLocale|readStoredLocale|LOCALE_STORAGE_KEY|ENABLED_LOCALES/, file);
+    // Code outside app/i18n translates only into the source language.
+    if (!/from "\.{1,2}\/(?:\.\.\/)*i18n\//.test(text)) continue;
+    for (const match of text.matchAll(/(?<![.\w])translat(?:e|or)\(\s*([^,)\s]+)/g)) assert.equal(match[1], 'SOURCE_LOCALE', `${file}: ${match[0]}`);
+  }
+  // The pages that would show a switch do not import the layer (layout.tsx sets lang="de" as before).
+  for (const file of ['app/page.tsx', 'app/game-app.tsx', 'app/layout.tsx'].filter((f) => existsSync(f))) assert.doesNotMatch(readFileSync(file, 'utf8'), /i18n\//, file);
 });
