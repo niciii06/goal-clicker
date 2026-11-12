@@ -7,6 +7,7 @@ import { adoptOwnUpload, planInitialSync } from '../app/cloud-sync.ts';
 import { cleanDisplayName, displayNameError, isPasswordLoginEmail, nextUsernameChangeAt, passwordError, usernameError } from '../app/profile-rules.ts';
 import { accountDeps, fakeNeon, ISSUER, memoryStore, sessionCookieFrom } from './helpers/memory-account-store.ts';
 
+import { readStyles } from './helpers/styles.mjs';
 const game = (totalGoals: number) => JSON.stringify({ goals: totalGoals, totalGoals, clicks: totalGoals, seasons: 1, stars: 2 });
 
 /** A Google login that is already bound to the game account user-a, and helpers to call the API as it. */
@@ -320,7 +321,6 @@ test('state changing account calls from another site are refused', async () => {
 test('while the login is checked the start screen shows an animated ball, not only a status card', async () => {
   const { renderToStaticMarkup } = await import('react-dom/server');
   const { createElement } = await import('react');
-  const { readFile } = await import('node:fs/promises');
   const { AccountGate } = await import('../app/account-gate.tsx');
   const before = process.env.NEXT_PUBLIC_AUTH_MODE;
   process.env.NEXT_PUBLIC_AUTH_MODE = 'neon';
@@ -334,7 +334,7 @@ test('while the login is checked the start screen shows an animated ball, not on
   } finally {
     if (before === undefined) delete process.env.NEXT_PUBLIC_AUTH_MODE; else process.env.NEXT_PUBLIC_AUTH_MODE = before;
   }
-  const css = await readFile(new URL('../app/globals.css', import.meta.url), 'utf8');
+  const css = readStyles();
   assert.match(css, /@keyframes account-boot-bounce/);
   assert.match(css, /prefers-reduced-motion: reduce\) \{ \.account-boot-ball, \.account-boot-shadow \{ animation: none; \} \}/);
   // Only compositor friendly properties move.

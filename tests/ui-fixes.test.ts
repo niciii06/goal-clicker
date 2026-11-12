@@ -4,6 +4,7 @@ import { formatNumber } from "../app/game/format";
 import { STAR_RATING_FILTERS } from "../app/game/constants";
 import { filterAndSortReserve, matchesReservePosition, matchesReserveRating } from "../app/game/reserve-filter";
 
+import { readStyles } from './helpers/styles.mjs';
 test("formatNumber rounds before choosing the unit", () => {
   assert.equal(formatNumber(999), "999");
   assert.equal(formatNumber(1000), "1.0K");
@@ -124,8 +125,7 @@ test("album merges the custom and legendary groups without a double claim", asyn
 });
 
 test('the Fabrizio transfer window follows the theme: light by default, dark tokens only in the dark blocks', async () => {
-  const { readFile } = await import('node:fs/promises');
-  const css = await readFile(new URL('../app/globals.css', import.meta.url), 'utf8');
+  const css = readStyles();
   const tokens = [...css.matchAll(/--(tx-[a-z-]+):/g)].map((match) => match[1]);
   const names = [...new Set(tokens)];
   assert.ok(names.length >= 25, 'the window is described by theme tokens');
@@ -152,15 +152,14 @@ test('the Fabrizio transfer window follows the theme: light by default, dark tok
 
 test('Club & Mehr: the club identity is a section of its own, set apart from the save file card above it', async () => {
   const { readFile } = await import('node:fs/promises');
-  const [page, css] = await Promise.all([readFile(new URL('../app/page.tsx', import.meta.url), 'utf8'), readFile(new URL('../app/globals.css', import.meta.url), 'utf8')]);
+  const [page, css] = await Promise.all([readFile(new URL('../app/game-app.tsx', import.meta.url), 'utf8'), Promise.resolve(readStyles())]);
   assert.match(page, /<section className="club-identity" aria-label="Clubidentität">[\s\S]*Clubprofil speichern<\/button><\/div><\/section>/);
   assert.match(page, /className="club-preview" role="img" aria-label=\{`Vorschau deines Wappens/, 'the badge preview is a picture, not a lookalike button');
   assert.match(css, /\.club-identity \{ margin-top: 16px; padding: 16px; border: 1px solid var\(--line-soft\)/);
 });
 
 test('the iPhone and iPad header is a nearly opaque glass (WebKit only), so logo and icons keep their contrast', async () => {
-  const { readFile } = await import('node:fs/promises');
-  const css = await readFile(new URL('../app/globals.css', import.meta.url), 'utf8');
+  const css = readStyles();
   assert.match(css, /@supports \(-webkit-touch-callout: none\) \{\s*\.topbar \{ background: color-mix\(in srgb, var\(--surface-raised\) 94%, transparent\); \}/);
   // The rule comes after the glass header definition, so it wins on iOS only.
   assert.ok(css.indexOf('@supports (-webkit-touch-callout: none) {\n  .topbar') > css.indexOf('.topbar { top: 0; margin: 0 calc(var(--space-2) * -1)'));

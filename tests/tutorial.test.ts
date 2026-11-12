@@ -164,7 +164,7 @@ test("the welcome pack: invisible until the shop step, one random walkout, once;
 
 test("the shop shows the welcome pack only at its step, without odds; ending the tutorial asks first", async () => {
   const { readFile } = await import("node:fs/promises");
-  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const page = await readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8");
   const card = page.slice(page.indexOf('welcomePack === "available" && <div className="star-pack-grid">'), page.indexOf("earnedPacks.some(p=>!p.opening)"));
   assert.ok(card.includes("Willkommenspack öffnen") && card.length > 100);
   assert.doesNotMatch(card, /star-pack-odds|Chancen|Wahrscheinlichkeit|getRewardPackOdds|%/);

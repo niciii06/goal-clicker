@@ -11,6 +11,7 @@ import { MULTIPLAYER_PROTOCOL_VERSION } from '../app/multiplayer-protocol.ts';
 import { UPGRADES } from '../app/game/upgrades.ts';
 import { installLightRoomMocks } from './helpers/light-room-mock.ts';
 
+import { readStyles } from './helpers/styles.mjs';
 const { GoalClickerDatabase } = await import('../db/index.ts');
 const { POST, clearRoomCacheForTests } = await import('../app/api/multiplayer/route.ts');
 
@@ -167,7 +168,7 @@ test('cup-abandon is refused while the world travels to the next round; a world 
 
 test('co-op: Home keeps only a slim room strip; the world management moved to Club & Mehr with every action kept', async () => {
   const { readFile } = await import('node:fs/promises');
-  const [page, css] = await Promise.all([readFile(new URL('../app/page.tsx', import.meta.url), 'utf8'), readFile(new URL('../app/globals.css', import.meta.url), 'utf8')]);
+  const [page, css] = await Promise.all([readFile(new URL('../app/game-app.tsx', import.meta.url), 'utf8'), Promise.resolve(readStyles())]);
   const homeStrip = page.slice(page.indexOf('<div className="coop-inline-room-bar compact">'), page.indexOf('<div className={`layout-toolbar'));
   // Above the game: status, code, who is online, saving state, invite and one way to the management. Nothing big.
   for (const wanted of ['coop-presence', 'coop-pending-chip', 'Einladen', 'Welt verwalten', 'openFeatureTab("club")']) assert.ok(homeStrip.includes(wanted), wanted);

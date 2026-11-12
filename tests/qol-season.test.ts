@@ -14,6 +14,7 @@ import { reserveCardType, filterAndSortReserve } from '../app/game/reserve-filte
 import { albumGroupIncludes, nationGroupScope } from '../app/career-data.ts';
 import { STAR_XI_PLAYERS, toggleFavoriteCard } from '../app/feature-data.ts';
 
+import { readStyles } from './helpers/styles.mjs';
 const row = (id: string, points: number, played: number, goalsFor = 0, goalsAgainst = 0): SeasonTableRow => ({ id, name: id, rating: 60, played, wins: 0, draws: 0, losses: 0, goalsFor, goalsAgainst, points } as SeasonTableRow);
 
 test('form guide lists the last five results of a team, oldest first', () => {
@@ -154,7 +155,8 @@ test('the season table ends with Form, then Pkt (points last)', () => {
 
 test('"Spiele" shows no extra season result card after a league match; the table stays in the Saison tab', async () => {
   const { readFile } = await import('node:fs/promises');
-  const [page, css] = await Promise.all([readFile(new URL('../app/page.tsx', import.meta.url), 'utf8'), readFile(new URL('../app/globals.css', import.meta.url), 'utf8')]);
+  const page = await readFile(new URL('../app/game-app.tsx', import.meta.url), 'utf8');
+  const css = readStyles();
   assert.doesNotMatch(page, /inline-standings|season-standings-panel|seasonStandingsAnnouncement|SeasonStandingsAnnouncement/);
   assert.doesNotMatch(css, /inline-standings|season-standings/);
   // The compact post match summary and the season tab are untouched.
