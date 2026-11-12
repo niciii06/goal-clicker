@@ -887,13 +887,38 @@ test("sale offers pay the card value sixty percent of the time and can be free",
   assert.equal(paid.features.transferSaga.pendingOffer, null);
   assert.equal(paid.features.transferSaga.archive.at(-1)?.outcome, "sale");
 
-  const freeOffer = resolveTransferInsiderEvent(transferReadyFeatures(), sequenceRandom([0.31, 0, 0, 0.6, 0]), 2000);
-  assert.equal(freeOffer.event!.outcome, "offer");
-  assert.equal(freeOffer.event!.fee, 0);
-  const free = acceptTransferOffer(freeOffer.features, 3000);
+  // Without a fee the contract ends: no offer, no decision. The player leaves at once and the club gets no Goals.
+  const before = transferReadyFeatures();
+  const free = resolveTransferInsiderEvent(before, sequenceRandom([0.31, 0, 0, 0.6, 0]), 2000);
+  const freeId = free.event!.playerId!;
   assert.equal(free.event!.outcome, "sale");
-  assert.equal(free.goalDelta, 0);
+  assert.equal(free.event!.fee, 0);
+  assert.equal(free.event!.headline, "Vertragsende");
+  assert.match(free.event!.message, /Vertrag von .* ist ausgelaufen/);
   assert.match(free.event!.message, /ablösefrei/i);
+  assert.equal(free.goalDelta, 0);
+  assert.equal(free.features.transferSaga.pendingOffer, null, "nothing to keep or decline");
+  assert.equal(free.features.starXI.ownedIds.includes(freeId), false);
+  assert.equal(free.features.starXI.lineupIds.includes(freeId), false);
+  assert.equal(free.features.starXI.benchIds.includes(freeId), false);
+  assert.equal(getOpenTransferSquadVacancies(free.features).length, 1, "the squad place stays open");
+  assert.equal(free.features.transferSaga.archive.at(-1)?.outcome, "sale");
+  assert.equal(free.features.transferSaga.archive.at(-1)?.reason, "Vertragsende");
+  assert.equal(free.features.transferSaga.unhappy.some((entry) => entry.playerId === freeId), false);
+  assert.equal(free.features.transferSaga.loans.some((loan) => loan.playerId === freeId), false);
+  // The same card is processed once: a second event never removes the same player again, and an answer finds no offer.
+  assert.ok(acceptTransferOffer(free.features, 3000).error);
+  assert.ok(declineTransferOffer(free.features, 3000).error);
+  // Album and career statistics stay: only the squad changes.
+  assert.ok(free.features.career.collectedIds.includes(freeId), "the card stays in the album");
+  assert.ok(before.career.collectedIds.every((id) => free.features.career.collectedIds.includes(id)));
+  // (Never during a match or a journey: the existing 'blocked' test above covers the squad lock for every outcome.)
+  // A save from before this change can still hold an open fee-free offer: it stays an offer and takes nobody away.
+  const legacy = transferReadyFeatures();
+  legacy.transferSaga.pendingOffer = { id: "transfer-offer-1", outcome: "offer", playerId: freeId, playerName: "Alt", club: "Altclub", headline: "Er will ablösefrei weg", message: "alt", reason: "Wechselwunsch ohne Ablöse", fee: 0, createdAt: 1, expiresAt: Date.now() + 60_000 } as typeof legacy.transferSaga.pendingOffer;
+  const reloaded = normalizeGameFeatures(JSON.parse(JSON.stringify(legacy)));
+  assert.equal(reloaded.starXI.ownedIds.includes(freeId), true);
+  assert.equal(reloaded.transferSaga.pendingOffer?.fee, 0);
 });
 
 test("keeping a player who wanted to leave makes him weaker for three matches", () => {

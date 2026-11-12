@@ -3476,24 +3476,27 @@ export function resolveTransferInsiderEvent(value: GameFeatures, random: () => n
       createdAt: now,
     };
   } else if (outcome === "sale" && player) {
-    // A sale is an offer the player answers: sell for the fee, or keep a player who then is unhappy.
+    // A sale with a fee is an offer the player answers: sell for the fee, or keep a player who then is unhappy.
+    // Without a fee the contract simply ends: the player leaves at once, there is nothing to decide.
     const paidSale = clamp(random(), 0, 0.999999) < TRANSFER_PAID_SALE_CHANCE;
     const fee = paidSale ? Math.max(0, Math.floor(player.price)) : 0;
-    event = {
-      id: `transfer-offer-${now}-${player.id}`,
-      outcome: "offer",
-      playerId: player.id,
-      playerName: player.name,
-      club,
-      headline: paidSale ? "Angebot auf dem Tisch" : pronounText("{Er} will ablösefrei weg", player),
-      message: paidSale
-        ? `Fabrizio Romario meldet: ${club} bietet ${fee.toLocaleString("de-CH")} Goals für ${player.name}. Verkaufen oder behalten?`
-        : `Fabrizio Romario meldet: ${player.name} will ablösefrei zu ${club}. ${pronounText("Lässt du {ihn} gehen oder behältst du {ihn}?", player)}`,
-      reason: paidSale ? "Kaufangebot" : "Wechselwunsch ohne Ablöse",
-      fee,
-      createdAt: now,
-    };
-    features.transferSaga.pendingOffer = { ...event, expiresAt: now + TRANSFER_OFFER_DURATION_MS };
+    if (!paidSale) {
+      event = completeTransferDeparture(features, player, club, 0, now);
+    } else {
+      event = {
+        id: `transfer-offer-${now}-${player.id}`,
+        outcome: "offer",
+        playerId: player.id,
+        playerName: player.name,
+        club,
+        headline: "Angebot auf dem Tisch",
+        message: `Fabrizio Romario meldet: ${club} bietet ${fee.toLocaleString("de-CH")} Goals für ${player.name}. Verkaufen oder behalten?`,
+        reason: "Kaufangebot",
+        fee,
+        createdAt: now,
+      };
+      features.transferSaga.pendingOffer = { ...event, expiresAt: now + TRANSFER_OFFER_DURATION_MS };
+    }
   } else {
     // The stored reason keeps its {der Spieler} tokens, so the next one is never the same; texts say "die Spielerin" for women.
     const reasonTemplate = getNextTransferFailureReason(features.transferSaga.lastFailedReason, random);
@@ -3536,14 +3539,12 @@ function transferOfferRemaining(features: GameFeatures, now: number) {
 }
 
 /** Sells the player of the open offer: he leaves for good, his squad place stays open, the fee goes to the goals. */
-export function acceptTransferOffer(value: GameFeatures, now = Date.now()): { features: GameFeatures; event: TransferInsiderEvent | null; goalDelta: number; error?: string } {
-  const features = normalizeGameFeatures(value);
-  const offer = features.transferSaga.pendingOffer;
-  if (!offer) return { features, event: null, goalDelta: 0, error: "Es liegt kein Angebot vor." };
-  if (features.squadLock || features.cup.active) return { features, event: null, goalDelta: 0, error: "Während eines Spiels oder einer Reise kannst du nicht verkaufen." };
-  const player = offer.playerId ? getStarXIPlayer(offer.playerId) : undefined;
-  features.transferSaga.pendingOffer = null;
-  if (!player || !features.starXI.ownedIds.includes(player.id)) return { features, event: null, goalDelta: 0, error: "Der Spieler ist nicht mehr im Club." };
+/**
+ * A card leaves the club for good (a paid sale, or the end of a contract with no fee): its place in the matchday squad
+ * becomes a vacancy, injuries, yellow cards and bans leave with it, so a copy drawn later is fit and eligible. Returns the
+ * announcement; the caller files it (latest event, archive, history). `fee` 0 is a contract end: no decision, no Goals.
+ */
+function completeTransferDeparture(features: GameFeatures, player: StarXIPlayer, club: string, fee: number, now: number): TransferInsiderEvent {
   const lineupIndex = features.starXI.lineupIds.indexOf(player.id);
   const benchIndex = features.starXI.benchIds.indexOf(player.id);
   // A player who moved to the reserves meanwhile leaves no gap in the matchday squad.
@@ -3554,8 +3555,7 @@ export function acceptTransferOffer(value: GameFeatures, now = Date.now()): { fe
       : { area: "bench", index: benchIndex, requiredPlayers, createdAt: now };
     features.transferSaga.vacancies = [...getOpenTransferSquadVacancies(features), vacancy].slice(-20);
   }
-  const paidSale = offer.fee > 0;
-  const fee = offer.fee;
+  const paidSale = fee > 0;
   const soldState = {
     ...features.starXI,
     ownedIds: features.starXI.ownedIds.filter((playerId) => playerId !== player.id),
@@ -3582,19 +3582,31 @@ export function acceptTransferOffer(value: GameFeatures, now = Date.now()): { fe
     outcome: "sale",
     playerId: player.id,
     playerName: player.name,
-    club: offer.club,
-    headline: paidSale ? "HERE WE GOAL" : "Ablösefreier Abgang",
+    club,
+    headline: paidSale ? "HERE WE GOAL" : "Vertragsende",
     message: paidSale
-      ? `Fabrizio Romario meldet: ${player.name} wechselt dauerhaft zu ${offer.club}. Dein Club erhält ${fee.toLocaleString("de-CH")} Goals Ablöse.`
-      : `Fabrizio Romario meldet: ${player.name} wechselt dauerhaft und ablösefrei zu ${offer.club}. Dein Club erhält keine Goals.`,
-    reason: paidSale ? "Verkauf mit Ablöse" : "Ablösefreier Wechsel",
+      ? `Fabrizio Romario meldet: ${player.name} wechselt dauerhaft zu ${club}. Dein Club erhält ${fee.toLocaleString("de-CH")} Goals Ablöse.`
+      : `Fabrizio Romario meldet: Der Vertrag von ${player.name} ist ausgelaufen. ${pronounText("{Er} verlässt", player)} den Club ablösefrei Richtung ${club}. Dein Club erhält keine Goals.`,
+    reason: paidSale ? "Verkauf mit Ablöse" : "Vertragsende",
     fee,
     createdAt: now,
   };
+  return event;
+}
+
+export function acceptTransferOffer(value: GameFeatures, now = Date.now()): { features: GameFeatures; event: TransferInsiderEvent | null; goalDelta: number; error?: string } {
+  const features = normalizeGameFeatures(value);
+  const offer = features.transferSaga.pendingOffer;
+  if (!offer) return { features, event: null, goalDelta: 0, error: "Es liegt kein Angebot vor." };
+  if (features.squadLock || features.cup.active) return { features, event: null, goalDelta: 0, error: "Während eines Spiels oder einer Reise kannst du nicht verkaufen." };
+  const player = offer.playerId ? getStarXIPlayer(offer.playerId) : undefined;
+  features.transferSaga.pendingOffer = null;
+  if (!player || !features.starXI.ownedIds.includes(player.id)) return { features, event: null, goalDelta: 0, error: "Der Spieler ist nicht mehr im Club." };
+  const event = completeTransferDeparture(features, player, offer.club, offer.fee, now);
   features.transferSaga.latestEvent = event;
   appendTransferArchive(features, event);
   addHistory(features, { title: `Fabrizio Romario · ${event.headline}`, detail: event.message, tone: "negative" }, now);
-  return { features, event, goalDelta: fee };
+  return { features, event, goalDelta: offer.fee };
 }
 
 /** Keeps the player of the open offer; he wanted to leave and plays weaker for the next matches. */

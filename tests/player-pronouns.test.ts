@@ -52,6 +52,7 @@ test('Fabrizio talks about a woman player as her', () => {
   }
   assert.equal(offer?.playerId, putellas.id);
   if (!offer) return;
-  assert.equal(offer.headline, 'Sie will ablösefrei weg');
-  assert.match(offer.message, /Lässt du sie gehen oder behältst du sie\?/);
+  // A contract end: no decision any more, the text still uses the right pronoun.
+  assert.equal(offer.headline, 'Vertragsende');
+  assert.match(offer.message, /Sie verlässt den Club ablösefrei/);
 });
