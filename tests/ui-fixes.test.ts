@@ -122,3 +122,30 @@ test("album merges the custom and legendary groups without a double claim", asyn
     assert.deepEqual(saved.career.claimedAlbumRewards, earlierClaims);
   }
 });
+
+test('the Fabrizio transfer window follows the theme: light by default, dark tokens only in the dark blocks', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const css = await readFile(new URL('../app/globals.css', import.meta.url), 'utf8');
+  const tokens = [...css.matchAll(/--(tx-[a-z-]+):/g)].map((match) => match[1]);
+  const names = [...new Set(tokens)];
+  assert.ok(names.length >= 25, 'the window is described by theme tokens');
+  const lightRoot = css.slice(css.indexOf('/* Fabrizio Romario transfer window'), css.indexOf('/* Stadion bei Nacht'));
+  const darkMedia = css.slice(css.indexOf('@media (prefers-color-scheme: dark)'), css.indexOf(':root[data-theme="dark"]'));
+  const darkForced = css.slice(css.indexOf(':root[data-theme="dark"]'), css.indexOf(':root[data-theme="dark"]') + 6000);
+  for (const name of names) {
+    assert.ok(lightRoot.includes(`--${name}:`), `light value of ${name}`);
+    assert.ok(darkMedia.includes(`--${name}:`), `dark value of ${name} for the system setting`);
+    assert.ok(darkForced.includes(`--${name}:`), `dark value of ${name} for the chosen dark theme`);
+  }
+  // The light card is light, the dark card is the former near black night look, both with readable text colours.
+  assert.match(lightRoot, /--tx-card-bg: linear-gradient\(150deg, #ffffff/);
+  assert.match(darkMedia, /--tx-card-bg: linear-gradient\(150deg, rgba\(16,39,29,\.98\)/);
+  assert.match(lightRoot, /--tx-card-text: var\(--text\)/);
+  // No fixed dark or white colours are left in the transfer window rules themselves.
+  // (The round FR avatar and the LIVE badge are bright green with dark text in both themes on purpose.)
+  const rules = css.split('\n').filter((line) => (/^\.transfer-insider-/.test(line) || /^\.transfer-insider-card \./.test(line)) && !/^\.transfer-insider-reporter (> span|b) /.test(line));
+  assert.ok(rules.length >= 20);
+  for (const rule of rules) assert.doesNotMatch(rule, /#fff\b|rgba\(255,255,255|#0[0-9a-f]{5}|rgba\(2,10,7|rgba\(16,39,29/i, rule.slice(0, 90));
+  // Every outcome keeps its own colours: offer, sale, failed and declined chips and card variants.
+  for (const variant of ['sale', 'failed', 'offer', 'declined']) assert.match(css, new RegExp(`\\.transfer-insider-takeover\\.${variant} \\.transfer-insider-(card|result) \\{`));
+});

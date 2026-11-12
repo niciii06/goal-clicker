@@ -68,10 +68,54 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Fabrizio Romario transfer window: light by default, the former stadium night look only in dark mode. */
+:root {
+  --tx-overlay: radial-gradient(circle at 50% 36%, rgba(10,125,67,.12), transparent 40%), rgba(236,242,238,.74);
+  --tx-card-bg: linear-gradient(150deg, #ffffff, #eef7f1 72%);
+  --tx-card-border: rgba(10,125,67,.3);
+  --tx-card-text: var(--text);
+  --tx-card-shadow: 0 30px 80px rgba(20,33,26,.22), inset 0 1px 0 #fff;
+  --tx-sale-bg: linear-gradient(150deg, #ffffff, #fdeef1 74%);
+  --tx-sale-border: rgba(196,40,77,.32);
+  --tx-warn-bg: linear-gradient(150deg, #fffdf6, #fbf1d8 74%);
+  --tx-warn-border: rgba(160,112,0,.42);
+  --tx-kicker: #0a7d43;
+  --tx-body: var(--soft);
+  --tx-subtle: var(--muted);
+  --tx-reporter-bg: rgba(20,33,26,.045);
+  --tx-reporter-border: rgba(20,33,26,.1);
+  --tx-chip-border: rgba(10,125,67,.35); --tx-chip-text: #0a6a39; --tx-chip-bg: rgba(10,125,67,.1);
+  --tx-sale-chip-border: rgba(196,40,77,.35); --tx-sale-chip-text: #a3213f; --tx-sale-chip-bg: rgba(196,40,77,.09);
+  --tx-warn-chip-border: rgba(138,97,0,.4); --tx-warn-chip-text: #7a5200; --tx-warn-chip-bg: rgba(230,168,0,.14);
+  --tx-secondary-border: var(--line); --tx-secondary-text: var(--text); --tx-secondary-bg: rgba(20,33,26,.05);
+  --tx-later: var(--soft);
+  --tx-dismiss-bg: var(--accent); --tx-dismiss-text: #fff; --tx-dismiss-hover: #086a38;
+}
+
 /* Stadion bei Nacht: follows the device unless the player picked a theme in the account menu. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
+    --tx-overlay: radial-gradient(circle at 50% 36%, rgba(29,185,84,.2), transparent 38%), rgba(2,10,7,.88);
+    --tx-card-bg: linear-gradient(150deg, rgba(16,39,29,.98), rgba(4,13,9,.99) 72%);
+    --tx-card-border: rgba(91,236,142,.36);
+    --tx-card-text: #fff;
+    --tx-card-shadow: 0 36px 110px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.11);
+    --tx-sale-bg: linear-gradient(150deg,#35131c,#10090b 74%);
+    --tx-sale-border: rgba(255,111,137,.4);
+    --tx-warn-bg: linear-gradient(150deg,#30230e,#0f0c07 74%);
+    --tx-warn-border: rgba(255,202,82,.4);
+    --tx-kicker: #75eda0;
+    --tx-body: rgba(255,255,255,.76);
+    --tx-subtle: rgba(255,255,255,.52);
+    --tx-reporter-bg: rgba(255,255,255,.055);
+    --tx-reporter-border: rgba(255,255,255,.1);
+    --tx-chip-border: rgba(91,236,142,.3); --tx-chip-text: #a8f8c4; --tx-chip-bg: rgba(91,236,142,.1);
+    --tx-sale-chip-border: rgba(255,111,137,.32); --tx-sale-chip-text: #ffadc0; --tx-sale-chip-bg: rgba(255,111,137,.11);
+    --tx-warn-chip-border: rgba(255,202,82,.32); --tx-warn-chip-text: #ffe19a; --tx-warn-chip-bg: rgba(255,202,82,.11);
+    --tx-secondary-border: rgba(255,255,255,.4); --tx-secondary-text: #fff; --tx-secondary-bg: rgba(255,255,255,.08);
+    --tx-later: rgba(255,255,255,.8);
+    --tx-dismiss-bg: #fff; --tx-dismiss-text: #101416; --tx-dismiss-hover: #dceeff;
     --bg: #07130e;
     --surface: rgba(17, 36, 28, 0.86);
     --surface-raised: #11241c;
@@ -103,6 +147,26 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
+  --tx-overlay: radial-gradient(circle at 50% 36%, rgba(29,185,84,.2), transparent 38%), rgba(2,10,7,.88);
+  --tx-card-bg: linear-gradient(150deg, rgba(16,39,29,.98), rgba(4,13,9,.99) 72%);
+  --tx-card-border: rgba(91,236,142,.36);
+  --tx-card-text: #fff;
+  --tx-card-shadow: 0 36px 110px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.11);
+  --tx-sale-bg: linear-gradient(150deg,#35131c,#10090b 74%);
+  --tx-sale-border: rgba(255,111,137,.4);
+  --tx-warn-bg: linear-gradient(150deg,#30230e,#0f0c07 74%);
+  --tx-warn-border: rgba(255,202,82,.4);
+  --tx-kicker: #75eda0;
+  --tx-body: rgba(255,255,255,.76);
+  --tx-subtle: rgba(255,255,255,.52);
+  --tx-reporter-bg: rgba(255,255,255,.055);
+  --tx-reporter-border: rgba(255,255,255,.1);
+  --tx-chip-border: rgba(91,236,142,.3); --tx-chip-text: #a8f8c4; --tx-chip-bg: rgba(91,236,142,.1);
+  --tx-sale-chip-border: rgba(255,111,137,.32); --tx-sale-chip-text: #ffadc0; --tx-sale-chip-bg: rgba(255,111,137,.11);
+  --tx-warn-chip-border: rgba(255,202,82,.32); --tx-warn-chip-text: #ffe19a; --tx-warn-chip-bg: rgba(255,202,82,.11);
+  --tx-secondary-border: rgba(255,255,255,.4); --tx-secondary-text: #fff; --tx-secondary-bg: rgba(255,255,255,.08);
+  --tx-later: rgba(255,255,255,.8);
+  --tx-dismiss-bg: #fff; --tx-dismiss-text: #101416; --tx-dismiss-hover: #dceeff;
   --bg: #07130e;
   --surface: rgba(17, 36, 28, 0.86);
   --surface-raised: #11241c;
@@ -356,35 +420,37 @@
 .event-takeover-dismiss { display: block; min-width: 128px; margin: 28px auto 0; padding: 11px 18px; border: 0; border-radius: 980px; color: #101416; cursor: pointer; background: #fff; font-size: var(--text-footnote); font-weight: 800; transition: 160ms ease; }
 .event-takeover-dismiss:hover { background: #dceeff; transform: translateY(-1px); }
 @keyframes event-in { 0% { opacity: 0; transform: scale(.97); } 100% { opacity: 1; transform: scale(1); } }
-.transfer-insider-takeover { position: fixed; z-index: 55; inset: 0; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at 50% 36%, rgba(29,185,84,.2), transparent 38%), rgba(2,10,7,.88); backdrop-filter: blur(22px) saturate(145%); animation: event-in 220ms cubic-bezier(.2,.8,.2,1); }
-.transfer-insider-card { position: relative; width: min(680px,100%); padding: 30px clamp(22px,6vw,58px) 32px; overflow: hidden; border: 1px solid rgba(91,236,142,.36); border-radius: 28px; color: #fff; background: linear-gradient(150deg, rgba(16,39,29,.98), rgba(4,13,9,.99) 72%); box-shadow: 0 36px 110px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.11); }
-.transfer-insider-takeover.sale .transfer-insider-card { border-color: rgba(255,111,137,.4); background: linear-gradient(150deg,#35131c,#10090b 74%); }
-.transfer-insider-takeover.failed .transfer-insider-card { border-color: rgba(255,202,82,.38); background: linear-gradient(150deg,#30230e,#0f0c07 74%); }
+.transfer-insider-takeover { position: fixed; z-index: 55; inset: 0; display: grid; place-items: center; padding: 24px; background: var(--tx-overlay); backdrop-filter: blur(22px) saturate(145%); animation: event-in 220ms cubic-bezier(.2,.8,.2,1); }
+.transfer-insider-card { position: relative; width: min(680px,100%); padding: 30px clamp(22px,6vw,58px) 32px; overflow: hidden; border: 1px solid var(--tx-card-border); border-radius: 28px; color: var(--tx-card-text); background: var(--tx-card-bg); box-shadow: var(--tx-card-shadow); }
+.transfer-insider-takeover.sale .transfer-insider-card { border-color: var(--tx-sale-border); background: var(--tx-sale-bg); }
+.transfer-insider-takeover.failed .transfer-insider-card { border-color: var(--tx-warn-border); background: var(--tx-warn-bg); }
 .transfer-insider-card::after { position: absolute; right: -42px; bottom: -62px; opacity: .055; font-size: 240px; font-weight: 950; letter-spacing: -.13em; content: "FR"; transform: rotate(-8deg); pointer-events: none; }
 .transfer-insider-card > * { position: relative; z-index: 1; }
-.transfer-insider-kicker { display: block; color: #75eda0; font-size: var(--text-caption2); font-weight: 900; letter-spacing: .18em; }
-.transfer-insider-reporter { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 11px; margin-top: 20px; padding: 12px; border: 1px solid rgba(255,255,255,.1); border-radius: 16px; background: rgba(255,255,255,.055); }
+.transfer-insider-kicker { display: block; color: var(--tx-kicker); font-size: var(--text-caption2); font-weight: 900; letter-spacing: .18em; }
+.transfer-insider-reporter { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 11px; margin-top: 20px; padding: 12px; border: 1px solid var(--tx-reporter-border); border-radius: 16px; background: var(--tx-reporter-bg); }
 .transfer-insider-reporter > span { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 50%; color: #07140d; background: linear-gradient(135deg,#b5ffd0,#37d973); font-size: var(--text-footnote); font-weight: 950; }
 .transfer-insider-reporter strong, .transfer-insider-reporter small { display: block; }
 .transfer-insider-reporter strong { font-size: var(--text-footnote); }
-.transfer-insider-reporter small { margin-top: 3px; color: rgba(255,255,255,.52); font-size: var(--text-caption2); }
+.transfer-insider-reporter small { margin-top: 3px; color: var(--tx-subtle); font-size: var(--text-caption2); }
 .transfer-insider-reporter b { padding: 6px 8px; border-radius: 980px; color: #07140d; background: #5bec8e; font-size: var(--text-caption2); letter-spacing: .1em; }
 .transfer-insider-card h2 { margin: 27px 0 0; font-size: clamp(42px,8vw,76px); font-weight: 790; letter-spacing: -.075em; line-height: .9; text-transform: uppercase; }
-.transfer-insider-card p { max-width: 540px; margin: 20px 0 0; color: rgba(255,255,255,.76); font-size: var(--text-footnote); line-height: 1.55; }
-.transfer-insider-result { display: inline-block; margin-top: 21px; padding: 9px 12px; border: 1px solid rgba(91,236,142,.3); border-radius: 980px; color: #a8f8c4; background: rgba(91,236,142,.1); font-size: var(--text-caption2); font-weight: 900; letter-spacing: .08em; }
-.transfer-insider-takeover.sale .transfer-insider-result { border-color: rgba(255,111,137,.32); color: #ffadc0; background: rgba(255,111,137,.11); }
-.transfer-insider-takeover.failed .transfer-insider-result { border-color: rgba(255,202,82,.3); color: #ffe19a; background: rgba(255,202,82,.1); }
-.transfer-insider-takeover.offer .transfer-insider-card { border-color: rgba(255,202,82,.42); background: linear-gradient(150deg,#2f2410,#0e0b06 74%); }
-.transfer-insider-takeover.offer .transfer-insider-result { border-color: rgba(255,202,82,.34); color: #ffe19a; background: rgba(255,202,82,.12); }
-.transfer-insider-takeover.declined .transfer-insider-result { border-color: rgba(255,111,137,.32); color: #ffadc0; background: rgba(255,111,137,.11); }
+.transfer-insider-card p { max-width: 540px; margin: 20px 0 0; color: var(--tx-body); font-size: var(--text-footnote); line-height: 1.55; }
+.transfer-insider-result { display: inline-block; margin-top: 21px; padding: 9px 12px; border: 1px solid var(--tx-chip-border); border-radius: 980px; color: var(--tx-chip-text); background: var(--tx-chip-bg); font-size: var(--text-caption2); font-weight: 900; letter-spacing: .08em; }
+.transfer-insider-takeover.sale .transfer-insider-result { border-color: var(--tx-sale-chip-border); color: var(--tx-sale-chip-text); background: var(--tx-sale-chip-bg); }
+.transfer-insider-takeover.failed .transfer-insider-result { border-color: var(--tx-warn-chip-border); color: var(--tx-warn-chip-text); background: var(--tx-warn-chip-bg); }
+.transfer-insider-takeover.offer .transfer-insider-card { border-color: var(--tx-warn-border); background: var(--tx-warn-bg); }
+.transfer-insider-takeover.offer .transfer-insider-result { border-color: var(--tx-warn-chip-border); color: var(--tx-warn-chip-text); background: var(--tx-warn-chip-bg); }
+.transfer-insider-takeover.declined .transfer-insider-result { border-color: var(--tx-sale-chip-border); color: var(--tx-sale-chip-text); background: var(--tx-sale-chip-bg); }
 .transfer-offer-actions { display: grid; gap: 12px; margin-top: 18px; }
 .transfer-offer-actions p { margin: 0; color: var(--muted); font-size: var(--text-footnote); line-height: 1.45; }
 .transfer-offer-actions > div { display: flex; flex-wrap: wrap; gap: 10px; }
 .transfer-offer-actions > div button { flex: 1 1 160px; min-height: 44px; }
 .transfer-offer-later { justify-self: center; min-height: 44px; padding: 0 14px; border: 0; color: inherit; cursor: pointer; background: transparent; font-size: var(--text-footnote); font-weight: 750; text-decoration: underline; text-underline-offset: 3px; }
-.transfer-insider-card .transfer-offer-actions p { color: rgba(255,255,255,.72); }
-.transfer-insider-card .transfer-offer-actions .mode-secondary { border-color: rgba(255,255,255,.4); color: #fff; background: rgba(255,255,255,.08); }
-.transfer-insider-card .transfer-offer-later { color: rgba(255,255,255,.8); }
+.transfer-insider-card .transfer-offer-actions p { color: var(--tx-body); }
+.transfer-insider-card .transfer-offer-actions .mode-secondary { border-color: var(--tx-secondary-border); color: var(--tx-secondary-text); background: var(--tx-secondary-bg); }
+.transfer-insider-card .transfer-offer-later { color: var(--tx-later); }
+.transfer-insider-card .event-takeover-dismiss { color: var(--tx-dismiss-text); background: var(--tx-dismiss-bg); }
+.transfer-insider-card .event-takeover-dismiss:hover { background: var(--tx-dismiss-hover); }
 @media (max-width: 1200px) { .feature-card { grid-column: 1 / -1; } }
 @media (max-width: 780px) { .feature-card { padding: 17px; border-radius: 21px; }.feature-card-heading { gap: 12px; }.feature-card-heading h2 { font-size: 25px; }.feature-panel-heading { display: block; }.feature-panel-heading .feature-stat { display: inline-block; margin-top: 9px; }.transfer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.cup-start { display: block; }.cup-start .mode-primary { width: 100%; margin-top: 13px; }.strategy-grid { grid-template-columns: 1fr; }.mission-row { grid-template-columns: 1fr; }.mission-row .feature-buy-button { width: 100%; }.event-takeover,.transfer-insider-takeover { padding: 15px; }.event-takeover-card { padding: 42px 22px 28px; border-radius: 23px; }.event-takeover-card h2 { font-size: clamp(46px, 13vw, 76px); }.event-takeover-card p { font-size: var(--text-footnote); }.transfer-insider-card { padding: 24px 20px 26px; border-radius: 22px; }.transfer-insider-card h2 { font-size: 43px; }.transfer-insider-card p { font-size: var(--text-footnote); } }
 @media (max-width: 540px) { .transfer-grid { grid-template-columns: 1fr; }.owned-strip { align-items: flex-start; flex-direction: column; }.owned-strip > div { justify-content: flex-start; }.event-takeover-card h2 { font-size: 48px; } }
