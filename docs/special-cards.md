@@ -17,5 +17,23 @@ Von den 10 Spezialkarten haben 8 das Rating 100 und 2 das Rating 67. Mit gleiche
 ## Offene Fragen an Nicolas
 
 1. ~~Höhe der Duplikat Entschädigung~~ entschieden: 25'000. Ein Duplikat bringt damit einen halben Packpreis zurück, bei 80 % Karten mit Rating 100.
-2. **Freischaltung Liga 3:** Das gekaufte Spezialkarten Pack öffnet weiter ab Liga 3 (`PACK_UNLOCK_SEASONS`). Der Grund war die 100er Kategorie. Soll es früher oder bleibt es wegen der Ökonomie?
-3. **Normale Packs:** Im Weltklasse Pack (0,001 %) und Legenden Pack (0,01 %) gibt es eine Zeile «Rating 100», aus der die Spezialkarten mit Rating 100 fallen können. Das ist eine Rating Zeile, keine Kategorie, deshalb unverändert. Sollen Spezialkarten nur noch aus dem Spezialkarten Pack kommen?
+2. ~~Freischaltung Liga 3~~ geprüft, **Sperre bleibt** (siehe unten).
+3. ~~Normale Packs~~ entschieden: Weltklasse und Legenden Pack bleiben im bisherigen Format mit ihren Rating Zeilen.
+
+## Liga 3 Freischaltung des Spezialkarten Packs: Herkunft geprüft, Sperre bleibt
+
+Kriterium aus Notion: nur entfernen, wenn sie nachweislich **ausschliesslich** an der alten 100er Kategorie hängt. Das ist nicht eindeutig belegt, und es gibt einen eigenständigen Fortschrittsgrund. Deshalb bleibt die Sperre (`PACK_UNLOCK_SEASONS.special` = 13, also Liga 3).
+
+**Für eine Bindung an die 100er Kategorie**
+* Commit `e346a75` (29. Oktober 2026) führt sie ein: «Spezialkarten-Pack erst ab Liga 3, 50'000 Fragmente, nur 8% 100er». Vorher war das Pack ab Liga 15 offen (`special: 1`).
+* Kommentar in `app/season-progression.ts` bisher: «holds the 100 rated cards, so it opens only in Liga 3».
+* Die einmalige Spielstand Reparatur (Schema 6, `removeEarlyHundredSpecialCards` in `app/feature-data.ts`) entfernt 100er Spezialkarten aus Spielständen unterhalb Liga 3. Sie bleibt unverändert, weil sie alte Spielstände betrifft.
+
+**Eigenständige Gründe (Fortschritt und Ökonomie)**
+* `docs/balance-update.md`, Zeile 3: Die Neuordnung entstand, weil das Pack ab Liga 15 offen war und in 70 % der Züge Karten mit Rating 100 gab, ein Club in Liga 5 hatte dadurch schon Star XI Rating 93. Das ist ein Problem des Fortschritts und der Ökonomie, nicht der Kategorie.
+* Zeile 67 und 23: Die Packs bilden «eine Leiter, die nur steigt», das Spezialkarten Pack (50'000 Fragmente) steht als Stufe 3 oben. Der Code Kommentar dazu: «every pack opens in the league whose opponents match its cards» (`app/season-progression.ts`).
+* Zeile 231: Die Liga 3 Sperre hängt an `packRating` der Karte, nicht an einer Kategorie Zuordnung.
+* Folge der neuen Regel: Bei gleicher Chance sind 8 von 10 Spezialkarten Rating 100, also 80 % der Züge. Ohne Sperre wäre genau der damalige Zustand zurück (starkes Pack ab Liga 15).
+* Tests und Anzeige: `tests/progression-shop.test.ts` (Zeilen 23 bis 30), Kauf Sperre im Client (`app/game-app.tsx`, Kauf und Kachel) und auf dem Server (`app/api/multiplayer/route.ts`, Aktion `special-pack`).
+
+**Ergebnis:** Der Lock bleibt vorerst bestehen. Eine Änderung bräuchte eine eigene Ökonomie Entscheidung (ab welcher Liga, mit welchen Folgen für Fragmente und Kartenstärke). Das Gratis Pack der Tagesprämie ist nicht an die Liga gebunden und zieht schon mit der gleichen Chance.

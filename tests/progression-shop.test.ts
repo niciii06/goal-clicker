@@ -27,7 +27,7 @@ test('every former season requirement maps to its league equivalent', () => {
   assert.equal(getPackUnlockLeague('elite'), 7);
   assert.equal(getPackUnlockLeague('weltklasse'), 5);
   assert.equal(getPackUnlockLeague('legend'), 4);
-  assert.equal(getPackUnlockLeague(SPECIAL_CARD_PACK.id), 3, 'the 100 rated special cards open only in Liga 3');
+  assert.equal(getPackUnlockLeague(SPECIAL_CARD_PACK.id), 3, 'the special card pack, the top step of the pack ladder, opens in Liga 3');
   assert.equal(getTournamentUnlockLeague('champions'), 10, 'was Saison 6');
   assert.equal(getTournamentUnlockLeague('world'), 4, 'was Saison 12');
   assert.equal(getFormationUnlockLeague('541'), 1);

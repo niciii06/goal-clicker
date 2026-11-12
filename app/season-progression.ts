@@ -45,7 +45,9 @@ export const PACK_UNLOCK_SEASONS: Record<string, number> = {
   elite: 9,
   weltklasse: 11,
   legend: 12,
-  // The fragment priced special card pack holds the 100 rated cards, so it opens only in Liga 3.
+  // The fragment priced special card pack is the top step of the pack ladder and opens in Liga 3 (rebalance of 29 Oct 2026, e346a75).
+  // It was introduced together with the old 100 category, but the lock is kept: with equal chances 8 of 10 special cards are 100 rated,
+  // and an open pack from the start was the very imbalance that rebalance removed. Reasons and sources: docs/special-cards.md.
   special: 13,
 };
 
