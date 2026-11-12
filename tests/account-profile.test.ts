@@ -316,3 +316,28 @@ test('state changing account calls from another site are refused', async () => {
   assert.equal(response.status, 403);
   assert.equal(store.profiles.size, 0);
 });
+
+test('while the login is checked the start screen shows an animated ball, not only a status card', async () => {
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const { createElement } = await import('react');
+  const { readFile } = await import('node:fs/promises');
+  const { AccountGate } = await import('../app/account-gate.tsx');
+  const before = process.env.NEXT_PUBLIC_AUTH_MODE;
+  process.env.NEXT_PUBLIC_AUTH_MODE = 'neon';
+  try {
+    // The first render is always the "checking" phase: the game children must not be in it before the check.
+    const html = renderToStaticMarkup(createElement(AccountGate, null, createElement('div', { id: 'game-secret' }, 'Spielstand')));
+    assert.match(html, /account-boot-ball/);
+    assert.match(html, /role="status"[^>]*>Anmeldung wird geprüft/);
+    assert.doesNotMatch(html, /game-secret|Spielstand/, 'no game or account data before the identity and save check');
+    assert.doesNotMatch(html, /account-card/, 'the bare card with only a status line is gone');
+  } finally {
+    if (before === undefined) delete process.env.NEXT_PUBLIC_AUTH_MODE; else process.env.NEXT_PUBLIC_AUTH_MODE = before;
+  }
+  const css = await readFile(new URL('../app/globals.css', import.meta.url), 'utf8');
+  assert.match(css, /@keyframes account-boot-bounce/);
+  assert.match(css, /prefers-reduced-motion: reduce\) \{ \.account-boot-ball, \.account-boot-shadow \{ animation: none; \} \}/);
+  // Only compositor friendly properties move.
+  const keyframes = css.match(/@keyframes account-boot-bounce \{[\s\S]*?\n\}/)![0];
+  assert.doesNotMatch(keyframes, /\b(top|left|margin|width|height)\s*:/);
+});

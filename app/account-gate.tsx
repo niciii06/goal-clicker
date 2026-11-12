@@ -321,10 +321,23 @@ function RequiredAccount({ children }: { children: ReactNode }) {
     </GuestContext.Provider>;
   }
 
+  // The start while the session and the cloud save are checked: a bouncing ball instead of a bare status card. The
+  // animation runs on its own (CSS only), so it never waits for the network; the game still appears only after the
+  // identity and save check, never earlier.
+  if (phase.name === "checking") return <main className="account-screen account-boot" aria-busy="true">
+    <div className="account-boot-stage">
+      <div className="account-boot-ball-wrap" aria-hidden="true">
+        <svg className="account-boot-ball" viewBox="0 0 64 64" width="84" height="84" focusable="false"><circle cx="32" cy="32" r="29" fill="#fff" stroke="#1d1d1f" strokeWidth="2.4" /><g fill="#1d1d1f" stroke="#1d1d1f" strokeWidth="2" strokeLinejoin="round"><polygon points="32 22.5 40.6 28.7 37.3 38.8 26.7 38.8 23.4 28.7" /><polygon points="32 3.4 25.5 8.3 28 15.8 36 15.8 38.5 8.3" /><polygon points="56.3 20.8 58.9 28.8 52.8 34.2 46.6 30.6 48.4 23" /><polygon points="7.7 20.8 15.6 23 17.4 30.6 11.2 34.2 5.1 28.8" /><polygon points="44.5 52.8 38.5 57.6 32 54.3 33.5 47.2 41 46.7" /><polygon points="19.5 52.8 23 46.7 30.5 47.2 32 54.3 25.5 57.6" /></g><g fill="none" stroke="#1d1d1f" strokeWidth="2"><path d="M32 22.5V15.8M40.6 28.7l7.8-5.7M37.3 38.8l3.7 7.9M26.7 38.8l-3.7 7.9M23.4 28.7l-7.8-5.7" /></g></svg>
+        <span className="account-boot-shadow" />
+      </div>
+      <strong className="account-boot-title">Goal Clicker</strong>
+      <p className="account-boot-status" role="status">Anmeldung wird geprüft …</p>
+    </div>
+  </main>;
+
   return <main className="account-screen">
     <section className="account-card">
       <div className="account-brand"><span className="account-brand-ball" aria-hidden="true">⚽</span><div><p className="eyebrow">FOOTBALL IDLE CLUB</p><strong>Goal Clicker</strong></div></div>
-      {phase.name === "checking" && <p className="account-status" role="status">Anmeldung wird geprüft …</p>}
       {phase.name === "signed-out" && <LoginForm message={phase.message} onSignedIn={() => void enter()} onGuest={playAsGuest} />}
       {phase.name === "profile" && <ProfileSetup user={phase.user} onCreated={(profile) => { writeProfileCache(phase.user, profile); void syncAndStart(phase.user, profile); }} onSignOut={() => void signOut()} />}
       {phase.name === "deletion" && <FinishDeletion message={phase.message} />}

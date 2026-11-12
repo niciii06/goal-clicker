@@ -1898,6 +1898,22 @@ button { font: inherit; }
 .account-brand strong { color: var(--text); font-size: 20px; font-weight: 760; letter-spacing: -.04em; }
 .account-brand-ball { display: grid; width: 46px; height: 46px; place-items: center; border-radius: 14px; background: var(--accent); font-size: 24px; }
 .account-status { margin: 18px 0 0; color: var(--muted); font-size: var(--text-footnote); }
+/* Start screen while the login and the cloud save are checked: only transform and opacity animate. */
+.account-boot { padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+.account-boot-stage { display: grid; justify-items: center; gap: 14px; text-align: center; }
+.account-boot-ball-wrap { position: relative; display: grid; width: 120px; height: 150px; place-items: end center; }
+.account-boot-ball { position: absolute; bottom: 14px; border-radius: 50%; animation: account-boot-bounce 900ms cubic-bezier(.33,0,.67,1) infinite; will-change: transform; }
+.account-boot-shadow { width: 64px; height: 10px; border-radius: 50%; background: color-mix(in srgb, var(--text) 24%, transparent); animation: account-boot-shadow 900ms cubic-bezier(.33,0,.67,1) infinite; }
+.account-boot-title { color: var(--text); font-size: 22px; font-weight: 760; letter-spacing: -.04em; }
+.account-boot-status { margin: 0; color: var(--muted); font-size: var(--text-footnote); }
+@keyframes account-boot-bounce {
+  0%, 100% { transform: translateY(0) rotate(0deg) scale(1.06, .94); animation-timing-function: cubic-bezier(.2,.7,.4,1); }
+  12% { transform: translateY(0) rotate(0deg) scale(.98, 1.02); }
+  50% { transform: translateY(-62px) rotate(180deg) scale(1); animation-timing-function: cubic-bezier(.6,0,.8,.3); }
+}
+@keyframes account-boot-shadow { 0%, 100% { transform: scaleX(1.08); opacity: .9; } 50% { transform: scaleX(.6); opacity: .45; } }
+/* Reduced motion: a calm still image, nothing moves. */
+@media (prefers-reduced-motion: reduce) { .account-boot-ball, .account-boot-shadow { animation: none; } }
 .account-google { display: flex; width: 100%; min-height: 46px; align-items: center; justify-content: center; gap: 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--text); background: var(--surface-raised); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: 160ms ease; }
 .account-google:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 34%, transparent); background: var(--accent-soft); }
 .account-google span { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 50%; color: var(--on-accent); background: var(--accent); font-size: var(--text-footnote); font-weight: 800; }
