@@ -28,12 +28,12 @@ test('in Liga 1 only the champion reaches the Hall of Fame; second place stays',
   assert.equal(title?.club.id, 'club');
 });
 
-test('every league title gets the trophy, second place still goes up below Liga 1', () => {
+test('every league title gets the trophy, second place stays (one place goes up)', () => {
   const champion = recordSeasonModeMatch(lastMatchday(5, 100, 50), 2, 0, 'FC Test', 5000, () => 0.5);
   assert.equal(champion.entry?.seasonOutcome, 'promoted');
   assert.ok(getSeasonTitle(champion.entry, champion.state.lastTable));
   const second = recordSeasonModeMatch(lastMatchday(5, 50, 100), 0, 0, 'FC Test', 5000, () => 0.5);
-  assert.equal(second.entry?.seasonOutcome, 'promoted');
+  assert.equal(second.entry?.seasonOutcome, 'stayed');
   assert.equal(getSeasonTitle(second.entry, second.state.lastTable), null);
   // A matchday in the middle of the season is no title, even when the club leads.
   const midSeason = recordSeasonModeMatch({ ...lastMatchday(5, 100, 50), matchday: 3 }, 2, 0, 'FC Test', 5000, () => 0.5);

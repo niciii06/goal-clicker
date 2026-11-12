@@ -17,6 +17,9 @@ import { FC27_POSITION_BY_SOURCE_ID } from "./fc27-positions";
 import { FC27_INDIA_PROFILES, SCRAP_PACK_MIN_RATING, SCRAP_RATING_GROUPS, drawScrapPlayer } from "./scrap-pack";
 import { GAZETTE_CHAMPION_HEADLINES, GAZETTE_EXIT_HEADLINES, TRANSFER_INTERESTED_CLUBS, transferClubsForRating } from "./features/news-data";
 import { HOME_VENUE, LEAGUE_LABELS, seasonGeography, venueForClubName } from "./travel-geography";
+import type { AiLeagues } from "./travel-geography";
+import { advanceAiLeagues, normalizeAiLeagues, normalizeAiMoves } from "./season-leagues";
+import type { AiMove } from "./season-leagues";
 import { addBroadcastSubstitution, advanceMatchBroadcast, chooseGoalPattern, createMatchBroadcast, normalizeMatchBroadcast, recordedActionRating } from "./match-broadcast";
 import { advanceInteractive, normalizeInteractive, pauseBeforeExtraTime, resumeInteractive, simulationMinute } from "./interactive-match";
 import { emptyTravel, normalizeTravel } from "./travel-data";
@@ -89,6 +92,10 @@ export type SeasonModeState = {
   history: SeasonMatchHistoryEntry[];
   hallOfFame: boolean;
   prestigeCount: number;
+  /** League of every AI club in this world; missing means every club plays in its catalogue league (old saves). */
+  aiLeagues?: AiLeagues;
+  /** The AI clubs that changed league after the last finished season. */
+  lastAiMoves?: AiMove[];
 };
 
 export type GameFeatures = {
@@ -203,6 +210,9 @@ export const GAME_FEATURES_SCHEMA_VERSION = 9;
 export const SEASON_MODE_DIVISION_COUNT = 15;
 export const SEASON_MODE_MATCHES_PER_SEASON = 10;
 export const SEASON_MODE_TABLE_SIZE = 6;
+/** Owner decision 12 Nov 2026: one place goes up and one goes down across every league boundary, for every club including the own one. The same count moves AI clubs. */
+export const SEASON_PROMOTION_PLACES = 1;
+export const SEASON_RELEGATION_PLACES = 1;
 export const TRANSFER_EVENT_MIN_DELAY_MS = 480000;
 export const TRANSFER_EVENT_MAX_DELAY_MS = 720000;
 export const TRANSFER_LOAN_CHANCE = 0.30;
@@ -785,16 +795,16 @@ export function getSeasonOpponentRating(division: number, index: number) {
   return Math.round(clamp(40 + (Math.max(1, division) - 1) * 3.4 + index * 1.5, 40, 99));
 }
 
-function createSeasonTable(division: number, clubName: string): SeasonTableRow[] {
+function createSeasonTable(division: number, clubName: string, aiLeagues?: AiLeagues): SeasonTableRow[] {
   return [
     { id: "club", name: clubName || "FC Goal", rating: 0 },
-    ...SEASON_OPPONENT_NAMES.map((_, index) => ({ id: `season-opponent-${index + 1}`, name: seasonGeography(division, index).name, clubId: seasonGeography(division,index).id, venue: seasonGeography(division,index).venue, rating: getSeasonOpponentRating(division, index + 1) })),
+    ...SEASON_OPPONENT_NAMES.map((_, index) => ({ id: `season-opponent-${index + 1}`, name: seasonGeography(division, index, aiLeagues).name, clubId: seasonGeography(division, index, aiLeagues).id, venue: seasonGeography(division, index, aiLeagues).venue, rating: getSeasonOpponentRating(division, index + 1) })),
   ].map((team) => ({ ...team, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 }));
 }
 
-function normalizeSeasonTable(raw: unknown, division: number, clubName: string) {
+function normalizeSeasonTable(raw: unknown, division: number, clubName: string, aiLeagues?: AiLeagues) {
   const saved = Array.isArray(raw) ? raw.map(asRecord) : [];
-  return createSeasonTable(division, clubName).map((fallback) => {
+  return createSeasonTable(division, clubName, aiLeagues).map((fallback) => {
     const source = saved.find((candidate) => candidate.id === fallback.id) ?? {};
     return {
       id: fallback.id,
@@ -930,8 +940,9 @@ export function normalizeSeasonModeState(value: unknown, clubName = "FC Goal", l
       createdAt: Math.max(1, Math.floor(Number(item.createdAt) || Date.now())),
     };
   }).filter((item): item is SeasonMatchHistoryEntry => Boolean(item)).slice(-30);
-  const table = normalizeSeasonTable(source.table, division, clubName);
-  const lastTable = normalizeSeasonTable(source.lastTable, division, clubName);
+  const aiLeagues = normalizeAiLeagues(source.aiLeagues);
+  const table = normalizeSeasonTable(source.table, division, clubName, aiLeagues);
+  const lastTable = normalizeSeasonTable(source.lastTable, division, clubName, aiLeagues);
   const generated=createSeasonFixtures(table);
   const fixtures=generated.map((fallback,index)=>{const raw=asRecord((Array.isArray(source.fixtures)?source.fixtures:[])[index]);return raw.opponentId===fallback.opponentId&&typeof raw.away==='boolean'?{...fallback,away:raw.away,venue:raw.away?(table.find(t=>t.id===raw.opponentId)?.venue??fallback.venue):HOME_VENUE}:fallback;});
   const teamIds = new Set(table.map((team) => team.id));
@@ -961,6 +972,8 @@ export function normalizeSeasonModeState(value: unknown, clubName = "FC Goal", l
     history,
     hallOfFame,
     prestigeCount: Math.max(0, Math.floor(Number(source.prestigeCount) || 0)),
+    ...(aiLeagues ? { aiLeagues } : {}),
+    lastAiMoves: normalizeAiMoves(source.lastAiMoves),
   };
 }
 
@@ -1041,11 +1054,11 @@ export function recordSeasonModeMatch(value: unknown, clubScore: number, opponen
       seasonOutcome = "hall-of-fame";
       nextDivision = SEASON_MODE_DIVISION_COUNT;
       lastResult = "Hall of Fame erreicht. Dein Club ist Meister der Weltliga.";
-    } else if (position <= 2 && state.division < SEASON_MODE_DIVISION_COUNT) {
+    } else if (position <= SEASON_PROMOTION_PLACES && state.division < SEASON_MODE_DIVISION_COUNT) {
       seasonOutcome = "promoted";
       nextDivision = state.division + 1;
       lastResult = `Saison beendet: Platz ${position} und Aufstieg in Liga ${16-nextDivision}.`;
-    } else if (position >= SEASON_MODE_TABLE_SIZE - 1 && state.division > 1) {
+    } else if (position > SEASON_MODE_TABLE_SIZE - SEASON_RELEGATION_PLACES && state.division > 1) {
       seasonOutcome = "relegated";
       nextDivision = state.division - 1;
       lastResult = `Saison beendet: Platz ${position} und Abstieg in Liga ${16-nextDivision}.`;
@@ -1070,13 +1083,20 @@ export function recordSeasonModeMatch(value: unknown, clubScore: number, opponen
     // Only for the season's completion (club chronicle); the stored history does not keep it.
     ...(completedSeason ? { finalTable: lastTable } : {}),
   };
+  // The AI clubs move too: as many up from the lower league as go down from the upper one (the relegation places).
+  const aiMovement = completedSeason && !hallOfFame
+    ? advanceAiLeagues({ aiLeagues: state.aiLeagues, playerDivision: state.division, playerLeagueAiOrder: lastTable.filter((team) => team.id !== "club").map((team) => team.clubId ?? ""), places: SEASON_RELEGATION_PLACES, ratingOf: getSeasonOpponentRating, rollScore: rollSeasonScore, random })
+    : null;
+  const nextAiLeagues = aiMovement ? aiMovement.aiLeagues : state.aiLeagues;
   const nextState: SeasonModeState = {
     ...state,
+    aiLeagues: nextAiLeagues,
+    ...(aiMovement ? { lastAiMoves: aiMovement.moves } : {}),
     division: nextDivision,
     highestDivision: nextHighestDivision,
     matchday: completedSeason ? 0 : matchday,
-    table: completedSeason && !hallOfFame ? createSeasonTable(nextDivision, clubName) : lastTable,
-    fixtures: completedSeason && !hallOfFame ? createSeasonFixtures(createSeasonTable(nextDivision,clubName)) : state.fixtures,
+    table: completedSeason && !hallOfFame ? createSeasonTable(nextDivision, clubName, nextAiLeagues) : lastTable,
+    fixtures: completedSeason && !hallOfFame ? createSeasonFixtures(createSeasonTable(nextDivision,clubName,nextAiLeagues)) : state.fixtures,
     // A new season starts without results; the finished one stays visible through lastTable.
     results: completedSeason && !hallOfFame ? [] : seasonResults,
     lastTable,
@@ -1128,6 +1148,9 @@ export function startSeasonPrestige(value: unknown, clubName = "FC Goal", now = 
     lastMatchAt: now,
     hallOfFame: false,
     prestigeCount: state.prestigeCount + 1,
+    // A new run starts in the catalogue leagues again.
+    aiLeagues: undefined,
+    lastAiMoves: [],
   };
 }
 

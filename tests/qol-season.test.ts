@@ -27,10 +27,13 @@ test('form guide lists the last five results of a team, oldest first', () => {
 });
 
 test('promotion outlook: sure, gap with games left, impossible', () => {
-  const sure = [row('club', 27, 9), row('a', 24, 9), row('b', 9, 9), row('c', 6, 9), row('d', 3, 9), row('e', 0, 9)];
+  const sure = [row('club', 27, 9), row('a', 20, 9), row('b', 9, 9), row('c', 6, 9), row('d', 3, 9), row('e', 0, 9)];
   assert.equal(promotionOutlook(sure, [], 3), 'Aufstieg sicher');
+  // One place goes up: the runner up can still draw level with one match left, so it is not sure yet.
+  const open = [row('club', 27, 9), row('a', 24, 9), row('b', 9, 9), row('c', 6, 9), row('d', 3, 9), row('e', 0, 9)];
+  assert.equal(promotionOutlook(open, [], 3), 'Aufstiegsplatz · noch 1 Spiel');
   const chase = [row('a', 15, 6), row('b', 12, 6), row('club', 9, 6), row('c', 6, 6), row('d', 3, 6), row('e', 0, 6)];
-  assert.equal(promotionOutlook(chase, [], 3), '3 Punkte Rückstand auf Platz 2 · noch 4 Spiele');
+  assert.equal(promotionOutlook(chase, [], 3), '6 Punkte Rückstand auf Platz 1 · noch 4 Spiele');
   const gone = [row('a', 27, 9), row('b', 25, 9), row('club', 20, 9), row('c', 6, 9), row('d', 3, 9), row('e', 0, 9)];
   assert.equal(promotionOutlook(gone, [], 3), 'Aufstieg nicht mehr möglich · noch 1 Spiel');
   const top = [row('club', 27, 9), row('a', 20, 9), row('b', 9, 9), row('c', 6, 9), row('d', 3, 9), row('e', 0, 9)];

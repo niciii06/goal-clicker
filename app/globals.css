@@ -2501,3 +2501,10 @@ main :is(h2, h3, h4)[tabindex="-1"]:focus-visible { outline: 3px solid var(--acc
 .gc-interactive-pause { margin-top: var(--space-2); }
 .gc-interactive-controls { margin-top: var(--space-3); margin-bottom: var(--space-3); row-gap: var(--space-2); }
 .gc-interactive-controls + .gc-sub-panel, .gc-interactive-pause + .gc-sub-panel { margin-top: 0; }
+
+/* AI clubs that changed league after the finished season: two calm columns, one line per club. */
+.season-ai-moves-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: var(--space-3); padding-top: var(--space-2); }
+.season-ai-moves-grid h5 { margin: 0 0 var(--space-1); color: var(--soft); font-size: var(--text-footnote); font-weight: 700; }
+.season-ai-moves-grid ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.season-ai-moves-grid li { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-2); padding: var(--space-1) 0; border-bottom: 1px solid var(--line-soft); font-size: var(--text-footnote); }
+.season-ai-moves-grid li small { color: var(--soft); font-size: var(--text-caption); }

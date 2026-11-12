@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { getSeasonModeDivisionLabel, getSeasonSchedule, SEASON_MODE_DIVISION_COUNT, SEASON_MODE_MATCHES_PER_SEASON, sortSeasonTable } from "./feature-data";
+import { getSeasonModeDivisionLabel, getSeasonSchedule, SEASON_MODE_DIVISION_COUNT, SEASON_MODE_MATCHES_PER_SEASON, SEASON_PROMOTION_PLACES, SEASON_RELEGATION_PLACES, sortSeasonTable } from "./feature-data";
 import type { GameFeatures, SeasonResult, SeasonScheduleMatch, SeasonTableRow } from "./feature-data";
 import { getStarXIPlayer } from "./feature-data";
 import { formMatchLabel, formMatches, promotionOutlook, seasonTopScorers } from "./qol/season-insights";
@@ -42,7 +42,7 @@ function StandingsTable({ table, results, division, caption }: { table: readonly
       <caption>{caption}</caption>
       <thead><tr><th scope="col">#</th><th scope="col">Club</th><th scope="col" title="Spiele">Sp</th><th scope="col" title="Siege">S</th><th scope="col" title="Unentschieden">U</th><th scope="col" title="Niederlagen">N</th><th scope="col">Tore</th><th scope="col" title="Tordifferenz">+/-</th><th scope="col" className="season-form-head">Form</th><th scope="col" title="Punkte">Pkt</th></tr></thead>
       <tbody>{rows.map((team, index) => {
-        const zone = top ? (index === 0 ? "hall-of-fame" : index >= rows.length - 2 ? "relegation" : "") : index < 2 ? "promotion" : index >= rows.length - 2 && division > 1 ? "relegation" : "";
+        const zone = top ? (index === 0 ? "hall-of-fame" : index >= rows.length - SEASON_RELEGATION_PLACES ? "relegation" : "") : index < SEASON_PROMOTION_PLACES ? "promotion" : index >= rows.length - SEASON_RELEGATION_PLACES && division > 1 ? "relegation" : "";
         const diff = team.goalsFor - team.goalsAgainst;
         const form = formMatches(team.id, results);
         return <tr key={team.id} className={`${zone}${team.id === "club" ? " club" : ""}`}>
@@ -60,7 +60,7 @@ function StandingsTable({ table, results, division, caption }: { table: readonly
     </table>
     </div>
     {tip && <div id="season-form-tip" role="tooltip" className="season-form-tip" style={{ left: tip.left, top: tip.top }}>{tip.text}</div>}
-    <p className="season-hub-legend"><span className={top ? "hall-of-fame" : "promotion"}>{top ? "Platz 1: Hall of Fame" : "Platz 1 und 2: Aufstieg"}</span>{division > 1 && <span className="relegation">Platz 5 und 6: Abstieg</span>}<small className="season-hub-tie-break">Bei gleich vielen Punkten zählen Tordifferenz, erzielte Tore und danach die direkten Begegnungen.</small></p>
+    <p className="season-hub-legend"><span className={top ? "hall-of-fame" : "promotion"}>{top ? "Platz 1: Hall of Fame" : `Platz ${placesLabel(1, SEASON_PROMOTION_PLACES)}: Aufstieg`}</span>{division > 1 && <span className="relegation">{`Platz ${placesLabel(rows.length - SEASON_RELEGATION_PLACES + 1, rows.length)}: Abstieg`}</span>}<small className="season-hub-tie-break">Bei gleich vielen Punkten zählen Tordifferenz, erzielte Tore und danach die direkten Begegnungen.</small></p>
   </div>;
 }
 
@@ -74,6 +74,17 @@ function MatchLine({ match }: { match: SeasonScheduleMatch }) {
 }
 
 /** Season tab: the table, the club's remaining matches and every matchday of the league. */
+/** "1" for a single place, "5 und 6" for a range of places. */
+const placesLabel = (first: number, last: number) => (first === last ? `${first}` : `${first} und ${last}`);
+
+/** The AI clubs that changed league after the last season: the same number goes up and down at every boundary. */
+function AiMovesList({ moves }: { moves: NonNullable<GameFeatures["seasonMode"]["lastAiMoves"]> }) {
+  const up = moves.filter((move) => move.to > move.from), down = moves.filter((move) => move.to < move.from);
+  const league = (division: number) => `Liga ${16 - division}`;
+  const list = (items: typeof moves, label: string) => <div><h5>{label} ({items.length})</h5><ul>{items.map((move) => <li key={move.clubId}><span>{move.name}</span><small>{league(move.from)} → {league(move.to)}</small></li>)}</ul></div>;
+  return <details className="season-hub-last season-ai-moves"><summary>Auf und Abstieg der anderen Vereine</summary><div className="season-ai-moves-grid">{list(up, "Aufsteiger")}{list(down, "Absteiger")}</div></details>;
+}
+
 export function SeasonPanel({ features, action }: { features: GameFeatures; /** Q46: start the next match or Prestige right here. */ action?: { label: string; disabled: boolean; note?: string; onClick: () => void } }) {
   const season = features.seasonMode, schedule = getSeasonSchedule(season);
   const next = schedule.filter((day) => !day.played);
@@ -88,6 +99,7 @@ export function SeasonPanel({ features, action }: { features: GameFeatures; /** 
     <StandingsTable table={season.table} results={season.results ?? []} division={season.division} caption="Tabelle" />
     {seasonTopScorers(features.career.seasonPlayers).length > 0 && <section className="season-hub-section" aria-label="Torschützen der Saison"><h4>Torschützen dieser Saison</h4><ol className="season-hub-scorers">{seasonTopScorers(features.career.seasonPlayers).map((entry) => <li key={entry.playerId}><strong>{getStarXIPlayer(entry.playerId)?.name ?? "Spieler"}</strong><span>{entry.goals} {entry.goals === 1 ? "Tor" : "Tore"} · {entry.assists} Vorl. · {entry.appearances} Sp.</span></li>)}</ol></section>}
     {showLastSeason && <details className="season-hub-last"><summary>Abschlusstabelle der letzten Saison</summary><StandingsTable table={season.lastTable} results={season.lastResults ?? []} division={Math.max(1, season.division - (season.history.at(-1)?.seasonOutcome === "promoted" ? 1 : season.history.at(-1)?.seasonOutcome === "relegated" ? -1 : 0))} caption="Letzte Saison" /></details>}
+    {showLastSeason && (season.lastAiMoves?.length ?? 0) > 0 && <AiMovesList moves={season.lastAiMoves!} />}
     <section className="season-hub-section" aria-label="Deine nächsten Spiele">
       <h4>Deine nächsten Spiele</h4>
       {next.length && !season.hallOfFame ? <ol className="season-hub-next">{next.map((day, index) => {

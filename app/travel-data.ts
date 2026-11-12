@@ -28,7 +28,7 @@ function normalizeTravelUnchecked(value: unknown): TravelState {
 }
 export function fixtureFor(features: GameFeatures, mode: 'season'|'tournament', tournamentId: TournamentId='stadium'): TravelFixture {
  if (mode==='season') {
-  const s=features.seasonMode, o=getSeasonModeNextOpponent(s,features.club.name), index=Number(o.id.split('-').at(-1))-1, geo=seasonGeography(s.division,index), saved=s.fixtures?.[s.matchday], away=saved?.away??s.matchday%2===1, venue=away?(saved?.venue??s.table.find(t=>t.id===o.id)?.venue??geo.venue):HOME_VENUE;
+  const s=features.seasonMode, o=getSeasonModeNextOpponent(s,features.club.name), index=Number(o.id.split('-').at(-1))-1, geo=seasonGeography(s.division,index,s.aiLeagues), saved=s.fixtures?.[s.matchday], away=saved?.away??s.matchday%2===1, venue=away?(saved?.venue??s.table.find(t=>t.id===o.id)?.venue??geo.venue):HOME_VENUE;
   return {id:`season:${s.prestigeCount}:${features.career.seasonNumber}:${s.division}:${s.matchday}:${s.history.at(-1)?.id||'initial'}`,mode,tournamentId:'stadium',opponentId:o.id,opponent:o.name,away,region:away?classifyDestination(venue):0,venue:features.travel.journey&&!features.travel.journey.consumed&&features.travel.journey.fixture.mode==='season'&&features.travel.journey.fixture.id===`season:${s.prestigeCount}:${features.career.seasonNumber}:${s.division}:${s.matchday}:${s.history.at(-1)?.id||'initial'}`?features.travel.journey.fixture.venue:currentVenue(venue),schedule:[]};
  }
  const c=features.cup, t=getTournament(tournamentId)!;

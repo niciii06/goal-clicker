@@ -34,11 +34,11 @@ test("a three-way tie is decided by the mini table of the matches between the th
   assert.deepEqual(sortSeasonTable(table, results).map((team) => team.id), ["season-opponent-1", "season-opponent-2", "club"]);
 });
 
-/** The last matchday of Liga 15: our club and Aarau end level on points, goal difference and goals in second place. */
+/** The last matchday: our club and Aarau end level on points, goal difference and goals in first place (one place goes up). */
 function promotionRace(headToHead: { homeScore: number; awayScore: number }): SeasonModeState {
   const base = initialSeasonMode("FC Test");
   const values: Record<string, [number, number, number]> = {
-    club: [10, 10, 8], "season-opponent-1": [12, 11, 8], "season-opponent-2": [25, 20, 2], "season-opponent-3": [3, 2, 15], "season-opponent-4": [3, 2, 15], "season-opponent-5": [3, 2, 15],
+    club: [10, 10, 8], "season-opponent-1": [12, 11, 8], "season-opponent-2": [3, 2, 15], "season-opponent-3": [3, 2, 15], "season-opponent-4": [3, 2, 15], "season-opponent-5": [3, 2, 15],
   };
   return {
     ...base,
@@ -56,20 +56,20 @@ test("head-to-head decides promotion at the end of the season, and the club gets
   assert.equal(level[0].points, level[1].points);
   assert.equal(level[0].goalsFor - level[0].goalsAgainst, level[1].goalsFor - level[1].goalsAgainst);
   assert.equal(level[0].goalsFor, level[1].goalsFor);
-  assert.equal(lost.entry?.seasonOutcome, "stayed", "Aarau won the direct match and goes up");
+  assert.equal(lost.entry?.seasonOutcome, "stayed", "Aarau won the direct match and goes up, our club is second and stays");
   assert.equal(lost.state.division, 1);
   assert.equal(lost.state.lastResults?.length, 4, "the finished season keeps its results for the final table");
-  assert.equal(sortSeasonTable(lost.state.lastTable, lost.state.lastResults)[2].id, "club");
+  assert.equal(sortSeasonTable(lost.state.lastTable, lost.state.lastResults)[1].id, "club");
   assert.equal(getSeasonTitle(lost.entry, lost.state.lastTable, lost.state.lastResults), null);
 
   const won = recordSeasonModeMatch(promotionRace({ homeScore: 0, awayScore: 1 }), 1, 0, "FC Test", 5000, noGoals, "season-opponent-5");
   assert.equal(won.entry?.seasonOutcome, "promoted");
   assert.equal(won.state.division, 2);
-  assert.equal(sortSeasonTable(won.state.lastTable, won.state.lastResults)[1].id, "club");
+  assert.equal(sortSeasonTable(won.state.lastTable, won.state.lastResults)[0].id, "club");
   // The saved state keeps the results behind the final table.
   const restored = normalizeSeasonModeState(JSON.parse(JSON.stringify(won.state)), "FC Test");
   assert.deepEqual(restored.lastResults, won.state.lastResults);
-  assert.equal(sortSeasonTable(restored.lastTable, restored.lastResults)[1].id, "club");
+  assert.equal(sortSeasonTable(restored.lastTable, restored.lastResults)[0].id, "club");
 });
 
 test("old saves without lastResults rank the running table with its results", () => {

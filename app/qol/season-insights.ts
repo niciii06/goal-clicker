@@ -1,7 +1,7 @@
 // Season tab helpers (Q47 to Q49): form guide, what promotion still needs, top scorers of the running season. All
 // read the table the game itself uses (sortSeasonTable: points, goal difference, goals, then head to head).
 import type { SeasonResult, SeasonTableRow } from "../feature-data";
-import { SEASON_MODE_DIVISION_COUNT, SEASON_MODE_MATCHES_PER_SEASON, sortSeasonTable } from "../feature-data";
+import { SEASON_MODE_DIVISION_COUNT, SEASON_MODE_MATCHES_PER_SEASON, SEASON_PROMOTION_PLACES, SEASON_RELEGATION_PLACES, sortSeasonTable } from "../feature-data";
 
 export type FormLetter = "S" | "U" | "N";
 
@@ -42,7 +42,7 @@ export function promotionOutlook(table: readonly SeasonTableRow[], results: read
   const left = Math.max(0, SEASON_MODE_MATCHES_PER_SEASON - club.played);
   const maxOf = (team: SeasonTableRow) => team.points + 3 * Math.max(0, SEASON_MODE_MATCHES_PER_SEASON - team.played);
   const top = division >= SEASON_MODE_DIVISION_COUNT;
-  const spots = top ? 1 : 2;
+  const spots = top ? 1 : SEASON_PROMOTION_PLACES;
   const games = left === 1 ? "noch 1 Spiel" : `noch ${left} Spiele`;
   const goal = top ? "Hall of Fame" : "Aufstieg";
   // Sure: fewer than `spots` other teams can still reach the club's points.
@@ -52,9 +52,9 @@ export function promotionOutlook(table: readonly SeasonTableRow[], results: read
   const target = rows[spots - 1];
   const gap = target.points - club.points;
   if (maxOf(club) < target.points) return `${goal} nicht mehr möglich · ${games}`;
-  const relegation = division > 1 && index >= rows.length - 2;
-  const safe = rows[rows.length - 3];
-  if (relegation && safe) return `Abstiegsplatz · ${Math.max(0, safe.points - club.points)} ${safe.points - club.points === 1 ? "Punkt" : "Punkte"} bis Platz ${rows.length - 2} · ${games}`;
+  const relegation = division > 1 && index >= rows.length - SEASON_RELEGATION_PLACES;
+  const safe = rows[rows.length - SEASON_RELEGATION_PLACES - 1];
+  if (relegation && safe) return `Abstiegsplatz · ${Math.max(0, safe.points - club.points)} ${safe.points - club.points === 1 ? "Punkt" : "Punkte"} bis Platz ${rows.length - SEASON_RELEGATION_PLACES} · ${games}`;
   return `${gap} ${gap === 1 ? "Punkt" : "Punkte"} Rückstand auf Platz ${spots} · ${games}`;
 }
 

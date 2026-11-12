@@ -85,9 +85,15 @@ for(const club of FICTIONAL){const record=STADIUM_AUDIT.fictional.find(r=>r.venu
 const WORLD_IDS=['world-real-madreto','world-fc-barceloneta','world-liverpuhl-fc','world-manchester-cite','world-bayern-muenchan'];
 const WORLD = LEGACY_POOLS[7].map(([name,key],i):SeasonClub=>({id:WORLD_IDS[i],name,league:1,venue:VENUES[key]}));
 export const SEASON_CLUBS: SeasonClub[] = [...FICTIONAL,...SWISS_CLUBS as SeasonClub[],...WORLD];
-export function seasonGeography(division:number,index:number) {
+/** Which league (division) each AI club plays in this world; clubs that are not listed play in their catalogue league. */
+export type AiLeagues=Record<string,number>;
+/** The five AI clubs of a division, in stable catalogue order (the club slots keep their ratings and travel data). */
+export function seasonClubsOf(division:number,aiLeagues?:AiLeagues) {
+ return SEASON_CLUBS.filter(c=>(aiLeagues?.[c.id]??16-c.league)===division);
+}
+export function seasonGeography(division:number,index:number,aiLeagues?:AiLeagues) {
  const d=Math.max(1,Math.min(15,Math.floor(division))), i=Math.max(0,Math.min(4,index));
- const club=SEASON_CLUBS.filter(c=>c.league===16-d)[i];
+ const club=seasonClubsOf(d,aiLeagues)[i];
  if(!club)throw new Error(`Fehlender Club in Liga ${16-d}`);
  return {...club,region:classifyDestination(club.venue)};
 }
