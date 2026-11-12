@@ -36,3 +36,46 @@ test('the manifest and layout reference the generated icon files', async () => {
   for (const path of ['/favicon.svg', '/icons/icon-192.png', '/apple-touch-icon.png']) assert.ok(layout.includes(path), path);
   for (const path of ['/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-maskable-512.png']) assert.ok(manifest.includes(path), path);
 });
+
+test('the offline page is stored without the redirect mark, because the live host redirects /offline.html to /offline', async () => {
+  const { runInNewContext } = await import('node:vm');
+  const sw = await readFile(new URL('../public/sw.js', import.meta.url), 'utf8');
+  const stored = new Map<string, Response>();
+  const listeners: Record<string, (event: { waitUntil: (promise: Promise<unknown>) => void }) => void> = {};
+  const redirected = new Response('<html>offline</html>', { status: 200, headers: { 'content-type': 'text/html' } });
+  Object.defineProperty(redirected, 'redirected', { value: true });
+  const calls: string[] = [];
+  const sandbox = {
+    self: { addEventListener: (name: string, handler: (event: { waitUntil: (promise: Promise<unknown>) => void }) => void) => { listeners[name] = handler; }, skipWaiting: async () => { calls.push('skipWaiting'); }, location: { origin: 'https://goalclicker.ch' }, clients: {} },
+    caches: { open: async () => ({ put: async (url: string, response: Response) => { stored.set(url, response); }, addAll: async (urls: string[]) => { calls.push(`addAll:${urls.join(',')}`); } }), keys: async () => [], match: async () => undefined },
+    fetch: async () => redirected,
+    Response, URL,
+  };
+  runInNewContext(sw, sandbox);
+  let pending: Promise<unknown> = Promise.resolve();
+  listeners.install({ waitUntil: (promise) => { pending = promise; } });
+  await pending;
+  const copy = stored.get('/offline.html')!;
+  assert.ok(copy, 'the offline page is cached');
+  assert.equal(copy.redirected, false, 'a redirected response cannot answer a navigation');
+  assert.equal(await copy.text(), '<html>offline</html>');
+  assert.ok(calls.includes('skipWaiting'));
+  assert.ok(calls.some((call) => call.startsWith('addAll:/icons/icon-192.png')));
+});
+
+test('a missing offline page stops the install instead of caching an error page', async () => {
+  const { runInNewContext } = await import('node:vm');
+  const sw = await readFile(new URL('../public/sw.js', import.meta.url), 'utf8');
+  const listeners: Record<string, (event: { waitUntil: (promise: Promise<unknown>) => void }) => void> = {};
+  const sandbox = { self: { addEventListener: (name: string, handler: (event: { waitUntil: (promise: Promise<unknown>) => void }) => void) => { listeners[name] = handler; }, skipWaiting: async () => undefined, location: { origin: 'https://x' }, clients: {} }, caches: { open: async () => ({ put: async () => undefined, addAll: async () => undefined }), keys: async () => [] }, fetch: async () => new Response('nope', { status: 404 }), Response, URL };
+  runInNewContext(sw, sandbox);
+  let pending: Promise<unknown> = Promise.resolve();
+  listeners.install({ waitUntil: (promise) => { pending = promise; } });
+  await assert.rejects(pending, /offline page 404/);
+});
+
+test('link previews use the production domain as their base', async () => {
+  const layout = await readFile(new URL('../app/layout.tsx', import.meta.url), 'utf8');
+  assert.match(layout, /metadataBase: new URL\("https:\/\/goalclicker\.ch"\)/);
+  assert.doesNotMatch(layout, /metadataBase: new URL\("https:\/\/goal-clicker\.vercel\.app"\)/);
+});

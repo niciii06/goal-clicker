@@ -1,15 +1,30 @@
 // Service worker of the installable app. Pages and the API always come from the network, because the game needs
 // the login and the cloud save; without a connection a page request shows offline.html. Hashed build files, icons
 // and stadium sounds never change, so they are served from the cache once loaded.
-// Bumped with the green app icons so installed copies drop the cached blue ones.
-const VERSION = "v2";
+// Bumped with the green app icons so installed copies drop the cached blue ones, and again for the offline page copy below.
+const VERSION = "v3";
 const STATIC_CACHE = `goal-clicker-static-${VERSION}`;
 const OFFLINE_CACHE = `goal-clicker-offline-${VERSION}`;
 const OFFLINE_URL = "/offline.html";
 const MAX_STATIC_ENTRIES = 200;
 
+// The live host answers /offline.html with a redirect to /offline. A response that was redirected cannot answer a
+// navigation request in a browser, so the offline page is stored as a plain copy without the redirect mark.
+async function plainCopy(response) {
+  if (!response.redirected) return response;
+  return new Response(await response.blob(), { status: response.status, statusText: response.statusText, headers: response.headers });
+}
+
+async function precache() {
+  const cache = await caches.open(OFFLINE_CACHE);
+  const page = await fetch(OFFLINE_URL);
+  if (!page.ok) throw new Error(`offline page ${page.status}`);
+  await cache.put(OFFLINE_URL, await plainCopy(page));
+  await cache.addAll(["/icons/icon-192.png", "/favicon.svg"]);
+}
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(OFFLINE_CACHE).then((cache) => cache.addAll([OFFLINE_URL, "/icons/icon-192.png", "/favicon.svg"])).then(() => self.skipWaiting()));
+  event.waitUntil(precache().then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (event) => {
