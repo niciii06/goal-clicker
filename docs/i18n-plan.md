@@ -18,11 +18,58 @@ Nachweise beim Umbau: `account-api.ts` mit den Katalogtexten zurückersetzt ist 
 
 Diese Dateien sind auf Sonnets Branch (Stand `28416b4`) nicht geändert.
 
+## Etappe 2: Sprachwahl Deutsch und Englisch (Branch `claude/opus-i18n-language-choice`)
+
+Freigegeben von Nicolas: Sprachwahl, dauerhaft gespeicherte Präferenz, Deutsch Fallback, lokalisierte Texte inklusive Konto und Fehlermeldungen, responsive Oberflächentests.
+
+**Fertig in dieser Etappe**
+
+* **Sprachwahl** Deutsch und English, gebaut wie die Darstellungswahl (segmentierte Optionsgruppe, jede Sprache in ihrer eigenen Schreibweise, auf Touchgeräten 44 px hoch):
+  * auf der Anmeldeseite direkt unter dem Logo (vor der Anmeldung erreichbar),
+  * im Kontomenü und im Gastmenü,
+  * in den Einstellungen dieses Geräts (Club & Mehr).
+* **Präferenz** dauerhaft auf dem Gerät (`goalClickerLocaleV1`). Sie kommt nie in den Spielstand und nie in das Konto, damit bestehende Spielstände unverändert bleiben.
+* **Ohne Wahl** gilt die Browsersprache, sonst Deutsch. Französisch und Spanisch werden nie angezeigt, solange ihre Kataloge fehlen.
+* **Deutsch Fallback** je Text: Fehlt eine Übersetzung, erscheint der deutsche Text.
+* **`<html lang>`:** Der Server rendert weiter `lang="de"`, der Browser setzt danach die gewählte Sprache.
+* **Laufzeit** `app/i18n/runtime.ts`:
+  * `t()` übersetzt in die gewählte Sprache, auf dem Server immer Deutsch.
+  * `localizeText()` übersetzt deutsche Texte, die schon fertig ankommen (API Antworten, Konstanten), wenn der Katalog sie kennt.
+  * Die API bleibt unverändert, Entscheidung C (Fehlercodes) ist dafür nicht nötig.
+* **Übersetzte Oberflächen:**
+  * Anmeldeseite mit allen Zuständen: Anmelden, Konto erstellen, Profil anlegen, Spielstandwahl, Speicher voll, keine Verbindung, Konto gelöscht, neue Version.
+  * Kontomenü und Gastmenü, Darstellungswahl, App Installation.
+  * Hauptnavigation und Unterreiter, Geräteeinstellungen.
+  * Alle Fehlermeldungen der Konto API und der Anmeldung (`auth/browser.ts`), Prüfmeldungen für Benutzername, Anzeigename und Passwort, Sync Meldungen.
+* **Tests:**
+  * `tests/i18n-runtime.test.ts`: Server Deutsch, Browsersprache, gespeicherte Wahl, `html lang`, Fallback, `localizeText`, Prüfmeldungen, jeder verwendete Schlüssel in beiden Katalogen.
+  * `tests/i18n.test.ts`: angepasst an den neuen Vertrag.
+  * `tests/browser/i18n.test.ts`: Telefon, Tablet, Desktop; Umschalten, Neuladen, Spielstand unberührt, kein horizontaler Überlauf, Browsersprache Englisch und Französisch.
+  * Die übrigen Browsertests (`smoke`, `account`) laufen mit einem Browser auf `de-CH`, weil Playwright sonst `en-US` meldet und das Spiel dann Englisch startet.
+
+**Was noch Deutsch ist** (Schätzung `node scripts/i18n/inventory.mjs`, rund 1690 Texte):
+
+| Etappe | Dateien | Texte |
+| --- | --- | --- |
+| 3 | `app/game-app.tsx` (Spielansicht, Toasts, Dialoge) | rund 410 |
+| 4 | `app/career-panels.tsx`, `app/season-panel.tsx`, `app/prestige-dialog.tsx`, `app/home-city-picker.tsx` (falls gemergt), `app/leaderboard-panel.tsx`, `app/daily-reward-panel.tsx`, `app/match-*.tsx`, `app/interactive-match-panel.tsx`, `app/travel-panel.tsx` | rund 250 |
+| 5 | Spieldaten mit Anzeigetexten: `app/game/upgrades.ts`, `app/game/constants.ts`, `app/features/catalog.ts`, `app/season-progression.ts`, `app/tutorial.ts`, `app/whats-new.ts`, `app/press-conference.ts`, `app/travel-data.ts`, `app/travel-geography.ts` (Liganamen, Regionen) | rund 400 |
+| 6 | Meldungen der Multiplayer Route (`app/api/multiplayer/route.ts`, rund 140): über `localizeText` an der Anzeigestelle, sobald im Katalog | rund 140 |
+| offen, Entscheidung B | Texte, die in Spielständen und Welten gespeichert werden (Verlauf, Schlagzeilen, rund 55 Stellen in `feature-data.ts`, `career-data.ts`, Route) | rund 55 |
+
+Spielernamen und Clubnamen (`fc26-*`, `fc27-*`) sind Eigennamen und werden nicht übersetzt.
+
+**Weiter offene Entscheidungen**
+
+* **B:** Verlauf und Schlagzeilen künftig als Schlüssel speichern?
+* **D:** britisches Englisch, wie angelegt?
+* **A** ist für diese Etappe so gelöst: nur auf dem Gerät, weil bestehende Spielstände nicht verändert werden dürfen. Ein späteres Mitreisen mit dem Konto bräuchte ein eigenes Feld ausserhalb des Spielstands.
+
 ## Dateien
 
 | Datei | Zweck |
 | --- | --- |
-| `app/i18n/locales.ts` | Sprachen `de`, `en`, `fr`, `es`; eingeschaltet nur `de`. Auflösung gespeicherte Wahl, dann Browsersprache, dann Deutsch. Speichern der Wahl, robust gegen gesperrten oder vollen Speicher. |
+| `app/i18n/locales.ts` | Sprachen `de`, `en`, `fr`, `es`; eingeschaltet `de` und `en` (seit Etappe 2). Auflösung gespeicherte Wahl, dann Browsersprache, dann Deutsch. Speichern der Wahl, robust gegen gesperrten oder vollen Speicher. |
 | `app/i18n/messages/de.ts` | Deutscher Quellkatalog. Jeder Schlüssel jeder Sprache kommt von hier. |
 | `app/i18n/messages/en.ts` | Englischer Katalog (britisches Englisch), nur für die Startschlüssel. |
 | `app/i18n/translate.ts` | `translate`, `translator`: Platzhalter `{name}`, Mehrzahl über `Intl.PluralRules`, Zahlen im Format der Sprache, Rückfall auf Deutsch je Schlüssel, Lückenbericht je Sprache. |
@@ -41,8 +88,7 @@ node scripts/i18n/inventory.mjs --all
 Die Tests prüfen:
 
 * Die deutschen Einträge sind **wortgleich** mit den Konstanten, die sie später ersetzen (`STORAGE_FULL_MESSAGE`, `SAVE_TOO_LARGE_MESSAGE`, `NEWER_VERSION_MESSAGE`, `MULTIPLAYER_UPDATE_MESSAGE`) und mit dem Zahlenformat de-CH.
-* Mit nur Deutsch eingeschaltet schaltet keine gespeicherte Wahl und keine Browsersprache um.
-* Sobald eine Sprache eingeschaltet wäre: gespeicherte Wahl vor Browser vor Deutsch; nicht eingeschaltete Sprachen werden nie gezeigt.
+* Gespeicherte Wahl vor Browser vor Deutsch; nicht eingeschaltete Sprachen werden nie gezeigt.
 * Fehlende Übersetzungen fallen je Schlüssel auf Deutsch zurück, samt deutschem Zahlenformat.
 * Mehrzahl richtig für Deutsch und Englisch; ein fehlender Wert bleibt als `{count}` sichtbar statt zu verschwinden.
 * Kein Katalog hat Schlüssel, die Deutsch nicht kennt, und jede Übersetzung behält die Platzhalter.

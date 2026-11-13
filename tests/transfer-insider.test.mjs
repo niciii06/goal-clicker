@@ -53,7 +53,7 @@ test("Fabrizio stays available while the player transfer market is closed", asyn
 
   assert.match(pageSource, /type FeatureTab = RoutedTab;/);
   assert.match(routesSource, /fabrizio: '\/club\/fabrizio'/);
-  assert.match(pageSource, /\{ id: "fabrizio", label: "Fabrizio" \}/);
+  assert.match(pageSource, /\{ id: "fabrizio", label: (?:"Fabrizio"|t\('nav\.fabrizio'\)) \}/);
   assert.match(pageSource, /Keine Spielerkäufe bei Fabrizio/);
   assert.match(pageSource, /featureTab === "fabrizio"/);
   assert.doesNotMatch(pageSource, /buyTransfer/);

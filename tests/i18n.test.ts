@@ -26,11 +26,11 @@ test('the German catalog has exactly the wording the game showed before the cata
   assert.equal(translate('de', 'pack.fragmentsBack', { amount: 12500 }), `+${(12500).toLocaleString('de-CH')} Fragmente zurück.`);
 });
 
-test('only German is enabled: no stored or browser language switches the game', () => {
-  assert.deepEqual([...ENABLED_LOCALES], ['de']);
-  for (const stored of [null, 'de', 'en', 'fr', 'es', 'xx', 42]) {
-    assert.equal(resolveLocale(stored, ['en-GB', 'fr-CH', 'es']), 'de', String(stored));
-  }
+test('German and English can be chosen; French and Spanish never show until their catalogues exist', () => {
+  assert.deepEqual([...ENABLED_LOCALES], ['de', 'en']);
+  assert.equal(resolveLocale('en', ['de-CH']), 'en', 'the stored choice wins');
+  assert.equal(resolveLocale(null, ['en-US']), 'en', 'without a choice the browser language');
+  for (const stored of [null, 'fr', 'es', 'xx', 42]) assert.equal(resolveLocale(stored, ['fr-CH', 'es']), 'de', String(stored));
 });
 
 test('with a language enabled later, the stored choice wins, then the browser, then German', () => {
@@ -46,8 +46,10 @@ test('the stored preference survives broken storage and only takes enabled langu
   const map = new Map<string, string>();
   const storage = { getItem: (k: string) => map.get(k) ?? null, setItem: (k: string, v: string) => { map.set(k, v); } };
   assert.equal(readStoredLocale(storage), null);
-  assert.equal(storeLocale(storage, 'en'), false, 'English is not enabled');
+  assert.equal(storeLocale(storage, 'fr'), false, 'French is not enabled');
   assert.equal(map.size, 0);
+  assert.equal(storeLocale(storage, 'en'), true);
+  assert.equal(readStoredLocale(storage), 'en');
   assert.equal(storeLocale(storage, 'de'), true);
   assert.equal(map.get(LOCALE_STORAGE_KEY), 'de');
   assert.equal(readStoredLocale(storage), 'de');
@@ -89,7 +91,7 @@ test('every catalog only uses German keys and keeps the placeholders of each mes
   assert.deepEqual(catalogGaps('en').missing, [], 'English covers the seeded keys');
 });
 
-test('no language choice is wired: nothing outside app/i18n reads or stores a language', () => {
+test('only app/i18n reads or stores the language; server texts stay German', () => {
   const files: string[] = [];
   (function walk(dir: string) {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -104,6 +106,9 @@ test('no language choice is wired: nothing outside app/i18n reads or stores a la
     if (!/from "\.{1,2}\/(?:\.\.\/)*i18n\//.test(text)) continue;
     for (const match of text.matchAll(/(?<![.\w])translat(?:e|or)\(\s*([^,)\s]+)/g)) assert.equal(match[1], 'SOURCE_LOCALE', `${file}: ${match[0]}`);
   }
-  // The pages that would show a switch do not import the layer (layout.tsx sets lang="de" as before).
-  for (const file of ['app/page.tsx', 'app/game-app.tsx', 'app/layout.tsx'].filter((f) => existsSync(f))) assert.doesNotMatch(readFileSync(file, 'utf8'), /i18n\//, file);
+  // The server renders lang="de" as before; the browser switches it after reading the choice (app/i18n/runtime.ts).
+  assert.match(readFileSync('app/layout.tsx', 'utf8'), /lang="de"/);
+  assert.doesNotMatch(readFileSync('app/layout.tsx', 'utf8'), /i18n\//);
+  // The game uses only the runtime layer (current language and its re-render hook), never the storage helpers.
+  if (existsSync('app/game-app.tsx')) for (const match of readFileSync('app/game-app.tsx', 'utf8').matchAll(/from "\.\/i18n\/([\w-]+)"/g)) assert.ok(['runtime', 'use-locale'].includes(match[1]), match[0]);
 });

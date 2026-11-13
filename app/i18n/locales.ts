@@ -1,11 +1,11 @@
-// Languages of the game (docs/i18n-plan.md). German is the source language and the only one switched on: until a
-// language is in ENABLED_LOCALES, every resolution ends in German, so nothing visible changes for players.
+// Languages of the game (docs/i18n-plan.md). German is the source language and the fallback for every missing text;
+// English can be chosen. A language that is not enabled never shows.
 export const SOURCE_LOCALE = "de" as const;
 export const LOCALES = ["de", "en", "fr", "es"] as const;
 export type Locale = (typeof LOCALES)[number];
 
-/** Languages players can get. English joins only once its catalog covers the game and the switch is designed. */
-export const ENABLED_LOCALES: readonly Locale[] = [SOURCE_LOCALE];
+/** Languages players can choose (settings and login screen). French and Spanish follow once their catalogues exist. */
+export const ENABLED_LOCALES: readonly Locale[] = [SOURCE_LOCALE, "en"];
 
 /** BCP 47 tags for Intl (numbers, plurals). German keeps the Swiss format the game uses today (de-CH). */
 export const INTL_TAG: Record<Locale, string> = { de: "de-CH", en: "en-GB", fr: "fr-CH", es: "es-ES" };
