@@ -1,9 +1,6 @@
 // Rules for usernames, display names and passwords. The forms and the API share them.
-import { SOURCE_LOCALE } from "./i18n/locales";
-import { translator } from "./i18n/translate";
-
-/** Validation messages, German until a language choice exists (docs/i18n-plan.md). */
-const t = translator(SOURCE_LOCALE);
+// Validation messages in the current language: German on the server (API answers), the chosen one in the browser.
+import { t } from "./i18n/runtime";
 
 export const USERNAME_MIN = 3;
 export const USERNAME_MAX = 20;

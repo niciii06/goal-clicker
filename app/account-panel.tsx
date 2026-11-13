@@ -14,23 +14,27 @@ import type { InstallState } from "./pwa";
 import { DISPLAY_NAME_MAX, displayNameError, PASSWORD_MAX, PASSWORD_MIN, passwordError, USERNAME_MAX, usernameError } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
 import { readThemePreference, setThemePreference, THEME_OPTIONS } from "./theme";
+import { currentIntlTag, localizeText, t } from "./i18n/runtime";
+import type { MessageKey } from "./i18n/translate";
+import { useLocale } from "./i18n/use-locale";
+import { LanguagePicker } from "./i18n/language-picker";
 import type { ThemePreference } from "./theme";
 
 /** What the return from linking Google (?google=...) tells the player. */
-const GOOGLE_LINK_MESSAGES: Record<string, string> = {
-  verknuepft: "Google ist jetzt mit deinem Konto verknüpft. Du kannst dich ab sofort auch mit Google anmelden.",
-  vergeben: "Dieses Google Konto gehört schon zu einem anderen Spielerkonto.",
-  abgebrochen: "Die Verknüpfung mit Google wurde abgebrochen.",
-  fehler: "Die Verknüpfung mit Google hat nicht geklappt. Bitte versuche es nochmal.",
-  "nicht-konfiguriert": "Der Login ist auf diesem Server noch nicht eingerichtet.",
+const GOOGLE_LINK_MESSAGES: Record<string, MessageKey> = {
+  verknuepft: "google.linked",
+  vergeben: "google.taken",
+  abgebrochen: "google.cancelled",
+  fehler: "google.failed",
+  "nicht-konfiguriert": "auth.notSetUp",
 };
 
-const SYNC_LABELS: Record<SyncStatus, string> = { saved: "Gespeichert", saving: "Speichert …", offline: "Offline, wird später gespeichert", failed: "Nicht gespeichert, der Browser Speicher ist voll" };
+const SYNC_LABELS: Record<SyncStatus, MessageKey> = { saved: "sync.saved", saving: "sync.saving", offline: "sync.offline", failed: "sync.failed" };
 
 async function linkAccount(playerId: string) {
   const response = await fetch("/api/account", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ playerId }) });
   const data = await response.json() as { playerId?: string; email?: string | null; error?: string };
-  if (!response.ok) throw new Error(data.error ?? "Das Konto konnte nicht geladen werden.");
+  if (!response.ok) throw new Error(localizeText(data.error) || t("panel.accountLoadFailed"));
   return data;
 }
 
@@ -68,12 +72,13 @@ export function AccountLink({ playerId, onPlayerId, onMessage }: { playerId: str
 async function patchProfile(body: { displayName?: string; username?: string }) {
   const response = await fetch("/api/profile", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const data = await response.json().catch(() => ({})) as { profile?: PublicProfile; error?: string };
-  if (!response.ok || !data.profile) throw new Error(data.error ?? "Das Profil konnte nicht gespeichert werden.");
+  if (!response.ok || !data.profile) throw new Error(localizeText(data.error) || t("panel.profileSaveFailed"));
   return data.profile;
 }
 
 /** Profile settings: display name, username (every 30 days), password of username accounts and deleting the profile. */
 export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void }) {
+  useLocale();
   const account = useContext(AccountContext);
   const { status, message: syncMessage } = useSyncStatus();
   const [displayName, setDisplayName] = useState(account?.profile.displayName ?? "");
@@ -111,7 +116,7 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
     try {
       await action();
     } catch (error) {
-      onMessage(error instanceof Error && !("code" in error) ? error.message : authErrorMessage(error));
+      onMessage(error instanceof Error && !("code" in error) ? localizeText(error.message) : localizeText(authErrorMessage(error)));
     } finally {
       setBusy("");
     }
@@ -121,21 +126,21 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
     event.preventDefault();
     const problem = displayNameError(displayName);
     if (problem) { onMessage(problem); return; }
-    void run("name", async () => { account!.setProfile(await patchProfile({ displayName })); onMessage("Anzeigename gespeichert."); });
+    void run("name", async () => { account!.setProfile(await patchProfile({ displayName })); onMessage(t("panel.displayNameSaved")); });
   }
 
   function saveUsername(event: FormEvent) {
     event.preventDefault();
     const problem = usernameError(username);
     if (problem) { onMessage(problem); return; }
-    void run("username", async () => { account!.setProfile(await patchProfile({ username: username.trim() })); onMessage("Benutzername geändert."); });
+    void run("username", async () => { account!.setProfile(await patchProfile({ username: username.trim() })); onMessage(t("panel.usernameChanged")); });
   }
 
   function savePassword(event: FormEvent) {
     event.preventDefault();
-    const problem = (currentPassword ? null : "Gib dein aktuelles Passwort ein.") ?? passwordError(password) ?? (password !== passwordRepeat ? "Die beiden Passwörter stimmen nicht überein." : null);
+    const problem = (currentPassword ? null : t("panel.enterCurrentPassword")) ?? passwordError(password) ?? (password !== passwordRepeat ? t("panel.passwordsDiffer") : null);
     if (problem) { onMessage(problem); return; }
-    void run("password", async () => { await setAccountPassword(currentPassword, password); setCurrentPassword(""); setPassword(""); setPasswordRepeat(""); onMessage("Neues Passwort gespeichert. Andere Geräte sind abgemeldet."); });
+    void run("password", async () => { await setAccountPassword(currentPassword, password); setCurrentPassword(""); setPassword(""); setPasswordRepeat(""); onMessage(t("panel.passwordSaved")); });
   }
 
   function linkGoogle() {
@@ -144,30 +149,31 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
 
   function deleteProfile(event: FormEvent) {
     event.preventDefault();
-    if (!window.confirm("Profil und Spielstand werden endgültig gelöscht und dein Login gesperrt. Das lässt sich nicht rückgängig machen. Wirklich löschen?")) return;
+    if (!window.confirm(t("panel.deleteConfirm"))) return;
     void run("delete", () => account!.deleteProfile(confirm));
   }
 
-  return <section className="profile-panel" aria-label="Profil">
-    <div><p className="eyebrow">PROFIL / KONTO</p><h4>{profile.displayName} <small>@{profile.username}</small></h4><p>{account.passwordLogin ? "Angemeldet mit Benutzername und Passwort." : `Angemeldet mit Google (${account.email ?? "unbekannt"}).`} Dein Spielstand wird automatisch in deinem Profil gespeichert: <strong className={`account-sync ${status}`}>{syncMessage ?? SYNC_LABELS[status]}</strong></p></div>
-    <form className="profile-row" onSubmit={saveDisplayName}><label><span>Anzeigename</span><input className="mode-input" maxLength={DISPLAY_NAME_MAX} value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || displayName.trim() === profile.displayName}>Speichern</button></form>
-    <form className="profile-row" onSubmit={saveUsername}><label><span>Benutzername</span><input className="mode-input" maxLength={USERNAME_MAX} autoCapitalize="none" spellCheck={false} value={username} onChange={(event) => setUsername(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || usernameLocked || username.trim() === profile.username}>Ändern</button>
-      <small>{nextChange.getTime() > now ? `Nächste Änderung ab ${nextChange.toLocaleDateString("de-CH")} möglich (nur Gross und Kleinschreibung jederzeit).` : "Du kannst den Benutzernamen jetzt ändern. Danach erst wieder in 30 Tagen."}{account.passwordLogin ? " Du meldest dich danach mit dem neuen Namen an." : ""}</small></form>
-    {account.passwordLogin && <form className="profile-row" onSubmit={savePassword}><label><span>Aktuelles Passwort</span><input className="mode-input" type="password" autoComplete="current-password" maxLength={PASSWORD_MAX} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} /></label><label><span>Neues Passwort</span><input className="mode-input" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} maxLength={PASSWORD_MAX} value={password} onChange={(event) => setPassword(event.target.value)} /></label><label><span>Wiederholen</span><input className="mode-input" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} maxLength={PASSWORD_MAX} value={passwordRepeat} onChange={(event) => setPasswordRepeat(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || !password || !currentPassword}>Passwort ändern</button>
-      <small>Du meldest dich mit deinem Benutzernamen und diesem Passwort an.</small></form>}
+  return <section className="profile-panel" aria-label={t("panel.profile")}>
+    <div><p className="eyebrow">{t("panel.eyebrow")}</p><h4>{profile.displayName} <small>@{profile.username}</small></h4><p>{account.passwordLogin ? t("panel.signedInPassword") : t("panel.signedInGoogle", { email: account.email ?? t("panel.unknown") })} {t("panel.autosave")} <strong className={`account-sync ${status}`}>{syncMessage ? localizeText(syncMessage) : t(SYNC_LABELS[status])}</strong></p></div>
+    <form className="profile-row" onSubmit={saveDisplayName}><label><span>{t("panel.displayName")}</span><input className="mode-input" maxLength={DISPLAY_NAME_MAX} value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || displayName.trim() === profile.displayName}>{t("panel.save")}</button></form>
+    <form className="profile-row" onSubmit={saveUsername}><label><span>{t("panel.username")}</span><input className="mode-input" maxLength={USERNAME_MAX} autoCapitalize="none" spellCheck={false} value={username} onChange={(event) => setUsername(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || usernameLocked || username.trim() === profile.username}>{t("panel.change")}</button>
+      <small>{nextChange.getTime() > now ? t("panel.nextChange", { date: nextChange.toLocaleDateString(currentIntlTag()) }) : t("panel.changeNow")}{account.passwordLogin ? ` ${t("panel.signInWithNew")}` : ""}</small></form>
+    {account.passwordLogin && <form className="profile-row" onSubmit={savePassword}><label><span>{t("panel.currentPassword")}</span><input className="mode-input" type="password" autoComplete="current-password" maxLength={PASSWORD_MAX} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} /></label><label><span>{t("panel.newPassword")}</span><input className="mode-input" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} maxLength={PASSWORD_MAX} value={password} onChange={(event) => setPassword(event.target.value)} /></label><label><span>{t("panel.repeat")}</span><input className="mode-input" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} maxLength={PASSWORD_MAX} value={passwordRepeat} onChange={(event) => setPasswordRepeat(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || !password || !currentPassword}>{t("panel.changePassword")}</button>
+      <small>{t("panel.passwordHint")}</small></form>}
     {account.passwordLogin && <div className="profile-row profile-google">
-      {typeof googleEmail === "string" ? <p><strong>Mit Google verknüpft</strong><small>{googleEmail ? `${googleEmail} · ` : ""}Du kannst dich mit Google oder mit Benutzername und Passwort anmelden, es ist dasselbe Konto.</small></p>
-        : <><p><strong>Google verknüpfen</strong><small>Danach meldest du dich wahlweise mit Google oder mit Benutzername und Passwort an. Spielstand und Profil bleiben gleich.</small></p><button type="button" className="mode-secondary" disabled={Boolean(busy) || googleEmail === undefined} onClick={linkGoogle}>{busy === "google" ? "Weiter zu Google …" : "Mit Google verknüpfen"}</button></>}
+      {typeof googleEmail === "string" ? <p><strong>{t("panel.googleLinked")}</strong><small>{googleEmail ? `${googleEmail} · ` : ""}{t("panel.googleLinkedHint")}</small></p>
+        : <><p><strong>{t("panel.linkGoogle")}</strong><small>{t("panel.linkGoogleHint")}</small></p><button type="button" className="mode-secondary" disabled={Boolean(busy) || googleEmail === undefined} onClick={linkGoogle}>{busy === "google" ? t("panel.toGoogle") : t("panel.linkWithGoogle")}</button></>}
     </div>}
-    <details className="profile-danger"><summary>Profil löschen</summary>
-      <form className="profile-row" onSubmit={deleteProfile}><label><span>Zur Bestätigung „{profile.username}“ eintippen</span><input className="mode-input" autoCapitalize="none" spellCheck={false} value={confirm} onChange={(event) => setConfirm(event.target.value)} /></label><button type="submit" className="mode-secondary danger" disabled={Boolean(busy) || confirm.trim().toLowerCase() !== profile.username.toLowerCase()}>Endgültig löschen</button>
-        <small>Löscht Profil und Spielstand sofort und sperrt den Login; den Login entfernt danach der Besitzer des Spiels. Multiplayer Welten bleiben für die anderen Spieler bestehen.</small></form>
+    <details className="profile-danger"><summary>{t("panel.deleteProfile")}</summary>
+      <form className="profile-row" onSubmit={deleteProfile}><label><span>{t("panel.confirmType", { username: profile.username })}</span><input className="mode-input" autoCapitalize="none" spellCheck={false} value={confirm} onChange={(event) => setConfirm(event.target.value)} /></label><button type="submit" className="mode-secondary danger" disabled={Boolean(busy) || confirm.trim().toLowerCase() !== profile.username.toLowerCase()}>{t("panel.deleteFinal")}</button>
+        <small>{t("panel.deleteHint")}</small></form>
     </details>
   </section>;
 }
 
 /** The account button in the header; it opens the profile settings in a dialog. */
 export function AccountButton() {
+  useLocale();
   const account = useContext(AccountContext);
   const guest = useContext(GuestContext);
   const [open, setOpen] = useState(false);
@@ -184,20 +190,21 @@ export function AccountButton() {
     params.delete("google");
     const query = params.toString();
     window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
-    const timer = window.setTimeout(() => { setNotice(GOOGLE_LINK_MESSAGES[result] ?? GOOGLE_LINK_MESSAGES.fehler); setOpen(true); }, 0);
+    const timer = window.setTimeout(() => { setNotice(t(GOOGLE_LINK_MESSAGES[result] ?? GOOGLE_LINK_MESSAGES.fehler)); setOpen(true); }, 0);
     return () => window.clearTimeout(timer);
   }, [account]);
 
   if (!account && guest) return <>
-    <button type="button" className="account-signin-button" aria-haspopup="dialog" aria-expanded={open} onClick={() => { setNotice(""); setOpen(true); }}>Anmelden</button>
+    <button type="button" className="account-signin-button" aria-haspopup="dialog" aria-expanded={open} onClick={() => { setNotice(""); setOpen(true); }}>{t("header.signIn")}</button>
     {open && createPortal(<div className="account-overlay" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
-      <div ref={dialogRef} className="account-dialog" role="dialog" aria-modal="true" aria-label="Gast">
-        <button type="button" className="account-dialog-close" aria-label="Schliessen" onClick={() => setOpen(false)}>×</button>
-        <section className="profile-panel" aria-label="Gast">
-          <div><p className="eyebrow">GAST</p><h4>Du spielst als Gast</h4><p>Dein Spielstand liegt nur in diesem Browser, und Koop Multiplayer ist gesperrt. Mit einem Konto ist dein Spielstand gesichert, auf allen deinen Geräten gleich, und du kannst mit anderen zusammen spielen. Hat das Konto noch keinen Spielstand, nimmt es deinen Gast Spielstand mit.</p></div>
-          <button type="button" className="mode-primary" onClick={() => { setOpen(false); guest.signIn(); }}>Anmelden oder Konto erstellen</button>
+      <div ref={dialogRef} className="account-dialog" role="dialog" aria-modal="true" aria-label={t("guest.label")}>
+        <button type="button" className="account-dialog-close" aria-label={t("dialog.close")} onClick={() => setOpen(false)}>×</button>
+        <section className="profile-panel" aria-label={t("guest.label")}>
+          <div><p className="eyebrow">{t("guest.eyebrow")}</p><h4>{t("guest.title")}</h4><p>{t("guest.text")}</p></div>
+          <button type="button" className="mode-primary" onClick={() => { setOpen(false); guest.signIn(); }}>{t("guest.signIn")}</button>
         </section>
         <ThemePicker />
+        <LanguagePicker />
         <InstallAppPanel onMessage={setNotice} />
         {notice && <p className="account-notice" role="status">{notice}</p>}
       </div>
@@ -205,16 +212,17 @@ export function AccountButton() {
   </>;
   if (!account) return null;
   return <>
-    <button type="button" className="icon-button account-button" aria-label={`Konto von ${account.profile.displayName}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => { setNotice(""); setOpen(true); }}>👤</button>
+    <button type="button" className="icon-button account-button" aria-label={t("panel.accountOf", { name: account.profile.displayName })} aria-haspopup="dialog" aria-expanded={open} onClick={() => { setNotice(""); setOpen(true); }}>👤</button>
     {/* The header blurs its background, which would trap a fixed dialog inside it; the dialog lives on <body>. */}
     {open && createPortal(<div className="account-overlay" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
-      <div ref={dialogRef} className="account-dialog" role="dialog" aria-modal="true" aria-label="Konto">
-        <button type="button" className="account-dialog-close" aria-label="Schliessen" onClick={() => setOpen(false)}>×</button>
+      <div ref={dialogRef} className="account-dialog" role="dialog" aria-modal="true" aria-label={t("panel.account")}>
+        <button type="button" className="account-dialog-close" aria-label={t("dialog.close")} onClick={() => setOpen(false)}>×</button>
         <ProfilePanel onMessage={setNotice} />
         <ThemePicker />
+        <LanguagePicker />
         <InstallAppPanel onMessage={setNotice} />
         {notice && <p className="account-notice" role="status">{notice}</p>}
-        <button type="button" className="mode-secondary account-dialog-signout" onClick={() => void account.signOut()}>Abmelden</button>
+        <button type="button" className="mode-secondary account-dialog-signout" onClick={() => void account.signOut()}>{t("panel.signOut")}</button>
       </div>
     </div>, document.body)}
   </>;
@@ -222,23 +230,25 @@ export function AccountButton() {
 
 /** Light, dark or the device setting; applies at once and is remembered on this device. */
 function ThemePicker() {
+  useLocale();
   const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
   return <div className="theme-picker">
-    <span id="theme-picker-label">Darstellung</span>
+    <span id="theme-picker-label">{t("settings.appearance")}</span>
     <div role="radiogroup" aria-labelledby="theme-picker-label">
-      {THEME_OPTIONS.map((option) => <button key={option.value} type="button" role="radio" aria-checked={theme === option.value} className={theme === option.value ? "active" : ""} onClick={() => { setThemePreference(option.value); setTheme(option.value); }}>{option.label}</button>)}
+      {THEME_OPTIONS.map((option) => <button key={option.value} type="button" role="radio" aria-checked={theme === option.value} className={theme === option.value ? "active" : ""} onClick={() => { setThemePreference(option.value); setTheme(option.value); }}>{t(`theme.${option.value}` as MessageKey)}</button>)}
     </div>
   </div>;
 }
 
 /** "App installieren": the browser's install prompt, or the share menu hint on iPhone and iPad. */
 function InstallAppPanel({ onMessage }: { onMessage: (text: string) => void }) {
+  useLocale();
   const state = useSyncExternalStore(subscribeInstallState, getInstallState, () => "unavailable" as InstallState);
   if (state === "unavailable") return null;
   return <div className="install-app">
-    <span>App</span>
-    {state === "installed" && <p>Goal Clicker ist als App installiert.</p>}
-    {state === "prompt" && <button type="button" className="mode-secondary" onClick={() => void promptInstall().then((accepted) => { if (accepted) onMessage("Goal Clicker wird installiert."); })}>App installieren</button>}
-    {state === "ios" && <p>Zum Installieren unten auf Teilen tippen und dann «Zum Home Bildschirm».</p>}
+    <span>{t("app.label")}</span>
+    {state === "installed" && <p>{t("app.installed")}</p>}
+    {state === "prompt" && <button type="button" className="mode-secondary" onClick={() => void promptInstall().then((accepted) => { if (accepted) onMessage(t("app.installing")); })}>{t("app.install")}</button>}
+    {state === "ios" && <p>{t("app.iosHint")}</p>}
   </div>;
 }
