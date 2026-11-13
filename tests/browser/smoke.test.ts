@@ -2,6 +2,8 @@
 // Run with: npm run test:browser (CI runs it after npm test, which builds .next).
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { createServer, request as httpRequest } from 'node:http';
+import type { Socket } from 'node:net';
 import type { ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { after, before, test } from 'node:test';
@@ -709,4 +711,41 @@ test('the layout checker itself reports overlapping text, unreadable text and ho
   assert.match(found, /low contrast .*Kaum lesbar/);
   assert.match(found, /horizontal overflow/);
   await page.close();
+});
+
+test('the offline page also shows when the host redirects /offline.html (as the live host does), and the worker stores a plain copy', async () => {
+  // A stand in for the live host: /offline.html answers 307 to /offline, which serves the offline page.
+  const sockets = new Set<Socket>();
+  const proxyPort = PORT + 1;
+  const proxy = createServer((req, res) => {
+    if (req.url === '/offline.html') { res.writeHead(307, { location: '/offline' }); res.end(); return; }
+    const path = req.url === '/offline' ? '/offline.html' : req.url ?? '/';
+    const upstream = httpRequest({ host: '127.0.0.1', port: PORT, path, method: req.method, headers: req.headers }, (answer) => { res.writeHead(answer.statusCode ?? 200, answer.headers); answer.pipe(res); });
+    upstream.on('error', () => { res.writeHead(502); res.end(); });
+    req.pipe(upstream);
+  });
+  proxy.on('connection', (socket) => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)); });
+  await new Promise<void>((resolve) => proxy.listen(proxyPort, '127.0.0.1', resolve));
+  const context = await browser.newContext({ serviceWorkers: 'allow' });
+  try {
+    const page = await context.newPage();
+    await page.goto(`http://127.0.0.1:${proxyPort}/`, { waitUntil: 'domcontentloaded' });
+    const stored = await page.evaluate(async () => {
+      await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      const name = (await caches.keys()).find((key) => key.includes('offline'));
+      const response = name ? await (await caches.open(name)).match('/offline.html') : undefined;
+      return { cached: Boolean(response), redirected: response?.redirected, status: response?.status };
+    });
+    assert.deepEqual(stored, { cached: true, redirected: false, status: 200 }, 'a redirected response cannot answer a navigation, so the plain copy is stored');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    assert.equal(await page.evaluate(() => Boolean(navigator.serviceWorker.controller)), true, 'the worker controls the page');
+    // The host stops answering: a navigation now gets the offline page from the worker.
+    await new Promise<void>((resolve) => { proxy.close(() => resolve()); for (const socket of sockets) socket.destroy(); });
+    await page.goto(`http://127.0.0.1:${proxyPort}/kader`, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    assert.equal(await page.title(), 'Goal Clicker · Keine Verbindung');
+  } finally {
+    await context.close();
+    if (proxy.listening) await new Promise<void>((resolve) => { proxy.close(() => resolve()); for (const socket of sockets) socket.destroy(); });
+  }
 });

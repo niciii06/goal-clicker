@@ -39,3 +39,9 @@ Stand 12. November 2026, 19:44 UTC. Nur normale Lese Abrufe der öffentlichen Se
 | Hosting-Auslieferung | Kompression, Cache Header, Drittanbieter live belegt, Vergleich mit lokal in `docs/qa/hosting-delivery.md` | Entscheid, ob lange Cache Zeiten für hashierte Dateien bei der Plattform gewünscht und möglich sind; Security Header |
 | AdSense | `ads.txt` live vorhanden, keine Werbung eingebunden | Freigabe und Einwilligungslösung durch Nicolas, Konto Status in AdSense |
 | Neon Kosten | nicht lesend prüfbar | Zugriff auf die Neon Konsole |
+
+## Kontrolle am 13. November 2026 (lesend, ohne Login)
+
+* Live läuft weiter ein älterer Stand: `/sw.js` meldet Version **v1** (der Kandidat hat v3), die Offline Seite wird weiter mit 307 von `/offline.html` auf `/offline` umgeleitet, HTML `no-store`, HTTP/2, gzip. Alle Korrekturen aus dem Kandidaten (Offline Kopie, Metadaten Basis, neue Anmeldeseite) sind live **noch nicht** sichtbar, jede Live Abnahme hängt also an einem Deployment.
+* **Echter Browser Beleg für die Offline Korrektur** (Chromium, lokal, mit einem Proxy, der das Live Verhalten `/offline.html` gleich 307 gleich `/offline` nachbildet und danach nicht mehr antwortet): Der alte Service Worker speichert eine umgeleitete Antwort (`redirected: true`), die Offline Navigation scheitert mit `ERR_FAILED`. Der neue speichert eine saubere Kopie (`redirected: false`) und zeigt «Goal Clicker · Keine Verbindung». Dieser Ablauf ist jetzt ein fester Test in `tests/browser/smoke.test.ts` und schlägt mit dem alten Worker fehl.
+* Weiter offen (brauchen deinen Zugang oder ein echtes Gerät): echtes Zertifikat im Browser, 302 oder 301, Cache Zeiten der Plattform, Offline Seite auf einem echten iPhone.
