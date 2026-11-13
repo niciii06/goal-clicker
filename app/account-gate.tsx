@@ -18,6 +18,9 @@ import { resumeLocalPersistence, suspendLocalPersistence } from "./game/persiste
 import { exportCurrentSave } from "./save-file-controls";
 import { cleanDisplayName, DISPLAY_NAME_MAX, displayNameError, PASSWORD_MAX, PASSWORD_MIN, passwordError, USERNAME_MAX, usernameError } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
+import { localizeText, t } from "./i18n/runtime";
+import { useLocale } from "./i18n/use-locale";
+import { LanguagePicker } from "./i18n/language-picker";
 
 export type AccountContextValue = {
   /** The game account ID (not the ID of the login). */
@@ -111,6 +114,8 @@ export function AccountGate({ children }: { children: ReactNode }) {
 }
 
 function RequiredAccount({ children }: { children: ReactNode }) {
+  // The sign in screens follow the chosen language; the game below re-renders with it as well.
+  useLocale();
   const [phase, setPhase] = useState<Phase>({ name: "checking" });
   const syncRef = useRef<CloudSync | null>(null);
 
@@ -254,7 +259,7 @@ function RequiredAccount({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     const sync = syncRef.current;
     const saved = sync ? await sync.upload() : true;
-    if (!saved && !window.confirm("Dein letzter Spielstand konnte nicht gespeichert werden. Trotzdem abmelden? Der Fortschritt seit dem letzten Speichern geht dann verloren.")) return;
+    if (!saved && !window.confirm(t("gate.signOutUnsaved"))) return;
     sync?.stop();
     suspendLocalPersistence();
     clearLocalAccountData();
@@ -331,57 +336,58 @@ function RequiredAccount({ children }: { children: ReactNode }) {
         <span className="account-boot-shadow" />
       </div>
       <strong className="account-boot-title">Goal Clicker</strong>
-      <p className="account-boot-status" role="status">Anmeldung wird geprüft …</p>
+      <p className="account-boot-status" role="status">{t("gate.checking")}</p>
     </div>
   </main>;
 
   return <main className="account-screen">
     <section className="account-card">
       <div className="account-brand"><span className="account-brand-ball" aria-hidden="true">⚽</span><div><p className="eyebrow">FOOTBALL IDLE CLUB</p><strong>Goal Clicker</strong></div></div>
+      <LanguagePicker className="theme-picker language-picker account-language" />
       {phase.name === "signed-out" && <LoginForm message={phase.message} onSignedIn={() => void enter()} onGuest={playAsGuest} />}
       {phase.name === "profile" && <ProfileSetup user={phase.user} onCreated={(profile) => { writeProfileCache(phase.user, profile); void syncAndStart(phase.user, profile); }} onSignOut={() => void signOut()} />}
       {phase.name === "deletion" && <FinishDeletion message={phase.message} />}
       {phase.name === "outdated" && <>
-        <h2>Neue Version verfügbar</h2>
-        <p role="alert">{NEWER_VERSION_MESSAGE}</p>
+        <h2>{t("gate.newVersion")}</h2>
+        <p role="alert">{localizeText(NEWER_VERSION_MESSAGE)}</p>
         <div className="account-actions">
-          <button type="button" className="mode-primary" onClick={() => window.location.reload()}>Neu laden</button>
+          <button type="button" className="mode-primary" onClick={() => window.location.reload()}>{t("gate.reload")}</button>
         </div>
       </>}
       {phase.name === "storage-full" && <>
-        <h2>Speicher voll</h2>
-        <p role="alert">{STORAGE_FULL_MESSAGE} Der Spielstand aus deinem Profil konnte nicht in diesem Browser gespeichert werden; dein bisheriger Spielstand hier ist unverändert.</p>
+        <h2>{t("gate.storageFull")}</h2>
+        <p role="alert">{localizeText(STORAGE_FULL_MESSAGE)} {t("gate.storageFullText")}</p>
         <div className="account-actions">
-          <button type="button" className="mode-primary" onClick={() => void syncAndStart(phase.user, phase.profile)}>Erneut versuchen</button>
-          <button type="button" className="mode-secondary" onClick={() => exportCurrentSave(undefined)}>Spielstand als Datei sichern</button>
+          <button type="button" className="mode-primary" onClick={() => void syncAndStart(phase.user, phase.profile)}>{t("gate.retry")}</button>
+          <button type="button" className="mode-secondary" onClick={() => exportCurrentSave(undefined)}>{t("gate.exportSave")}</button>
         </div>
       </>}
       {phase.name === "choose-save" && <ChooseSave phase={phase} onAccount={() => { exportCurrentSave(undefined); try { applyCloudSave(phase.user.id, phase.cloud); } catch { setPhase({ name: "storage-full", user: phase.user, profile: phase.profile }); return; } startGame(phase.user, phase.profile); }} onGuest={() => { writeCloudMeta({ userId: phase.user.id, version: phase.cloud.version, hash: "", played: true }); startGame(phase.user, phase.profile); }} />}
       {phase.name === "unreachable" && <>
-        <h2>Keine Verbindung</h2>
-        <p>{phase.message} Prüfe dein Internet und versuche es nochmal.{phase.offlineProfile ? " Du kannst auch offline weiterspielen; dein Fortschritt wird gespeichert, sobald die Verbindung zurück ist." : ""}</p>
+        <h2>{t("gate.noConnection")}</h2>
+        <p>{localizeText(phase.message)} {t("gate.checkInternet")}{phase.offlineProfile ? ` ${t("gate.offlineHint")}` : ""}</p>
         <div className="account-actions">
-          <button type="button" className="mode-primary" onClick={() => void enter()}>Erneut versuchen</button>
-          {phase.user && phase.offlineProfile && <button type="button" className="mode-secondary" onClick={() => startGame(phase.user!, phase.offlineProfile!)}>Offline weiterspielen</button>}
+          <button type="button" className="mode-primary" onClick={() => void enter()}>{t("gate.retry")}</button>
+          {phase.user && phase.offlineProfile && <button type="button" className="mode-secondary" onClick={() => startGame(phase.user!, phase.offlineProfile!)}>{t("gate.playOffline")}</button>}
         </div>
       </>}
     </section>
   </main>;
 }
 
-const describeSave = (summary: SaveSummary | null) => summary ? `${Math.floor(summary.totalGoals).toLocaleString("de-CH")} Tore insgesamt, ${summary.seasons} Saisons, ${summary.stars} Sterne` : "kein Spielstand";
+const describeSave = (summary: SaveSummary | null) => summary ? t("gate.saveSummary", { goals: Math.floor(summary.totalGoals), seasons: summary.seasons, stars: summary.stars }) : t("gate.noSave");
 
 /** A guest signs in to an account that already has a save: which one continues. Nothing is replaced silently. */
 function ChooseSave({ phase, onAccount, onGuest }: { phase: { local: SaveSummary | null; account: SaveSummary | null }; onAccount: () => void; onGuest: () => void }) {
   return <>
-    <h2>Welcher Spielstand?</h2>
-    <p>Dein Konto hat schon einen Spielstand. In diesem Browser liegt dein Gast Spielstand. Nur einer kann weitergespielt werden.</p>
-    <p><strong>Konto:</strong> {describeSave(phase.account)}<br /><strong>Gast:</strong> {describeSave(phase.local)}</p>
-    <p className="account-hint">Lädst du den Kontospielstand, wird dein Gast Spielstand vorher als Datei gesichert. Behältst du den Gast Spielstand, ersetzt er den Spielstand in deinem Konto.</p>
+    <h2>{t("gate.whichSave")}</h2>
+    <p>{t("gate.whichSaveText")}</p>
+    <p><strong>{t("gate.accountLabel")}</strong> {describeSave(phase.account)}<br /><strong>{t("gate.guestLabel")}</strong> {describeSave(phase.local)}</p>
+    <p className="account-hint">{t("gate.whichSaveHint")}</p>
     <div className="account-actions">
-      <button type="button" className="mode-primary" onClick={onAccount}>Kontospielstand laden</button>
-      <button type="button" className="mode-secondary" onClick={onGuest}>Gast Spielstand behalten</button>
-      <button type="button" className="mode-secondary quiet" onClick={() => exportCurrentSave(undefined)}>Gast Spielstand als Datei sichern</button>
+      <button type="button" className="mode-primary" onClick={onAccount}>{t("gate.loadAccountSave")}</button>
+      <button type="button" className="mode-secondary" onClick={onGuest}>{t("gate.keepGuestSave")}</button>
+      <button type="button" className="mode-secondary quiet" onClick={() => exportCurrentSave(undefined)}>{t("gate.exportGuestSave")}</button>
     </div>
   </>;
 }
@@ -405,22 +411,22 @@ function useUsernameCheck(username: string) {
   }, [trimmed, localProblem]);
 
   const checked = availability?.name === trimmed ? availability : null;
-  const message = localProblem ?? (checked ? (checked.available ? "Dieser Benutzername ist frei." : checked.error ?? "Dieser Benutzername ist schon vergeben.") : "");
+  const message = localProblem ?? (checked ? (checked.available ? t("gate.usernameFree") : localizeText(checked.error) || t("account.usernameTaken")) : "");
   const tone = localProblem || checked?.available === false ? " bad" : checked?.available ? " good" : "";
   return { trimmed, message, tone, blocked: Boolean(localProblem) || checked?.available === false };
 }
 
 function UsernameHint({ check }: { check: ReturnType<typeof useUsernameCheck> }) {
-  return <small className={`account-hint${check.tone}`}>{check.message || "3 bis 20 Zeichen: Buchstaben, Zahlen und _. Änderbar alle 30 Tage."}</small>;
+  return <small className={`account-hint${check.tone}`}>{check.message || t("gate.usernameRules")}</small>;
 }
 
 /** A login whose account was deleted: the data is gone, the login is locked until the owner removes it. */
 function FinishDeletion({ message }: { message: string }) {
   return <>
-    <h2>Konto gelöscht</h2>
-    <p>{message}</p>
+    <h2>{t("gate.accountDeleted")}</h2>
+    <p>{localizeText(message)}</p>
     <div className="account-actions">
-      <button type="button" className="mode-primary" onClick={() => { clearLocalAccountData(); localStorage.removeItem(PROFILE_CACHE_KEY); void signOutOfAuth().then(() => window.location.replace("/")); }}>Abmelden</button>
+      <button type="button" className="mode-primary" onClick={() => { clearLocalAccountData(); localStorage.removeItem(PROFILE_CACHE_KEY); void signOutOfAuth().then(() => window.location.replace("/")); }}>{t("gate.signOut")}</button>
     </div>
   </>;
 }
@@ -446,7 +452,7 @@ export function PasswordInput({ fieldName, labelId, value, onChange, autoComplet
   }, [shown]);
   return <span className="account-password">
     <input ref={inputRef} className="mode-input" type={shown ? "text" : "password"} aria-labelledby={labelId} autoComplete={autoComplete} autoCapitalize="none" spellCheck={false} minLength={minLength} maxLength={PASSWORD_MAX} required value={value} onChange={(event) => onChange(event.target.value)} />
-    <button type="button" className="account-password-toggle" aria-label={`${fieldName} ${shown ? "verbergen" : "anzeigen"}`} aria-pressed={shown}
+    <button type="button" className="account-password-toggle" aria-label={t(shown ? "gate.hidePassword" : "gate.showPassword", { field: fieldName })} aria-pressed={shown}
       onMouseDown={(event) => event.preventDefault()}
       onClick={() => { const input = inputRef.current; caretRef.current = [input?.selectionStart ?? value.length, input?.selectionEnd ?? value.length]; setShown((current) => !current); }}>
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
@@ -457,6 +463,7 @@ export function PasswordInput({ fieldName, labelId, value, onChange, autoComplet
 }
 
 function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSignedIn: () => void; onGuest: () => void }) {
+  useLocale();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -478,7 +485,7 @@ function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSigne
     event.preventDefault();
     if (busy) return;
     if (mode === "register") {
-      const problem = usernameError(username) ?? displayNameError(displayName) ?? passwordError(password) ?? (password !== passwordRepeat ? "Die beiden Passwörter stimmen nicht überein." : null);
+      const problem = usernameError(username) ?? displayNameError(displayName) ?? passwordError(password) ?? (password !== passwordRepeat ? t("panel.passwordsDiffer") : null);
       if (problem) { setError(problem); return; }
     }
     setBusy(true);
@@ -494,34 +501,35 @@ function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSigne
   }
 
   return <>
-    <h2>{mode === "login" ? "Anmelden" : "Konto erstellen"}</h2>
-    <p>Melde dich an, damit dein Spielstand auf allen deinen Geräten gleich ist.</p>
-    {message && <p className="account-notice" role="status">{message}</p>}
-    <button type="button" className="account-google" disabled={busy} onClick={() => void signInWithGoogle(window.location.pathname).catch((failure: unknown) => setError(authErrorMessage(failure)))}><span aria-hidden="true">G</span>Mit Google anmelden</button>
-    <div className="account-divider"><span>oder mit Benutzername</span></div>
+    <h2>{mode === "login" ? t("gate.signIn") : t("gate.createAccount")}</h2>
+    <p>{t("gate.intro")}</p>
+    {message && <p className="account-notice" role="status">{localizeText(message)}</p>}
+    <button type="button" className="account-google" disabled={busy} onClick={() => void signInWithGoogle(window.location.pathname).catch((failure: unknown) => setError(authErrorMessage(failure)))}><span aria-hidden="true">G</span>{t("gate.google")}</button>
+    <div className="account-divider"><span>{t("gate.orUsername")}</span></div>
     <div className="account-tabs" role="tablist">
-      <button type="button" role="tab" aria-selected={mode === "login"} className={mode === "login" ? "active" : ""} onClick={() => switchMode("login")}>Anmelden</button>
-      <button type="button" role="tab" aria-selected={mode === "register"} className={mode === "register" ? "active" : ""} onClick={() => switchMode("register")}>Konto erstellen</button>
+      <button type="button" role="tab" aria-selected={mode === "login"} className={mode === "login" ? "active" : ""} onClick={() => switchMode("login")}>{t("gate.signIn")}</button>
+      <button type="button" role="tab" aria-selected={mode === "register"} className={mode === "register" ? "active" : ""} onClick={() => switchMode("register")}>{t("gate.createAccount")}</button>
     </div>
     <form className="account-form" onSubmit={(event) => void submit(event)}>
-      <label className="account-field"><span>Benutzername</span><input className="mode-input" autoComplete="username" autoCapitalize="none" spellCheck={false} maxLength={USERNAME_MAX} required value={username} onChange={(event) => setUsername(event.target.value)} /></label>
+      <label className="account-field"><span>{t("gate.username")}</span><input className="mode-input" autoComplete="username" autoCapitalize="none" spellCheck={false} maxLength={USERNAME_MAX} required value={username} onChange={(event) => setUsername(event.target.value)} /></label>
       {mode === "register" && <UsernameHint check={check} />}
-      {mode === "register" && <><label className="account-field"><span>Anzeigename</span><input className="mode-input" autoComplete="nickname" maxLength={DISPLAY_NAME_MAX} required value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
-        <small className="account-hint">So heisst du im Spiel und im Multiplayer. Jederzeit änderbar.</small></>}
-      <label className="account-field"><span id={passwordLabelId}>{mode === "register" ? `Passwort (mindestens ${PASSWORD_MIN} Zeichen)` : "Passwort"}</span><PasswordInput key={`password-${mode}`} fieldName="Passwort" labelId={passwordLabelId} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? undefined : PASSWORD_MIN} value={password} onChange={setPassword} /></label>
-      {mode !== "login" && <label className="account-field"><span id={repeatLabelId}>Passwort wiederholen</span><PasswordInput fieldName="Passwort wiederholen" labelId={repeatLabelId} autoComplete="new-password" value={passwordRepeat} onChange={setPasswordRepeat} /></label>}
-      {mode === "register" && <small className="account-hint">Merk dir dein Passwort gut: Ohne E-Mail Adresse lässt es sich nicht zurücksetzen.</small>}
-      <button type="submit" className="mode-primary" disabled={busy || (mode === "register" && check.blocked)}>{mode === "login" ? "Anmelden" : "Konto erstellen"}</button>
+      {mode === "register" && <><label className="account-field"><span>{t("gate.displayName")}</span><input className="mode-input" autoComplete="nickname" maxLength={DISPLAY_NAME_MAX} required value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
+        <small className="account-hint">{t("gate.displayNameHint")}</small></>}
+      <label className="account-field"><span id={passwordLabelId}>{mode === "register" ? t("gate.passwordMin", { min: PASSWORD_MIN }) : t("gate.password")}</span><PasswordInput key={`password-${mode}`} fieldName={t("gate.password")} labelId={passwordLabelId} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? undefined : PASSWORD_MIN} value={password} onChange={setPassword} /></label>
+      {mode !== "login" && <label className="account-field"><span id={repeatLabelId}>{t("gate.passwordRepeat")}</span><PasswordInput fieldName={t("gate.passwordRepeat")} labelId={repeatLabelId} autoComplete="new-password" value={passwordRepeat} onChange={setPasswordRepeat} /></label>}
+      {mode === "register" && <small className="account-hint">{t("gate.passwordNote")}</small>}
+      <button type="submit" className="mode-primary" disabled={busy || (mode === "register" && check.blocked)}>{mode === "login" ? t("gate.signIn") : t("gate.createAccount")}</button>
     </form>
-    {error && <p className="account-error" role="alert">{error}</p>}
+    {error && <p className="account-error" role="alert">{localizeText(error)}</p>}
     <div className="account-guest">
-      <button type="button" className="mode-secondary quiet" disabled={busy} onClick={onGuest}>Als Gast fortfahren</button>
-      <small className="account-hint">Als Gast spielst du nur Einzelspieler, und dein Spielstand bleibt in diesem Browser. Anmelden kannst du dich jederzeit.</small>
+      <button type="button" className="mode-secondary quiet" disabled={busy} onClick={onGuest}>{t("gate.guest")}</button>
+      <small className="account-hint">{t("gate.guestHint")}</small>
     </div>
   </>;
 }
 
 function ProfileSetup({ user, onCreated, onSignOut }: { user: SessionUser; onCreated: (profile: PublicProfile) => void; onSignOut: () => void }) {
+  useLocale();
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState(user.suggestedName);
   const [error, setError] = useState("");
@@ -539,25 +547,25 @@ function ProfileSetup({ user, onCreated, onSignOut }: { user: SessionUser; onCre
       const response = await fetch("/api/profile", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: trimmed, displayName }) });
       const body = await readJson<{ profile?: PublicProfile }>(response);
       if (response.ok && body.profile) onCreated(body.profile);
-      else setError(body.error ?? "Das Profil konnte nicht erstellt werden.");
+      else setError(localizeText(body.error) || t("gate.profileCreateFailed"));
     } catch {
-      setError("Keine Verbindung. Prüfe dein Internet.");
+      setError(t("auth.noConnection"));
     } finally {
       setBusy(false);
     }
   }
 
   return <>
-    <h2>Dein Profil</h2>
-    <p>Angemeldet als {user.email ?? "neues Konto"}. Wähle einen Benutzernamen, den es nur einmal gibt, und einen Namen, den die anderen im Spiel sehen.</p>
+    <h2>{t("gate.yourProfile")}</h2>
+    <p>{t("gate.signedInAs", { email: user.email ?? t("gate.newAccount") })}</p>
     <form className="account-form" onSubmit={(event) => void submit(event)}>
-      <label className="account-field"><span>Benutzername</span><input className="mode-input" autoComplete="username" autoCapitalize="none" spellCheck={false} maxLength={USERNAME_MAX} required value={username} onChange={(event) => setUsername(event.target.value)} /></label>
+      <label className="account-field"><span>{t("gate.username")}</span><input className="mode-input" autoComplete="username" autoCapitalize="none" spellCheck={false} maxLength={USERNAME_MAX} required value={username} onChange={(event) => setUsername(event.target.value)} /></label>
       <UsernameHint check={check} />
-      <label className="account-field"><span>Anzeigename</span><input className="mode-input" autoComplete="nickname" maxLength={DISPLAY_NAME_MAX} required value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
-      <small className="account-hint">So heisst du im Spiel und im Multiplayer. Jederzeit änderbar.</small>
-      <button type="submit" className="mode-primary" disabled={busy || check.blocked}>Profil erstellen</button>
-      <button type="button" className="mode-secondary quiet" onClick={onSignOut}>Abmelden</button>
+      <label className="account-field"><span>{t("gate.displayName")}</span><input className="mode-input" autoComplete="nickname" maxLength={DISPLAY_NAME_MAX} required value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
+      <small className="account-hint">{t("gate.displayNameHint")}</small>
+      <button type="submit" className="mode-primary" disabled={busy || check.blocked}>{t("gate.createProfile")}</button>
+      <button type="button" className="mode-secondary quiet" onClick={onSignOut}>{t("gate.signOut")}</button>
     </form>
-    {error && <p className="account-error" role="alert">{error}</p>}
+    {error && <p className="account-error" role="alert">{localizeText(error)}</p>}
   </>;
 }

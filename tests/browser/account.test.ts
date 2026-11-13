@@ -68,7 +68,7 @@ after(async () => {
 });
 
 async function device(name: string) {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'de-CH' });
   const page = await context.newPage();
   await page.addInitScript('globalThis.__name = (fn) => fn;');
   page.on('pageerror', (error) => problems.push(`${name}: ${error.message}`));
@@ -171,6 +171,29 @@ test('a wrong password is refused, the right one opens the same save on a second
   await page.getByRole('button', { name: 'Fussball anklicken' }).waitFor();
   const cloud = await cloudSave('Striker');
   assert.equal(await localGoals(page), cloud!.totalGoals);
+});
+
+test('the sign in screen offers English before signing in; account errors follow the language on a phone', { skip }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'de-CH' });
+  const page = await context.newPage();
+  page.on('pageerror', (error) => problems.push(`language: ${error.message}`));
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.getByRole('radiogroup', { name: 'Sprache' }).getByRole('radio', { name: 'English' }).click();
+  await page.getByRole('heading', { name: 'Sign in' }).waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
+  assert.ok(await page.getByRole('tab', { name: 'Create account' }).count());
+  // A wrong password: the server answers in German, the screen shows it in English.
+  await page.getByLabel('Username').fill('STRIKER');
+  await page.getByLabel('Password', { exact: true }).fill('falsches-passwort');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await page.getByText('Username or password is incorrect.').waitFor();
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 0, 'no horizontal scrolling on a phone');
+  // Remembered on this device: still English after a reload, and back to German on request.
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.getByRole('heading', { name: 'Sign in' }).waitFor();
+  await page.getByRole('radiogroup', { name: 'Language' }).getByRole('radio', { name: 'Deutsch' }).click();
+  await page.getByRole('heading', { name: 'Anmelden' }).waitFor();
+  await context.close();
 });
 
 test('when both devices were played, the second one to save takes the newer save without asking', { skip }, async () => {

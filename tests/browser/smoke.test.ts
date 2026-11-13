@@ -41,7 +41,7 @@ before(async () => {
   server = spawn('node_modules/.bin/next', ['start', '-p', String(PORT), '-H', '127.0.0.1'], { stdio: 'ignore', detached: true, env: { ...process.env, PORT: String(PORT) } });
   await waitForServer(120000);
   browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
-  const page = await browser.newPage();
+  const page = await browser.newPage({ locale: 'de-CH' });
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.waitForFunction((key) => Boolean(localStorage.getItem(key)), SAVE_KEY, { timeout: 30000 });
   baseSave = JSON.parse((await page.evaluate((key) => localStorage.getItem(key), SAVE_KEY))!);
@@ -85,7 +85,7 @@ function finishedMatch(now: number) {
 
 /** `whatsNewSeen: false` leaves the newest release notes unread, so the "Was ist neu" window opens. */
 async function openWithSave(viewport: { width: number; height: number }, saveJson: string, colorScheme: 'light' | 'dark' = 'light', whatsNewSeen = true) {
-  const page = await browser.newPage({ viewport, colorScheme });
+  const page = await browser.newPage({ viewport, colorScheme, locale: 'de-CH' });
   // tsx keeps function names with a __name helper; functions passed to page.evaluate need it in the browser too.
   await page.addInitScript('globalThis.__name = (fn) => fn;');
   const problems: string[] = [];
@@ -327,7 +327,7 @@ test('the "Was ist neu" window opens once for an existing game and stays closed 
   assert.deepEqual(problems, []);
   await page.close();
   // A brand new player (fresh browser storage) starts without the window.
-  const fresh = await browser.newPage({ viewport: VIEWPORTS[1] });
+  const fresh = await browser.newPage({ viewport: VIEWPORTS[1], locale: 'de-CH' });
   await fresh.goto(BASE, { waitUntil: 'networkidle' });
   await fresh.waitForTimeout(1200);
   assert.equal(await fresh.getByRole('dialog', { name: WHATS_NEW[0].title }).count(), 0, 'no release notes for a new game');
@@ -349,7 +349,7 @@ async function closeWelcomePack(page: Page) {
 
 test('a new player gets the welcome window first (no walkout), then guided tasks that tick off; ending asks about the welcome pack', async () => {
   for (const viewport of [VIEWPORTS[0], VIEWPORTS[1]]) {
-    const page = await browser.newPage({ viewport });
+    const page = await browser.newPage({ viewport, locale: 'de-CH' });
     await page.addInitScript('globalThis.__name = (fn) => fn;');
     const problems: string[] = [];
     page.on('pageerror', (error) => problems.push(`page error: ${error.message}`));
@@ -443,7 +443,7 @@ test('the welcome pack opens once from the shop at its tutorial step: one walkou
 });
 
 test('the first starting eleven is built by the player through the real lineup actions; the guide follows the steps', async () => {
-  const page = await browser.newPage({ viewport: VIEWPORTS[0] });
+  const page = await browser.newPage({ viewport: VIEWPORTS[0], locale: 'de-CH' });
   await page.addInitScript('globalThis.__name = (fn) => fn;');
   const problems: string[] = [];
   page.on('pageerror', (error) => problems.push(`page error: ${error.message}`));
@@ -697,7 +697,7 @@ test('while the team travels the match choice is hidden; it comes back without a
 });
 
 test('the layout checker itself reports overlapping text, unreadable text and horizontal overflow', async () => {
-  const page = await browser.newPage({ viewport: { width: 400, height: 600 } });
+  const page = await browser.newPage({ viewport: { width: 400, height: 600 }, locale: 'de-CH' });
   await page.addInitScript('globalThis.__name = (fn) => fn;');
   await page.setContent(`<body style="margin:0;background:#fff">
     <p style="position:absolute;top:20px;left:10px;margin:0;font-size:20px">Erster Text</p>
