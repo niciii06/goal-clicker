@@ -26,7 +26,7 @@ Wichtig für alle «Zu prüfen» Tickets: **Live läuft noch ein älterer Stand*
 | Apple HIG Standard | `6813382` | Regel in `CLAUDE.md`, bei jeder UI Änderung angewendet | keine |
 | Test und Skriptorganisation | `3ed3e67` | Entscheidungsvorlage `docs/qa/test-organisation.md` | Entscheid von Nicolas |
 | Repository Hygiene | `966b460` | `.gitignore`, Bestandsdokument, nichts gelöscht | keine |
-| Spezialkarten gleich wahrscheinlich, 25'000 | `6fa9a06`, `064968f`, `e4c6061`, `2932067` | 40 gezielte Tests (Gleichverteilung, Solo, Koop, Altquittung) | Live Test |
+| Spezialkarten gleich wahrscheinlich, 25'000 | `6fa9a06`, `064968f`, `e4c6061`, `2932067` | 20 neue Tests (Gleichverteilung, Solo, Koop, Altquittung) in zwei Dateien, 90 Tests in den acht betroffenen Dateien grün | Live Test |
 | Hosting Auslieferung | `18dfb81`, `47b62c0` | Lokal und live gemessen, Offline Korrektur im echten Browser belegt (neu, siehe `docs/qa/live-delivery-check.md`) | Plattform Entscheide, echtes Gerät |
 | Domain, HTTPS | `47b62c0` | DNS, 302, www, Metadaten Basis im Code | echtes Zertifikat im Browser, Überwachung |
 | AdSense, Neon Kosten | nicht lesend im Code prüfbar | `ads.txt` live vorhanden, keine Skripte; Neon Kontoprüfung steht in Notion | Konto Zugriff und Freigabe von Nicolas |
