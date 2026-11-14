@@ -6,6 +6,7 @@
 import { HOME_CITIES, HOME_CITY_IDS, homeCityOf } from "./home-cities";
 import type { HomeCityId } from "./home-cities";
 import { t } from "./i18n/runtime";
+import { dataText } from "./i18n/data-text";
 
 export function HomeCityPicker({ value, onChange, disabled = false, name = "home-city", legend = t("homeCity.label") }: { value: unknown; onChange: (city: HomeCityId) => void; disabled?: boolean; name?: string; legend?: string }) {
   const current = homeCityOf(value).id;
@@ -16,7 +17,7 @@ export function HomeCityPicker({ value, onChange, disabled = false, name = "home
       const selected = id === current;
       return <label key={id} className={selected ? "selected" : ""}>
         <input type="radio" name={name} value={id} checked={selected} onChange={() => onChange(id)} />
-        <span><strong>{city.name}</strong><small>{city.homeVenue.stadium} · {city.leagueLabels[1]}</small></span>
+        <span><strong>{city.name}</strong><small>{dataText(city.homeVenue.stadium)} · {city.leagueLabels[1]}</small></span>
         {selected && <em aria-hidden="true">{t("homeCity.chosen")}</em>}
       </label>;
     })}
