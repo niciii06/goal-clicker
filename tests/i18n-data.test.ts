@@ -85,3 +85,25 @@ test('a weekly goal shows in English, but its history entry keeps the German tit
   german();
   assert.equal(getWeeklyGoalViews(features, 0)[0].description, 'Spiele einmal zu Null.');
 });
+
+test('server answers (multiplayer route) show in English, values included; German stays exactly as the server sent it', () => {
+  english();
+  assert.equal(runtime.localizeText('Dieser Raum ist bereits voll. Maximal vier Spieler können gemeinsam spielen.'), 'This room is already full. At most four players can play together.');
+  assert.equal(runtime.localizeText('Das Turnier ist ab Liga 12 verfügbar.'), 'The tournament is available from league 12.');
+  assert.equal(runtime.localizeText('Schnellere Stiefel kostet 1’200 Tore.'), 'Faster boots costs 1’200 goals.');
+  assert.equal(runtime.localizeText('Neo ist nach der Roten Karte für die nächste Partie gesperrt.'), 'Neo is suspended for the next match after the red card.');
+  assert.equal(runtime.localizeText('Eine Meldung, die der Katalog nicht kennt.'), 'Eine Meldung, die der Katalog nicht kennt.');
+  german();
+  assert.equal(runtime.localizeText('Das Turnier ist ab Liga 12 verfügbar.'), 'Das Turnier ist ab Liga 12 verfügbar.');
+});
+
+test('every server answer in the catalogue is a text the server really sends', async () => {
+  const { readFileSync } = await import('node:fs');
+  const route = readFileSync('app/api/multiplayer/route.ts', 'utf8');
+  const server = Object.entries(de).filter(([key, value]) => key.startsWith('server.') && key !== 'server.unavailable' && typeof value === 'string') as [string, string][]; // server.unavailable: the account API (Etappe 1)
+  assert.ok(server.length > 80);
+  for (const [key, text] of server) {
+    // Placeholders stand for ${…} in the route; the words around them must be there as written.
+    for (const part of text.split(/\{\w+\}/).map((piece) => piece.trim()).filter((piece) => piece.length > 3)) assert.ok(route.includes(part), `${key}: "${part}"`);
+  }
+});
