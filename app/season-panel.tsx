@@ -7,6 +7,7 @@ import type { GameFeatures, SeasonResult, SeasonScheduleMatch, SeasonTableRow } 
 import { getStarXIPlayer } from "./feature-data";
 import { formMatchLabel, formMatches, promotionOutlook, seasonTopScorers } from "./qol/season-insights";
 import { t } from "./i18n/runtime";
+import { dataText } from "./i18n/data-text";
 
 /** `mode`: how the tip was opened. Hover and focus come and go by themselves, a tap stays until the next tap or a tap elsewhere. */
 type FormTip = { key: string; text: string; left: number; top: number; mode: "hover" | "focus" | "tap" };
@@ -94,7 +95,7 @@ export function SeasonPanel({ features, action }: { features: GameFeatures; /** 
   const seasonLabel = season.hallOfFame ? Math.max(1, features.career.seasonNumber - 1) : features.career.seasonNumber;
   const showLastSeason = season.matchday === 0 && season.lastMatchAt > 0 && season.lastTable.some((team) => team.played > 0) && !season.hallOfFame;
   return <div className="feature-panel season-hub">
-    <div className="feature-panel-heading"><div><p className="eyebrow">{t("seasonPanel.seasonCaps")} {seasonLabel} / {getSeasonModeDivisionLabel(season.division, season.homeCity).toUpperCase()}</p><h3>{season.hallOfFame ? t("seasonPanel.hofReached") : t("seasonPanel.matchdayOf", { matchday: season.matchday + 1, total: SEASON_MODE_MATCHES_PER_SEASON })}</h3></div></div>
+    <div className="feature-panel-heading"><div><p className="eyebrow">{t("seasonPanel.seasonCaps")} {seasonLabel} / {dataText(getSeasonModeDivisionLabel(season.division, season.homeCity)).toUpperCase()}</p><h3>{season.hallOfFame ? t("seasonPanel.hofReached") : t("seasonPanel.matchdayOf", { matchday: season.matchday + 1, total: SEASON_MODE_MATCHES_PER_SEASON })}</h3></div></div>
     {action && <div className="season-hub-action"><button type="button" className="mode-primary" disabled={action.disabled} onClick={action.onClick}>{action.label}</button>{action.note && <small>{action.note}</small>}</div>}
     {!season.hallOfFame && season.table.some((team) => team.played > 0) && <p className="season-hub-outlook" role="status">{promotionOutlook(season.table, season.results ?? [], season.division)}</p>}
     <StandingsTable table={season.table} results={season.results ?? []} division={season.division} caption={t("seasonPanel.table")} />

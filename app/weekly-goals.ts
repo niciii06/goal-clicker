@@ -8,6 +8,7 @@ import type { GameFeatures, RewardPackId } from './feature-data';
 import { GROWTH_POINTS_PER_LEVEL, hasPotential } from './career-data';
 import { getTournamentUnlockLeague, hasReachedLeague, leagueForTier } from './season-progression';
 import { recordChroniclePackOpened } from './club-chronicle';
+import { localizeText, t } from './i18n/runtime';
 
 export const WEEKLY_METRICS = ['leagueWins', 'matchWins', 'cleanSheets', 'goalsScored', 'derbyWins', 'tournamentWins', 'packsOpened', 'minigameWins', 'specialGrowth', 'albumCards'] as const;
 export type WeeklyMetric = (typeof WEEKLY_METRICS)[number];
@@ -19,19 +20,18 @@ export type WeeklyGoalsState = { week: string; division: number; goals: WeeklyGo
 export const WEEKLY_GOAL_COUNT = 3;
 
 type MetricDefinition = { title: string; text: (n: number) => string; targets: readonly [number, number, number] };
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 /** Targets per difficulty (easy, medium, hard). A normal week of play (10 league matches take about 40 minutes) clears them. */
 export const WEEKLY_METRIC_DEFINITIONS: Record<WeeklyMetric, MetricDefinition> = {
-  leagueWins: { title: 'Ligasiege', text: (n) => `Gewinne ${plural(n, 'Ligaspiel', 'Ligaspiele')}.`, targets: [2, 3, 5] },
-  matchWins: { title: 'Siegeswoche', text: (n) => `Gewinne ${plural(n, 'Pflichtspiel', 'Pflichtspiele')} in Liga oder Turnier.`, targets: [3, 5, 7] },
-  cleanSheets: { title: 'Zu Null', text: (n) => `Spiele ${n === 1 ? 'einmal' : `${n} Mal`} zu Null.`, targets: [1, 2, 3] },
-  goalsScored: { title: 'Torhunger', text: (n) => `Erziele ${plural(n, 'Tor', 'Tore')} in Pflichtspielen.`, targets: [6, 10, 15] },
-  derbyWins: { title: 'Derbytag', text: (n) => `Gewinne ${plural(n, 'Derby', 'Derbys')} gegen einen Rivalen.`, targets: [1, 1, 2] },
-  tournamentWins: { title: 'Pokalnächte', text: (n) => `Gewinne ${plural(n, 'Turnierspiel', 'Turnierspiele')}.`, targets: [2, 3, 5] },
-  packsOpened: { title: 'Packfieber', text: (n) => `Öffne ${plural(n, 'Pack', 'Packs')}.`, targets: [2, 4, 6] },
-  minigameWins: { title: 'Trainingsplatz', text: (n) => `Gewinne ${plural(n, 'Minispiel', 'Minispiele')}.`, targets: [2, 4, 6] },
-  specialGrowth: { title: 'Wachstumsschub', text: (n) => `Sammle ${plural(n, 'Wachstumspunkt', 'Wachstumspunkte')} mit deinen Spezialkarten.`, targets: [6, 10, 15] },
-  albumCards: { title: 'Sammlerwoche', text: (n) => `Bringe ${plural(n, 'neue Karte', 'neue Karten')} ins Sammelalbum.`, targets: [2, 3, 5] },
+  leagueWins: { title: 'Ligasiege', text: (n) => t('data.weekly.leagueWinsText', { count: n }), targets: [2, 3, 5] },
+  matchWins: { title: 'Siegeswoche', text: (n) => t('data.weekly.matchWinsText', { count: n }), targets: [3, 5, 7] },
+  cleanSheets: { title: 'Zu Null', text: (n) => t('data.weekly.cleanSheetsText', { count: n }), targets: [1, 2, 3] },
+  goalsScored: { title: 'Torhunger', text: (n) => t('data.weekly.goalsScoredText', { count: n }), targets: [6, 10, 15] },
+  derbyWins: { title: 'Derbytag', text: (n) => t('data.weekly.derbyWinsText', { count: n }), targets: [1, 1, 2] },
+  tournamentWins: { title: 'Pokalnächte', text: (n) => t('data.weekly.tournamentWinsText', { count: n }), targets: [2, 3, 5] },
+  packsOpened: { title: 'Packfieber', text: (n) => t('data.weekly.packsOpenedText', { count: n }), targets: [2, 4, 6] },
+  minigameWins: { title: 'Trainingsplatz', text: (n) => t('data.weekly.minigameWinsText', { count: n }), targets: [2, 4, 6] },
+  specialGrowth: { title: 'Wachstumsschub', text: (n) => t('data.weekly.specialGrowthText', { count: n }), targets: [6, 10, 15] },
+  albumCards: { title: 'Sammlerwoche', text: (n) => t('data.weekly.albumCardsText', { count: n }), targets: [2, 3, 5] },
 };
 
 /** Fragments for the easy and the medium goal by the best league reached; the hard goal pays a reward pack. */
@@ -193,7 +193,7 @@ export function getWeeklyGoalViews(features: GameFeatures, minigameWins?: number
   const counters = getWeeklyCounters(features, minigameWins);
   return state.goals.map((goal) => {
     const progress = getWeeklyGoalProgress(state, goal, counters);
-    return { ...goal, title: WEEKLY_METRIC_DEFINITIONS[goal.metric].title, description: WEEKLY_METRIC_DEFINITIONS[goal.metric].text(goal.target), progress, complete: progress >= goal.target, claimed: state.claimed.includes(goal.id) };
+    return { ...goal, title: localizeText(WEEKLY_METRIC_DEFINITIONS[goal.metric].title), description: WEEKLY_METRIC_DEFINITIONS[goal.metric].text(goal.target), progress, complete: progress >= goal.target, claimed: state.claimed.includes(goal.id) };
   });
 }
 
@@ -224,6 +224,7 @@ export function claimWeeklyGoal(features: GameFeatures, goalId: string, now = Da
     if (!features.earnedPacks.some((pack) => pack.id === id)) features.earnedPacks = [...features.earnedPacks, { id, packId: goal.reward.packId, earnedAt: now }];
   }
   const label = weeklyRewardLabel(goal.reward);
-  addHistory(features, { title: `Wochenziel erreicht: ${goal.title}`, detail: goal.reward.kind === 'pack' ? `${label} liegt unter Packs & Album bereit.` : `+${label}`, tone: 'positive' }, now);
+  // History is saved: the German title, whatever language the player uses.
+  addHistory(features, { title: `Wochenziel erreicht: ${WEEKLY_METRIC_DEFINITIONS[goal.metric].title}`, detail: goal.reward.kind === 'pack' ? `${label} liegt unter Packs & Album bereit.` : `+${label}`, tone: 'positive' }, now);
   return { ok: true, goal, label };
 }
