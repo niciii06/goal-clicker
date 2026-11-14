@@ -5,7 +5,8 @@ import { CLICK_PASSIVE_SHARE_CAP, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, M
 import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../upgrade-purchase";
 import { addHistory, getGoalBoostMultiplier, getPrestigeGoalMultiplier, getTransferBonuses } from "../feature-data";
 import { UPGRADES, getUpgrade } from "./upgrades";
-import { currentLocale } from "../i18n/runtime";
+import { currentLocale, t } from "../i18n/runtime";
+import { dataText } from "../i18n/data-text";
 
 export function getLevel(upgrades: Record<string, number>, id: string) {
   return upgrades[id] ?? 0;
@@ -129,10 +130,10 @@ function formatShare(share: number) {
 
 export function getUpgradeEffect(upgrade: UpgradeDefinition, level: number) {
   const effectiveLevel = Math.min(level, MAX_MULTIPLIER_LEVEL);
-  if (upgrade.id === "golden") return `Stufe ${effectiveLevel}: x${((1 + upgrade.gain) ** effectiveLevel).toFixed(2)} Klickpower`;
-  if (upgrade.id === "legacy") return `Stufe ${effectiveLevel}: x${((1 + upgrade.gain) ** effectiveLevel).toFixed(2)} alle Einnahmen`;
-  if (upgrade.passiveShare) return `${upgrade.description}, dazu ${formatShare(upgrade.passiveShare)} vom Einkommen pro Sekunde (bis ${formatShare(upgrade.passiveShareMax ?? upgrade.passiveShare)}) · Stufe ${level}`;
-  return `${upgrade.description} · Stufe ${level}`;
+  if (upgrade.id === "golden") return t("data.upgrade.effectGolden", { level: effectiveLevel, factor: ((1 + upgrade.gain) ** effectiveLevel).toFixed(2) });
+  if (upgrade.id === "legacy") return t("data.upgrade.effectLegacy", { level: effectiveLevel, factor: ((1 + upgrade.gain) ** effectiveLevel).toFixed(2) });
+  if (upgrade.passiveShare) return t("data.upgrade.effectShare", { description: dataText(upgrade.description), share: formatShare(upgrade.passiveShare), max: formatShare(upgrade.passiveShareMax ?? upgrade.passiveShare), level });
+  return t("data.upgrade.effectLevel", { description: dataText(upgrade.description), level });
 }
 
 export function normalizeUpgrades(value: unknown) {

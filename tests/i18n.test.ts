@@ -109,6 +109,6 @@ test('only app/i18n reads or stores the language; server texts stay German', () 
   // The server renders lang="de" as before; the browser switches it after reading the choice (app/i18n/runtime.ts).
   assert.match(readFileSync('app/layout.tsx', 'utf8'), /lang="de"/);
   assert.doesNotMatch(readFileSync('app/layout.tsx', 'utf8'), /i18n\//);
-  // The game uses only the runtime layer (current language and its re-render hook), never the storage helpers.
-  if (existsSync('app/game-app.tsx')) for (const match of readFileSync('app/game-app.tsx', 'utf8').matchAll(/from "\.\/i18n\/([\w-]+)"/g)) assert.ok(['runtime', 'use-locale'].includes(match[1]), match[0]);
+  // The game uses only the runtime layer (current language, its re-render hook and dataText for game data), never the storage helpers.
+  if (existsSync('app/game-app.tsx')) for (const match of readFileSync('app/game-app.tsx', 'utf8').matchAll(/from "\.\/i18n\/([\w-]+)"/g)) assert.ok(['runtime', 'use-locale', 'data-text'].includes(match[1]), match[0]);
 });
