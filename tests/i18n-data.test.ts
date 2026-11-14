@@ -129,3 +129,13 @@ test('saved history entries show in English when displayed; the saved German tex
   german();
   assert.equal(runtime.localizeText('Runde 2 gewonnen'), 'Runde 2 gewonnen');
 });
+
+test('co-op history entries written by the multiplayer route show in English too', () => {
+  english();
+  assert.equal(runtime.localizeText('Mia hat die Welt verlassen. Leo ist jetzt Host.'), 'Mia left the world. Leo is now host.');
+  assert.equal(runtime.localizeText('Mia wurde vom Host aus der Welt entfernt.'), 'Mia was removed from the world by the host.');
+  assert.equal(runtime.localizeText('Leo holt 1’200 Tore und ein Prämienpack. Serie: 7 Tage.'), 'Leo collects 1’200 goals and a reward pack. Streak: 7 days.');
+  assert.equal(runtime.localizeText('Schnellere Stiefel auf Level 4 (+3).'), 'Faster boots to level 4 (+3).');
+  assert.equal(runtime.localizeText('Neo war 7 Tage nicht aktiv. Mia ist jetzt Host dieser Welt.'), 'Neo was not active for 7 days. Mia is now host of this world.');
+  german();
+});

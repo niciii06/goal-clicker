@@ -72,7 +72,7 @@ const SERVER_PATTERNS: { key: MessageKey; pattern: RegExp; names: string[]; fixe
     const names: string[] = [];
     const source = (value as string).split(/(\{\w+\})/).map((part) => {
       const name = /^\{(\w+)\}$/.exec(part)?.[1];
-      if (name) { names.push(name); return "(.+?)"; }
+      if (name) { names.push(name); return "(.+)"; }
       return part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     }).join("");
     return { key, pattern: new RegExp(`^${source}$`), names, fixed: (value as string).replace(/\{\w+\}/g, "").length };
