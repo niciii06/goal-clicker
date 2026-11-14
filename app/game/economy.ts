@@ -5,6 +5,7 @@ import { CLICK_PASSIVE_SHARE_CAP, COMBO_DECAY_MS, COMBO_HOLD_MS, COMBO_LEVELS, M
 import { calculateBulkUpgradePurchase, getUpgradeCostAtLevel } from "../upgrade-purchase";
 import { addHistory, getGoalBoostMultiplier, getPrestigeGoalMultiplier, getTransferBonuses } from "../feature-data";
 import { UPGRADES, getUpgrade } from "./upgrades";
+import { currentLocale } from "../i18n/runtime";
 
 export function getLevel(upgrades: Record<string, number>, id: string) {
   return upgrades[id] ?? 0;
@@ -164,7 +165,7 @@ export function decayComboCount(count: number, idleMs: number) {
 
 /** "x1,5" in the German number format. */
 export function formatComboMultiplier(multiplier: number) {
-  return `x${String(multiplier).replace(".", ",")}`;
+  return `x${currentLocale() === "en" ? String(multiplier) : String(multiplier).replace(".", ",")}`;
 }
 
 export function getComboProgress(count: number) {

@@ -2,6 +2,7 @@
 import type { CrossbarHeight, MatchPrediction, PenaltyDirection } from "./types";
 import type { SeasonTableRow } from "../feature-data";
 import { CROSSBAR_HEIGHTS, MATCH_PREDICTIONS, PENALTY_DIRECTIONS } from "./constants";
+import { t } from "../i18n/runtime";
 
 export function formatCountdown(until: number, now: number) {
   const seconds = Math.max(0, Math.ceil((until - now) / 1000));
@@ -34,18 +35,28 @@ export function getRandomMatchPrediction(): MatchPrediction {
   return getRandomItem(MATCH_PREDICTIONS);
 }
 
+// The values stay German (they are stored in minigame state); the labels follow the language.
+const DIRECTION_KEYS = { links: "mini.dirLeft", mitte: "mini.dirCentre", rechts: "mini.dirRight" } as const;
+const DIRECTION_WORD_KEYS = { links: "mini.wordLeft", mitte: "mini.wordCentre", rechts: "mini.wordRight" } as const;
+const HEIGHT_KEYS = { hoch: "mini.heightHigh", mitte: "mini.heightMiddle", tief: "mini.heightLow" } as const;
+
 export function directionLabel(direction: PenaltyDirection) {
-  return direction[0].toUpperCase() + direction.slice(1);
+  return t(DIRECTION_KEYS[direction]);
+}
+
+/** The direction inside a sentence: "Der Goalie war links." */
+export function directionWord(direction: PenaltyDirection) {
+  return t(DIRECTION_WORD_KEYS[direction]);
 }
 
 export function heightLabel(height: CrossbarHeight) {
-  return height[0].toUpperCase() + height.slice(1);
+  return t(HEIGHT_KEYS[height]);
 }
 
 export function predictionLabel(prediction: MatchPrediction) {
-  if (prediction === "heim") return "Heimsieg";
-  if (prediction === "auswärts") return "Auswärtssieg";
-  return "Remis";
+  if (prediction === "heim") return t("mini.homeWin");
+  if (prediction === "auswärts") return t("mini.awayWin");
+  return t("mini.drawResult");
 }
 
 export function formatNumber(value: number) {
