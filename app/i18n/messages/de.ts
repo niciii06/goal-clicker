@@ -2,7 +2,10 @@
 // shows it today (tests/i18n.test.ts compares each entry with the constant it will replace).
 //
 // A message is a text with {placeholders}, or plural forms chosen by Intl.PluralRules (one, other, …) for {count}.
+import { gameDe } from "./game.de";
+
 export const de = {
+  ...gameDe,
   "sync.storageFull": "Gerätespeicher voll. Bitte Speicher freigeben oder Spielstand als Datei sichern.",
   "sync.saveTooLarge": "Der Spielstand ist zu gross für die Cloud und wird nur auf diesem Gerät gespeichert. Bitte sichere ihn als Datei.",
   "update.newerSave": "Neue Version verfügbar, bitte neu laden. Dein Spielstand wurde mit einer neueren Version gespeichert und bleibt unverändert.",
