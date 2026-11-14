@@ -5,6 +5,7 @@ import { STAR_RATING_FILTERS } from "../app/game/constants";
 import { filterAndSortReserve, matchesReservePosition, matchesReserveRating } from "../app/game/reserve-filter";
 
 import { readStyles } from './helpers/styles.mjs';
+import { germanSource } from "./helpers/german-source.mjs";
 test("formatNumber rounds before choosing the unit", () => {
   assert.equal(formatNumber(999), "999");
   assert.equal(formatNumber(1000), "1.0K");
@@ -92,7 +93,7 @@ test("kick off text uses the real match duration", async () => {
   }
   assert.equal(formatCountdown(seasonMatchDuration(15), 0), "04:00");
   assert.equal(formatCountdown(seasonMatchDuration(3), 0), "03:30");
-  const pageSource = await import("node:fs/promises").then((fs) => fs.readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"));
+  const pageSource = await import("node:fs/promises").then((fs) => fs.readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8").then(germanSource));
   assert.doesNotMatch(pageSource, /06:00/);
 });
 
@@ -152,7 +153,7 @@ test('the Fabrizio transfer window follows the theme: light by default, dark tok
 
 test('Club & Mehr: the club identity is a section of its own, set apart from the save file card above it', async () => {
   const { readFile } = await import('node:fs/promises');
-  const [page, css] = await Promise.all([readFile(new URL('../app/game-app.tsx', import.meta.url), 'utf8'), Promise.resolve(readStyles())]);
+  const [page, css] = await Promise.all([readFile(new URL('../app/game-app.tsx', import.meta.url), 'utf8').then(germanSource), Promise.resolve(readStyles())]);
   assert.match(page, /<section className="club-identity" aria-label="Clubidentität">[\s\S]*Clubprofil speichern<\/button><\/div><\/section>/);
   assert.match(page, /className="club-preview" role="img" aria-label=\{`Vorschau deines Wappens/, 'the badge preview is a picture, not a lookalike button');
   assert.match(css, /\.club-identity \{ margin-top: 16px; padding: 16px; border: 1px solid var\(--line-soft\)/);

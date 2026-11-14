@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { ReactNode, RefObject } from "react";
 import { createPortal } from "react-dom";
+import { t } from "./i18n/runtime";
 
 /**
  * A modal dialog keeps the keyboard inside: focus moves in on open, Tab wraps around, Escape closes,
@@ -32,7 +33,7 @@ export function useDialogFocus(open: boolean, dialogRef: RefObject<HTMLElement |
 }
 
 /** Asks before an action the player might regret. The safe choice comes first and has the focus. */
-export function ConfirmDialog({ title, children, confirmLabel, cancelLabel = "Abbrechen", onConfirm, onCancel }: { title: string; children?: ReactNode; confirmLabel: string; cancelLabel?: string; onConfirm: () => void; onCancel: () => void }) {
+export function ConfirmDialog({ title, children, confirmLabel, cancelLabel = t("confirm.cancel"), onConfirm, onCancel }: { title: string; children?: ReactNode; confirmLabel: string; cancelLabel?: string; onConfirm: () => void; onCancel: () => void }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   useDialogFocus(true, dialogRef, onCancel);
   // The header blurs its background, which would trap a fixed dialog inside it; the dialog lives on <body>.

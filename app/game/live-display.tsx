@@ -10,6 +10,7 @@ import { formatNumber } from "./format";
 import type { ClickEffect } from "./types";
 import { FootballGraphic } from "./ui";
 import type { PassiveGoalsStore } from "./live-goals";
+import { t } from "../i18n/runtime";
 
 type Listener = () => void;
 export type ComboDisplay = { count: number; multiplier: number };
@@ -54,12 +55,12 @@ function useFeedback(store: ClickFeedbackStore) {
 export function ClickBallButton({ store, coop, onClick, onKeyDown }: { store: ClickFeedbackStore; coop: boolean; onClick: (event: MouseEvent<HTMLButtonElement>) => void; onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void }) {
   const { pulse, combo } = useFeedback(store);
   const comboLevel = getComboLevel(combo.count);
-  return <button type="button" className={`ball-button${pulse ? " hit" : ""}${comboLevel.tier > 1 ? ` combo-${comboLevel.tier}` : ""}`} onClick={onClick} onKeyDown={onKeyDown} aria-label={coop ? "Team-Ball anklicken" : "Fussball anklicken"}><span className="ball-aura" /><FootballGraphic /></button>;
+  return <button type="button" className={`ball-button${pulse ? " hit" : ""}${comboLevel.tier > 1 ? ` combo-${comboLevel.tier}` : ""}`} onClick={onClick} onKeyDown={onKeyDown} aria-label={coop ? t("liveDisplay.clickTeamBall") : t("liveDisplay.clickBall")}><span className="ball-aura" /><FootballGraphic /></button>;
 }
 
 export function FloatingClickNumbers({ store }: { store: ClickFeedbackStore }) {
   const { effects } = useFeedback(store);
-  return <div className="floating-layer">{effects.map((effect) => <span className={`floating-number${effect.critical ? " critical" : ""}${effect.combo > 1 ? ` combo-${effect.combo}` : ""}`} key={effect.id} style={{ left: effect.x, top: effect.y }}>{effect.critical ? `CRIT! +${formatNumber(effect.amount)}` : `+${formatNumber(effect.amount)}`}</span>)}</div>;
+  return <div className="floating-layer">{effects.map((effect) => <span className={`floating-number${effect.critical ? " critical" : ""}${effect.combo > 1 ? ` combo-${effect.combo}` : ""}`} key={effect.id} style={{ left: effect.x, top: effect.y }}>{effect.critical ? t("liveDisplay.crit", { amount: formatNumber(effect.amount) }) : `+${formatNumber(effect.amount)}`}</span>)}</div>;
 }
 
 export function ComboMeter({ store, paused }: { store: ClickFeedbackStore; paused: boolean }) {
@@ -67,7 +68,7 @@ export function ComboMeter({ store, paused }: { store: ClickFeedbackStore; pause
   const comboLevel = getComboLevel(combo.count);
   const nextComboLevel = COMBO_LEVELS.find((level) => level.clicks > combo.count);
   return <>
-    <div className={`combo-meter level-${comboLevel.tier}${combo.count > 1 ? " active" : ""}`}><span className="combo-label">{paused && combo.count > 1 ? `Combo pausiert${combo.multiplier > 1 ? ` · ${formatComboMultiplier(combo.multiplier)}` : ""}` : combo.multiplier > 1 ? `COMBO ${formatComboMultiplier(combo.multiplier)}` : combo.count > 1 ? `${combo.count} Klicks` : "Schnell klicken für Combo"}</span><span className="combo-track"><i style={{ width: `${Math.round(getComboProgress(combo.count) * 100)}%` }} /></span><small>{nextComboLevel ? `Nächste Stufe: ${formatComboMultiplier(nextComboLevel.multiplier)}` : "Maximum erreicht"}</small></div>
+    <div className={`combo-meter level-${comboLevel.tier}${combo.count > 1 ? " active" : ""}`}><span className="combo-label">{paused && combo.count > 1 ? `${t("liveDisplay.comboPaused")}${combo.multiplier > 1 ? ` · ${formatComboMultiplier(combo.multiplier)}` : ""}` : combo.multiplier > 1 ? `COMBO ${formatComboMultiplier(combo.multiplier)}` : combo.count > 1 ? t("liveDisplay.clicks", { count: combo.count }) : "Schnell klicken für Combo"}</span><span className="combo-track"><i style={{ width: `${Math.round(getComboProgress(combo.count) * 100)}%` }} /></span><small>{nextComboLevel ? t("liveDisplay.nextTier", { multiplier: formatComboMultiplier(nextComboLevel.multiplier) }) : t("liveDisplay.max")}</small></div>
     {burst && <div className={`combo-burst${burst.text === "Combo vorbei" ? " ended" : ""}`} key={burst.id} aria-hidden="true">{burst.text}</div>}
   </>;
 }
