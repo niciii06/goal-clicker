@@ -62,10 +62,12 @@ const GERMAN_TEXT_TO_KEY = new Map<string, MessageKey>(
   (Object.entries(de) as [MessageKey, unknown][]).filter(([, value]) => typeof value === "string" && !/\{\w+\}/.test(value as string)).map(([key, value]) => [value as string, key]),
 );
 
-// Server answers with values ("Das Turnier ist ab Liga 12 verfügbar."): the German entries of the "server." group with
-// {placeholders} become patterns; the values are taken over, known German values are translated too. Built once.
-const SERVER_PATTERNS: { key: MessageKey; pattern: RegExp; names: string[] }[] = (Object.entries(de) as [MessageKey, unknown][])
-  .filter(([key, value]) => key.startsWith("server.") && typeof value === "string" && /\{\w+\}/.test(value))
+// Texts with values that arrive written out: server answers ("Das Turnier ist ab Liga 12 verfügbar.", group "server.")
+// and saved history entries ("Runde 2 gewonnen", group "history."). Their German entries with {placeholders} become
+// patterns; the values are taken over and translated too when the catalogue knows them. The most specific pattern
+// (most fixed text) is tried first. Built once.
+const SERVER_PATTERNS: { key: MessageKey; pattern: RegExp; names: string[]; fixed: number }[] = (Object.entries(de) as [MessageKey, unknown][])
+  .filter(([key, value]) => (key.startsWith("server.") || key.startsWith("history.")) && typeof value === "string" && /\{\w+\}/.test(value))
   .map(([key, value]) => {
     const names: string[] = [];
     const source = (value as string).split(/(\{\w+\})/).map((part) => {
@@ -73,8 +75,9 @@ const SERVER_PATTERNS: { key: MessageKey; pattern: RegExp; names: string[] }[] =
       if (name) { names.push(name); return "(.+?)"; }
       return part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     }).join("");
-    return { key, pattern: new RegExp(`^${source}$`), names };
-  });
+    return { key, pattern: new RegExp(`^${source}$`), names, fixed: (value as string).replace(/\{\w+\}/g, "").length };
+  })
+  .sort((a, b) => b.fixed - a.fixed);
 
 /** A German text from the server or a constant in the current language when the catalogue knows it; otherwise as it is. */
 export function localizeText(text: string | null | undefined): string {
