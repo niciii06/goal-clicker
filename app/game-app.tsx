@@ -56,7 +56,7 @@ import { pronounText } from "./player-pronouns";
 import { LeaderboardPanel } from "./leaderboard-panel";
 import { SeasonPanel } from "./season-panel";
 import { expectedHomeCrowd, getTicketIncome, recordTicketIncome } from "./ticket-income";
-import { directionLabel, formatCountdown, formatGoalDifference, formatHistoryTime, formatNumber, formatPackChance, getRandomCrossbarHeight, getRandomMatchPrediction, getRandomPenaltyDirection, heightLabel, predictionLabel } from "./game/format";
+import { directionLabel, directionWord, formatCountdown, formatGoalDifference, formatHistoryTime, formatNumber, formatPackChance, getRandomCrossbarHeight, getRandomMatchPrediction, getRandomPenaltyDirection, heightLabel, predictionLabel } from "./game/format";
 import { getCurrentTime, getTravelTime, syncTravelClock } from "./game/clock";
 import { getStarCardTier, getWalkoutPresentation } from "./walkout-data";
 import { WalkoutAvatar } from "./walkout-avatar";
@@ -103,7 +103,7 @@ const WALKOUT_COUNTRY_FLAGS: Record<string, typeof FR> = {
 
 function WalkoutCountryFlag({ code, country, compact = false }: { code: string; country: string; compact?: boolean }) {
   const Flag = WALKOUT_COUNTRY_FLAGS[code] ?? CH;
-  return <Flag className={compact ? "walkout-country-flag compact" : "walkout-country-flag"} role="img" aria-label={`Flagge von ${country}`} />;
+  return <Flag className={compact ? "walkout-country-flag compact" : "walkout-country-flag"} role="img" aria-label={t("logic.flagOf", { country })} />;
 }
 
 
@@ -371,7 +371,7 @@ export function App() {
   const squadDrag = useSquadDrag({
     canDrop: canDropSquadPlayer,
     onDrop: dropSquadPlayer,
-    onBlocked: () => showToast("Dieser Wechsel ist wegen Position oder Spielstatus nicht möglich."),
+    onBlocked: () => showToast(t("logic.subNotPossible")),
     locked: (source) => layoutEditMode || coopBusy || (source.area === "reserve" && displayGame.features.cup.active),
     picked: () => pickedSquadSpot()?.source ?? null,
   });
@@ -379,7 +379,7 @@ export function App() {
   // Each tab has its own address; the game page stays mounted, only the history entry changes.
   function openFeatureTab(tab: FeatureTab) {
     // While the tutorial runs only the tabs of the current step open; the rest belongs to a later step.
-    if (tutorialLockRef.current && !tutorialLockRef.current.includes(primarySectionOf(tab) as RoutedTab)) { showToast("Das kommt in einem späteren Tutorialschritt."); return; }
+    if (tutorialLockRef.current && !tutorialLockRef.current.includes(primarySectionOf(tab) as RoutedTab)) { showToast(t("logic.laterTutorial")); return; }
     // A new main section starts at the top with focus on its heading; a sub tab of the same section keeps the place.
     if (tab !== featureTab && primarySectionOf(tab) !== primarySectionOf(featureTab)) tabFocusPendingRef.current = true;
     setFeatureTabState(tab);
@@ -438,7 +438,7 @@ export function App() {
   const [offline, setOffline] = useState("");
   const saveFailedRef = useRef(false);
   const [feedExpanded, setFeedExpanded] = useState(false);
-  const [feed, setFeed] = useState<FeedEntry[]>([{ id: 1, icon: "broadcast", text: "Die Fans sind da. Klaus der Torwart auch." }]);
+  const [feed, setFeed] = useState<FeedEntry[]>([{ id: 1, icon: "broadcast", text: t("logic.fansHere") }]);
   const gameRef = useRef(game);
   const stageRef = useRef<HTMLDivElement>(null);
   const lastClickRef = useRef(0);
@@ -502,10 +502,10 @@ export function App() {
       const response = await fetch(multiplayerUrl({ list: "1", playerId }), { cache: "no-store" });
       const data = await readCoopResponse(response);
       syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
-      if (!response.ok) throw new Error(data.error ?? "Die gespeicherten Räume konnten nicht geladen werden.");
+      if (!response.ok) throw new Error(data.error ?? t("logic.roomsLoadFailed"));
       setSavedRooms(data.rooms ?? []);
     } catch (error) {
-      if (appMode === "coop") setCoopMessage(error instanceof Error ? error.message : "Die gespeicherten Räume konnten nicht geladen werden.");
+      if (appMode === "coop") setCoopMessage(error instanceof Error ? error.message : t("logic.roomsLoadFailed"));
     } finally {
       setRoomsLoading(false);
     }
@@ -537,7 +537,7 @@ export function App() {
         setSavedRooms((current) => upsertSavedRoom(current, data.room!));
         setCoopSession({ code: data.room.code, role: data.role ?? (isCoopRole(stored.role) ? stored.role : "host"), playerId: candidateId, room: data.room });
         setAppMode("coop");
-        setCoopMessage("Dein Koop Raum wurde wieder geöffnet.");
+        setCoopMessage(t("logic.roomReopened"));
         return;
       }
       const nickname = normalizeNickname(localStorage.getItem(PLAYER_NAME_KEY) ?? playerName);
@@ -553,9 +553,9 @@ export function App() {
       setSavedRooms((current) => upsertSavedRoom(current, data.room!));
       setCoopSession({ code: data.room.code, role: data.role ?? (isCoopRole(stored.role) ? stored.role : "host"), playerId, room: data.room });
       setAppMode("coop");
-      setCoopMessage("Dein Platz im Koop Raum wurde sicher wiederhergestellt.");
+      setCoopMessage(t("logic.seatRestored"));
     } catch {
-      setCoopMessage("Der gespeicherte Koop-Raum ist gerade nicht erreichbar.");
+      setCoopMessage(t("logic.savedRoomUnreachable"));
     }
   }, [playerId, playerName]);
 
@@ -576,7 +576,7 @@ export function App() {
           if (response.status === 403) setSavedRooms((current) => current.filter((room) => room.code !== activeCoopCode));
           void loadSavedRooms();
         }
-        if (response.status === 403) setCoopMessage("Du bist nicht mehr in dieser Welt. Mit dem Raumcode kannst du wieder beitreten, sobald ein Platz frei ist.");
+        if (response.status === 403) setCoopMessage(t("logic.notInWorld"));
         else if (data.error) setCoopMessage(data.error);
         return;
       }
@@ -586,12 +586,12 @@ export function App() {
         coopStatusRef.current = data.room.status;
         coopPlayerCountRef.current = data.room.playerCount;
         setSavedRooms((current) => upsertSavedRoom(current, data.room!));
-        if (previousStatus && previousStatus !== data.room.status) setCoopMessage(data.room.status === "live" ? "Der zweite Spieler ist verbunden. Das Koop-Match läuft." : "Das Koop-Match wartet wieder auf einen zweiten Spieler.");
-        else if (previousPlayerCount && previousPlayerCount !== data.room.playerCount) setCoopMessage(data.room.playerCount > previousPlayerCount ? `${data.room.playerCount} von 4 Spielern sind jetzt in dieser Welt.` : `Noch ${data.room.playerCount} von 4 Spielern sind in dieser Welt.`);
+        if (previousStatus && previousStatus !== data.room.status) setCoopMessage(data.room.status === "live" ? t("logic.secondConnected") : t("logic.waitingSecond"));
+        else if (previousPlayerCount && previousPlayerCount !== data.room.playerCount) setCoopMessage(data.room.playerCount > previousPlayerCount ? t("logic.nowInWorld", { playerCount: data.room.playerCount }) : t("logic.stillInWorld", { playerCount: data.room.playerCount }));
         setCoopSession((current) => mergeCoopSessionRoom(current, data.room!, data.role));
       }
     } catch {
-      setCoopMessage("Die Verbindung zum Koop-Raum ist gerade unterbrochen.");
+      setCoopMessage(t("logic.coopDisconnected"));
     }
   }, [activeCoopCode, activeCoopPlayerId, loadSavedRooms]);
 
@@ -659,8 +659,8 @@ export function App() {
   const tournamentCooldownLabel = formatCountdown(displayGame.features.cup.nextTournamentAt, countdownNow);
   const starRevealAge = starReveal ? Math.max(0, countdownNow - starReveal.openedAt) : 0;
   const starRevealIsCustomDraw = starReveal?.source === "custom-draw";
-  const starRevealAction = starRevealIsCustomDraw ? "die Spezialkarte gezogen" : "das Pack geöffnet";
-  const starRevealKicker = starRevealIsCustomDraw ? "ZUFALLSZUG / SPEZIALKARTE" : starReveal ? `PACK GEÖFFNET / ${starReveal.packName}` : "";
+  const starRevealAction = starRevealIsCustomDraw ? t("logic.drewSpecial") : t("logic.openedPack");
+  const starRevealKicker = starRevealIsCustomDraw ? t("logic.randomSpecial") : starReveal ? t("logic.packOpenedEyebrow", { packName: starReveal.packName }) : "";
   const starRevealTier = starReveal ? getStarCardTier(starReveal.player) : "standard";
   const starRevealIsWalkout = starRevealTier === "walkout" || starRevealTier === "icon" || starRevealTier === "legendary";
   const starRevealIsIconic = starRevealTier === "icon";
@@ -684,8 +684,8 @@ export function App() {
     }
     return best ?? { kind: squad.benchIds.includes(id) ? "bench" as const : "reserve" as const, slot: -1, delta: 0 };
   }, [starReveal, displayGame.features.starXI, displayGame.features.cup.active]);
-  const revealContinueLabel = starReveal?.duplicate ? "Weiter" : revealPlacement?.kind === "lineup" ? "Weiter · in der Startelf" : revealPlacement?.kind === "bench" ? "Weiter · auf der Bank" : "Weiter · im Kader";
-  const revealLineupButton = starReveal && revealPlacement?.kind === "upgrade" ? <button type="button" className="mode-primary star-reveal-lineup" disabled={coopBusy} onClick={() => { const id = starReveal.player.id, slot = revealPlacement.slot; dismissStarReveal(); void moveStarXIPlayerToLineup(id, slot); }}>In die Startelf ({formatRatingDelta(revealPlacement.delta)})</button> : null;
+  const revealContinueLabel = starReveal?.duplicate ? t("logic.continue") : revealPlacement?.kind === "lineup" ? t("logic.continueXI") : revealPlacement?.kind === "bench" ? t("logic.continueBench") : t("logic.continueSquad");
+  const revealLineupButton = starReveal && revealPlacement?.kind === "upgrade" ? <button type="button" className="mode-primary star-reveal-lineup" disabled={coopBusy} onClick={() => { const id = starReveal.player.id, slot = revealPlacement.slot; dismissStarReveal(); void moveStarXIPlayerToLineup(id, slot); }}>{t("logic.intoXI")}{formatRatingDelta(revealPlacement.delta)})</button> : null;
   const starRevealTrollDelay = starReveal?.troll && starRevealIsWalkout ? PACK_TROLL_INTRO_MS : 0;
   const starWalkoutIsTop = starRevealIsWalkout && (starReveal?.player.rating ?? 0) >= 90;
   const starWalkoutConfetti = starRevealIsLegendary || starWalkoutIsTop ? GOLD_CONFETTI : starRevealIsIconic ? SILVER_CONFETTI : null;
@@ -751,7 +751,7 @@ export function App() {
   const hasTransferSquadVacancy = openTransferSquadVacancies.length > 0;
   // While the team travels to a match (or a match runs) no other match can start, so the match choice is hidden.
   const journeyUnderway = Boolean(displayGame.features.travel.journey && !displayGame.features.travel.journey.consumed);
-  const transferSquadVacancyLabel = startingStarXISelection.length < STAR_XI_SQUAD_SIZE ? "in der Startelf" : "auf der Bank";
+  const transferSquadVacancyLabel = startingStarXISelection.length < STAR_XI_SQUAD_SIZE ? t("logic.inXI") : t("logic.onBench");
   const filteredReserveStarXIPlayers = useMemo(() => {
     const career = displayGame.features.career;
     const order = new Map(ownedStarIds.map((id, index) => [id, index]));
@@ -775,15 +775,15 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [featureTab, hydrated, squadScope]);
   const favoriteCardIds = useMemo(() => new Set(displayGame.features.favoriteIds ?? []), [displayGame.features.favoriteIds]);
-  /** Pins or unpins the starter of the chosen place: "Beste Startelf" keeps pinned cards in the eleven. */
+  /** Pins or unpins the starter of the chosen place: t("logic.bestXI") keeps pinned cards in the eleven. */
   async function togglePinnedStarterOfSlot(playerId: string) {
-    const name = getStarXIPlayer(playerId)?.name ?? "Spieler";
+    const name = getStarXIPlayer(playerId)?.name ?? t("logic.player");
     const wasPinned = Boolean(displayGame.features.starXI.pinnedPlayerIds?.includes(playerId));
     if (isCoopLive) {
       setCoopBusy(true);
       const data = await sendCoopAction("star-pin", { starPlayerId: playerId });
       setCoopBusy(false);
-      if (data) showToast(wasPinned ? `${name} ist nicht mehr fixiert` : `${name} bleibt in der Startelf (fixiert)`);
+      if (data) showToast(wasPinned ? t("logic.unpinned", { name }) : t("logic.pinned", { name }));
       return;
     }
     let outcome = "";
@@ -792,24 +792,24 @@ export function App() {
       outcome = togglePinnedStarter(features, playerId);
       return outcome === "pinned" || outcome === "unpinned" ? { ...current, features } : current;
     });
-    if (outcome === "limit") showToast("Es können höchstens 11 Spieler fixiert werden.");
-    else showToast(wasPinned ? `${name} ist nicht mehr fixiert` : `${name} bleibt in der Startelf (fixiert)`);
+    if (outcome === "limit") showToast(t("logic.maxPinned"));
+    else showToast(wasPinned ? t("logic.unpinned", { name }) : t("logic.pinned", { name }));
   }
   async function toggleFavorite(playerId: string) {
-    const name = getStarXIPlayer(playerId)?.name ?? "Spieler";
+    const name = getStarXIPlayer(playerId)?.name ?? t("logic.player");
     const wasFavorite = favoriteCardIds.has(playerId);
     if (isCoopLive) {
       setCoopBusy(true);
       const data = await sendCoopAction("star-favorite", { starPlayerId: playerId });
       setCoopBusy(false);
-      if (data) showToast(wasFavorite ? `${name} ist kein Favorit mehr` : `${name} ist jetzt Favorit`);
+      if (data) showToast(wasFavorite ? t("logic.unfavorited", { name }) : t("logic.favorited", { name }));
       return;
     }
     setGame((current) => {
       const features = normalizeGameFeatures(current.features);
       return toggleFavoriteCard(features, playerId) ? { ...current, features } : current;
     });
-    showToast(wasFavorite ? `${name} ist kein Favorit mehr` : `${name} ist jetzt Favorit`);
+    showToast(wasFavorite ? t("logic.unfavorited", { name }) : t("logic.favorited", { name }));
   }
   const reservePageCount = Math.max(1, Math.ceil(filteredReserveStarXIPlayers.length / RESERVE_PAGE_SIZE));
   const activeReservePage = Math.min(reservePage, reservePageCount - 1);
@@ -820,7 +820,7 @@ export function App() {
   // Squad helpers (app/game/lineup-tools.ts): bans for the coming match, open gaps, rating preview while dragging.
   const nextSquadCompetition = nextCompetition(displayGame.features);
   const bannedForNext = useMemo(() => new Set(displayGame.features.cup.active ? [] : getBannedPlayerIds(displayGame.features, nextSquadCompetition)), [displayGame.features, nextSquadCompetition]);
-  const banLabelFor = (playerId: string | undefined) => playerId && bannedForNext.has(playerId) ? `GESPERRT · ${competitionLabel(nextSquadCompetition).toUpperCase()}` : undefined;
+  const banLabelFor = (playerId: string | undefined) => playerId && bannedForNext.has(playerId) ? t("logic.bannedFor", { competition: competitionLabel(nextSquadCompetition).toUpperCase() }) : undefined;
   const squadGapCount = useMemo(() => featureTab === "squad" && !displayGame.features.cup.active ? fillStarXIGaps(displayGame.features, { career: displayGame.features.career, cup: displayGame.features.cup }).replacements.length : 0, [featureTab, displayGame.features]);
   // The kickoff checklist (Q25) offers "Lücken füllen" on every tab; computed once per change of the world, not per render.
   const squadGapsFillable = useMemo(() => squadGapCount > 0 || (!displayGame.features.cup.active && fillStarXIGaps(displayGame.features, { career: displayGame.features.career, cup: displayGame.features.cup }).replacements.length > 0), [squadGapCount, displayGame.features]);
@@ -879,7 +879,7 @@ export function App() {
   const announcedRankRef = useRef<string | null>(null);
   useEffect(() => { if (toast) setSrAnnouncement(toast); }, [toast]);
   useEffect(() => {
-    if (announcedRankRef.current !== null && announcedRankRef.current !== currentRank.name) setSrAnnouncement(`Neuer Rang: ${currentRank.name}`);
+    if (announcedRankRef.current !== null && announcedRankRef.current !== currentRank.name) setSrAnnouncement(t("logic.newRank", { name: currentRank.name }));
     announcedRankRef.current = currentRank.name;
   }, [currentRank.name]);
   const goalBoostMultiplier = getGoalBoostMultiplier(displayGame.features, countdownNow);
@@ -906,7 +906,7 @@ export function App() {
     if (!prestigeDialog || shownPrestigeCount === prestigeDialog.prestigeCount) return;
     const ownRequest = prestigeConfirmedRef.current.has(prestigeDialog.requestId);
     setPrestigeDialog(null);
-    if (!ownRequest) setCoopMessage(`Prestige ${shownPrestigeCount} wurde in dieser Welt gestartet. Alle Upgrades stehen wieder auf Stufe 0.`);
+    if (!ownRequest) setCoopMessage(t("logic.prestigeInWorld", { count: shownPrestigeCount }));
   }, [prestigeDialog, shownPrestigeCount]);
   // Co-op Prestige vote: every member sees the open vote, and once how it ended (a result older than half a minute
   // when the world opens is not announced again).
@@ -935,22 +935,22 @@ export function App() {
   function setSavingsGoal(goal: SavingsGoal | null) {
     setSavingsGoalState(goal);
     writePref(PREF_KEYS.savingsGoal, goal ? JSON.stringify(goal) : null);
-    if (goal) showToast("Sparziel gesetzt. Der Fortschritt steht unter deinem Kontostand.");
+    if (goal) showToast(t("logic.savingsGoalSet"));
   }
   function toggleSavingsGoal(goal: SavingsGoal) { setSavingsGoal(savingsGoal?.kind === goal.kind && savingsGoal.id === goal.id ? null : goal); }
   const savingsTarget = (() => {
     if (!savingsGoal) return null;
-    if (savingsGoal.kind === "upgrade") { const upgrade = UPGRADES.find((item) => item.id === savingsGoal.id); return upgrade ? { label: `${upgrade.name} · Level ${getLevel(displayGame.upgrades, upgrade.id) + 1}`, cost: getCost(upgrade, displayGame.upgrades) } : null; }
+    if (savingsGoal.kind === "upgrade") { const upgrade = UPGRADES.find((item) => item.id === savingsGoal.id); return upgrade ? { label: t("logic.upgradeLevel", { name: upgrade.name, level: getLevel(displayGame.upgrades, upgrade.id) + 1 }), cost: getCost(upgrade, displayGame.upgrades) } : null; }
     const pack = getStarPack(savingsGoal.id as StarPackId);
     return pack && !isRewardPack(pack.id) ? { label: pack.label, cost: pack.price } : null;
   })();
   const isMiniGameOnCooldown = (id: MiniGameId) => displayGame.miniGameCooldowns[id] > countdownNow;
-  const miniGameCooldownLabel = (id: MiniGameId, availableLabel: string) => isMiniGameOnCooldown(id) ? `Bereit in ${formatCountdown(displayGame.miniGameCooldowns[id], countdownNow)}` : availableLabel;
+  const miniGameCooldownLabel = (id: MiniGameId, availableLabel: string) => isMiniGameOnCooldown(id) ? t("logic.readyIn", { time: formatCountdown(displayGame.miniGameCooldowns[id], countdownNow) }) : availableLabel;
   // Open actions (app/qol/status.ts): tab title, navigation dots, "Nächste Schritte", app badge and local notices.
   const albumClaimableCount = useMemo(() => claimableAlbumGroups(displayGame.features).length, [displayGame.features]);
   const openActions = useMemo(() => hydrated ? getOpenActions({ features: displayGame.features, now: countdownNow, coop: isCoopLive, minigameWins: displayGame.minigameWins, miniGameCooldowns: displayGame.miniGameCooldowns, travelNow: getTravelTime(), albumClaimable: albumClaimableCount }) : [], [hydrated, displayGame.features, countdownNow, isCoopLive, displayGame.minigameWins, displayGame.miniGameCooldowns, albumClaimableCount]);
   const navBadges = sectionBadges(openActions);
-  const pageTitle = statusTitle(TAB_TITLES[featureTab], displayGame.features, countdownNow, openActions);
+  const pageTitle = statusTitle(localizeText(TAB_TITLES[featureTab]), displayGame.features, countdownNow, openActions);
   // Next.js writes the metadata title after the first render (first load, direct URL); the 1 s countdown below puts the status title back.
   const pageTitleRef = useRef(pageTitle);
   useEffect(() => { pageTitleRef.current = pageTitle; document.title = pageTitle; }, [pageTitle]);
@@ -983,7 +983,7 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [featureTab, latestHistoryAt]);
   const unreadHistory = historySeenAt === null ? 0 : displayGame.features.history.filter((entry) => entry.timestamp > historySeenAt).length;
-  /** A "Nächste Schritte" chip: open the place where the action is done. */
+  /** A t("logic.nextSteps") chip: open the place where the action is done. */
   function openActionTarget(action: OpenAction) {
     openFeatureTab(action.tab);
     const selector = action.id === "daily" ? ".daily-reward" : action.id === "minigame" ? ".mini-game-hub" : action.id === "press" ? ".press-conference" : "";
@@ -1071,8 +1071,8 @@ export function App() {
     if (seasonHistoryRef.current === latest.id) return;
     seasonHistoryRef.current = latest.id;
     // No extra result card on "Spiele" any more (the match summary shows the result); the table lives in "Saison".
-    const seasonEnd = latest.completedSeason ? { promoted: "Aufstieg", relegated: "Abstieg", stayed: "Klassenerhalt", "hall-of-fame": "Hall of Fame" }[String(latest.seasonOutcome)] : undefined;
-    showToast(seasonEnd ? `Saison beendet: ${seasonEnd}. Die Tabelle steht im Reiter Saison.` : "Rangliste aktualisiert");
+    const seasonEnd = latest.completedSeason ? { promoted: t("logic.promotion"), relegated: t("logic.relegation"), stayed: t("logic.survival"), "hall-of-fame": "Hall of Fame" }[String(latest.seasonOutcome)] : undefined;
+    showToast(seasonEnd ? t("logic.seasonEnded", { seasonEnd }) : t("logic.leaderboardUpdated"));
     // A league title gets the trophy celebration on top of the final table.
     const title = getSeasonTitle(latest, displayGame.features.seasonMode.lastTable, displayGame.features.seasonMode.lastResults);
     if (title) {
@@ -1118,14 +1118,14 @@ export function App() {
     }
     coopPackRevealRef.current = sharedPackReveal.openedAt;
     presentStarReveal(sharedPackReveal);
-    showToast(sharedPackReveal.duplicate ? `Doppelter Star · +${formatNumber(sharedPackReveal.fragmentCompensation)} Fragmente` : `${sharedPackReveal.player.name} gezogen`);
+    showToast(sharedPackReveal.duplicate ? t("logic.duplicateStar", { fragments: formatNumber(sharedPackReveal.fragmentCompensation) }) : t("logic.drawn", { name: sharedPackReveal.player.name }));
     // Present the shared pack result on both devices.
   }, [isCoopLive, sharedPackReveal]);
 
   useEffect(() => {
     if (!displayedCupGoal || cupGoalRef.current === displayedCupGoal.id || getCurrentTime() - displayedCupGoal.createdAt > 12000) return;
     cupGoalRef.current = displayedCupGoal.id;
-    addFeed(`${displayedCupGoal.scorer} trifft in der ${displayedCupGoal.minute}. Minute.`, "crown");
+    addFeed(t("logic.scores", { scorer: displayedCupGoal.scorer, minute: displayedCupGoal.minute }), "crown");
   }, [displayedCupGoal]);
 
   useEffect(() => {
@@ -1137,8 +1137,8 @@ export function App() {
       setCupCardAnnouncement(null);
       cupCardTimerRef.current = null;
     }, 5000);
-    addFeed(`${displayedCupCard.player} sieht Rot. Für die nächste Partie gesperrt.`, "screen");
-    showToast("Rote Karte");
+    addFeed(t("logic.seesRed", { player: displayedCupCard.player }), "screen");
+    showToast(t("logic.redCard"));
   }, [displayedCupCard]);
 
   useEffect(() => {
@@ -1456,17 +1456,17 @@ export function App() {
 
   function resetLayout() {
     setLayoutOrder(DEFAULT_LAYOUT_ORDER);
-    showToast("Standardanordnung wiederhergestellt");
+    showToast(t("logic.layoutRestored"));
   }
 
   async function createCoopRoom() {
     const nickname = normalizeNickname(coopNickname);
     if (!playerId) {
-      setCoopMessage("Deine Spieler-ID wird noch vorbereitet.");
+      setCoopMessage(t("logic.idPreparing"));
       return;
     }
     if (nickname.length < 2) {
-      setCoopMessage("Gib zuerst deinen Spielernamen ein.");
+      setCoopMessage(t("logic.enterNameFirst"));
       return;
     }
     setCoopBusy(true);
@@ -1476,14 +1476,14 @@ export function App() {
       const response = await fetch("/api/multiplayer", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "create", playerId, nickname, roomName: coopRoomName, protocol: MULTIPLAYER_PROTOCOL_VERSION }) });
       const data = await readCoopResponse(response);
       syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
-      if (!response.ok || !data.room) throw new Error(data.error ?? "Der Koop-Raum konnte nicht erstellt werden.");
+      if (!response.ok || !data.room) throw new Error(data.error ?? t("logic.roomCreateFailed"));
       coopStatusRef.current = data.room.status;
       coopPlayerCountRef.current = data.room.playerCount;
       setSavedRooms((current) => upsertSavedRoom(current, data.room!));
       setCoopSession({ code: data.room.code, role: data.role ?? "host", playerId, room: data.room });
-      setCoopMessage("Raum erstellt. Teile den Code mit bis zu drei Mitspielern.");
+      setCoopMessage(t("logic.roomCreated"));
     } catch (error) {
-      setCoopMessage(error instanceof Error ? error.message : "Der Koop-Raum konnte nicht erstellt werden.");
+      setCoopMessage(error instanceof Error ? error.message : t("logic.roomCreateFailed"));
     } finally {
       setCoopBusy(false);
     }
@@ -1493,15 +1493,15 @@ export function App() {
     const nickname = normalizeNickname(coopNickname);
     const code = coopCodeInput.trim().toUpperCase().slice(0, 6);
     if (!playerId) {
-      setCoopMessage("Deine Spieler-ID wird noch vorbereitet.");
+      setCoopMessage(t("logic.idPreparing"));
       return;
     }
     if (nickname.length < 2) {
-      setCoopMessage("Gib zuerst deinen Spielernamen ein.");
+      setCoopMessage(t("logic.enterNameFirst"));
       return;
     }
     if (code.length !== 6) {
-      setCoopMessage("Ein Raumcode besteht aus 6 Zeichen.");
+      setCoopMessage(t("logic.codeSixChars"));
       return;
     }
     setCoopBusy(true);
@@ -1511,14 +1511,14 @@ export function App() {
       const response = await fetch("/api/multiplayer", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "join", code, playerId, nickname, protocol: MULTIPLAYER_PROTOCOL_VERSION }) });
       const data = await readCoopResponse(response);
       syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
-      if (!response.ok || !data.room) throw new Error(data.error ?? "Der Raum konnte nicht betreten werden.");
+      if (!response.ok || !data.room) throw new Error(data.error ?? t("logic.roomJoinFailed"));
       coopStatusRef.current = data.room.status;
       coopPlayerCountRef.current = data.room.playerCount;
       setSavedRooms((current) => upsertSavedRoom(current, data.room!));
       setCoopSession({ code: data.room.code, role: data.role ?? "guest", playerId, room: data.room });
-      setCoopMessage(`${data.room.playerCount} von 4 Spielern sind im Raum. Jetzt gemeinsam Tore sammeln.`);
+      setCoopMessage(t("logic.playersInRoom", { playerCount: data.room.playerCount }));
     } catch (error) {
-      setCoopMessage(error instanceof Error ? error.message : "Der Raum konnte nicht betreten werden.");
+      setCoopMessage(error instanceof Error ? error.message : t("logic.roomJoinFailed"));
     } finally {
       setCoopBusy(false);
     }
@@ -1531,16 +1531,16 @@ export function App() {
       const response = await fetch(multiplayerUrl({ code, playerId }), { cache: "no-store" });
       const data = await readCoopResponse(response);
       syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
-      if (!response.ok || !data.room) throw new Error(data.error ?? "Der Raum konnte nicht geöffnet werden.");
+      if (!response.ok || !data.room) throw new Error(data.error ?? t("logic.roomOpenFailed"));
       coopStatusRef.current = data.room.status;
       coopPlayerCountRef.current = data.room.playerCount;
       setSavedRooms((current) => upsertSavedRoom(current, data.room!));
       setCoopSession({ code: data.room.code, role: data.role ?? "host", playerId, room: data.room });
       setAppMode("coop");
-      setCoopMessage("Gespeicherter Koop-Raum geöffnet.");
+      setCoopMessage(t("logic.savedRoomOpened"));
     } catch (error) {
-      setCoopMessage(error instanceof Error ? error.message : "Der Raum konnte nicht geöffnet werden.");
-      if (error instanceof Error && error.message.includes("nicht in diesem Raum")) {
+      setCoopMessage(error instanceof Error ? error.message : t("logic.roomOpenFailed"));
+      if (error instanceof Error && error.message.includes(t("logic.notInRoom"))) {
         setSavedRooms((current) => current.filter((room) => room.code !== code));
       }
     } finally {
@@ -1558,7 +1558,7 @@ export function App() {
     clearEventAnnouncements();
     dismissStarReveal();
     setCoopSession(null);
-    setCoopMessage("Du hast den Koop-Raum verlassen. Er bleibt gespeichert und kann später wieder geöffnet werden.");
+    setCoopMessage(t("logic.leftRoom"));
     void loadSavedRooms();
   }
 
@@ -1585,7 +1585,7 @@ export function App() {
     const data = await sendCoopAction("leave-seat");
     setCoopBusy(false);
     if (!data?.left) return;
-    forgetCoopRoom(code, data.newHost ? "Du hast deinen Platz freigegeben. Die Host Rolle ging an das zuletzt aktive Mitglied. Mit dem Raumcode kannst du wieder beitreten, solange ein Platz frei ist." : "Du hast deinen Platz freigegeben. Die Welt spielt ohne dich weiter. Mit dem Raumcode kannst du wieder beitreten, solange ein Platz frei ist.");
+    forgetCoopRoom(code, data.newHost ? t("logic.freedHostPassed") : t("logic.freedWorldGoesOn"));
   }
 
   async function kickCoopMember(role: CoopRole, name: string, force: boolean) {
@@ -1594,7 +1594,7 @@ export function App() {
     setCoopBusy(true);
     const data = await sendCoopAction("kick", { targetRole: role, force });
     setCoopBusy(false);
-    if (data?.left) setCoopMessage(`${name} ist nicht mehr in dieser Welt. Der Platz ist wieder frei.`);
+    if (data?.left) setCoopMessage(t("logic.seatFreeAgain", { name }));
   }
 
   async function answerPrestigeVote(decision: "approve" | "decline") {
@@ -1603,22 +1603,22 @@ export function App() {
     setCoopBusy(true);
     const data = await sendCoopAction("prestige-vote", { voteId: vote.id, decision });
     setCoopBusy(false);
-    if (data?.prestigeVote === "pending") setCoopMessage("Du hast zugestimmt. Die Abstimmung wartet noch auf die anderen.");
+    if (data?.prestigeVote === "pending") setCoopMessage(t("logic.youAgreed"));
   }
 
   async function deleteCoopRoom(code: string) {
     const room = coopSession?.code === code ? coopSession.room : savedRooms.find((item) => item.code === code);
     if (!room?.canDelete) {
-      setCoopMessage("Nur der Host kann diesen Raum löschen.");
+      setCoopMessage(t("logic.onlyHostDeletes"));
       return;
     }
-    if (!window.confirm(`Raum ${code} wirklich löschen? Der gemeinsame Spielstand geht für alle verloren.`)) return;
+    if (!window.confirm(t("logic.deleteRoomConfirm", { code }))) return;
     setCoopBusy(true);
     try {
       const response = await fetch("/api/multiplayer", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "delete", code, playerId, protocol: MULTIPLAYER_PROTOCOL_VERSION }) });
       const data = await readCoopResponse(response);
       syncTravelClock((data as typeof data & {serverNow?:number}).serverNow);
-      if (!response.ok || !data.deleted) throw new Error(data.error ?? "Der Raum konnte nicht gelöscht werden.");
+      if (!response.ok || !data.deleted) throw new Error(data.error ?? t("logic.roomDeleteFailed"));
       localStorage.removeItem(COOP_ROOM_KEY);
       setSavedRooms((current) => current.filter((item) => item.code !== code));
       if (coopSession?.code === code) {
@@ -1630,10 +1630,10 @@ export function App() {
         dismissStarReveal();
         setCoopSession(null);
       }
-      setCoopMessage("Raum gelöscht. Er ist bei allen Spielern entfernt.");
+      setCoopMessage(t("logic.roomDeleted"));
       void loadSavedRooms();
     } catch (error) {
-      setCoopMessage(error instanceof Error ? error.message : "Der Raum konnte nicht gelöscht werden.");
+      setCoopMessage(error instanceof Error ? error.message : t("logic.roomDeleteFailed"));
     } finally {
       setCoopBusy(false);
     }
@@ -1652,7 +1652,7 @@ export function App() {
       const state = comboRef.current;
       const count = decayComboCount(state.count, Date.now() - state.last);
       const { multiplier } = getComboLevel(count);
-      if (state.multiplier > 1 && multiplier === 1) clickFeedback.setBurst({ id: Date.now(), text: "Combo vorbei" });
+      if (state.multiplier > 1 && multiplier === 1) clickFeedback.setBurst({ id: Date.now(), text: t("logic.comboOver") });
       clickFeedback.setCombo({ count, multiplier });
       if (count > 0) {
         state.multiplier = multiplier;
@@ -1712,25 +1712,25 @@ export function App() {
           if (!response.ok && data.errorCode === "STALE_STATE" && attempt + 1 < maxAttempts) continue;
           if (!response.ok) {
             // Clicks beyond the server's click budget are simply not counted; that is no error to show.
-            if (action !== "click" || response.status !== 429) { setCoopMessage(data.error ?? "Die Koop-Aktion ist fehlgeschlagen."); showToast(data.error ?? "Die Koop-Aktion ist fehlgeschlagen.", "error"); }
+            if (action !== "click" || response.status !== 429) { setCoopMessage(data.error ?? t("logic.coopActionFailed")); showToast(data.error ?? t("logic.coopActionFailed"), "error"); }
             return null;
           }
           if (actionId) setCoopFailed((current) => current?.extra.actionId === actionId ? null : current);
           if (data.packReveal) {
             coopPackRevealRef.current = data.packReveal.openedAt;
             presentStarReveal(data.packReveal);
-            showToast(data.packReveal.duplicate ? `Doppelt gezogen · +${formatNumber(data.packReveal.fragmentCompensation)} Fragmente` : data.packReveal.source === "custom-draw" ? `${data.packReveal.player.name} als Spezialkarte gezogen` : `${data.packReveal.player.name} gezogen`);
+            showToast(data.packReveal.duplicate ? t("logic.duplicateDrawn", { fragments: formatNumber(data.packReveal.fragmentCompensation) }) : data.packReveal.source === "custom-draw" ? t("logic.drawnAsSpecial", { name: data.packReveal.player.name }) : t("logic.drawn", { name: data.packReveal.player.name }));
           }
           return data;
         } catch {
           const retryUnsafe = NETWORK_RETRY_UNSAFE_COOP_ACTIONS.has(action);
           if (action !== "click" && !retryUnsafe && attempt + 1 < maxAttempts) continue;
           if (actionId && !retryUnsafe) setCoopFailed({ action, extra: { ...extra, actionId } });
-          setCoopMessage(retryUnsafe ? "Die Verbindung wurde unterbrochen. Prüfe den gemeinsamen Kontostand, bevor du den Kauf wiederholst." : "Die Verbindung zum Koop-Raum ist gerade unterbrochen.");
+          setCoopMessage(retryUnsafe ? t("logic.connectionLostPurchase") : t("logic.coopDisconnected"));
           return null;
         }
       }
-      setCoopMessage("Die Koop-Aktion konnte nach mehreren gleichzeitigen Änderungen nicht gespeichert werden.");
+      setCoopMessage(t("logic.coopConflict"));
       return null;
     };
     // Klicks werden serverseitig atomar addiert. Hintergrund-Ticks werden
@@ -1769,15 +1769,15 @@ export function App() {
   async function shareInvite() {
     if (!coopSession) return;
     const url = inviteUrl(window.location.origin, coopSession.code);
-    const text = `Spiel mit mir Goal Clicker in der Welt «${coopSession.room.roomName}». Raumcode ${coopSession.code}.`;
+    const text = t("logic.inviteText", { roomName: coopSession.room.roomName, code: coopSession.code });
     try {
       if (navigator.share) { await navigator.share({ title: "Goal Clicker Koop", text, url }); return; }
       await navigator.clipboard?.writeText(url);
-      showToast("Einladungslink kopiert");
+      showToast(t("logic.inviteCopied"));
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
-      setCoopMessage(`Einladungslink: ${url}`);
-      showToast(`Einladungslink: ${url}`);
+      setCoopMessage(t("logic.inviteLink", { url }));
+      showToast(t("logic.inviteLink", { url }));
     }
   }
 
@@ -1785,9 +1785,9 @@ export function App() {
     if (!coopSession) return;
     try {
       await navigator.clipboard?.writeText(coopSession.code);
-      setCoopMessage("Raumcode kopiert.");
+      setCoopMessage(t("logic.codeCopied"));
     } catch {
-      setCoopMessage(`Raumcode: ${coopSession.code}`);
+      setCoopMessage(t("logic.roomCode", { code: coopSession.code }));
     }
   }
 
@@ -1795,12 +1795,12 @@ export function App() {
     if (!coopSession || coopSession.role !== "host") return;
     const roomName = coopRoomName.trim().replace(/\s+/g, " ").slice(0, 28);
     if (!roomName) {
-      setCoopMessage("Gib deiner Welt zuerst einen Namen.");
+      setCoopMessage(t("logic.nameWorldFirst"));
       return;
     }
     setCoopBusy(true);
     const data = await sendCoopAction("rename-room", { roomName });
-    if (data?.room) setCoopMessage(`Die Welt heisst jetzt ${data.room.roomName}.`);
+    if (data?.room) setCoopMessage(t("logic.worldRenamed", { roomName: data.room.roomName }));
     setCoopBusy(false);
   }
 
@@ -1908,7 +1908,7 @@ export function App() {
     if (isCoopLive) {
       setCoopBusy(true);
       const data = await sendCoopAction("profile", profile);
-      if (data) setCoopMessage("Clubprofil gemeinsam gespeichert.");
+      if (data) setCoopMessage(t("logic.clubProfileShared"));
       setCoopBusy(false);
       return;
     }
@@ -1920,7 +1920,7 @@ export function App() {
       addHistory(features, { title: "Clubprofil aktualisiert", detail: `${profile.badge} ${profile.name} ist bereit für die nächste Runde.`, tone: "neutral" });
       return { ...current, features };
     });
-    showToast("Clubprofil gespeichert");
+    showToast(t("logic.clubProfileSaved"));
   }
 
   async function openRewardPack(rewardId:string) {
@@ -1930,7 +1930,7 @@ export function App() {
       if(isCoopLive){const data=await sendCoopAction('reward-pack',{rewardId});if(!data)openAllRef.current=null;return;}
       const playerId=localStorage.getItem(PLAYER_ID_KEY);
       const response=await fetch('/api/rewards',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({playerId,rewardId,features:gameRef.current.features})});
-      const data=await response.json() as {error?:string;opening?:import('./feature-data').StarPackOpening};if(!response.ok){openAllRef.current=null;showToast(data.error??'Prämie konnte nicht geöffnet werden.');return;}
+      const data=await response.json() as {error?:string;opening?:import('./feature-data').StarPackOpening};if(!response.ok){openAllRef.current=null;showToast(data.error??t("logic.rewardOpenFailed"));return;}
       const apply=async()=>{
         const current=gameRef.current, saved=readStoredGame().saved;
         const features=normalizeGameFeatures(current.features);
@@ -1939,11 +1939,11 @@ export function App() {
         // Merge receipts from this tab before applying the single canonical server draw.
         for(const earned of current.features.earnedPacks)if(!features.earnedPacks.some(p=>p.id===earned.id))features.earnedPacks.push(earned);
         const reveal=openEarnedPack(features,rewardId,Date.now(),Math.random,data.opening);
-        if(!reveal){showToast('Diese Prämie wurde bereits geöffnet.');return;}
+        if(!reveal){showToast(t("logic.rewardOpened"));return;}
         const next={...current,features,lastSaved:Date.now()};persistLocalGame(next);gameRef.current=next;setGame(next);presentStarReveal(reveal);
       };
       if(navigator.locks)await navigator.locks.request('goal-clicker-reward',apply);else await apply();
-    } catch {openAllRef.current=null;showToast('Prämie bleibt gespeichert. Bitte erneut versuchen.');}
+    } catch {openAllRef.current=null;showToast(t("logic.rewardKept"));}
     finally {packPurchaseRef.current=false;setCoopBusy(false);}
   }
 
@@ -1975,15 +1975,15 @@ export function App() {
     if (!pack || isRewardPack(pack.id)) return;
     const unlockLeague = getPackUnlockLeague(pack.id);
     if (!isLeagueContentUnlocked(unlockLeague, reachedLeague, hasFullTestAccess)) {
-      showToast(`${pack.label} wird ab Liga ${unlockLeague} freigeschaltet.`);
+      showToast(t("logic.packUnlocksAt", { label: pack.label, unlockLeague }));
       return;
     }
     if (displayGame.features.cup.active) {
-      showToast("Während eines Pokalspiels keine Packs.");
+      showToast(t("logic.noPacksCup"));
       return;
     }
     if (!hasInfiniteMoney && displayGame.goals < pack.price) {
-      showToast(`${pack.label} kostet ${formatNumber(pack.price)} Tore.`);
+      showToast(t("logic.packCosts", { label: pack.label, price: formatNumber(pack.price) }));
       return;
     }
     packPurchaseRef.current = true;
@@ -2000,7 +2000,7 @@ export function App() {
     const latestGame = gameRef.current;
     if (latestGame.goals < pack.price || latestGame.features.cup.active) {
       packPurchaseRef.current = false;
-      showToast(latestGame.features.cup.active ? "Während eines Pokalspiels keine Packs." : `${pack.label} kostet ${formatNumber(pack.price)} Tore.`);
+      showToast(latestGame.features.cup.active ? t("logic.noPacksCup") : t("logic.packCosts", { label: pack.label, price: formatNumber(pack.price) }));
       return;
     }
     const opening = openStarPack(pack.id, latestGame.features.starXI.ownedIds, Math.random, latestGame.features.starXI.formationPositions);
@@ -2014,7 +2014,7 @@ export function App() {
       window.setTimeout(() => {
         if (!applied) { packPurchaseRef.current = false; return; }
         presentStarReveal(reveal);
-        showToast(opening.duplicate ? `Doppelter Star · +${formatNumber(opening.fragmentCompensation)} Fragmente` : `${opening.player.name} gezogen`);
+        showToast(opening.duplicate ? t("logic.duplicateStar", { fragments: formatNumber(opening.fragmentCompensation) }) : t("logic.drawn", { name: opening.player.name }));
       }, 0);
     };
     setGame((current) => {
@@ -2039,15 +2039,15 @@ export function App() {
     const cost = SPECIAL_CARD_PACK.price;
     const unlockLeague = getPackUnlockLeague(SPECIAL_CARD_PACK.id);
     if (!isLeagueContentUnlocked(unlockLeague, reachedLeague, hasFullTestAccess)) {
-      showToast(`${SPECIAL_CARD_PACK.label} wird ab Liga ${unlockLeague} freigeschaltet.`);
+      showToast(t("logic.packUnlocksAt", { label: SPECIAL_CARD_PACK.label, unlockLeague }));
       return;
     }
     if (displayGame.features.cup.active) {
-      showToast("Während eines Spiels keine Packs.");
+      showToast(t("logic.noPacksMatch"));
       return;
     }
     if (!hasInfiniteMoney && displayGame.features.starXI.fragments < cost) {
-      showToast(`${SPECIAL_CARD_PACK.label} kostet ${formatNumber(cost)} Fragmente.`);
+      showToast(t("logic.specialCosts", { label: SPECIAL_CARD_PACK.label, cost: formatNumber(cost) }));
       return;
     }
     // One ID per click: the server and the local save both refuse a repeated receipt.
@@ -2080,24 +2080,24 @@ export function App() {
     });
     packPurchaseRef.current = false;
     presentStarReveal(result.reveal);
-    showToast(result.reveal.duplicate ? `Doppelt gezogen · +${formatNumber(result.reveal.fragmentCompensation)} Fragmente` : `${result.reveal.player.name} gezogen`);
+    showToast(result.reveal.duplicate ? t("logic.duplicateDrawn", { fragments: formatNumber(result.reveal.fragmentCompensation) }) : t("logic.drawn", { name: result.reveal.player.name }));
   }
 
   async function confirmMatchChanges(changes: {playerId:string;slot:number}[]) {
     if(isCoopLive){await sendCoopAction('cup-substitutions',{changes});return;}
     let failure='';
     setGame(current=>{const features=normalizeGameFeatures(current.features);failure=queueMatchChanges(features,changes,getCurrentTime());return failure?current:{...current,features};});
-    showToast(failure||'Wechsel für den nächsten Unterbruch vorgemerkt.');
+    showToast(failure||t("logic.subQueued"));
   }
 
   async function moveStarXIPlayerToLineup(playerId: string, lineupIndex: number) {
-    if(displayGame.features.cup.active && displayGame.features.cup.simulation){showToast('Öffne Wechsel in der Matchansicht.');return;}
+    if(displayGame.features.cup.active && displayGame.features.cup.simulation){showToast(t("logic.openSubs"));return;}
     if(displayGame.features.cup.active){await confirmMatchChanges([{playerId,slot:lineupIndex}]);return;}
     const player = getStarXIPlayer(playerId);
     if (!player || !Number.isInteger(lineupIndex) || lineupIndex < 0 || lineupIndex >= STAR_XI_SQUAD_SIZE || !displayGame.features.starXI.ownedIds.includes(playerId)) return;
-    if (displayGame.features.cup.active && displayGame.features.squadLock && !displayGame.features.squadLock.playerIds.includes(playerId)) { showToast('Dieser Spieler gehört nicht zum Spieltagskader.'); return; }
+    if (displayGame.features.cup.active && displayGame.features.squadLock && !displayGame.features.squadLock.playerIds.includes(playerId)) { showToast(t("logic.notInMatchSquad")); return; }
     if (suspendedStarIds.includes(playerId)) {
-      showToast(`${player.name} ist nach der Roten Karte für die nächste Partie gesperrt.`);
+      showToast(t("logic.bannedAfterRed", { name: player.name }));
       return;
     }
     const lineupPosition = activeFormationPositions[lineupIndex];
@@ -2108,26 +2108,26 @@ export function App() {
       return;
     }
     if (!canStarXIPlayerFillSlot(playerId, lineupIndex, activeFormationPositions)) {
-      showToast(`${player.name} kann nicht auf ${lineupPosition} spielen.`);
+      showToast(t("logic.cannotPlayPosition", { name: player.name, position: lineupPosition }));
       return;
     }
     const comesFromBench = displayGame.features.starXI.benchIds.includes(playerId);
     if (displayGame.features.cup.active && !comesFromBench) {
-      showToast("Während des Spiels kannst du nur von der Bank wechseln.");
+      showToast(t("logic.onlyFromBench"));
       return;
     }
     if (displayGame.features.cup.active && displayGame.features.cup.substitutionsUsed >= STAR_XI_MAX_SUBSTITUTIONS) {
-      showToast("Alle fünf Wechsel sind bereits gebraucht.");
+      showToast(t("logic.allSubsUsed"));
       return;
     }
     if (displayGame.features.cup.active && displayGame.features.cup.playerExitedAt[playerId]) {
-      showToast(`${player.name} wurde bereits ausgewechselt und darf nicht zurück aufs Feld.`);
+      showToast(t("logic.alreadySubbedOff", { name: player.name }));
       return;
     }
     if (isCoopLive) {
       setCoopBusy(true);
       const data = await sendCoopAction("star-lineup", { lineupIndex, starPlayerId: playerId });
-      if (data) setCoopMessage(displayGame.features.cup.active ? `${player.name} wird live eingewechselt.` : `${player.name} spielt jetzt auf Position ${lineupPosition}.`);
+      if (data) setCoopMessage(displayGame.features.cup.active ? t("logic.subbedOnLive", { name: player.name }) : t("logic.nowAtPosition", { name: player.name, position: lineupPosition }));
       setCoopBusy(false);
       if (data) setSelectedLineupSlot(null);
       return;
@@ -2146,7 +2146,7 @@ export function App() {
       }
       return { ...current, features };
     });
-    showToast(displayGame.features.cup.active ? `${player.name} wird eingewechselt` : `${player.name} auf ${lineupPosition} gesetzt`);
+    showToast(displayGame.features.cup.active ? t("logic.subbedOn", { name: player.name }) : t("logic.putAt", { name: player.name, position: lineupPosition }));
     setSelectedLineupSlot(null);
     setSelectedBenchSlot(null);
   }
@@ -2156,13 +2156,13 @@ export function App() {
     const formation = getStarFormation(formationId);
     const unlockLeague = getFormationUnlockLeague(formation.id);
     if (!isLeagueContentUnlocked(unlockLeague, reachedLeague, hasFullTestAccess)) {
-      showToast(`${formation.label} wird ab Liga ${unlockLeague} freigeschaltet.`);
+      showToast(t("logic.packUnlocksAt", { label: formation.label, unlockLeague }));
       return;
     }
     if (isCoopLive) {
       setCoopBusy(true);
       const data = await sendCoopAction("star-formation", { formationId });
-      if (data) setCoopMessage(`Formation auf ${formation.label} umgestellt.`);
+      if (data) setCoopMessage(t("logic.formationSwitched", { label: formation.label }));
       setCoopBusy(false);
       return;
     }
@@ -2173,23 +2173,23 @@ export function App() {
       return { ...current, features };
     });
     setSelectedLineupSlot(null);
-    showToast(`Formation: ${formation.label}`);
+    showToast(t("logic.formation", { label: formation.label }));
   }
 
   async function autoPickBestStarXI() {
     if (displayGame.features.cup.active) {
-      showToast("Während eines Spiels ist die Startelf gesperrt. Wechsle im Spiel über «Wechsel».");
+      showToast(t("logic.xiLockedInMatch"));
       return;
     }
     const preview = setBestStarXI(displayGame.features.starXI, getBestXIUnavailablePlayerIds(displayGame.features), { career: displayGame.features.career, cup: displayGame.features.cup });
     const selectedCount = preview.lineupIds.filter(Boolean).length;
     if (!selectedCount) {
-      showToast("Du hast noch keine passenden Spieler im Kader.");
+      showToast(t("logic.noMatchingPlayers"));
       return;
     }
     const unchanged = preview.lineupIds.join() === displayGame.features.starXI.lineupIds.join() && preview.benchIds.join() === displayGame.features.starXI.benchIds.join();
     if (unchanged) {
-      showToast("Das ist schon deine beste Startelf.");
+      showToast(t("logic.alreadyBestXI"));
       return;
     }
     const before = displayGame.features.starXI;
@@ -2208,8 +2208,8 @@ export function App() {
       if (data) {
         setSelectedLineupSlot(null);
         setSelectedBenchSlot(null);
-        setCoopMessage(`Beste Startelf aufgestellt · ${selectedCount} von ${STAR_XI_SQUAD_SIZE} Plätzen besetzt.`);
-        showToast(`Beste Startelf · ${selectedCount} von ${STAR_XI_SQUAD_SIZE}`);
+        setCoopMessage(t("logic.bestXIFilled", { count: selectedCount, size: STAR_XI_SQUAD_SIZE }));
+        showToast(t("logic.bestXIShort", { count: selectedCount, size: STAR_XI_SQUAD_SIZE }));
       }
       setCoopBusy(false);
       return;
@@ -2230,10 +2230,10 @@ export function App() {
     });
     setSelectedLineupSlot(null);
     setSelectedBenchSlot(null);
-    showToast(`Beste Startelf · ${selectedCount} von ${STAR_XI_SQUAD_SIZE}`);
+    showToast(t("logic.bestXIShort", { count: selectedCount, size: STAR_XI_SQUAD_SIZE }));
   }
 
-  /** One step back after "Beste Startelf" (single player), as long as nobody changed the squad since. */
+  /** One step back after t("logic.bestXI") (single player), as long as nobody changed the squad since. */
   function undoBestStarXI() {
     const undo = squadUndo;
     setSquadUndo(null);
@@ -2244,14 +2244,14 @@ export function App() {
       features.starXI = removeStarXIPlayersFromSquad(normalizeStarXIState({ ...features.starXI, lineupIds: undo.lineupIds, benchIds: undo.benchIds }), getBestXIUnavailablePlayerIds(features));
       return { ...current, features };
     });
-    showToast("Aufstellung zurückgesetzt");
+    showToast(t("logic.lineupReset"));
   }
 
-  /** "Lücken füllen" (Q21): only empty or unavailable places change; everything else stays as the player set it. */
+  /** t("logic.fillGaps") (Q21): only empty or unavailable places change; everything else stays as the player set it. */
   async function fillSquadGaps() {
-    if (displayGame.features.cup.active) { showToast("Während eines Spiels füllst du Lücken über die Wechsel."); return; }
+    if (displayGame.features.cup.active) { showToast(t("logic.gapsViaSubs")); return; }
     const preview = fillStarXIGaps(displayGame.features, { career: displayGame.features.career, cup: displayGame.features.cup });
-    if (!preview.replacements.length) { showToast(startingStarXISelection.length < STAR_XI_SQUAD_SIZE ? "Kein passender Spieler für die freien Plätze. Neue Spieler gibt es in den Packs." : "Keine Lücken in Startelf und Bank."); return; }
+    if (!preview.replacements.length) { showToast(startingStarXISelection.length < STAR_XI_SQUAD_SIZE ? t("logic.noFitForGaps") : t("logic.noGaps")); return; }
     if (isCoopLive) {
       setCoopBusy(true);
       const data = await sendCoopAction("star-fill-gaps");
@@ -2271,16 +2271,16 @@ export function App() {
     showToast(describeReplacements(preview.replacements).join(" · "));
   }
 
-  /** "Beste Bank" (Q27): the strongest fitting substitutes behind the eleven, which stays as it is. */
+  /** t("logic.bestBench") (Q27): the strongest fitting substitutes behind the eleven, which stays as it is. */
   async function pickBestBench() {
     if (displayGame.features.cup.active) return;
     const next = withBestBench(displayGame.features, { career: displayGame.features.career, cup: displayGame.features.cup });
-    if (next.benchIds.join() === displayGame.features.starXI.benchIds.join()) { showToast("Das ist schon deine beste Bank."); return; }
+    if (next.benchIds.join() === displayGame.features.starXI.benchIds.join()) { showToast(t("logic.alreadyBestBench")); return; }
     if (isCoopLive) {
       setCoopBusy(true);
       const data = await sendCoopAction("star-best-bench");
       setCoopBusy(false);
-      if (data) showToast("Beste Bank aufgestellt");
+      if (data) showToast(t("logic.bestBenchSet"));
       return;
     }
     setGame((current) => {
@@ -2289,20 +2289,20 @@ export function App() {
       addHistory(features, { title: "Beste Bank aufgestellt", detail: `${features.starXI.benchIds.filter(Boolean).length} Bankplätze mit den stärksten passenden Spielern besetzt.`, tone: "neutral", kind: "squad" });
       return { ...current, features };
     });
-    showToast("Beste Bank aufgestellt");
+    showToast(t("logic.bestBenchSet"));
   }
 
   /** A player leaves his place without a replacement: onto an empty bench place or back to the reserve (Q30). */
   async function unassignSquadPlayer(playerId: string, benchIndex?: number) {
     if (displayGame.features.cup.active) return;
-    const name = getStarXIPlayer(playerId)?.name ?? "Spieler";
+    const name = getStarXIPlayer(playerId)?.name ?? t("logic.player");
     const preview = benchIndex === undefined ? movePlayerToReserve(displayGame.features.starXI, playerId) : movePlayerToEmptyBench(displayGame.features.starXI, playerId, benchIndex);
     if (!preview) return;
     if (isCoopLive) {
       setCoopBusy(true);
       const data = await sendCoopAction("star-unassign", { starPlayerId: playerId, ...(benchIndex === undefined ? {} : { benchIndex }) });
       setCoopBusy(false);
-      if (data) showToast(benchIndex === undefined ? `${name} ist jetzt in der Reserve` : `${name} sitzt jetzt auf der Bank`);
+      if (data) showToast(benchIndex === undefined ? t("logic.nowInReserve", { name }) : t("logic.nowOnBench", { name }));
       return;
     }
     setGame((current) => {
@@ -2312,7 +2312,7 @@ export function App() {
       features.starXI = next;
       return { ...current, features };
     });
-    showToast(benchIndex === undefined ? `${name} ist jetzt in der Reserve` : `${name} sitzt jetzt auf der Bank`);
+    showToast(benchIndex === undefined ? t("logic.nowInReserve", { name }) : t("logic.nowOnBench", { name }));
   }
 
   // "Kaderlücke schliessen": the best eleven and bench fill the free place; without enough players the packs help.
@@ -2322,7 +2322,7 @@ export function App() {
     if (filled.replacements.length && !getOpenTransferSquadVacancies({ ...displayGame.features, starXI: filled.starXI }).length) { await fillSquadGaps(); return; }
     const starXI = setBestStarXI(displayGame.features.starXI, getBestXIUnavailablePlayerIds(displayGame.features), { career: displayGame.features.career, cup: displayGame.features.cup });
     if (getOpenTransferSquadVacancies({ ...displayGame.features, starXI }).length) {
-      showToast("Zu wenige einsatzfähige Spieler für die Lücke. Neue Spieler gibt es in den Packs.");
+      showToast(t("logic.tooFewFit"));
       return;
     }
     await autoPickBestStarXI();
@@ -2331,15 +2331,15 @@ export function App() {
   async function selectStarXIBenchPlayer(playerId: string, benchIndex: number) {
     const player = getStarXIPlayer(playerId);
     if (!player || displayGame.features.cup.active || !displayGame.features.starXI.ownedIds.includes(playerId) || displayGame.features.starXI.lineupIds.includes(playerId)) return;
-    if (displayGame.features.cup.active && displayGame.features.squadLock && !displayGame.features.squadLock.playerIds.includes(playerId)) { showToast('Dieser Spieler gehört nicht zum Spieltagskader.'); return; }
+    if (displayGame.features.cup.active && displayGame.features.squadLock && !displayGame.features.squadLock.playerIds.includes(playerId)) { showToast(t("logic.notInMatchSquad")); return; }
     if (suspendedStarIds.includes(playerId)) {
-      showToast(`${player.name} darf nach einer Roten Karte nicht auf die Bank.`);
+      showToast(t("logic.redNoBench", { name: player.name }));
       return;
     }
     if (isCoopLive) {
       setCoopBusy(true);
       const data = await sendCoopAction("star-bench", { benchIndex, starPlayerId: playerId });
-      if (data) setCoopMessage(`${player.name} sitzt jetzt auf Bankplatz ${benchIndex + 1}.`);
+      if (data) setCoopMessage(t("logic.onBenchSlot", { name: player.name, slot: benchIndex + 1 }));
       setCoopBusy(false);
       if (data) setSelectedBenchSlot(null);
       return;
@@ -2350,10 +2350,10 @@ export function App() {
       return { ...current, features };
     });
     setSelectedBenchSlot(null);
-    showToast(`${player.name} auf die Bank verschoben`);
+    showToast(t("logic.movedToBench", { name: player.name }));
   }
 
-  /** The spot picked by a first tap in the "Kader" tab: a pitch place, a bench place or a reserve player. */
+  /** The spot picked by a first tap in the t("logic.squad") tab: a pitch place, a bench place or a reserve player. */
   function pickedSquadSpot(): SquadPick | null {
     if (activeLineupSlot !== null) { const id = lineupStarIds[activeLineupSlot]; return { source: id ? { playerId: id, area: "lineup", index: activeLineupSlot } : null, target: { area: "lineup", index: activeLineupSlot } }; }
     if (selectedBenchSlot !== null) { const id = benchStarIds[selectedBenchSlot]; return { source: id ? { playerId: id, area: "bench", index: selectedBenchSlot } : null, target: { area: "bench", index: selectedBenchSlot } }; }
@@ -2386,7 +2386,7 @@ export function App() {
 
   function chooseBenchSlot(index: number) {
     if (displayGame.features.cup.active) {
-      showToast("Wähle zuerst den Spieler in der Startelf, den du auswechseln willst.");
+      showToast(t("logic.pickStarterToSub"));
       return;
     }
     const playerId = benchStarIds[index];
@@ -2449,17 +2449,17 @@ export function App() {
   }
 
   function travelLabel(fixture:TravelFixture) {
-    if(!fixture.away)return 'Match starten';
+    if(!fixture.away)return t("logic.startMatch");
     const j=displayGame.features.travel.journey;
-    if(!j||j.fixture.id!==fixture.id||j.consumed)return 'Reise antreten';
-    return journeyView(j,getTravelTime()).arrived?'Match starten':'Reise läuft …';
+    if(!j||j.fixture.id!==fixture.id||j.consumed)return t("logic.startTrip");
+    return journeyView(j,getTravelTime()).arrived?t("logic.startMatch"):t("logic.tripRunning");
   }
   async function prepareTravel(mode:'season'|'tournament', tournamentId: TournamentId):Promise<TravelFixture|null> {
     const fixture=fixtureFor(displayGame.features,mode,tournamentId);
     const error=eligibilityError(displayGame.features,mode,tournamentId,getTravelTime());
     if(error){showToast(error);return null;}
     const j=displayGame.features.travel.journey;
-    if(j&&!j.consumed&&j.fixture.id!==fixture.id){showToast('Schliesse zuerst die begonnene Auswärtsreise ab.');openFeatureTab('cup');return null;}
+    if(j&&!j.consumed&&j.fixture.id!==fixture.id){showToast(t("logic.finishTripFirst"));openFeatureTab('cup');return null;}
     if(!fixture.away)return fixture;
     if(travelActionRef.current)return null;
     travelActionRef.current=true;setTravelBusy(true);
@@ -2471,7 +2471,7 @@ export function App() {
       const action=j?.fixture.id===fixture.id&&journeyView(j,getTravelTime()).arrived?'start':'depart';
       const response=await fetch('/api/travel',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,mode,tournamentId,playerId,features:displayGame.features})});
       const data=await response.json() as {journey?:Journey;serverNow?:number;error?:string};
-      if(!response.ok||!data.journey){showToast(data.error||'Reise konnte nicht gespeichert werden.');return null;}
+      if(!response.ok||!data.journey){showToast(data.error||t("logic.tripSaveFailed"));return null;}
       syncTravelClock(data.serverNow);
       setGame(current=>{
         const old=current.features.travel, same=old.journey?.id===data.journey!.id, counted=same?(old.journey as Journey & {counted?:boolean}).counted:false, finesPaid=same?old.journey!.finesPaid:false;
@@ -2481,7 +2481,7 @@ export function App() {
       });
       openFeatureTab('cup');
       return action==='start'?data.journey.fixture:null;
-    }catch{showToast('Die Reise braucht eine Verbindung zum Spielserver. Bitte erneut versuchen.');return null;}
+    }catch{showToast(t("logic.tripNeedsServer"));return null;}
     finally{travelActionRef.current=false;setTravelBusy(false);}
   }
 
@@ -2489,29 +2489,29 @@ export function App() {
     if (displayGame.features.cup.active) return;
     const cupStartNow = getCurrentTime();
     if (!displayGame.features.cup.pendingNextRound && displayGame.features.cup.nextTournamentAt > cupStartNow) {
-      showToast(`Neues Turnier in ${formatCountdown(displayGame.features.cup.nextTournamentAt, cupStartNow)}.`);
+      showToast(t("logic.newTournamentIn", { time: formatCountdown(displayGame.features.cup.nextTournamentAt, cupStartNow) }));
       return;
     }
     if (hasTransferSquadVacancy) {
-      showToast(`Besetze zuerst den freien Platz ${transferSquadVacancyLabel}.`);
+      showToast(t("logic.fillVacancyFirst", { place: transferSquadVacancyLabel }));
       return;
     }
     if (displayGame.features.cup.pendingNextRound && tournamentId !== displayGame.features.cup.tournamentId) {
-      showToast("Zuerst die nächste Partie dieses Turniers vorbereiten.");
+      showToast(t("logic.prepareNextFirst"));
       return;
     }
     if (!starXIComplete) {
-      showToast(suspendedStarPlayers.length ? t("games.replaceFirst", { names: suspendedStarPlayers.map((player) => player.name).join(", ") }) : `Für die Startelf werden ${STAR_XI_SQUAD_SIZE} passende Spieler benötigt.`);
+      showToast(suspendedStarPlayers.length ? t("games.replaceFirst", { names: suspendedStarPlayers.map((player) => player.name).join(", ") }) : t("logic.xiNeedsPlayers", { size: STAR_XI_SQUAD_SIZE }));
       return;
     }
     const tournament = getTournament(tournamentId) ?? TOURNAMENTS[0];
     const unlockLeague = getTournamentUnlockLeague(tournament.id);
     if (!isLeagueContentUnlocked(unlockLeague, reachedLeague, hasFullTestAccess)) {
-      showToast(`${tournament.label} wird ab Liga ${unlockLeague} freigeschaltet.`);
+      showToast(t("logic.packUnlocksAt", { label: tournament.label, unlockLeague }));
       return;
     }
     if (starXIRating < tournament.minimumRating) {
-      showToast(`${tournament.label} braucht mindestens ${tournament.minimumRating} OVR.`);
+      showToast(t("logic.needsOvr", { label: tournament.label, minimumRating: tournament.minimumRating }));
       return;
     }
     const tournamentBanError = squadBanError(displayGame.features, competitionFor("tournament", tournament.id));
@@ -2524,7 +2524,7 @@ export function App() {
     if (isCoopLive) {
       setCoopBusy(true);
       const data = await sendCoopAction("cup-start", { tournamentId: tournament.id });
-      if (data) setCoopMessage(`${tournament.label} ist eröffnet.`);
+      if (data) setCoopMessage(t("logic.tournamentOpened", { label: tournament.label }));
       setCoopBusy(false);
       return;
     }
@@ -2539,26 +2539,26 @@ export function App() {
       prepareCareerMatch(features);
       return { ...current, features };
     });
-    showToast(`${tournament.label} · Anpfiff · ${formatCountdown(tournamentMatchDuration(tournament.minimumRating), 0)}`);
+    showToast(t("logic.tournamentKickoff", { label: tournament.label, duration: formatCountdown(tournamentMatchDuration(tournament.minimumRating), 0) }));
   }
 
   async function startSeasonCupMatch() {
     if (displayGame.features.cup.active) return;
     const cupStartNow = getCurrentTime();
     if (displayGame.features.seasonMode.hallOfFame) {
-      showToast("Die Hall of Fame ist erreicht. Starte zuerst Prestige.");
+      showToast(t("logic.hofPrestigeFirst"));
       return;
     }
     if (displayGame.features.cup.pendingNextRound) {
-      showToast("Die vorherige Partie muss zuerst abgeschlossen werden.");
+      showToast(t("logic.previousMatchFirst"));
       return;
     }
     if (hasTransferSquadVacancy) {
-      showToast(`Besetze zuerst den freien Platz ${transferSquadVacancyLabel}.`);
+      showToast(t("logic.fillVacancyFirst", { place: transferSquadVacancyLabel }));
       return;
     }
     if (!starXIComplete) {
-      showToast(suspendedStarPlayers.length ? t("games.replaceFirst", { names: suspendedStarPlayers.map((player) => player.name).join(", ") }) : `Für die Startelf werden ${STAR_XI_SQUAD_SIZE} passende Spieler benötigt.`);
+      showToast(suspendedStarPlayers.length ? t("games.replaceFirst", { names: suspendedStarPlayers.map((player) => player.name).join(", ") }) : t("logic.xiNeedsPlayers", { size: STAR_XI_SQUAD_SIZE }));
       return;
     }
     const nextOpponent = getSeasonModeNextOpponent(displayGame.features.seasonMode, displayClubName);
@@ -2572,7 +2572,7 @@ export function App() {
     if (isCoopLive) {
       setCoopBusy(true);
       const data = await sendCoopAction("cup-start", { mode: "season" });
-      if (data) setCoopMessage(`Saisonspiel gegen ${nextOpponent.name} ist eröffnet.`);
+      if (data) setCoopMessage(t("logic.seasonMatchOpened", { name: nextOpponent.name }));
       setCoopBusy(false);
       return;
     }
@@ -2587,7 +2587,7 @@ export function App() {
       prepareCareerMatch(features);
       return { ...current, features };
     });
-    showToast(`Spieltag ${displayGame.features.seasonMode.matchday + 1} · ${nextOpponent.name} · Anpfiff · ${formatCountdown(seasonMatchDuration(displayGame.features.seasonMode.division), 0)}`);
+    showToast(t("logic.matchdayKickoff", { matchday: displayGame.features.seasonMode.matchday + 1, name: nextOpponent.name, duration: formatCountdown(seasonMatchDuration(displayGame.features.seasonMode.division), 0) }));
   }
 
 
@@ -2601,7 +2601,7 @@ export function App() {
     features.seasonMode = result.state;
     features.seasonMode.table = features.seasonMode.table.map((team) => team.id === "club" ? { ...team, name: features.club.name } : team);
     features = finishActiveTransferLoans(features, now, { hallOfFameReached: result.entry.seasonOutcome === "hall-of-fame" }).features;
-    const outcomeLabel = result.entry.seasonOutcome === "promoted" ? "Aufstieg" : result.entry.seasonOutcome === "relegated" ? "Abstieg" : result.entry.seasonOutcome === "hall-of-fame" ? "Hall of Fame" : result.entry.completedSeason ? "Klassenerhalt" : result.entry.outcome === "win" ? "Sieg" : result.entry.outcome === "loss" ? "Niederlage" : "Remis";
+    const outcomeLabel = result.entry.seasonOutcome === "promoted" ? t("logic.promotion") : result.entry.seasonOutcome === "relegated" ? t("logic.relegation") : result.entry.seasonOutcome === "hall-of-fame" ? "Hall of Fame" : result.entry.completedSeason ? t("logic.survival") : result.entry.outcome === "win" ? t("logic.win") : result.entry.outcome === "loss" ? t("logic.loss") : t("logic.draw");
     addHistory(features, {
       title: `Saisonspiel · ${outcomeLabel}`,
       detail: `${result.entry.clubScore}:${result.entry.opponentScore} gegen ${result.entry.opponent} · Spieltag ${result.entry.matchday}/${SEASON_MODE_MATCHES_PER_SEASON}`,
@@ -2619,7 +2619,7 @@ export function App() {
       setCoopBusy(true);
       const expectedPenaltyStep = getCupPenaltyStep(visibleCup);
       const data = await sendCoopAction("cup-penalty", { direction, expectedPenaltyStep });
-      if (data) setCoopMessage("Elfmeter ausgeführt und bei beiden Spielern synchronisiert.");
+      if (data) setCoopMessage(t("logic.penaltySynced"));
       setCoopBusy(false);
       return;
     }
@@ -2735,7 +2735,7 @@ export function App() {
         addHistory(features, { title: "Lücken automatisch gefüllt", detail: describeReplacements(result.replacements).join(" · "), tone: "neutral", kind: "squad" });
         return { ...latest, features };
       });
-      showToast(`Automatisch ersetzt: ${describeReplacements(preview.replacements).join(" · ")}`);
+      showToast(t("logic.autoReplaced", { replacements: describeReplacements(preview.replacements).join(" · ") }));
     }, 800);
     return () => window.clearTimeout(timer);
   }, [soloCupActive, hydrated, isCoopLive, setGame]);
@@ -2761,7 +2761,7 @@ export function App() {
     if (isCoopLive) {
       setCoopBusy(true);
       const data = await sendCoopAction("weekly-claim", { goalId });
-      if (data) setCoopMessage("Wochenziel abgeholt. Die Prämie gehört dem ganzen Team.");
+      if (data) setCoopMessage(t("logic.weeklyClaimed"));
       setCoopBusy(false);
       return;
     }
@@ -2814,7 +2814,7 @@ export function App() {
     setVibrationEnabled(next);
     try { localStorage.setItem(VIBRATION_STORAGE_KEY, next ? "on" : "off"); } catch { /* Storage can be unavailable. */ }
     if (next) vibrate(40);
-    showToast(next ? "Vibration an" : "Vibration aus");
+    showToast(next ? t("logic.vibrationOn") : t("logic.vibrationOff"));
   }
 
   function registerCombo(now: number) {
@@ -2844,8 +2844,8 @@ export function App() {
     starterSquadRequestedRef.current = true;
     const announce = (added: number, complete: boolean) => {
       if (!added) return;
-      addFeed(complete ? `Starterkader: ${added} Spieler sind neu in deiner Elf.` : `Starterkader: ${added} Spieler warten in deinem Kader auf ihren Platz.`, "squad");
-      showToast(complete ? "Startelf komplett! Starte deine erste Partie." : `${added} Starterspieler sind neu in deinem Kader.`);
+      addFeed(complete ? t("logic.starterNewInXI", { added }) : t("logic.starterWaiting", { added }), "squad");
+      showToast(complete ? t("logic.xiComplete") : t("logic.starterNew", { added }));
     };
     const timer = window.setTimeout(() => {
       if (isCoopLive) {
@@ -2883,8 +2883,8 @@ export function App() {
     setTimeout(() => clickFeedback.removeEffect(effect.id), 850);
     clickFeedback.togglePulse();
     playTone(result.critical ? 720 : 350, 0.07, "triangle", result.critical ? 0.055 : 0.025);
-    if (result.critical) { showToast("Kritischer Abschluss", "minor"); playTone(980, 0.13, "square", 0.04, 0.07); }
-    else if (result.streak === 10) showToast("Zehn Klicks am Stück", "minor");
+    if (result.critical) { showToast(t("logic.criticalFinish"), "minor"); playTone(980, 0.13, "square", 0.04, 0.07); }
+    else if (result.streak === 10) showToast(t("logic.tenClicks"), "minor");
   }
 
   function handleBallKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
@@ -2899,8 +2899,8 @@ export function App() {
   function awardMiniGame(reward: number, name: string, id: MiniGameId, icon: IconName = "star") {
     const safeReward = Math.max(0, Math.floor(reward));
     const celebrate = () => {
-      addFeed(`${name}: +${formatNumber(safeReward)} Tore Prämie. Nächste Runde in ${MINI_GAME_COOLDOWN_SECONDS[id]} Sekunden.`, icon);
-      showToast(`${name}: +${formatNumber(safeReward)} Tore`);
+      addFeed(t("logic.miniReward", { name, reward: formatNumber(safeReward), seconds: MINI_GAME_COOLDOWN_SECONDS[id] }), icon);
+      showToast(t("logic.miniRewardShort", { name, reward: formatNumber(safeReward) }));
       playTone(523, 0.1, "triangle", 0.035);
       playTone(784, 0.18, "triangle", 0.04, 0.1);
     };
@@ -2927,12 +2927,12 @@ export function App() {
 
   function startPenaltyGame() {
     if (isMiniGameOnCooldown("penalty")) {
-      showToast(`${localizeText(MINI_GAME_NAMES.penalty)} ist noch ${formatCountdown(displayGame.miniGameCooldowns.penalty, countdownNow)} gesperrt.`);
+      showToast(t("logic.penaltyLocked", { game: localizeText(MINI_GAME_NAMES.penalty), time: formatCountdown(displayGame.miniGameCooldowns.penalty, countdownNow) }));
       return;
     }
     openMiniGame("penalty", () => {
       setActiveMiniGame("penalty");
-      setPenaltyGame({ shots: 0, goals: 0, message: "Such dir eine Ecke aus.", finished: false, reward: 0 });
+      setPenaltyGame({ shots: 0, goals: 0, message: t("logic.pickCorner"), finished: false, reward: 0 });
     });
   }
 
@@ -2944,22 +2944,22 @@ export function App() {
     const goals = penaltyGame.goals + (scored ? 1 : 0);
     if (shots >= 5) {
       const reward = miniGameReward("penalty", 250 + goals * 150);
-      setPenaltyGame({ shots, goals, message: `${goals} von 5 Elfmetern drin. ${formatNumber(reward)} Tore Prämie.`, finished: true, reward });
-      awardMiniGame(reward, `Penalty Challenge ${goals}/5`, "penalty", scored ? "ball" : "screen");
+      setPenaltyGame({ shots, goals, message: t("logic.penaltyResult", { goals, reward: formatNumber(reward) }), finished: true, reward });
+      awardMiniGame(reward, t("logic.penaltyScore", { goals }), "penalty", scored ? "ball" : "screen");
       return;
     }
-    setPenaltyGame({ ...penaltyGame, shots, goals, message: scored ? "Tor. Der Goalie war in der falschen Ecke." : `Gehalten. Der Goalie war ${goalkeeper}.`, finished: false, reward: 0 });
+    setPenaltyGame({ ...penaltyGame, shots, goals, message: scored ? t("logic.penaltyGoal") : t("logic.penaltySaved", { goalkeeper: directionWord(goalkeeper) }), finished: false, reward: 0 });
   }
 
   function startDribbleGame() {
     if (isMiniGameOnCooldown("dribble")) {
-      showToast(`${localizeText(MINI_GAME_NAMES.dribble)} ist noch ${formatCountdown(displayGame.miniGameCooldowns.dribble, countdownNow)} gesperrt.`);
+      showToast(t("logic.dribbleLocked", { game: localizeText(MINI_GAME_NAMES.dribble), time: formatCountdown(displayGame.miniGameCooldowns.dribble, countdownNow) }));
       return;
     }
     const sequence = Array.from({ length: 6 }, () => getRandomPenaltyDirection());
     openMiniGame("dribble", () => {
       setActiveMiniGame("dribble");
-      setDribbleGame({ sequence, step: 0, attempts: 0, misses: 0, message: `Erster Move: ${directionLabel(sequence[0])}.`, finished: false, reward: 0 });
+      setDribbleGame({ sequence, step: 0, attempts: 0, misses: 0, message: t("logic.firstMove", { direction: directionLabel(sequence[0]) }), finished: false, reward: 0 });
     });
   }
 
@@ -2972,27 +2972,27 @@ export function App() {
     const misses = dribbleGame.misses + (correct ? 0 : 1);
     if (correct && step >= dribbleGame.sequence.length) {
       const reward = miniGameReward("dribble", 220 + Math.max(0, 3 - misses) * 45);
-      setDribbleGame({ ...dribbleGame, step, attempts, misses, message: `Perfekte Ballführung in ${attempts} Moves.`, finished: true, reward });
+      setDribbleGame({ ...dribbleGame, step, attempts, misses, message: t("logic.perfectDribble", { attempts }), finished: true, reward });
       awardMiniGame(reward, "Dribble Run", "dribble", "striker");
       return;
     }
     if (!correct && misses >= 3) {
       const reward = miniGameReward("dribble", 60 + dribbleGame.step * 15);
-      setDribbleGame({ ...dribbleGame, step, attempts, misses, message: `Dreimal den Ball verloren. ${formatNumber(reward)} Tore Trostpreis.`, finished: true, reward });
+      setDribbleGame({ ...dribbleGame, step, attempts, misses, message: t("logic.dribbleLost", { reward: formatNumber(reward) }), finished: true, reward });
       awardMiniGame(reward, "Dribble Run", "dribble", "boot");
       return;
     }
-    setDribbleGame({ ...dribbleGame, step, attempts, misses, message: correct ? `Sauber. Als Nächstes: ${directionLabel(dribbleGame.sequence[step])}.` : "Ball verloren. Wieder von vorne.", finished: false, reward: 0 });
+    setDribbleGame({ ...dribbleGame, step, attempts, misses, message: correct ? t("logic.cleanNext", { direction: directionLabel(dribbleGame.sequence[step]) }) : t("logic.ballLost"), finished: false, reward: 0 });
   }
 
   function startCrossbarGame() {
     if (isMiniGameOnCooldown("crossbar")) {
-      showToast(`${localizeText(MINI_GAME_NAMES.crossbar)} ist noch ${formatCountdown(displayGame.miniGameCooldowns.crossbar, countdownNow)} gesperrt.`);
+      showToast(t("logic.crossbarLocked", { game: localizeText(MINI_GAME_NAMES.crossbar), time: formatCountdown(displayGame.miniGameCooldowns.crossbar, countdownNow) }));
       return;
     }
     openMiniGame("crossbar", () => {
       setActiveMiniGame("crossbar");
-      setCrossbarGame({ shots: 0, hits: 0, message: "Zielhöhe wählen und die Latte treffen.", finished: false, reward: 0 });
+      setCrossbarGame({ shots: 0, hits: 0, message: t("logic.crossbarIntro"), finished: false, reward: 0 });
     });
   }
 
@@ -3004,21 +3004,21 @@ export function App() {
     const hits = crossbarGame.hits + (hit ? 1 : 0);
     if (shots >= 5) {
       const reward = miniGameReward("crossbar", 50 + hits * 45);
-      setCrossbarGame({ shots, hits, message: `${hits} von 5 Latten getroffen. ${formatNumber(reward)} Tore Prämie.`, finished: true, reward });
-      awardMiniGame(reward, `Latten Challenge ${hits}/5`, "crossbar", hit ? "star" : "screen");
+      setCrossbarGame({ shots, hits, message: t("logic.crossbarResult", { hits, reward: formatNumber(reward) }), finished: true, reward });
+      awardMiniGame(reward, t("logic.crossbarScore", { hits }), "crossbar", hit ? "star" : "screen");
       return;
     }
-    setCrossbarGame({ ...crossbarGame, shots, hits, message: hit ? "Ping. Genau die richtige Höhe." : `Daneben. Das Ziel war ${heightLabel(target)}.`, finished: false, reward: 0 });
+    setCrossbarGame({ ...crossbarGame, shots, hits, message: hit ? t("logic.crossbarHit") : t("logic.crossbarMiss", { height: heightLabel(target) }), finished: false, reward: 0 });
   }
 
   function startPredictionGame() {
     if (isMiniGameOnCooldown("prediction")) {
-      showToast(`${localizeText(MINI_GAME_NAMES.prediction)} ist noch ${formatCountdown(displayGame.miniGameCooldowns.prediction, countdownNow)} gesperrt.`);
+      showToast(t("logic.predictionLocked", { game: localizeText(MINI_GAME_NAMES.prediction), time: formatCountdown(displayGame.miniGameCooldowns.prediction, countdownNow) }));
       return;
     }
     openMiniGame("prediction", () => {
       setActiveMiniGame("prediction");
-      setPredictionGame({ round: 0, wins: 0, message: "Wer gewinnt das nächste Match?", finished: false, reward: 0 });
+      setPredictionGame({ round: 0, wins: 0, message: t("logic.whoWins"), finished: false, reward: 0 });
     });
   }
 
@@ -3029,32 +3029,32 @@ export function App() {
     const wins = predictionGame.wins + (prediction === outcome ? 1 : 0);
     if (round >= 3) {
       const reward = miniGameReward("prediction", 70 + wins * 55 + (wins === 3 ? 100 : 0));
-      setPredictionGame({ round, wins, message: `${wins} von 3 Tipps richtig. ${formatNumber(reward)} Tore Prämie.`, finished: true, reward });
-      awardMiniGame(reward, `Matchday Tipp ${wins}/3`, "prediction", "broadcast");
+      setPredictionGame({ round, wins, message: t("logic.predictResult", { wins, reward: formatNumber(reward) }), finished: true, reward });
+      awardMiniGame(reward, t("logic.predictScore", { wins }), "prediction", "broadcast");
       return;
     }
-    setPredictionGame({ ...predictionGame, round, wins, message: prediction === outcome ? `Richtig: ${predictionLabel(outcome)}. Nächster Tipp.` : `Falsch: Es war ${predictionLabel(outcome)}. Nächster Tipp.`, finished: false, reward: 0 });
+    setPredictionGame({ ...predictionGame, round, wins, message: prediction === outcome ? t("logic.predictRight", { outcome: predictionLabel(outcome) }) : t("logic.predictWrong", { outcome: predictionLabel(outcome) }), finished: false, reward: 0 });
   }
 
   async function buyUpgrade(upgrade: UpgradeDefinition) {
     const unlockLeague = getUpgradeUnlockLeague(upgrade.id);
     const alreadyOwned = getLevel(displayGame.upgrades, upgrade.id) > 0;
     if (!alreadyOwned && !isLeagueContentUnlocked(unlockLeague, reachedLeague, hasFullTestAccess)) {
-      showToast(`${upgrade.name} wird ab Liga ${unlockLeague} freigeschaltet.`);
+      showToast(t("logic.upgradeUnlocksAt", { name: upgrade.name, unlockLeague }));
       return;
     }
     const purchase = getBulkPurchase(upgrade, displayGame.upgrades, spendableGoals, purchaseMode, hasInfiniteMoney);
     const isBigPurchase = purchase.count >= 10 || (!hasInfiniteMoney && purchase.totalCost >= displayGame.goals * 0.5);
     if (purchase.count === 0) {
       const nextCost = getCost(upgrade, displayGame.upgrades);
-      showToast(nextCost === Infinity ? "Dieses Upgrade ist auf dem Maximum." : `${upgrade.name} kostet ${formatNumber(nextCost)} Tore.`);
+      showToast(nextCost === Infinity ? t("logic.upgradeMax") : t("logic.upgradeCosts", { name: upgrade.name, cost: formatNumber(nextCost) }));
       return;
     }
     if (isCoopLive) {
       setCoopBusy(true);
       try {
         const data = await sendCoopAction("buy", { upgradeId: upgrade.id, count: purchase.count });
-        if (data) setCoopMessage(`${upgrade.name} wurde gemeinsam gekauft.`);
+        if (data) setCoopMessage(t("logic.boughtTogether", { name: upgrade.name }));
         if (data && isBigPurchase) vibrate([35, 30, 60]);
       } finally {
         setCoopBusy(false);
@@ -3063,8 +3063,8 @@ export function App() {
     }
     const level = getLevel(game.upgrades, upgrade.id) + purchase.count;
     setGame((current) => ({ ...current, goals: current.goals - purchase.totalCost, upgrades: { ...current.upgrades, [upgrade.id]: level } }));
-    addFeed(`${upgrade.name} x${purchase.count} für ${formatNumber(purchase.totalCost)} Tore.`, upgrade.icon);
-    showToast(purchase.count === 1 ? `${upgrade.name} auf Level ${level}` : `${upgrade.name}: ${purchase.count} Level gekauft`);
+    addFeed(t("logic.boughtMany", { name: upgrade.name, count: purchase.count, total: formatNumber(purchase.totalCost) }), upgrade.icon);
+    showToast(purchase.count === 1 ? t("logic.upgradeToLevel", { name: upgrade.name, level }) : t("logic.levelsBought", { name: upgrade.name, count: purchase.count }));
     playTone(440, 0.08, "triangle", 0.03);
     playTone(660, 0.13, "triangle", 0.04, 0.08);
     if (isBigPurchase) vibrate([35, 30, 60]);
@@ -3087,7 +3087,7 @@ export function App() {
     }
     const now = getCurrentTime();
     const preview = claimDailyReward(game.features.dailyRewards, "solo", getBasePassivePower(game.upgrades, game.stars, game.features), getBaseClickPower(game.upgrades, game.stars, game.features), now);
-    if (!preview) { showToast("Die Prämie für heute ist schon abgeholt."); return; }
+    if (!preview) { showToast(t("logic.dailyClaimed")); return; }
     setGame((current) => {
       const claim = claimDailyReward(current.features.dailyRewards, "solo", getBasePassivePower(current.upgrades, current.stars, current.features), getBaseClickPower(current.upgrades, current.stars, current.features), now);
       if (!claim) return current;
@@ -3097,7 +3097,7 @@ export function App() {
       addHistory(features, { title: `Tägliche Prämie · Tag ${claim.dayIndex}`, detail: `+${formatNumber(claim.amount)} Tore${claim.pack ? " und ein Spezialkarten-Pack" : ""}. Serie: ${claim.streak} ${claim.streak === 1 ? "Tag" : "Tage"}.`, tone: "positive" }, now);
       return { ...current, goals: current.goals + claim.amount, seasonGoals: current.seasonGoals + claim.amount, totalGoals: current.totalGoals + claim.amount, features };
     });
-    addFeed(`Tägliche Prämie Tag ${preview.dayIndex}: +${formatNumber(preview.amount)} Tore.`, "star");
+    addFeed(t("logic.dailyAmount", { dayIndex: preview.dayIndex, amount: formatNumber(preview.amount) }), "star");
     showToast(`Tag ${preview.dayIndex}: +${formatNumber(preview.amount)} Tore${preview.pack ? " und ein Spezialkarten-Pack unter Packs & Album" : ""}`);
     playTone(659, 0.1, "triangle", 0.04);
     playTone(988, 0.18, "triangle", 0.045, 0.1);
@@ -3110,7 +3110,7 @@ export function App() {
       setPressBusy(true);
       try {
         const data = await sendCoopAction("press-answer", { matchId, questionId, answerIndex });
-        if (data?.press) showToast(`Medienprämie +${formatNumber(data.press.reward)} Tore · Fanstimmung ${data.press.mood >= 0 ? "+" : ""}${data.press.mood}`);
+        if (data?.press) showToast(t("logic.mediaReward", { reward: formatNumber(data.press.reward), sign: data.press.mood >= 0 ? "+" : "", mood: data.press.mood }));
       } finally {
         setPressBusy(false);
       }
@@ -3128,7 +3128,7 @@ export function App() {
       addHistory(features, { title: "Pressekonferenz", detail: `«${result.answer}» · Fanstimmung ${result.mood >= 0 ? "+" : ""}${result.mood}`, tone: result.mood >= 0 ? "positive" : "neutral" }, now);
       return { ...current, goals: current.goals + reward, seasonGoals: current.seasonGoals + reward, totalGoals: current.totalGoals + reward, features };
     });
-    showToast(`Medienprämie +${formatNumber(reward)} Tore · Fanstimmung ${preview.mood >= 0 ? "+" : ""}${preview.mood}`);
+    showToast(t("logic.mediaReward", { reward: formatNumber(reward), sign: preview.mood >= 0 ? "+" : "", mood: preview.mood }));
     playTone(523, 0.08, "triangle", 0.03);
   }
 
@@ -3144,13 +3144,13 @@ export function App() {
       setCoopBusy(true);
       const data = await sendCoopAction("home-city", { city });
       setCoopBusy(false);
-      if (data) setCoopMessage(`Heimstadt der Welt: ${homeCityOf(city).name}.`);
+      if (data) setCoopMessage(t("logic.worldHomeCity", { name: homeCityOf(city).name }));
       return;
     }
     const check = chooseHomeCity(gameRef.current.features, city);
     if (check.error) { showToast(check.error); return; }
     setGame((current) => { const result = chooseHomeCity(current.features, city); return result.error ? current : { ...current, features: result.features }; });
-    showToast(`Heimstadt: ${homeCityOf(city).name}`);
+    showToast(t("logic.homeCity", { name: homeCityOf(city).name }));
   }
 
   async function confirmSeasonPrestige(keepNormalId: string | null, homeCity?: HomeCityId) {
@@ -3166,17 +3166,17 @@ export function App() {
       if (!data) {
         // The same request id may be sent again: the server counts it once.
         prestigeConfirmedRef.current.delete(requestId);
-        setPrestigeDialog((current) => current && { ...current, error: "Prestige wurde nicht bestätigt. Wurde es in dieser Welt doch gestartet, schliesst sich dieses Fenster von selbst." });
+        setPrestigeDialog((current) => current && { ...current, error: t("logic.prestigeNotConfirmed") });
         return;
       }
       setPrestigeDialog(null);
       // Other members are online: the proposal opened a vote; Prestige starts once they all agreed.
       if (data.prestigeVote === "pending") {
         setHiddenPrestigeVote("");
-        setCoopMessage("Abstimmung gestartet. Prestige startet, sobald alle Mitspieler, die online sind, zugestimmt haben.");
+        setCoopMessage(t("logic.voteStarted"));
         return;
       }
-      setCoopMessage("Prestige gestartet. Die Aufstiegsjagd beginnt wieder in Saison 1, alle Upgrades stehen wieder auf Stufe 0.");
+      setCoopMessage(t("logic.prestigeStartedCoop"));
     } else {
       const now = getCurrentTime();
       // Checked once more against the current state; season, squad, album, upgrades, goals and count change in one update.
@@ -3190,8 +3190,8 @@ export function App() {
       });
       setPrestigeDialog(null);
     }
-    addFeed("Prestige gestartet: zurück auf Saison 1, alle Upgrades wieder auf Stufe 0, die Freischaltungen bleiben.", "star");
-    showToast("Prestige gestartet");
+    addFeed(t("logic.prestigeStartedSolo"), "star");
+    showToast(t("logic.prestigeStarted"));
     playTone(523, 0.12, "triangle", 0.04);
     playTone(784, 0.2, "triangle", 0.05, 0.1);
   }
@@ -3204,12 +3204,12 @@ export function App() {
       setCoopBusy(true);
       const data = await sendCoopAction("cup-abandon");
       setCoopBusy(false);
-      if (data) showToast("Turnier aufgegeben");
+      if (data) showToast(t("logic.tournamentGivenUp"));
       return;
     }
     const now = getCurrentTime();
     setGame((current) => { const features = abandonTournamentRun(normalizeGameFeatures(current.features), now); return features ? { ...current, features } : current; });
-    showToast("Turnier aufgegeben");
+    showToast(t("logic.tournamentGivenUp"));
   }
 
   async function resumeCupWithoutSubstitution() {
@@ -3217,7 +3217,7 @@ export function App() {
     if (isCoopLive) {
       setCoopBusy(true);
       const data = await sendCoopAction("cup-resume");
-      if (data) setCoopMessage("Die Partie läuft ohne Wechsel weiter.");
+      if (data) setCoopMessage(t("logic.noSubContinues"));
       setCoopBusy(false);
       return;
     }
@@ -3229,12 +3229,12 @@ export function App() {
       return { ...current, features };
     });
     setSelectedLineupSlot(null);
-    showToast("Partie läuft ohne Wechsel weiter");
+    showToast(t("logic.noSubContinuesShort"));
   }
 
   function toggleSound() {
     setGame((current) => ({ ...current, sound: !current.sound }));
-    showToast(game.sound ? "Sound aus" : "Sound an");
+    showToast(game.sound ? t("logic.soundOff") : t("logic.soundOn"));
   }
 
   function closeWhatsNew() {
@@ -3268,7 +3268,7 @@ export function App() {
     });
   }
 
-  /** "Tutorial beenden" and the skip of the welcome window: with an unopened welcome pack the player is asked first. */
+  /** t("logic.endTutorial") and the skip of the welcome window: with an unopened welcome pack the player is asked first. */
   function requestEndTutorial() {
     if (welcomePackOpen(gameRef.current.features)) setTutorialEndDialog(true);
     else endTutorial();
@@ -3375,7 +3375,7 @@ export function App() {
         const clicksValue = Number(saved.clicks);
         const next: GameState = { ...initialGame(), upgrades, features, achievements: normalizeAchievements(saved.achievements), goals, totalGoals, seasonGoals, clicks: Number.isFinite(clicksValue) ? Math.max(0, clicksValue) : 0, stars, seasons, balanceVersion: BALANCE_VERSION, sound: saved.sound !== false, lastSaved: Date.now(), miniGameCooldowns, minigameWins };
         if (stored.recovered) {
-          window.setTimeout(() => setOffline("Die Hauptspeicherung war leer. Deine letzte intakte Sicherung wurde automatisch geladen."), 0);
+          window.setTimeout(() => setOffline(t("logic.backupLoaded")), 0);
         } else if (pausedMs > 10000 && matchRanWhileAway(features.cup)) {
           // The match is not paused while the app is closed: say so, and list what happened once it has caught up.
           missedMatchRef.current = { since: savedAt, until: Date.now(), matchStartedAt: features.cup.matchStartedAt };
@@ -3383,7 +3383,7 @@ export function App() {
         } else if (pausedMs > 10000 && (getPassivePower(upgrades, stars, features) > 0 || features.cup.active)) {
           // Return summary: how long the club was alone and what waits now (the chips on Home lead there).
           const waiting = getOpenActions({ features, now: Date.now(), miniGameCooldowns, minigameWins });
-          window.setTimeout(() => setOffline(`Willkommen zurück: ${returnSummary(pausedMs, waiting)}. Solange niemand auf der Seite war, war das Spiel pausiert.`), 0);
+          window.setTimeout(() => setOffline(t("logic.welcomeBack", { summary: returnSummary(pausedMs, waiting) })), 0);
         }
         window.setTimeout(() => {
           setGame(next);
@@ -3393,7 +3393,7 @@ export function App() {
           if (next.features.randomEvent) presentEventAnnouncement(next.features.randomEvent);
         }, 0);
       } catch {
-        window.setTimeout(() => setOffline("Der gespeicherte Stand konnte nicht gelesen werden. Die Sicherung bleibt unangetastet."), 0);
+        window.setTimeout(() => setOffline(t("logic.backupUnreadable")), 0);
       }
     } else {
       // A brand new club: the free welcome pack (one random walkout) is not handed out now. It waits invisibly until the
@@ -3464,8 +3464,8 @@ export function App() {
     window.setTimeout(() => setGame((current) => ({ ...current, achievements: [...current.achievements, ...newlyUnlocked.map((item) => item.id)] })), 0);
     const first = newlyUnlocked[0];
     window.setTimeout(() => {
-      showToast(`Erfolg: ${first.name}`);
-      addFeed(`${first.name} freigeschaltet. Die Kurve zeigt nach oben.`, first.icon);
+      showToast(t("logic.achievement", { name: first.name }));
+      addFeed(t("logic.achievementBody", { name: first.name }), first.icon);
       playTone(523, 0.12, "square", 0.035);
       playTone(659, 0.12, "square", 0.035, 0.1);
       playTone(784, 0.22, "square", 0.04, 0.2);
@@ -3525,8 +3525,8 @@ export function App() {
     window.setTimeout(() => {
       setTutorial(next);
       if (finished) {
-        showToast("Tutorial geschafft! Viel Erfolg mit deinem Club.");
-        addFeed("Tutorial geschafft. Jetzt gehört der Club ganz dir.", "star");
+        showToast(t("logic.tutorialDone"));
+        addFeed(t("logic.tutorialDoneClub"), "star");
       }
     }, 0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3573,23 +3573,23 @@ export function App() {
   // The next match in one tap (Q44, Q46): the waiting cup round, else the next league matchday (or its journey).
   const seasonFixture = fixtureFor(displayGame.features, "season");
   const nextMatchAction = displayGame.features.cup.active || journeyUnderway ? undefined
-    : displayGame.features.cup.pendingNextRound ? { label: `${activeTournament.label} · Runde ${displayGame.features.cup.round + 1}`, disabled: coopBusy || travelBusy, onClick: () => void startCup(activeTournament.id) }
+    : displayGame.features.cup.pendingNextRound ? { label: t("logic.tournamentRound", { label: activeTournament.label, round: displayGame.features.cup.round + 1 }), disabled: coopBusy || travelBusy, onClick: () => void startCup(activeTournament.id) }
     : seasonCareerComplete ? undefined
-    : { label: `${travelLabel(seasonFixture) === "Reise antreten" ? "Reise antreten" : "Nächstes Saisonspiel"} · Spieltag ${seasonMode.matchday + 1}`, disabled: coopBusy || travelBusy, onClick: () => void startSeasonCupMatch() };
+    : { label: t("logic.travelMatchday", { label: travelLabel(seasonFixture) === t("logic.startTrip") ? t("logic.startTrip") : t("logic.nextSeasonMatch"), matchday: seasonMode.matchday + 1 }), disabled: coopBusy || travelBusy, onClick: () => void startSeasonCupMatch() };
   const seasonTabAction = displayGame.features.cup.active ? undefined
-    : seasonCareerComplete ? { label: "Prestige starten", disabled: coopBusy || Boolean(prestigeBlockReason), note: prestigeBlockReason || undefined, onClick: openPrestigeDialog }
-    : { label: displayGame.features.cup.pendingNextRound ? "Zuerst Pokalrunde abschliessen" : `${travelLabel(seasonFixture)} · Spieltag ${seasonMode.matchday + 1}`, disabled: coopBusy || travelBusy || journeyUnderway || displayGame.features.cup.pendingNextRound || hasTransferSquadVacancy || suspendedPlayerOnSquad || !starXIComplete, note: hasTransferSquadVacancy || suspendedPlayerOnSquad || !starXIComplete ? "Die Startelf ist noch nicht vollständig. Unter Spiele steht, was fehlt." : journeyUnderway ? "Die Mannschaft ist unterwegs." : undefined, onClick: () => void startSeasonCupMatch() };
+    : seasonCareerComplete ? { label: t("logic.prestigeStart"), disabled: coopBusy || Boolean(prestigeBlockReason), note: prestigeBlockReason || undefined, onClick: openPrestigeDialog }
+    : { label: displayGame.features.cup.pendingNextRound ? t("logic.finishCupFirst") : t("logic.travelMatchday", { label: travelLabel(seasonFixture), matchday: seasonMode.matchday + 1 }), disabled: coopBusy || travelBusy || journeyUnderway || displayGame.features.cup.pendingNextRound || hasTransferSquadVacancy || suspendedPlayerOnSquad || !starXIComplete, note: hasTransferSquadVacancy || suspendedPlayerOnSquad || !starXIComplete ? t("logic.xiIncomplete") : journeyUnderway ? t("logic.teamTravelling") : undefined, onClick: () => void startSeasonCupMatch() };
   // "Vor dem Anpfiff" (Q25, Q45): every blocker of the next match at once, each with its fix, and the open press talk.
   const kickoffItems: KickoffItem[] = [];
   if (!displayGame.features.cup.active) {
-    const fillFix = squadGapsFillable ? { label: "Lücken füllen", run: () => void fillSquadGaps() } : { label: "Zum Kader", run: () => openFeatureTab("squad") };
-    if (hasTransferSquadVacancy) kickoffItems.push({ id: "vacancy", text: `Freier Platz ${transferSquadVacancyLabel} nach einem Transfer.`, fix: fillFix });
-    if (suspendedPlayerOnSquad) kickoffItems.push({ id: "red", text: `${suspendedStarPlayers.map((player) => player.name).join(", ")} nach Roter Karte gesperrt.`, fix: fillFix });
-    else if (!starXIComplete) kickoffItems.push({ id: "eleven", text: `Startelf: ${startingStarXISelection.length} von ${STAR_XI_SQUAD_SIZE} Plätzen besetzt.`, fix: fillFix });
+    const fillFix = squadGapsFillable ? { label: t("logic.fillGaps"), run: () => void fillSquadGaps() } : { label: t("logic.toSquad"), run: () => openFeatureTab("squad") };
+    if (hasTransferSquadVacancy) kickoffItems.push({ id: "vacancy", text: t("logic.vacancyAfterTransfer", { place: transferSquadVacancyLabel }), fix: fillFix });
+    if (suspendedPlayerOnSquad) kickoffItems.push({ id: "red", text: t("logic.bannedAfterRedNames", { names: suspendedStarPlayers.map((player) => player.name).join(", ") }), fix: fillFix });
+    else if (!starXIComplete) kickoffItems.push({ id: "eleven", text: t("logic.xiFilled", { count: startingStarXISelection.length, size: STAR_XI_SQUAD_SIZE }), fix: fillFix });
     const banError = !seasonCareerComplete && !displayGame.features.cup.pendingNextRound ? squadBanError(displayGame.features, competitionFor("season", "stadium")) : displayGame.features.cup.pendingNextRound ? squadBanError(displayGame.features, competitionFor("tournament", displayGame.features.cup.tournamentId)) : "";
     if (banError) kickoffItems.push({ id: "ban", text: banError, fix: fillFix });
-    if (displayGame.features.cup.pendingNextRound) kickoffItems.push({ id: "pending", tone: "hint", text: `${activeTournament.label}: Runde ${displayGame.features.cup.round + 1} wartet. Liga und Prestige kommen danach.${abandonBlockReason ? ` ${abandonBlockReason}` : ""}`, ...(abandonBlockReason ? {} : { fix: { label: "Turnier aufgeben", run: () => setAbandonDialog(true) } }) });
-    if (openActions.some((action) => action.id === "press")) kickoffItems.push({ id: "press", tone: "hint", text: `Pressekonferenz offen: +${formatNumber(getPressReward(getBasePassivePower(displayGame.upgrades, displayGame.stars, displayGame.features), getBaseClickPower(displayGame.upgrades, displayGame.stars, displayGame.features)))} Tore. Sie verfällt mit dem nächsten Anpfiff.`, fix: { label: "Antworten", run: () => document.querySelector(".press-conference")?.scrollIntoView({ behavior: "smooth", block: "center" }) } });
+    if (displayGame.features.cup.pendingNextRound) kickoffItems.push({ id: "pending", tone: "hint", text: `${activeTournament.label}: Runde ${displayGame.features.cup.round + 1} wartet. Liga und Prestige kommen danach.${abandonBlockReason ? ` ${abandonBlockReason}` : ""}`, ...(abandonBlockReason ? {} : { fix: { label: t("logic.giveUpTournament"), run: () => setAbandonDialog(true) } }) });
+    if (openActions.some((action) => action.id === "press")) kickoffItems.push({ id: "press", tone: "hint", text: t("logic.pressOpen", { reward: formatNumber(getPressReward(getBasePassivePower(displayGame.upgrades, displayGame.stars, displayGame.features), getBaseClickPower(displayGame.upgrades, displayGame.stars, displayGame.features))) }), fix: { label: t("logic.answer"), run: () => document.querySelector(".press-conference")?.scrollIntoView({ behavior: "smooth", block: "center" }) } });
   }
   // short: the label in the phone tab bar; the button keeps the full label as its accessible name.
   const primaryTabs: { id: FeatureTab; label: string; text?: string; short: string; icon: IconName }[] = [{id:'home',label:t('nav.home'),short:t('nav.home'),icon:'home'},{id:'cup',label:displayGame.features.cup.active?t('nav.gamesLive'):t('nav.games'),text:t('nav.games'),short:t('nav.games'),icon:'trophy'},{id:'season',label:t('nav.season'),short:t('nav.season'),icon:'table'},{id:'squad',label:t('nav.squad'),short:t('nav.squad'),icon:'squad'},{id:'career',label:t('nav.career'),short:t('nav.career'),icon:'career'},{id:'packs',label:t('nav.packs'),short:t('nav.packsShort'),icon:'cards'},{id:'club',label:t('nav.club'),short:t('nav.clubShort'),icon:'shield'}];
@@ -3623,16 +3623,16 @@ export function App() {
     const timer = window.setTimeout(() => {
       setCoopCodeInput(code);
       if (guest) setGuestCoopPrompt(true);
-      else { setAppMode("coop"); setCoopMessage(`Einladung zu Raum ${code}. Prüfe deinen Namen und tippe auf Beitreten.`); }
+      else { setAppMode("coop"); setCoopMessage(t("logic.inviteToRoom", { code })); }
     }, 0);
     return () => window.clearTimeout(timer);
   }, [hydrated, guest]);
 
 
   // The full world management (name, members, code, delete, leave) lives under "Club & Mehr", not above the game on Home.
-  const coopWorldPanel = isCoopLive && coopSession ? <section className="coop-world-panel" id="coop-world" aria-label="Koop Welt verwalten">
-    <div className="coop-inline-room-bar static"><div><p className="eyebrow">KOOP / {coopSession.room.roomName}</p><strong>{coopSession.code}</strong><span>{occupiedCoopPlayers(coopSession.room).map((player) => player.name).join(" · ")}</span></div><div className="coop-inline-room-actions"><button className="mode-secondary" onClick={() => void shareInvite()}>Einladen</button><button className="mode-secondary" onClick={() => void copyCoopCode()}>Code kopieren</button>{coopSession.role === "host" && <button className="mode-secondary danger" onClick={() => void deleteCoopRoom(coopSession.code)}>Raum löschen</button>}<button className="mode-secondary quiet" onClick={leaveCoopRoom}>Verlassen</button></div></div>
-    <div className="coop-world-tools"><div><p className="eyebrow">WELT VERWALTEN</p>{coopSession.role === "host" ? <div className="coop-tool-input"><input className="mode-input" value={coopRoomName} maxLength={28} onChange={(event) => setCoopRoomName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !coopBusy) { event.preventDefault(); void renameCoopRoom(); } }} aria-label="Name der Welt" /><button className="mode-secondary" onClick={() => void renameCoopRoom()} disabled={coopBusy}>Name speichern</button></div> : <strong>{coopSession.room.roomName}</strong>}</div><div className="coop-members"><p className="eyebrow">MITGLIEDER</p><ul>{occupiedCoopPlayers(coopSession.room).map((player) => { const activity = coopLastActiveLabel(player); return <li key={player.role}><span><strong>{player.name ?? coopRoleLabel(player.role)}</strong><small>{player.role === "host" ? "Host" : coopRoleLabel(player.role)}{player.role === coopSession.role ? " · du" : ""}{activity ? ` · ${activity}` : ""}{player.inactive ? " · inaktiv" : ""}</small></span>{coopSession.role === "host" && player.role !== "host" && <button className="mode-secondary quiet" disabled={coopBusy} onClick={() => setSeatDialog({ kind: "kick", role: player.role, name: player.name ?? coopRoleLabel(player.role), inactive: Boolean(player.inactive), activity })}>Entfernen</button>}</li>; })}</ul>{coopSession.room.playerCount > 1 ? <button className="mode-secondary quiet danger" disabled={coopBusy} onClick={() => setSeatDialog({ kind: "leave" })}>Platz freigeben</button> : <small>Du bist das letzte Mitglied. Lösche die Welt, wenn du sie nicht mehr brauchst.</small>}<small className="coop-members-note">Wer {coopSession.room.inactiveDays ?? 7} Tage nicht aktiv war, kann vom Host entfernt werden. Ist der Host so lange weg, übernimmt das zuletzt aktive Mitglied.</small></div></div>
+  const coopWorldPanel = isCoopLive && coopSession ? <section className="coop-world-panel" id="coop-world" aria-label={t("logic.manageWorld")}>
+    <div className="coop-inline-room-bar static"><div><p className="eyebrow">{t("logic.coopEyebrow")} {coopSession.room.roomName}</p><strong>{coopSession.code}</strong><span>{occupiedCoopPlayers(coopSession.room).map((player) => player.name).join(" · ")}</span></div><div className="coop-inline-room-actions"><button className="mode-secondary" onClick={() => void shareInvite()}>{t("logic.invite")}</button><button className="mode-secondary" onClick={() => void copyCoopCode()}>{t("logic.copyCode")}</button>{coopSession.role === "host" && <button className="mode-secondary danger" onClick={() => void deleteCoopRoom(coopSession.code)}>{t("logic.deleteRoom")}</button>}<button className="mode-secondary quiet" onClick={leaveCoopRoom}>{t("logic.leave")}</button></div></div>
+    <div className="coop-world-tools"><div><p className="eyebrow">{t("logic.manageWorldCaps")}</p>{coopSession.role === "host" ? <div className="coop-tool-input"><input className="mode-input" value={coopRoomName} maxLength={28} onChange={(event) => setCoopRoomName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !coopBusy) { event.preventDefault(); void renameCoopRoom(); } }} aria-label={t("logic.worldName")} /><button className="mode-secondary" onClick={() => void renameCoopRoom()} disabled={coopBusy}>{t("logic.saveName")}</button></div> : <strong>{coopSession.room.roomName}</strong>}</div><div className="coop-members"><p className="eyebrow">{t("logic.members")}</p><ul>{occupiedCoopPlayers(coopSession.room).map((player) => { const activity = coopLastActiveLabel(player); return <li key={player.role}><span><strong>{player.name ?? coopRoleLabel(player.role)}</strong><small>{player.role === "host" ? "Host" : coopRoleLabel(player.role)}{player.role === coopSession.role ? " · du" : ""}{activity ? ` · ${activity}` : ""}{player.inactive ? t("logic.inactiveSuffix") : ""}</small></span>{coopSession.role === "host" && player.role !== "host" && <button className="mode-secondary quiet" disabled={coopBusy} onClick={() => setSeatDialog({ kind: "kick", role: player.role, name: player.name ?? coopRoleLabel(player.role), inactive: Boolean(player.inactive), activity })}>{t("logic.remove")}</button>}</li>; })}</ul>{coopSession.room.playerCount > 1 ? <button className="mode-secondary quiet danger" disabled={coopBusy} onClick={() => setSeatDialog({ kind: "leave" })}>{t("logic.freeSeat")}</button> : <small>{t("logic.lastMember")}</small>}<small className="coop-members-note">{t("logic.who")} {coopSession.room.inactiveDays ?? 7} {t("logic.inactiveRule")}</small></div></div>
   </section> : null;
 
   return (
@@ -3694,7 +3694,7 @@ export function App() {
           <div className="ball-stage" ref={stageRef}>
             <div className="stadium-glow" /><div className="stadium-lights"><span /><span /><span /><span /><span /></div><div className="field-circle" /><div className="field-line field-line-one" /><div className="field-line field-line-two" /><div className="field-label">{isCoopLive ? t("coop.arena") : "GOAL CLICKER ARENA"}</div>
             <ClickBallButton store={clickFeedback} coop={isCoopLive} onClick={handleBallClick} onKeyDown={handleBallKeyDown} />
-            <p className="click-label"><span>CLICK</span> den Ball {isCoopLive ? t("home.forTeam") : t("home.forGoals")}</p>
+            <p className="click-label"><span>CLICK</span> {t("home.theBall")} {isCoopLive ? t("home.forTeam") : t("home.forGoals")}</p>
             <FloatingClickNumbers store={clickFeedback} />
             <ComboMeter store={clickFeedback} paused={comboPaused} />
           </div>
@@ -3787,7 +3787,7 @@ export function App() {
                 <button className="mode-primary" onClick={() => void (hasTransferSquadVacancy ? closeSquadVacancy() : startCup(selectedTournament.id))} disabled={travelBusy || coopBusy || tournamentCooldownActive || (!hasTransferSquadVacancy && (!selectedTournamentLeagueUnlocked || !starXIComplete || suspendedPlayerOnSquad || starXIRating < selectedTournament.minimumRating))}>{tournamentCooldownActive ? t("games.newTournamentIn", { time: tournamentCooldownLabel }) : hasTransferSquadVacancy ? t("games.closeGap") : displayGame.features.cup.pendingNextRound ? starXIComplete && !suspendedPlayerOnSquad ? travelLabel(fixtureFor(displayGame.features,"tournament",selectedTournament.id)) : t("games.completeXI") : !selectedTournamentLeagueUnlocked ? t("game.fromLeagueSel", { selectedTournamentUnlockLeague }) : starXIComplete ? travelLabel(fixtureFor(displayGame.features,"tournament",selectedTournament.id)) : t("games.completeXI")}</button>
               </div>
             </section>}
-            {!displayGame.features.cup.active && <details className="season-overview"><summary>{t("games.tableDot")} {getSeasonModeDivisionLabel(seasonMode.division, seasonMode.homeCity)}</summary><div className="season-table">{seasonTable.map((team,index)=><div className={`season-table-row${team.id==='club'?' club':''}`} key={team.id}><i>{index+1}</i><strong>{team.name}</strong><small>{team.points} P · {team.played} SP · {team.wins}-{team.draws}-{team.losses} · TD {formatGoalDifference(team)}</small></div>)}</div></details>}
+            {!displayGame.features.cup.active && <details className="season-overview"><summary>{t("games.tableDot")} {getSeasonModeDivisionLabel(seasonMode.division, seasonMode.homeCity)}</summary><div className="season-table">{seasonTable.map((team,index)=><div className={`season-table-row${team.id==='club'?' club':''}`} key={team.id}><i>{index+1}</i><strong>{team.name}</strong><small>{t("table.rowAbbr", { points: team.points, played: team.played, wins: team.wins, draws: team.draws, losses: team.losses, diff: formatGoalDifference(team) })}</small></div>)}</div></details>}
             <details className="tournament-reward-odds"><summary>{t("games.tournamentPrize")} {getTournamentRewardPack(selectedTournament.id, displayGame.features.seasonMode.highestDivision).label} {t("packs.showOdds")}</summary><div className="star-pack-odds">{getRewardPackOdds(getTournamentRewardPack(selectedTournament.id, displayGame.features.seasonMode.highestDivision).id as import('./feature-data').RewardPackId).map(o=><span key={o.label}><em>{o.label}</em><b>{formatPackChance(o.chance)}</b></span>)}</div><small>{t("games.baseCardOnly")}</small></details>
             <MatchAudio features={displayGame.features} now={countdownNow} sound={displayGame.sound && soundPrefs.stadium} />
             {displayGame.features.cup.active && <LiveMatchViewer key={displayGame.features.cup.careerMatchId ?? displayGame.features.cup.matchStartedAt} features={displayGame.features} now={countdownNow} clubName={displayClubName} clubColor={displayClubColor} disabled={coopBusy} onEdit={()=>{void editInteractiveMatch();}} onBatch={draft=>{void batchInteractiveMatch(draft);}} onResume={()=>{void resumeInteractiveMatch();}} onSubstitute={changes=>{void confirmMatchChanges(changes);}} />}
@@ -3851,7 +3851,7 @@ export function App() {
           {layoutEditMode && <div className="layout-card-handle" draggable onDragStart={(event) => handleLayoutDragStart(event, "side")} onDragEnd={handleLayoutDragEnd} aria-label={t("layout.sideMove")}><span className="layout-handle-grip" aria-hidden="true"><Icon name="grip" size={18} /></span><div><strong>{t("layout.sideCards")}</strong><small>{t("layout.dragHint")}</small></div><div className="layout-order-controls"><button type="button" onClick={(event) => { event.stopPropagation(); moveLayoutCard("side", -1); }} aria-label={t("layout.sideUp")}>↑</button><button type="button" onClick={(event) => { event.stopPropagation(); moveLayoutCard("side", 1); }} aria-label={t("layout.sideDown")}>↓</button></div></div>}
           {isCoopLive && coopSession && <div className="side-card coop-team-card"><div className="side-card-heading"><span className="heading-icon"><Icon name="stadium" size={16} /></span><div><p className="eyebrow">TEAM / {String(coopSession.room.playerCount).padStart(2, "0")} VON 04</p><h2>{t("club.yourTeam")}</h2></div><span className="coop-live-badge">{hasInfiniteMoney ? "TEST" : "LIVE"}</span></div><div className="coop-players">{coopSession.room.players.map((player) => <div className={`coop-player-card${player.role === coopSession.role ? " you" : ""}${player.online ? " online" : ""}${!player.occupied ? " waiting" : ""}`} key={player.role}><span className="coop-player-tag">{player.role === coopSession.role ? t("club.youRole", { role: coopRoleLabel(player.role) }) : coopRoleLabel(player.role)}</span><strong>{player.occupied ? player.name : t("coop.freeSeat")}</strong><small>{player.occupied ? t("coop.playerStats", { goals: formatNumber(player.goals), clicks: formatNumber(player.clicks), status: player.online ? "online" : coopLastActiveLabel(player) || "offline" }) : t("coop.shareCode")}</small></div>)}</div><div className="coop-team-total"><span>{hasInfiniteMoney ? t("game.testBalance") : t("coop.sharedBalance")}</span><strong>{displayBalance} {t("game.goals")}</strong></div></div>}
           <div className="side-column-stack side-column-stack-rank">
-            <div className="side-card"><div className="side-card-heading"><span className="heading-icon">↗</span><div><p className="eyebrow">{t("game.promotion")}</p><h2>{t("club.table")}</h2></div></div><div className="rank-display"><span className="rank-symbol large"><Icon name={currentRank.icon} size={29} /></span><div><strong>{currentRank.name}</strong><small>{nextRank ? t("club.goalsForRank", { minimum: formatNumber(nextRank.minimum), name: nextRank.name }) : t("club.youAreTheTable")}</small></div></div><div className="rank-progress"><div style={{ width: `${rankProgress}%` }} /></div><div className="rank-progress-labels"><span>{formatNumber(displayGame.totalGoals)} insgesamt</span><span>{nextRank ? formatNumber(nextRank.minimum) : "MAX"}</span></div></div>
+            <div className="side-card"><div className="side-card-heading"><span className="heading-icon">↗</span><div><p className="eyebrow">{t("game.promotion")}</p><h2>{t("club.table")}</h2></div></div><div className="rank-display"><span className="rank-symbol large"><Icon name={currentRank.icon} size={29} /></span><div><strong>{currentRank.name}</strong><small>{nextRank ? t("club.goalsForRank", { minimum: formatNumber(nextRank.minimum), name: nextRank.name }) : t("club.youAreTheTable")}</small></div></div><div className="rank-progress"><div style={{ width: `${rankProgress}%` }} /></div><div className="rank-progress-labels"><span>{t("home.totalGoals", { goals: formatNumber(displayGame.totalGoals) })}</span><span>{nextRank ? formatNumber(nextRank.minimum) : "MAX"}</span></div></div>
             <div className="side-card feed-card"><div className="side-card-heading"><span className="heading-icon">≡</span><div><p className="eyebrow">{t("club.stadiumRadio")}</p><h2>{t("club.liveFromStand")}</h2></div></div><div className="feed-list">{feed.slice(0, feedExpanded ? 8 : 3).map((item) => <div className="feed-item" key={item.id}><span className="feed-mark"><Icon name={item.icon} size={13} /></span><p>{item.text}</p></div>)}</div>{feed.length > 3 && <button type="button" className="feed-more" aria-expanded={feedExpanded} onClick={() => setFeedExpanded((current) => !current)}>{feedExpanded ? "weniger" : t("club.more", { count: feed.length - 3 })}</button>}</div>
           </div>
           <div className="side-column-stack side-column-stack-season">
@@ -3861,7 +3861,7 @@ export function App() {
             <div className="season-unlocks"><span>{t("shop.activeUnlocks")}</span><div>{currentSeasonMilestone.rewards.map((reward) => <b key={`${currentSeason}-${reward}`}>✓ {reward}</b>)}</div></div>
             <div className="season-stat"><span>{seasonCareerComplete ? t("games.hofReachedCaps") : t("season.matchdayOf10", { matchday: seasonMode.matchday })}</span><strong>{seasonCareerComplete ? `PRESTIGE ${seasonMode.prestigeCount}` : seasonMode.lastResult.includes("wartet") ? t("games.kickoffReady") : t("season.bestLeagueCaps", { league: leagueForTier(seasonMode.highestDivision) })}</strong></div>
             <div className="season-progress"><div style={{ width: `${seasonCareerComplete ? 100 : Math.min(100, (seasonMode.matchday / 10) * 100)}%` }} /></div>
-            <div className="season-table" aria-label={t("season.tableLabel")}><div className="season-table-heading"><span>{t("game.table")}</span><span>P · SP · S-U-N · TD</span></div>{seasonTable.map((team, index) => <div className={`season-table-row${team.id === "club" ? " club" : ""}`} key={team.id}><i>{index + 1}</i><strong>{team.name}</strong><small>{team.points} P · {team.played} SP · {team.wins}-{team.draws}-{team.losses} · TD {formatGoalDifference(team)}</small></div>)}</div>
+            <div className="season-table" aria-label={t("season.tableLabel")}><div className="season-table-heading"><span>{t("game.table")}</span><span>{t("table.headAbbr")}</span></div>{seasonTable.map((team, index) => <div className={`season-table-row${team.id === "club" ? " club" : ""}`} key={team.id}><i>{index + 1}</i><strong>{team.name}</strong><small>{t("table.rowAbbr", { points: team.points, played: team.played, wins: team.wins, draws: team.draws, losses: team.losses, diff: formatGoalDifference(team) })}</small></div>)}</div>
             <div className="season-next"><span>{t("game.lastResult")}</span><strong>{seasonMode.lastResult}</strong><small>{seasonMode.highestDivision > 1 ? t("season.bestLeague", { league: leagueForTier(seasonMode.highestDivision) }) : t("season.playFirst")}</small></div>
             <details className="season-roadmap"><summary>{t("season.allUnlocks")} <span>＋</span></summary><div>{SEASON_MILESTONES.map((milestone) => { const league = leagueForTier(milestone.season); return <article className={league > reachedLeague ? "done" : league === reachedLeague ? "current" : "future"} key={`season-roadmap-${milestone.season}`}><i>{league > reachedLeague ? "✓" : league}</i><div><strong>{t("game.league1")} {league} · {milestone.title}</strong><small>{milestone.rewards.join(" · ")}</small></div></article>; })}</div></details>
             <p className="season-action-note">{t("season.startTogether")}</p>
@@ -3957,7 +3957,7 @@ export function App() {
         </div>
       </div>}
       {eventAnnouncement && <div key={`${eventAnnouncement.id}:${eventAnnouncement.createdAt}`} className={`gc-notification ${eventAnnouncement.tone}`} role="status" aria-live="polite"><span aria-hidden="true">{eventAnnouncement.id==='var'?'📺':eventAnnouncement.tone==='negative'?'⚠️':'🏟️'}</span><div><strong>{eventAnnouncement.title}</strong><p>{eventAnnouncement.message}</p><small>{eventAnnouncement.amount<0?t("event.minusGoals", { amount: formatNumber(Math.abs(eventAnnouncement.amount)) }):eventAnnouncement.amount>0?t("event.plusGoals", { amount: formatNumber(eventAnnouncement.amount) }):t("event.noChange")}</small></div></div>}
-      {offline && <div className="offline-banner" role="alert"><span className="offline-mark">Ⅱ</span><p>{offline}</p>{offline === SAVE_FAILED_MESSAGE && <button type="button" className="mode-secondary" style={{ minHeight: 44, flexShrink: 0, color: "var(--text)", fontSize: "var(--text-caption2)" }} onClick={() => showToast(exportCurrentSave(gameRef.current) ? t("club.saveFileDone") : t("game.saveFileFailed"))}>{t("club.saveAsFile")}</button>}{offline === NEWER_VERSION_MESSAGE && <button type="button" className="mode-secondary" style={{ minHeight: 44, flexShrink: 0, color: "var(--text)", fontSize: "var(--text-caption2)" }} onClick={() => window.location.reload()}>{t("game.reload")}</button>}<button type="button" style={{ minWidth: 44, minHeight: 44 }} onClick={() => setOffline("")} aria-label={t("game.closeHint")}>×</button></div>}
+      {offline && <div className="offline-banner" role="alert"><span className="offline-mark">Ⅱ</span><p>{localizeText(offline)}</p>{offline === SAVE_FAILED_MESSAGE && <button type="button" className="mode-secondary" style={{ minHeight: 44, flexShrink: 0, color: "var(--text)", fontSize: "var(--text-caption2)" }} onClick={() => showToast(exportCurrentSave(gameRef.current) ? t("club.saveFileDone") : t("game.saveFileFailed"))}>{t("club.saveAsFile")}</button>}{offline === NEWER_VERSION_MESSAGE && <button type="button" className="mode-secondary" style={{ minHeight: 44, flexShrink: 0, color: "var(--text)", fontSize: "var(--text-caption2)" }} onClick={() => window.location.reload()}>{t("game.reload")}</button>}<button type="button" style={{ minWidth: 44, minHeight: 44 }} onClick={() => setOffline("")} aria-label={t("game.closeHint")}>×</button></div>}
       <footer className="footer-note">Made by xevihans</footer>
       {toast && <div className="toast" aria-hidden="true">{toast}</div>}
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{srAnnouncement}</div>
