@@ -139,3 +139,16 @@ test('co-op history entries written by the multiplayer route show in English too
   assert.equal(runtime.localizeText('Neo war 7 Tage nicht aktiv. Mia ist jetzt Host dieser Welt.'), 'Neo was not active for 7 days. Mia is now host of this world.');
   german();
 });
+
+test('the squad tools (pin, fill gaps, best bench) come from the catalogue in both languages', async () => {
+  const { readFileSync } = await import('node:fs');
+  const page = readFileSync('app/game-app.tsx', 'utf8');
+  assert.doesNotMatch(page, /"Fixieren"|>Beste Bank<|>Lücken füllen \(/);
+  assert.match(page, /t\("squad\.pin"\)/);
+  assert.match(page, /t\("squad\.fillGapsCount", \{ count: squadGapCount \}\)/);
+  assert.match(page, /t\("logic\.bestBench"\)/);
+  english();
+  assert.deepEqual([runtime.t('squad.pin'), runtime.t('squad.fillGapsCount', { count: 2 }), runtime.t('logic.bestBench')], ['Pin', 'Fill gaps (2)', 'Best bench']);
+  german();
+  assert.deepEqual([runtime.t('squad.pin'), runtime.t('squad.fillGapsCount', { count: 2 }), runtime.t('logic.bestBench')], ['Fixieren', 'Lücken füllen (2)', 'Beste Bank']);
+});

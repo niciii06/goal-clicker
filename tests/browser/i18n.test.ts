@@ -120,6 +120,7 @@ for (const viewport of [VIEWPORTS[0], VIEWPORTS[2]]) {
         assert.ok(await page.getByText(wanted, { exact: true }).first().isVisible(), `${viewport.name} ${locale} ${name}: "${wanted}" is shown`);
         assert.equal(await page.getByText(other, { exact: true }).count(), 0, `${viewport.name} ${locale} ${name}: no "${other}" from the other language`);
         assert.ok(await overflow(page) <= 0, `${viewport.name} ${locale} ${name}: no horizontal scrolling`);
+        if (tab.de === 'Kader') assert.ok(await page.getByRole('button', { name: locale === 'en' ? 'Best bench' : 'Beste Bank', exact: true }).first().isVisible(), `${viewport.name} ${locale}: best bench button in this language`);
       }
       assert.deepEqual(problems, []);
       await page.close();
