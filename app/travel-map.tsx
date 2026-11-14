@@ -5,6 +5,7 @@ import { cameraCenter, cameraReducer, fitRoutes, initialCamera, projectRoutes, s
 import type { MapPoint, VehicleState } from './travel-map-geometry';
 import { routeCache, routeCacheReady } from './journey-routing';
 import { loadRouteCache } from './travel-route-cache-lazy';
+import { t } from './i18n/runtime';
 const ICONS={walk:'🚶',bike:'🚲',car:'🚗',bus:'🚌',train:'🚆',plane:'✈️'};
 const VIEW={width:800,height:340,cx:400,cy:170};
 /** Map props arrive about every 100 ms; between them the vehicle is extrapolated for at most this long. */
@@ -90,7 +91,7 @@ export function TravelMap({journey,now,progress}:{journey:Journey;now:number;pro
  const start=routes[0].projected[0],end=routes.at(-1)!.projected.at(-1)!;
  const activeIcon=vehicle.mode==='wait'?'⌛':ICONS[vehicle.mode];
 
- return <div className="travel-map-wrap"><svg ref={svg} className="travel-map" viewBox={`0 0 ${VIEW.width} ${VIEW.height}`} role="img" aria-label={`Reisekarte von Bern nach ${journey.fixture.venue.city}`}
+ return <div className="travel-map-wrap"><svg ref={svg} className="travel-map" viewBox={`0 0 ${VIEW.width} ${VIEW.height}`} role="img" aria-label={t("map.fromBernTo", { city: journey.fixture.venue.city })}
   onPointerDown={e=>{pointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});e.currentTarget.setPointerCapture(e.pointerId);if(pointers.current.size===1)startPan({x:e.clientX,y:e.clientY});else{pan.current=null;pinch.current=spread();}}}
   onPointerMove={e=>{
    if(!pointers.current.has(e.pointerId))return;pointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});
@@ -106,7 +107,7 @@ export function TravelMap({journey,now,progress}:{journey:Journey;now:number;pro
   <g ref={world}>
    {tiles.map(tile=><image key={`${camera.zoom}-${tile.x}-${tile.y}`} x={tile.x*256} y={tile.y*256} width="256" height="256" href={`https://tile.openstreetmap.org/${camera.zoom}/${((tile.x%n)+n)%n}/${tile.y}.png`} onError={()=>setFailed(true)} />)}
    {lines.filter(r=>r.mode!=='wait').map(r=><g key={r.id}><polyline points={r.svgPoints} fill="none" stroke="white" strokeWidth="7" strokeLinejoin="round" /><polyline points={r.svgPoints} fill="none" stroke={r.mode==='train'?'#7c3aed':r.mode==='plane'?'#b45309':'#0071e3'} strokeWidth="3" strokeLinejoin="round" strokeDasharray={r.geometry==='approximate'?'3 7':r.mode==='plane'?'9 6':r.mode==='train'?'12 3':undefined} /></g>)}
-   {lines.slice(0,-1).filter(r=>r.mode!=='wait').map(r=>{const p=r.projected.at(-1)!;return <circle key={r.id} cx={p.x*scale} cy={p.y*scale} r="5" fill="white" stroke="#334155" strokeWidth="2"><title>{r.name??'Umstieg'}</title></circle>;})}
+   {lines.slice(0,-1).filter(r=>r.mode!=='wait').map(r=>{const p=r.projected.at(-1)!;return <circle key={r.id} cx={p.x*scale} cy={p.y*scale} r="5" fill="white" stroke="#334155" strokeWidth="2"><title>{r.name??t("map.change")}</title></circle>;})}
    <circle cx={start.x*scale} cy={start.y*scale} r="8" fill="#16845b" stroke="white" strokeWidth="3" /><circle cx={end.x*scale} cy={end.y*scale} r="8" fill="#c69214" stroke="white" strokeWidth="3" />
    <g ref={body}>
     {vehicle.mode==='plane'&&<g ref={shadow}><ellipse rx="15" ry="6" fill="rgba(15,23,42,.22)" /></g>}
@@ -115,5 +116,5 @@ export function TravelMap({journey,now,progress}:{journey:Journey;now:number;pro
     <text ref={icon} textAnchor="middle" dominantBaseline="central" fontSize="27">{activeIcon}</text>
    </g>
   </g>
- </svg><div className="travel-map-controls"><button type="button" aria-label="Karte vergrössern" onClick={()=>dispatch({type:'zoom',delta:1})}>+</button><button type="button" aria-label="Karte verkleinern" onClick={()=>dispatch({type:'zoom',delta:-1})}>−</button><button type="button" onClick={()=>dispatch({type:'fit',zoom:fit.zoom,center:fit.center})}>Route</button><button type="button" aria-pressed={camera.follow} onClick={()=>dispatch(camera.follow?{type:'unfollow',vehicle:live.current.vehicle.point}:{type:'follow',vehicle:live.current.vehicle.point})}>Folgen {camera.follow?'✓':''}</button></div><small className="travel-attribution"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap</a> · FOSSGIS / Overpass · <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noreferrer">Kartenfehler melden</a></small>{failed&&<small className="travel-map-fallback">Kartenkacheln nicht verfügbar. Route und Reise laufen weiter.</small>}</div>;
+ </svg><div className="travel-map-controls"><button type="button" aria-label={t("map.zoomIn")} onClick={()=>dispatch({type:'zoom',delta:1})}>+</button><button type="button" aria-label={t("map.zoomOut")} onClick={()=>dispatch({type:'zoom',delta:-1})}>−</button><button type="button" onClick={()=>dispatch({type:'fit',zoom:fit.zoom,center:fit.center})}>{t("map.route")}</button><button type="button" aria-pressed={camera.follow} onClick={()=>dispatch(camera.follow?{type:'unfollow',vehicle:live.current.vehicle.point}:{type:'follow',vehicle:live.current.vehicle.point})}>{t("map.follow")} {camera.follow?'✓':''}</button></div><small className="travel-attribution"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap</a> · FOSSGIS / Overpass · <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noreferrer">{t("map.reportError")}</a></small>{failed&&<small className="travel-map-fallback">{t("map.tilesUnavailable")}</small>}</div>;
 }

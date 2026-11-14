@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { germanSource } from "./helpers/german-source.mjs";
 
 test("Fabrizio Romario transfer events are wired through singleplayer and coop", async () => {
   const [featureSource, apiSource, pageSource] = await Promise.all([
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8").then(germanSource),
   ]);
 
   assert.match(featureSource, /TRANSFER_LOAN_CHANCE = 0\.30/);
@@ -35,7 +36,7 @@ test("Fabrizio Romario transfer events are wired through singleplayer and coop",
 test("loaned players disappear from every squad list without looking suspended", async () => {
   const [featureSource, pageSource] = await Promise.all([
     readFile(new URL("../app/feature-data.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8").then(germanSource),
   ]);
 
   assert.match(featureSource, /normalizeStarXIState\(features\.starXI, blockedPlayerIds\)/);
@@ -47,13 +48,13 @@ test("loaned players disappear from every squad list without looking suspended",
 test("Fabrizio stays available while the player transfer market is closed", async () => {
   const [apiSource, pageSource, routesSource] = await Promise.all([
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8").then(germanSource),
     readFile(new URL("../app/tab-routes.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(pageSource, /type FeatureTab = RoutedTab;/);
   assert.match(routesSource, /fabrizio: '\/club\/fabrizio'/);
-  assert.match(pageSource, /\{ id: "fabrizio", label: (?:"Fabrizio"|t\('nav\.fabrizio'\)) \}/);
+  assert.match(pageSource, /\{ id: "fabrizio", label: ["']Fabrizio["'] \}/);
   assert.match(pageSource, /Keine Spielerkäufe bei Fabrizio/);
   assert.match(pageSource, /featureTab === "fabrizio"/);
   assert.doesNotMatch(pageSource, /buyTransfer/);

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { germanSource } from "./helpers/german-source.mjs";
 
 const clickTiers = [
   ["boots", 3],
@@ -16,7 +17,7 @@ const clickTiers = [
 
 test("singleplayer and multiplayer share the complete click progression", async () => {
   const [pageSource, apiSource, upgradesSource, economySource] = await Promise.all([
-    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8").then(germanSource),
     readFile(new URL("../app/api/multiplayer/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/game/upgrades.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/game/economy.ts", import.meta.url), "utf8"),
@@ -39,14 +40,14 @@ test("singleplayer and multiplayer share the complete click progression", async 
 });
 
 test("holding Enter or Space cannot repeat ball clicks", async () => {
-  const pageSource = await readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8");
+  const pageSource = await readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8").then(germanSource);
   const keyboardHandler = pageSource.slice(
     pageSource.indexOf("function handleBallKeyDown"),
     pageSource.indexOf("function awardMiniGame"),
   );
   // The ball button renders in its own component (render isolation) and gets both handlers from the page.
   const ballUse = pageSource.match(/<ClickBallButton [^\n]+?\/>/)?.[0] ?? "";
-  const displaySource = await readFile(new URL("../app/game/live-display.tsx", import.meta.url), "utf8");
+  const displaySource = await readFile(new URL("../app/game/live-display.tsx", import.meta.url), "utf8").then(germanSource);
   const ballButton = displaySource.match(/<button type="button" className=\{`ball-button[^\n]+<\/button>/)?.[0] ?? "";
 
   assert.match(keyboardHandler, /event\.key === "Enter"/);

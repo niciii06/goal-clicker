@@ -6,6 +6,7 @@ import { useDialogFocus } from "./confirm-dialog";
 import { GOAL_CONFETTI, GOLD_CONFETTI } from "./game/constants";
 import { SEASON_MODE_DIVISION_COUNT, getSeasonModeDivisionLabel, sortSeasonTable } from "./feature-data";
 import type { SeasonMatchHistoryEntry, SeasonResult, SeasonTableRow } from "./feature-data";
+import { t } from "./i18n/runtime";
 
 export type SeasonTitle = { id: string; division: number; club: SeasonTableRow; runnerUpPoints: number };
 
@@ -45,11 +46,11 @@ export function SeasonTrophyCelebration({ title, clubName, onClose, homeCity }: 
         <rect x="30" y="110" width="60" height="18" rx="4" fill="#2b2110" />
         <rect x="40" y="115" width="40" height="8" rx="2" fill="url(#season-trophy-gold)" opacity=".9" />
       </svg>
-      <p className="season-trophy-eyebrow">{hallOfFame ? "HALL OF FAME · MEISTER" : "MEISTER"} · {getSeasonModeDivisionLabel(title.division, homeCity).toUpperCase()}</p>
-      <h2 id="season-trophy-title">{clubName} holt den Titel!</h2>
-      <p id="season-trophy-detail">{club.points} {club.points === 1 ? "Punkt" : "Punkte"} · {club.wins} {club.wins === 1 ? "Sieg" : "Siege"}, {club.draws} Remis, {club.losses} {club.losses === 1 ? "Niederlage" : "Niederlagen"} · {club.goalsFor}:{club.goalsAgainst} Tore{lead > 0 ? ` · ${lead} ${lead === 1 ? "Punkt" : "Punkte"} Vorsprung` : ""}</p>
-      <p className="season-trophy-note">{hallOfFame ? "Meister der Weltliga: Dein Club steht für immer in der Hall of Fame." : "Platz 1 bringt den Aufstieg: Nächste Saison spielt dein Club eine Liga höher."}</p>
-      <button type="button" className="season-trophy-close" onClick={onClose}>Weiter</button>
+      <p className="season-trophy-eyebrow">{hallOfFame ? t("trophy.hofChampion") : t("trophy.champion")} · {getSeasonModeDivisionLabel(title.division, homeCity).toUpperCase()}</p>
+      <h2 id="season-trophy-title">{clubName} {t("trophy.winsTitle")}</h2>
+      <p id="season-trophy-detail">{club.points} {club.points === 1 ? t("trophy.point") : t("trophy.points")} · {club.wins} {club.wins === 1 ? t("trophy.win") : t("trophy.wins")}, {club.draws} {t("trophy.draws")}, {club.losses} {club.losses === 1 ? t("trophy.loss") : t("trophy.losses")} · {club.goalsFor}:{club.goalsAgainst} {t("trophy.goals")}{lead > 0 ? t("trophy.lead", { count: lead }) : ""}</p>
+      <p className="season-trophy-note">{hallOfFame ? t("trophy.worldChampion") : t("trophy.promotion")}</p>
+      <button type="button" className="season-trophy-close" onClick={onClose}>{t("trophy.continue")}</button>
     </div>
   </div>, document.body);
 }
