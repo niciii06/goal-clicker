@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { SPECIAL_CARD_PACK, STAR_XI_CUSTOM_PLAYERS, STAR_XI_RANDOM_CUSTOM_CARD_COST, cardPackRating, drawRandomStarXICustomCard, getSpecialCardChances, getSpecialCardPackOdds, getStarXIFragmentCompensation, initialGameFeatures, normalizeGameFeatures, openEarnedPack, openEarnedPackDraw, purchaseSpecialCardPack } from "../app/feature-data.ts";
 import type { StarXIState } from "../app/feature-data.ts";
+import { germanSource } from "./helpers/german-source.mjs";
 
 const N = STAR_XI_CUSTOM_PLAYERS.length;
 const state = (ownedIds: string[] = [], fragments = STAR_XI_RANDOM_CUSTOM_CARD_COST): StarXIState => ({ ...initialGameFeatures().starXI, ownedIds, fragments });
@@ -99,7 +100,7 @@ test("saved packs and results stay: an opened free special pack and its card sur
 
 test("no draw rule, quota, lock or text of the old 100 category is left in the game code", () => {
   const feature = readFileSync(new URL("../app/feature-data.ts", import.meta.url), "utf8");
-  const ui = readFileSync(new URL("../app/game-app.tsx", import.meta.url), "utf8");
+  const ui = germanSource(readFileSync(new URL("../app/game-app.tsx", import.meta.url), "utf8"));
   for (const source of [feature, ui]) assert.doesNotMatch(source, /SPECIAL_PACK_HUNDRED_CHANCE|SPECIAL_PACK_GROUPS|canDrawHundredSpecialCards|allowHundred|hundredChance|100er gibt es erst|nur 8% sind 100er|<em>100er Karte<\/em>/);
   assert.match(ui, /<em>Jede Karte<\/em>/);
   assert.match(SPECIAL_CARD_PACK.description, /gleich wahrscheinlich/);

@@ -4,6 +4,7 @@ import { STAR_XI_PLAYERS, STAR_XI_SQUAD_SIZE, STARTER_SQUAD_UNLOCK_CLICKS, begin
 import { SYNCED_SAVE_KEYS } from "../app/cloud-save-rules.ts";
 import { ALBUM_MILESTONES_STORAGE_KEY, TUTORIAL_STORAGE_KEY } from "../app/game/constants.ts";
 import { TUTORIAL_STEPS, advanceTutorial, tutorialAllowedTabs, tutorialStepTab, currentTutorialStep, hasStartedMatch, hasStartedSeasonMatch, newTutorial, parseTutorialState, serializeTutorialState, type TutorialGame, type TutorialState } from "../app/tutorial.ts";
+import { germanSource } from "./helpers/german-source.mjs";
 
 const freshGame = (): TutorialGame => ({ clicks: 0, upgrades: {}, features: initialGameFeatures() });
 /** The first starting eleven, built place by place like the player does (a real lineup action for every slot). */
@@ -164,7 +165,7 @@ test("the welcome pack: invisible until the shop step, one random walkout, once;
 
 test("the shop shows the welcome pack only at its step, without odds; ending the tutorial asks first", async () => {
   const { readFile } = await import("node:fs/promises");
-  const page = await readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8");
+  const page = await readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8").then(germanSource);
   const card = page.slice(page.indexOf('welcomePack === "available" && <div className="star-pack-grid">'), page.indexOf("earnedPacks.some(p=>!p.opening)"));
   assert.ok(card.includes("Willkommenspack öffnen") && card.length > 100);
   assert.doesNotMatch(card, /star-pack-odds|Chancen|Wahrscheinlichkeit|getRewardPackOdds|%/);

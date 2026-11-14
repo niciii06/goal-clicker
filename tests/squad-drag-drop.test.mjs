@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { readStyles } from "./helpers/styles.mjs";
+import { germanSource } from "./helpers/german-source.mjs";
 
 test("squad drag and drop keeps click controls, positions and multiplayer actions", async () => {
   const [pageSource, boardSource, cssSource] = await Promise.all([
-    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/squad-board.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-app.tsx", import.meta.url), "utf8").then(germanSource),
+    readFile(new URL("../app/squad-board.tsx", import.meta.url), "utf8").then(germanSource),
     Promise.resolve(readStyles()),
   ]);
 
@@ -37,8 +38,8 @@ test("squad drag and drop keeps click controls, positions and multiplayer action
 
 test("both in-match substitution views reuse the squad board", async () => {
   const [substitutions, interactive] = await Promise.all([
-    readFile(new URL("../app/match-substitutions.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/interactive-match-panel.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/match-substitutions.tsx", import.meta.url), "utf8").then(germanSource),
+    readFile(new URL("../app/interactive-match-panel.tsx", import.meta.url), "utf8").then(germanSource),
   ]);
   for (const component of ["useSquadDrag", "SquadPitchPanel", "SquadPitchSlot", "SquadBenchPanel", "SquadBenchCard"]) assert.match(substitutions, new RegExp(component));
   assert.match(interactive, /<MatchSquadEditor /);
