@@ -117,9 +117,24 @@ Englisch zeigt jetzt die zentrale Spieloberfläche und alle Panels; Deutsch blei
 | Walkout Texte, Match Kommentare und Ticker | `walkout-data.ts`, `match-visual-frame.ts`, `interactive-match.ts`, `match-commands.ts` |
 | Sperrgründe und Turnier Aufgabe | `discipline.ts`, `game/tournament-abandon.ts` |
 | Serverantworten der Reise und Prämien Route, Koop Verlaufseinträge | `api/travel/route.ts`, `api/rewards/route.ts`, Route |
-| Gespeicherte Verlaufseinträge (Entscheidung B) | Verlauf, Schlagzeilen, Koop Feed |
+| Gespeicherte Verlaufseinträge: Anzeige seit Etappe 7 übersetzt, Reste siehe dort | Schlagzeilen, Koop Feed |
 | «Was ist neu» (laut `CLAUDE.md` deutsch) | `whats-new.ts` |
 | wenige Reste in Anmeldung und Fehlergrenze | `account-gate.tsx`, `auth/*`, `game/error-boundary.tsx` |
+
+## Etappe 7: gespeicherte Verläufe in der gewählten Sprache anzeigen (Branch `claude/opus-i18n-game-ui`)
+
+Löst Entscheidung B für die Anzeige, ohne Daten zu ändern: Verlaufseinträge bleiben im Spielstand und in der Koop Welt deutsch gespeichert, auch neue. Der Verlauf im Club zeigt Titel und Detail über `localizeText`.
+
+* **Katalog `history.*`:** feste Titel («Neuer Host», «Upgrade gekauft») und Einträge mit Werten als Muster («Runde 2 gewonnen», «2:1 gegen FC Goal · Spieltag 3/10», «Mia hat die Welt verlassen. Leo ist jetzt Host.»). Werte werden mitübersetzt, wenn der Katalog sie kennt (Pokale, Packs, Ergebnisse). Das Muster mit dem meisten festen Text gewinnt.
+* **Koop:** Verlaufseinträge der Multiplayer Route (Mitspieler entfernt oder gegangen, Host Wechsel, Koop Tagesprämie, Upgrade Kauf) sind abgedeckt.
+* **Tests:** `tests/i18n-data.test.ts` prüft englische Anzeige, deutsche Anzeige unverändert und dass das Anzeigen die gespeicherten Einträge nie verändert.
+
+**Noch offen bei Koop Meldungen und Verläufen**
+
+* Live Feed der Koop Welt mit Ereignistexten aus `features/news-data.ts`, `features/catalog.ts` und Fabrizio Meldungen (Etappe 5, Datentexte).
+* Schlagzeilen der Goal Gazette und Fabrizio Schlagzeilen im Verlauf («Goal Gazette · …»): der Rahmen ist übersetzt, die Schlagzeile selbst nicht.
+* Verlaufsdetails mit frei zusammengesetzten Texten: Lücken Ersatzlisten, Ticketeinnahmen, Kontostand Anpassung, Sperren, Meilenstein Details, Prestige Zusammenfassung.
+* Standardname neuer Welten «Meine Welt» und «Du» als Öffner eines Packs: kommen als Daten vom Server und bleiben, wie sie sind.
 
 ## Dateien
 
