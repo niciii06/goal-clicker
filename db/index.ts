@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, getTableColumns, gt, isNull, lte, notLike, or, sql } from "drizzle-orm";
+import { Column, SQL, and, asc, desc, eq, getTableColumns, gt, is, isNull, lte, notLike, or, sql } from "drizzle-orm";
 import type { AnyColumn } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -31,10 +31,22 @@ const { sharedStateBackupJson: backupColumn, sharedFeaturesJson: featuresColumn,
 const backupIfNeeded = sql<string>`case when ${featuresColumn} in ('', '{}') then ${backupColumn} else '' end`;
 /** Every column except the backup copy, which comes along only when the features are empty. */
 const ROOM_FIELDS = { ...lightColumns, sharedFeaturesJson: featuresColumn, sharedStateBackupJson: backupIfNeeded };
+/**
+ * Egress of the protocol itself: without prepared statements (prepare: false, for the Neon pooler) Postgres sends
+ * the description of every result column with every answer, and for the 45 light columns of a world that
+ * description (their long names) was about three quarters of a poll (1.5 of 2.1 KB, docs/db-profile.md). Short
+ * aliases (c0, c1, …) shrink it; drizzle still decodes each value with its column and returns the usual keys.
+ * The columns are named without the table (every query here reads coop_rooms only), so the query text stays short.
+ */
+function shortAliases<T extends Record<string, AnyColumn | SQL>>(fields: T): T {
+  return Object.fromEntries(Object.entries(fields).map(([key, field], index) => [key, (is(field, Column) ? sql`${sql.identifier(field.name)}`.mapWith(field) : field).as(`c${index}`)])) as unknown as T;
+}
+/** The light columns for the frequent answers (poll, tick, clicks, writes), with short aliases. */
+const LIGHT_COLUMNS = shortAliases(lightColumns);
 /** A world without its features and backup, plus the md5 of the features to tell whether they changed. */
-const LIGHT_ROOM_FIELDS = { ...lightColumns, featuresKey: sql<string>`md5(${featuresColumn})` };
+const LIGHT_ROOM_FIELDS = shortAliases({ ...lightColumns, featuresKey: sql<string>`md5(${featuresColumn})` });
 /** The same with the stored key of migration 0009; rows the trigger has not seen yet fall back to md5. */
-const STORED_KEY_LIGHT_ROOM_FIELDS = { ...lightColumns, featuresKey: sql<string>`coalesce(${sql.identifier("features_key")}, md5(${featuresColumn}))` };
+const STORED_KEY_LIGHT_ROOM_FIELDS = shortAliases({ ...lightColumns, featuresKey: sql<string>`coalesce(${sql.identifier("features_key")}, md5(${featuresColumn}))` });
 /** How long an instance trusts "the column is not there yet" before it looks again. */
 const COLUMN_RECHECK_MS = 5 * 60_000;
 export type LightRoomRow = Omit<RoomRow, "sharedFeaturesJson" | "sharedStateBackupJson"> & { featuresKey: string };
@@ -553,7 +565,7 @@ export class GoalClickerDatabase {
       .update(coopRooms)
       .set(values)
       .where(and(...predicates))
-      .returning(lightColumns);
+      .returning(LIGHT_COLUMNS);
     if (!room) return null;
     if (typeof values.sharedFeaturesJson === "string" && values.sharedFeaturesJson !== "{}") return { ...room, sharedFeaturesJson: values.sharedFeaturesJson, sharedStateBackupJson: "" };
     if (unchanged && values.sharedFeaturesJson === undefined && conditions.sharedStateVersion !== undefined) return { ...room, sharedFeaturesJson: unchanged.sharedFeaturesJson, sharedStateBackupJson: unchanged.sharedStateBackupJson };

@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { getTableColumns } from 'drizzle-orm';
-import type { SQL } from 'drizzle-orm';
+import { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { coopRooms } from '../db/schema.ts';
 import type { RoomRow, RoomUpdate } from '../db/index.ts';
@@ -249,7 +249,8 @@ test('only click batches in between let a computed action be stored on top of th
 
 test('works before and after migration 0009: md5 without the column, the stored key with it, md5 again after a rollback', async () => {
   const dialect = new PgDialect();
-  const keySql = (fields: Record<string, unknown>) => dialect.sqlToQuery(fields.featuresKey as SQL).sql;
+  // The light fields carry short aliases (db/index.ts shortAliases): the key is an aliased SQL, its expression is .sql.
+  const keySql = (fields: Record<string, unknown>) => { const key = fields.featuresKey as SQL | SQL.Aliased; return dialect.sqlToQuery(key instanceof SQL.Aliased ? key.sql : key).sql; };
   // The real getLightRoom, not the test mock.
   const getLightRoom = realGetLightRoom;
   const fakeDb = (columnExists: boolean, columnWorks: boolean, seen: string[]) => ({

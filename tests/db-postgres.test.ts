@@ -46,6 +46,30 @@ test('rooms round trip with numbers, defaults and ISO timestamps', { skip }, asy
   assert.deepEqual(await db.getRoom('nope'), null);
 });
 
+test('the light reads (short column aliases) return exactly the columns and values of the full world', { skip }, async () => {
+  const features = JSON.stringify({ alias: true, n: 1 });
+  await db.insertRoom({ ...room('ALI1'), roomName: 'Alias', sharedCoins: 1.5e15, hostClicks: 2 ** 40, sharedTrophies: 3, sharedBestLeague: 7, pendingCost: 12.5, sharedFeaturesJson: features });
+  const full = (await db.getRoom('ALI1'))!;
+  const light = (await db.getLightRoom('ALI1'))!;
+  const { sharedFeaturesJson: _features, sharedStateBackupJson: _backup, ...columns } = full;
+  void _features; void _backup;
+  assert.deepEqual({ ...light, featuresKey: undefined }, { ...columns, featuresKey: undefined });
+  assert.match(light.featuresKey, /^[0-9a-f]{32}$/);
+  assert.equal(typeof light.sharedCoins, 'number');
+  assert.equal(light.hostClicks, 2 ** 40);
+  // A write returns the same light columns, and a click booking too.
+  const written = (await db.updateRoom('ALI1', { roomName: 'Alias 2' }))!;
+  assert.equal(written.roomName, 'Alias 2');
+  assert.equal(written.sharedCoins, 1.5e15);
+  assert.equal(written.sharedFeaturesJson, features);
+  const clicked = (await db.applyClick('ALI1', 'host', 2, 1, iso()))!;
+  assert.equal(clicked.sharedCoins, 1.5e15 + 2);
+  assert.equal(clicked.hostClicks, 2 ** 40 + 1);
+  assert.equal(clicked.featuresKey, light.featuresKey);
+  assert.deepEqual(Object.keys(clicked).sort(), Object.keys(light).sort());
+  await db.deleteRoom('ALI1'); // keeps the leaderboard test free of this world
+});
+
 test('only one of many writers with the same state version wins', { skip }, async () => {
   await db.insertRoom(room('VER1'));
   const results = await Promise.all(Array.from({ length: 25 }, (_, i) => db.updateRoom('VER1', { sharedStateVersion: 1, sharedFeaturesJson: JSON.stringify({ writer: i }) }, { sharedStateVersion: 0 })));
