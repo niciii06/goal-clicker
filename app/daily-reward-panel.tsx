@@ -26,7 +26,7 @@ export function DailyRewardCard({ state, claimKey, now, passivePerSecond, clickP
       </li>;
     })}</ol>
     {status.available
-      ? <button type="button" className="daily-reward-claim" disabled={busy} onClick={onClaim}>{t("daily.claim")}{format(getDailyRewardAmount(status.reward, passivePerSecond, clickPower))} Tore{status.reward.pack === 'special' ? t("daily.plusSpecialCardPack") : status.reward.pack ? t("daily.plusRewardPack") : ''}</button>
+      ? <button type="button" className="daily-reward-claim" disabled={busy} onClick={onClaim}>{t("daily.claim")}{format(getDailyRewardAmount(status.reward, passivePerSecond, clickPower))}{t("daily.goalsSuffix")}{status.reward.pack === 'special' ? t("daily.plusSpecialCardPack") : status.reward.pack ? t("daily.plusRewardPack") : ''}</button>
       : <p className="daily-reward-next" aria-live="off">{t("daily.nextIn")} <b>{countdown(status.msUntilNext)}</b>{t("daily.tomorrow")}</p>}
   </section>;
 }

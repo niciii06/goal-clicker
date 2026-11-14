@@ -1,6 +1,7 @@
 // Filter and sort for the reserve list. Everything runs on the rating the card shows (career rating), not the base rating.
 import type { StarPosition } from "../fc26-player-pool";
 import { STAR_RATING_FILTERS } from "./constants";
+import { t } from "../i18n/runtime";
 
 /** FC27 lists LV, RV and ST where the slots say LAV, RAV and MS; both names find the same players. */
 const POSITION_EQUIVALENTS: Partial<Record<StarPosition, StarPosition>> = { LAV: "LV", RAV: "RV", MS: "ST" };
@@ -37,7 +38,7 @@ export function reserveCardType(player: { id: string; isCustom?: boolean; cardTy
 
 /** Short type chip, so equal names stay apart (Q41). Base cards have none. */
 export function reserveTypeLabel(type: ReserveCardType) {
-  return type === "icon" ? "ICON" : type === "special" ? "SPEZIAL" : type === "scrap" ? "SCHROTT" : "";
+  return type === "icon" ? t("reserve.chipIcon") : type === "special" ? t("reserve.chipSpecial") : type === "scrap" ? t("reserve.chipScrap") : "";
 }
 
 const POSITION_ORDER = ["TW", "IV", "LV", "LAV", "RV", "RAV", "ZDM", "ZM", "LM", "RM", "ZOM", "LF", "RF", "LW", "RW", "MS", "ST"];

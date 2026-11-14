@@ -88,6 +88,45 @@ for (const viewport of VIEWPORTS) {
   });
 }
 
+// Every main tab in both languages: one text the tab always shows (German exactly as before), the navigation label,
+// no horizontal scrolling and no page errors. Game data (upgrade names, leagues, packs) is still German in English
+// (docs/i18n-plan.md, Etappe 5), so the check looks at interface texts only.
+const TAB_TEXTS = [
+  { de: 'Home', en: 'Home', deText: 'Ein Klick. Ein Tor. Eine völlig übertriebene Karriere.', enText: 'One click. One goal. A completely over the top career.' },
+  { de: 'Spiele', en: 'Matches', deText: 'Wähle deine nächste Partie.', enText: 'Choose your next match.' },
+  { de: 'Saison', en: 'Season', deText: 'Bei gleich vielen Punkten zählen Tordifferenz, erzielte Tore und danach die direkten Begegnungen.', enText: 'On equal points, goal difference counts first, then goals scored, then head to head results.' },
+  { de: 'Kader', en: 'Squad', deText: 'STARTELF · 11 PLÄTZE', enText: 'STARTING XI · 11 PLACES' },
+  { de: 'Karriere', en: 'Career', deText: 'Deine Spieler entwickeln Geschichte.', enText: 'Your players make history.' },
+  { de: 'Packs & Album', en: 'Packs & Album', deText: 'Neu für deinen Club', enText: 'New for your club' },
+  { de: 'Club & Mehr', en: 'Club & More', deText: 'Deine gewonnenen Pokale.', enText: 'Your cups won.' },
+];
+
+for (const viewport of [VIEWPORTS[0], VIEWPORTS[2]]) {
+  for (const locale of ['de', 'en'] as const) {
+    test(`${viewport.name} ${locale}: every main tab shows its interface texts in this language, without overflow or errors`, async () => {
+      const { page, problems } = await openGame(viewport);
+      if (locale === 'en') {
+        await page.evaluate(([key]) => localStorage.setItem(key, 'en'), [LOCALE_STORAGE_KEY]);
+        await page.reload({ waitUntil: 'networkidle' });
+        await page.waitForTimeout(800);
+      }
+      assert.equal(await lang(page), locale);
+      for (const tab of TAB_TEXTS) {
+        const name = locale === 'en' ? tab.en : tab.de;
+        await page.getByRole('button', { name, exact: true }).first().click();
+        await page.waitForTimeout(700);
+        const wanted = locale === 'en' ? tab.enText : tab.deText;
+        const other = locale === 'en' ? tab.deText : tab.enText;
+        assert.ok(await page.getByText(wanted, { exact: true }).first().isVisible(), `${viewport.name} ${locale} ${name}: "${wanted}" is shown`);
+        assert.equal(await page.getByText(other, { exact: true }).count(), 0, `${viewport.name} ${locale} ${name}: no "${other}" from the other language`);
+        assert.ok(await overflow(page) <= 0, `${viewport.name} ${locale} ${name}: no horizontal scrolling`);
+      }
+      assert.deepEqual(problems, []);
+      await page.close();
+    });
+  }
+}
+
 test('an English browser without a choice starts in English; French falls back to German', async () => {
   for (const [locale, expected, tab] of [['en-US', 'en', 'Squad'], ['fr-CH', 'de', 'Kader']] as const) {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale });

@@ -65,13 +65,45 @@ Spielernamen und Clubnamen (`fc26-*`, `fc27-*`) sind Eigennamen und werden nicht
 * **D:** britisches Englisch, wie angelegt?
 * **A** ist für diese Etappe so gelöst: nur auf dem Gerät, weil bestehende Spielstände nicht verändert werden dürfen. Ein späteres Mitreisen mit dem Konto bräuchte ein eigenes Feld ausserhalb des Spielstands.
 
+## Etappe 3: Spieloberfläche und Panels auf Englisch (Branch `claude/opus-i18n-game-ui`, Basis 68334a3)
+
+Englisch zeigt jetzt die zentrale Spieloberfläche und alle Panels; Deutsch bleibt Wort für Wort wie vorher und ist der Rückfall für jeden fehlenden Schlüssel.
+
+**Fertig, in prüfbaren Commits**
+
+* **3a, Hauptbildschirm** (`app/game-app.tsx`, Darstellung): Kopfzeile, Home, Minigames, Club Office, Spiele, Kader, Packs, Club & Mehr, Saison, Koop Lobby, Elfmeterschiessen, Walkout und Ankündigungen.
+* **3b, Panels:** `career-panels.tsx`, `season-panel.tsx`, `prestige-dialog.tsx` (ganze Sätze statt Satzstücke), `travel-panel.tsx`, `travel-map.tsx`, `interactive-match-panel.tsx`, `match-viewer.tsx`, `match-substitutions.tsx`, `squad-board.tsx`, `leaderboard-panel.tsx`, `save-file-controls.tsx`, `daily-reward-panel.tsx`, `home-city-picker.tsx`, `tutorial-panel.tsx`, `season-trophy.tsx`, `confirm-dialog.tsx`, `game/live-display.tsx`, `game/ui.tsx`, `qol/*`.
+* **3c, Meldungen:** Toasts, Banner, Anpfiff Hinweise, Koop Meldungen, Minigame Texte, Live Feed, Seitentitel und Statusliste (`qol/status.ts`), Reservefilter.
+* **Katalog:** rund 1540 Schlüssel in `app/i18n/messages/game.de.ts` und `game.en.ts`, in `de.ts` und `en.ts` eingebunden. Mehrzahl über `Intl.PluralRules`, Pronomen über `pronounText` mit englischen Tokens (`{he}`, `{his}`, `{him}`).
+* **Zahlen:** Tausendertrenner und Combo Multiplikator folgen der Sprache (`6,861` und `x1.5` auf Englisch, `6'861` und `x1,5` auf Deutsch).
+* **Gefundene Fehler beim Umbau:** zwei Vergleiche mit deutschem Text (Positionsabzeichen «Alle Positionen», Combo Ende) hätten auf Englisch nicht mehr gegriffen; beide vergleichen jetzt mit dem Katalogwert.
+
+**Tests**
+
+* `tests/browser/i18n.test.ts`: alle sieben Haupttabs auf Telefon und Desktop, je Deutsch und Englisch; pro Tab ein fester Oberflächentext in der Sprache, keiner aus der anderen, kein horizontales Scrollen, keine Seitenfehler. Dazu die Tests aus Etappe 2.
+* `tests/helpers/german-source.mjs`: Quelltext Tests, die nach deutschem Wortlaut suchen, sehen die Katalogaufrufe wieder als deutschen Text. Sie prüfen damit weiter genau, was Spieler auf Deutsch lesen.
+* Smoke und Konto Browsertests laufen unverändert auf Deutsch.
+
+**Was noch Deutsch ist** (`node scripts/i18n/inventory.mjs`: 1144 statt 1747 Stellen; Spieler und Clubnamen zählen mit, werden aber nicht übersetzt)
+
+| Etappe | Was | Wo |
+| --- | --- | --- |
+| 3 Rest | rund 25 Meldungen: Tagesprämie Toasts, Wochenziel Toast, «kann nach einer Roten Karte nicht ausgewechselt werden», Turnier Sperrgrund, Verletzungshinweis, «Öffnen ↗», «Du» in der Koop Liste | `app/game-app.tsx` |
+| 5 Spieldaten | Upgrade Namen und Beschreibungen, Erfolge, Ränge, Liganamen (Chaosliga), Turnier und Packnamen samt Beschreibungen und Quoten («Gewöhnlich 55–59»), Heimstädte und Quartierligen, Stadionfunk, Pressekonferenz, Tutorial Schritte, Wochenziele, Neuigkeiten, «Was ist neu» | `game/upgrades.ts`, `game/constants.ts`, `feature-data.ts`, `season-progression.ts`, `home-cities.ts`, `press-conference.ts`, `tutorial.ts`, `weekly-goals.ts`, `features/*`, `whats-new.ts`, `travel-data.ts`, `travel-geography.ts` |
+| 6 Server | Meldungen der Multiplayer und Reise Route | `api/multiplayer/route.ts`, `api/travel/route.ts` |
+| Entscheidung B | gespeicherte Texte: Verlaufseinträge (bleiben in Etappe 3 bewusst deutsch, auch neue), Schlagzeilen, Koop Feed der Welt | `game-app.tsx` (addHistory), `feature-data.ts`, `career-data.ts`, Route |
+| Anmeldung | wenige Reste in `account-gate.tsx` und `auth/*` | |
+
+`<html lang>` bleibt im Server HTML `de`; der Browser setzt danach die gewählte Sprache (Etappe 2).
+
 ## Dateien
 
 | Datei | Zweck |
 | --- | --- |
 | `app/i18n/locales.ts` | Sprachen `de`, `en`, `fr`, `es`; eingeschaltet `de` und `en` (seit Etappe 2). Auflösung gespeicherte Wahl, dann Browsersprache, dann Deutsch. Speichern der Wahl, robust gegen gesperrten oder vollen Speicher. |
 | `app/i18n/messages/de.ts` | Deutscher Quellkatalog. Jeder Schlüssel jeder Sprache kommt von hier. |
-| `app/i18n/messages/en.ts` | Englischer Katalog (britisches Englisch), nur für die Startschlüssel. |
+| `app/i18n/messages/en.ts` | Englischer Katalog (britisches Englisch). |
+| `app/i18n/messages/game.de.ts`, `game.en.ts` | Texte der Spieloberfläche und Panels (Etappe 3), in `de.ts` und `en.ts` eingebunden. |
 | `app/i18n/translate.ts` | `translate`, `translator`: Platzhalter `{name}`, Mehrzahl über `Intl.PluralRules`, Zahlen im Format der Sprache, Rückfall auf Deutsch je Schlüssel, Lückenbericht je Sprache. |
 | `tests/i18n.test.ts` | 8 Tests, siehe unten. |
 | `tests/i18n-account.test.ts` | 5 Tests für Schritt 1. |
