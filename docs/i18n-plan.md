@@ -96,6 +96,31 @@ Englisch zeigt jetzt die zentrale Spieloberfläche und alle Panels; Deutsch blei
 
 `<html lang>` bleibt im Server HTML `de`; der Browser setzt danach die gewählte Sprache (Etappe 2).
 
+## Etappen 5 und 6: Spieldaten und Serverantworten (Branch `claude/opus-i18n-game-ui`)
+
+**Grundsatz:** Spieldaten und Serverantworten bleiben deutsch im Code. Sie werden mit dem Koop Server geteilt, im Code verglichen und teils gespeichert (Verlauf, Packs, Welt). Übersetzt wird erst an der Anzeigestelle; so gelangt nie Englisch in einen Spielstand oder eine Welt. `scripts/i18n/inventory.mjs` zählt deshalb weiter deutsche Texte in diesen Dateien, auch wenn sie auf Englisch übersetzt erscheinen; massgeblich ist `tests/i18n-data.test.ts`.
+
+* **5a, `app/i18n/data-text.ts`:** `dataText()` übersetzt deutsche Daten beim Anzeigen: zuerst exakt über den Katalog, dann bekannte Muster mit Zahlen (Packquoten «Gewöhnlich 55–59», «Liga 15 · Chaosliga», Formationen, Fragmente, Upgrade Wirkung, Heimstadion). Unbekanntes, also Spieler, Clubs und Orte, bleibt unverändert.
+  * Übersetzt: alle 27 Upgrades samt Wirkung, Erfolge, Ränge, Saison Meilensteine und Freischaltungen, alle Packs samt Beschreibung und Quoten, Turniere und Pokale, Tutorial, Wochenziele samt Panel.
+  * Wochenziele: Anzeige auf Englisch, der Verlaufseintrag beim Abholen bleibt deutsch.
+* **5b:** Zeitangaben und Sparziel im Club Office, Saison Ausblick («Aufstieg sicher», «2 Punkte Rückstand …»), Form der letzten Spiele, Stadionfunk Startzeile, letztes Ergebnis.
+* **6, Multiplayer:** 90 Antworten von `app/api/multiplayer/route.ts` im Katalog (`server.*`). `localizeText` erkennt auch Antworten mit Werten («Das Turnier ist ab Liga 12 verfügbar.») und baut sie in der gewählten Sprache. Toasts und Koop Statuszeile zeigen Serverantworten so. Die Route selbst ist unverändert.
+* **Tests:** `tests/i18n-data.test.ts`: jeder angezeigte Datentext hat einen Katalogeintrag, Deutsch bleibt exakt, Englisch übersetzt, Namen bleiben, Verlauf deutsch, jede Serverantwort im Katalog kommt in der Route vor.
+
+**Was jetzt noch Deutsch ist**
+
+| Bereich | Wo |
+| --- | --- |
+| Pressekonferenz (Fragen und Antworten, rund 160 Texte) | `press-conference.ts` |
+| Neuigkeiten, Zufallsereignisse, Fabrizio Meldungen, Schlagzeilen der Goal Gazette | `features/news-data.ts`, `features/catalog.ts`, `feature-data.ts` |
+| Liganamen der Heimstädte und Quartierligen (Eigennamen, Entscheid offen), Reiseorte | `home-cities.ts`, `travel-geography.ts`, `travel-data.ts` |
+| Walkout Texte, Match Kommentare und Ticker | `walkout-data.ts`, `match-visual-frame.ts`, `interactive-match.ts`, `match-commands.ts` |
+| Sperrgründe und Turnier Aufgabe | `discipline.ts`, `game/tournament-abandon.ts` |
+| Serverantworten der Reise und Prämien Route, Koop Verlaufseinträge | `api/travel/route.ts`, `api/rewards/route.ts`, Route |
+| Gespeicherte Verlaufseinträge (Entscheidung B) | Verlauf, Schlagzeilen, Koop Feed |
+| «Was ist neu» (laut `CLAUDE.md` deutsch) | `whats-new.ts` |
+| wenige Reste in Anmeldung und Fehlergrenze | `account-gate.tsx`, `auth/*`, `game/error-boundary.tsx` |
+
 ## Dateien
 
 | Datei | Zweck |
@@ -103,7 +128,8 @@ Englisch zeigt jetzt die zentrale Spieloberfläche und alle Panels; Deutsch blei
 | `app/i18n/locales.ts` | Sprachen `de`, `en`, `fr`, `es`; eingeschaltet `de` und `en` (seit Etappe 2). Auflösung gespeicherte Wahl, dann Browsersprache, dann Deutsch. Speichern der Wahl, robust gegen gesperrten oder vollen Speicher. |
 | `app/i18n/messages/de.ts` | Deutscher Quellkatalog. Jeder Schlüssel jeder Sprache kommt von hier. |
 | `app/i18n/messages/en.ts` | Englischer Katalog (britisches Englisch). |
-| `app/i18n/messages/game.de.ts`, `game.en.ts` | Texte der Spieloberfläche und Panels (Etappe 3), in `de.ts` und `en.ts` eingebunden. |
+| `app/i18n/messages/game.de.ts`, `game.en.ts` | Texte der Spieloberfläche, Panels, Spieldaten und Serverantworten (Etappen 3, 5, 6), in `de.ts` und `en.ts` eingebunden. |
+| `app/i18n/data-text.ts` | `dataText()`: deutsche Spieldaten an der Anzeigestelle in der gewählten Sprache. |
 | `app/i18n/translate.ts` | `translate`, `translator`: Platzhalter `{name}`, Mehrzahl über `Intl.PluralRules`, Zahlen im Format der Sprache, Rückfall auf Deutsch je Schlüssel, Lückenbericht je Sprache. |
 | `tests/i18n.test.ts` | 8 Tests, siehe unten. |
 | `tests/i18n-account.test.ts` | 5 Tests für Schritt 1. |
