@@ -1256,7 +1256,8 @@ export function App() {
 
   /** Queued toasts (app/qol/toast-queue.ts): `minor` click messages never push a real message away. */
   function showToast(message: string, priority: ToastPriority = "info") {
-    setToastState((current) => pushToast(current, { text: message, priority }));
+    // Server answers arrive in German; the toast shows them in the chosen language (localizeText, Etappe 6).
+    setToastState((current) => pushToast(current, { text: localizeText(message), priority }));
   }
   const currentToast = toastState.current;
   useEffect(() => {
@@ -3895,7 +3896,7 @@ export function App() {
             </div>}
           </div>}
           {coopUpdateRequired && <p className="mode-message" role="status">{MULTIPLAYER_UPDATE_MESSAGE} <button type="button" onClick={reloadForUpdate}>{t("game.reloadNow")}</button></p>}
-          {coopMessage && <p className="mode-message" role="status">{coopMessage}</p>}
+          {coopMessage && <p className="mode-message" role="status">{localizeText(coopMessage)}</p>}
         </section>
       </main>}
 

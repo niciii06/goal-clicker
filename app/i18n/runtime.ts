@@ -62,11 +62,31 @@ const GERMAN_TEXT_TO_KEY = new Map<string, MessageKey>(
   (Object.entries(de) as [MessageKey, unknown][]).filter(([, value]) => typeof value === "string" && !/\{\w+\}/.test(value as string)).map(([key, value]) => [value as string, key]),
 );
 
+// Server answers with values ("Das Turnier ist ab Liga 12 verfügbar."): the German entries of the "server." group with
+// {placeholders} become patterns; the values are taken over, known German values are translated too. Built once.
+const SERVER_PATTERNS: { key: MessageKey; pattern: RegExp; names: string[] }[] = (Object.entries(de) as [MessageKey, unknown][])
+  .filter(([key, value]) => key.startsWith("server.") && typeof value === "string" && /\{\w+\}/.test(value))
+  .map(([key, value]) => {
+    const names: string[] = [];
+    const source = (value as string).split(/(\{\w+\})/).map((part) => {
+      const name = /^\{(\w+)\}$/.exec(part)?.[1];
+      if (name) { names.push(name); return "(.+?)"; }
+      return part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }).join("");
+    return { key, pattern: new RegExp(`^${source}$`), names };
+  });
+
 /** A German text from the server or a constant in the current language when the catalogue knows it; otherwise as it is. */
 export function localizeText(text: string | null | undefined): string {
   if (!text) return text ?? "";
   const key = GERMAN_TEXT_TO_KEY.get(text);
-  return key ? t(key) : text;
+  if (key) return t(key);
+  if (current === SOURCE_LOCALE) return text;
+  for (const { key: patternKey, pattern, names } of SERVER_PATTERNS) {
+    const match = pattern.exec(text);
+    if (match) return t(patternKey, Object.fromEntries(names.map((name, index) => [name, localizeText(match[index + 1])])));
+  }
+  return text;
 }
 
 /** Only for tests: back to German without touching storage. */
