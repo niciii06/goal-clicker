@@ -107,3 +107,25 @@ test('every server answer in the catalogue is a text the server really sends', a
     for (const part of text.split(/\{\w+\}/).map((piece) => piece.trim()).filter((piece) => piece.length > 3)) assert.ok(route.includes(part), `${key}: "${part}"`);
   }
 });
+
+test('saved history entries show in English when displayed; the saved German text stays exactly as it is', () => {
+  english();
+  const saved = [
+    { title: 'Saisonspiel · Sieg', detail: '2:1 gegen FC Goal · Spieltag 3/10' },
+    { title: 'Stadionpokal gewonnen', detail: 'Elfmeterschiessen gewonnen · Trophäe erhalten · Kleines Prämienpack' },
+    { title: 'Runde 2 gewonnen', detail: 'Runde 3 läuft bereits' },
+    { title: 'Wochenziel erreicht: Zu Null', detail: '+600 Fragmente' },
+    { title: 'Neuer Host', detail: 'Ein Eintrag, den der Katalog nicht kennt.' },
+  ];
+  const before = JSON.stringify(saved);
+  assert.deepEqual(saved.map((entry) => [runtime.localizeText(entry.title), runtime.localizeText(entry.detail)]), [
+    ['Season match · Win', '2:1 against FC Goal · matchday 3/10'],
+    ['Stadium Cup won', 'Shoot-out won · trophy received · Small reward pack'],
+    ['Round 2 won', 'Round 3 is already under way'],
+    ['Weekly goal reached: Clean sheets', '+600 Fragmente'],
+    ['New host', 'Ein Eintrag, den der Katalog nicht kennt.'],
+  ]);
+  assert.equal(JSON.stringify(saved), before, 'displaying never changes the saved entries');
+  german();
+  assert.equal(runtime.localizeText('Runde 2 gewonnen'), 'Runde 2 gewonnen');
+});
