@@ -73,8 +73,8 @@ Englisch zeigt jetzt die zentrale Spieloberfläche und alle Panels; Deutsch blei
 
 * **3a, Hauptbildschirm** (`app/game-app.tsx`, Darstellung): Kopfzeile, Home, Minigames, Club Office, Spiele, Kader, Packs, Club & Mehr, Saison, Koop Lobby, Elfmeterschiessen, Walkout und Ankündigungen.
 * **3b, Panels:** `career-panels.tsx`, `season-panel.tsx`, `prestige-dialog.tsx` (ganze Sätze statt Satzstücke), `travel-panel.tsx`, `travel-map.tsx`, `interactive-match-panel.tsx`, `match-viewer.tsx`, `match-substitutions.tsx`, `squad-board.tsx`, `leaderboard-panel.tsx`, `save-file-controls.tsx`, `daily-reward-panel.tsx`, `home-city-picker.tsx`, `tutorial-panel.tsx`, `season-trophy.tsx`, `confirm-dialog.tsx`, `game/live-display.tsx`, `game/ui.tsx`, `qol/*`.
-* **3c, Meldungen:** Toasts, Banner, Anpfiff Hinweise, Koop Meldungen, Minigame Texte, Live Feed, Seitentitel und Statusliste (`qol/status.ts`), Reservefilter.
-* **Katalog:** rund 1540 Schlüssel in `app/i18n/messages/game.de.ts` und `game.en.ts`, in `de.ts` und `en.ts` eingebunden. Mehrzahl über `Intl.PluralRules`, Pronomen über `pronounText` mit englischen Tokens (`{he}`, `{his}`, `{him}`).
+* **3c bis 3e, Meldungen:** Toasts, Banner, Anpfiff Hinweise, Koop Meldungen, Minigame Texte, Live Feed, Seitentitel und Statusliste (`qol/status.ts`), Reservefilter, Tagesprämie, Wochenziel, Rote Karte.
+* **Katalog:** rund 1550 Schlüssel in `app/i18n/messages/game.de.ts` und `game.en.ts`, in `de.ts` und `en.ts` eingebunden. Mehrzahl über `Intl.PluralRules`, Pronomen über `pronounText` mit englischen Tokens (`{he}`, `{his}`, `{him}`).
 * **Zahlen:** Tausendertrenner und Combo Multiplikator folgen der Sprache (`6,861` und `x1.5` auf Englisch, `6'861` und `x1,5` auf Deutsch).
 * **Gefundene Fehler beim Umbau:** zwei Vergleiche mit deutschem Text (Positionsabzeichen «Alle Positionen», Combo Ende) hätten auf Englisch nicht mehr gegriffen; beide vergleichen jetzt mit dem Katalogwert.
 
@@ -88,7 +88,7 @@ Englisch zeigt jetzt die zentrale Spieloberfläche und alle Panels; Deutsch blei
 
 | Etappe | Was | Wo |
 | --- | --- | --- |
-| 3 Rest | rund 25 Meldungen: Tagesprämie Toasts, Wochenziel Toast, «kann nach einer Roten Karte nicht ausgewechselt werden», Turnier Sperrgrund, Verletzungshinweis, «Öffnen ↗», «Du» in der Koop Liste | `app/game-app.tsx` |
+| 3 Rest | Begründung, warum ein Turnier nicht aufgegeben werden kann; «Du» als Öffner eines Packs im Koop (kommt als Name vom Server) | `game/tournament-abandon.ts`, Route |
 | 5 Spieldaten | Upgrade Namen und Beschreibungen, Erfolge, Ränge, Liganamen (Chaosliga), Turnier und Packnamen samt Beschreibungen und Quoten («Gewöhnlich 55–59»), Heimstädte und Quartierligen, Stadionfunk, Pressekonferenz, Tutorial Schritte, Wochenziele, Neuigkeiten, «Was ist neu» | `game/upgrades.ts`, `game/constants.ts`, `feature-data.ts`, `season-progression.ts`, `home-cities.ts`, `press-conference.ts`, `tutorial.ts`, `weekly-goals.ts`, `features/*`, `whats-new.ts`, `travel-data.ts`, `travel-geography.ts` |
 | 6 Server | Meldungen der Multiplayer und Reise Route | `api/multiplayer/route.ts`, `api/travel/route.ts` |
 | Entscheidung B | gespeicherte Texte: Verlaufseinträge (bleiben in Etappe 3 bewusst deutsch, auch neue), Schlagzeilen, Koop Feed der Welt | `game-app.tsx` (addHistory), `feature-data.ts`, `career-data.ts`, Route |
