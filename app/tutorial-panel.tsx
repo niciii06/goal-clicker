@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useDialogFocus } from "./confirm-dialog";
 import { TUTORIAL_INTRO_PAGES, TUTORIAL_STEPS, currentTutorialStep, type TutorialGame, type TutorialState, type TutorialStep } from "./tutorial";
 import { t } from "./i18n/runtime";
+import { dataText } from "./i18n/data-text";
 
 /** The welcome window of the tutorial: a few short pages, then the guided tasks start. Escape skips it. */
 export function TutorialIntroDialog({ onStart, onSkip }: { onStart: () => void; onSkip: () => void }) {
@@ -16,8 +17,8 @@ export function TutorialIntroDialog({ onStart, onSkip }: { onStart: () => void; 
   return createPortal(<div className="account-overlay" role="presentation">
     <div ref={dialogRef} className="account-dialog tutorial-dialog" role="dialog" aria-modal="true" aria-labelledby="tutorial-title" aria-describedby="tutorial-text">
       <p className="eyebrow">{t("tutorialPanel.eyebrow")} {page + 1} / {TUTORIAL_INTRO_PAGES.length}</p>
-      <h2 id="tutorial-title">{current.title}</h2>
-      <p id="tutorial-text">{current.text}</p>
+      <h2 id="tutorial-title">{dataText(current.title)}</h2>
+      <p id="tutorial-text">{dataText(current.text)}</p>
       <div className="tutorial-dots" aria-hidden="true">{TUTORIAL_INTRO_PAGES.map((item, index) => <i key={item.title} className={index === page ? "active" : ""} />)}</div>
       <div className="tutorial-dialog-actions">
         <button type="button" className="mode-secondary quiet" onClick={onSkip}>{t("tutorialPanel.skip")}</button>
@@ -40,8 +41,8 @@ export function TutorialCoach({ state, game, onShow, onEnd }: { state: TutorialS
   return <section className="tutorial-coach" aria-label={t("tutorialPanel.label")} aria-live="polite">
     <div className="tutorial-coach-copy">
       <p className="eyebrow">{t("tutorialPanel.step")} {index + 1} / {TUTORIAL_STEPS.length}</p>
-      <strong>{step.title}</strong>
-      <small>{step.text}</small>
+      <strong>{dataText(step.title)}</strong>
+      <small>{dataText(step.text)}</small>
       {progress && <div className="tutorial-coach-progress"><span><i style={{ width: `${Math.round(share * 100)}%` }} /></span><b>{progress.value} / {progress.goal}</b></div>}
       <ol className="tutorial-coach-steps" aria-label={t("tutorialPanel.progress")}>{TUTORIAL_STEPS.map((item) => <li key={item.id} className={state.done.includes(item.id) ? "done" : item === step ? "current" : ""} aria-label={`${item.title}${state.done.includes(item.id) ? ", erledigt" : ""}`} />)}</ol>
     </div>

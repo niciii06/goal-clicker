@@ -5,7 +5,7 @@
 //   >{t("k")}<  {t("k")}     -> Text (JSX text)
 //   t("k") / t('k')          -> "Text" / 'Text' (same quotes)
 //   t("k", { a: expr, b })   -> `Text with ${expr} and ${b}` (plural messages: the "other" form)
-//   localizeText(x)          -> x
+//   localizeText(x), dataText(x) -> x
 // so the existing assertions keep checking the same German wording.
 // Plain JavaScript so that the .mjs tests (run without tsx) can use it too: the German catalogue is read from the
 // catalogue files, one "key": value entry per line.
@@ -64,13 +64,13 @@ function params(object) {
 export function germanSource(source) {
   let out = '';
   let i = 0;
-  const call = /(?<![\w.$])(t|localizeText)\(/g;
+  const call = /(?<![\w.$])(t|localizeText|dataText)\(/g;
   for (let match = call.exec(source); match; match = call.exec(source)) {
     const start = match.index;
     const end = closing(source, start + match[1].length);
     const args = source.slice(start + match[1].length + 1, end - 1);
     let replacement;
-    if (match[1] === 'localizeText') replacement = germanSource(args);
+    if (match[1] !== 't') replacement = germanSource(args);
     else {
       const keyMatch = /^\s*(["'])([\w.]+)\1\s*(?:,([\s\S]*))?$/.exec(args);
       if (!keyMatch) { call.lastIndex = start + 2; continue; }
