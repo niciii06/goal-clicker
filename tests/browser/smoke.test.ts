@@ -500,7 +500,7 @@ test('the standings: Pkt is the last column, every form box names its match on h
     await openTab(page, 'Saison');
     const header = await page.locator('.season-hub-table thead th').allInnerTexts();
     assert.deepEqual(header.slice(-2), ['Form', 'Pkt'], `${viewport.width}: points last, form directly before`);
-    const chips = page.locator('.season-form-chip');
+    const chips = page.locator('.season-form-chip:visible');
     const tip = page.locator('.season-form-tip');
     await chips.first().hover();
     assert.equal(await tip.innerText(), `Spieltag 1 · Heim · ${features.club.name} 2:1 ${features.seasonMode.table[1].name}`);

@@ -112,7 +112,14 @@
 .season-hub-scorers { display: grid; gap: 4px; margin: 6px 0 0; padding-left: 20px; }
 .season-hub-scorers li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
 .season-hub-scorers span { color: var(--soft); font-size: var(--text-caption2); }
-@media (max-width: 520px) { .season-form-head, .season-form { display: none; } }
+/* On a phone the form boxes move from their own column to a second line under the club name, so they stay visible and tappable. */
+.season-form-inline { display: none; }
+.season-club-name { display: block; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 520px) {
+  .season-form-head, .season-form-col { display: none; }
+  .season-form-inline { display: flex; flex-wrap: wrap; row-gap: 4px; margin-top: 6px; }
+  .season-form-inline .season-form-chip { flex: none; }
+}
 
 .cup-penalty-rules { display: block; margin-top: 6px; opacity: .8; font-size: var(--text-caption2); }
 .coop-pending-chip { display: inline-flex; align-items: center; padding: 4px 10px; border: 0; border-radius: 999px; color: var(--text); background: var(--fill); font-size: var(--text-caption2); font-weight: 700; }
