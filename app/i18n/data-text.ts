@@ -17,6 +17,10 @@ const RULES: Rule[] = [
   // League labels: "Liga 15 · Chaosliga"
   [/^Liga (\d+) · (.+)$/, (m) => t("data.leagueLabel", { league: m[1], name: localizeText(m[2]) })],
   [/^Liga (\d+)$/, (m) => t("data.league", { league: m[1] })],
+  // Upgrade effects: "+3 Tore pro Klick", "+1.200 Tore pro Sekunde"
+  [/^\+([\d.]+) Tore pro (Klick|Sekunde)$/, (m) => t(m[2] === "Klick" ? "data.upgrade.perClick" : "data.upgrade.perSecond", { amount: m[1].replace(/\./g, ",") })],
+  // Home grounds of the home cities: "Heimstadion Apfelbaum"
+  [/^Heimstadion (.+)$/, (m) => t("data.homeGround", { name: m[1] })],
   // Weekly rewards: "1’000 Fragmente"
   [/^([\d’'.,]+) Fragmente$/, (m) => t("data.fragmentsAmount", { amount: m[1].replace(/[’'.]/g, ",") })],
   // Roadmap rewards (app/season-roadmap.ts)

@@ -3,6 +3,7 @@
 import type { GameFeatures } from "../feature-data";
 import type { UpgradeDefinition } from "../game/types";
 import { getBaseClickPower, getBasePassivePower, getCost, getLevel } from "../game/economy";
+import { t } from "../i18n/runtime";
 
 export type UpgradeGain = { id: string; cost: number; passiveGain: number; clickGain: number; paybackSeconds: number | null };
 
@@ -37,13 +38,13 @@ export function secondsUntilAffordable(cost: number, goals: number, passivePerSe
 /** "ca. 3 min", "ca. 2 h 10 min", "über 2 Tage"; rounded up, so the estimate never promises too early. */
 export function formatEta(seconds: number | null) {
   if (seconds === null) return "";
-  if (seconds <= 0) return "jetzt";
-  if (seconds < 60) return `ca. ${Math.ceil(seconds)} s`;
+  if (seconds <= 0) return t("hint.now");
+  if (seconds < 60) return t("hint.aboutSeconds", { seconds: Math.ceil(seconds) });
   const minutes = Math.ceil(seconds / 60);
-  if (minutes < 60) return `ca. ${minutes} min`;
+  if (minutes < 60) return t("hint.aboutMinutes", { minutes });
   const hours = Math.floor(minutes / 60), rest = minutes % 60;
-  if (hours >= 48) return `über ${Math.floor(hours / 24)} Tage`;
-  return rest ? `ca. ${hours} h ${rest} min` : `ca. ${hours} h`;
+  if (hours >= 48) return t("hint.overDays", { days: Math.floor(hours / 24) });
+  return rest ? t("hint.aboutHoursMinutes", { hours, minutes: rest }) : t("hint.aboutHours", { hours });
 }
 
 /** "noch 12,4K · ca. 3 min" for a price the club cannot pay yet; empty when it can. */
@@ -51,10 +52,10 @@ export function savingsHint(cost: number, goals: number, passivePerSecond: numbe
   const seconds = secondsUntilAffordable(cost, goals, passivePerSecond);
   if (seconds === 0 || !Number.isFinite(cost)) return "";
   const eta = formatEta(seconds);
-  return `noch ${format(cost - goals)}${eta ? ` · ${eta}` : ""}`;
+  return `${t("hint.toGo", { amount: format(cost - goals) })}${eta ? ` · ${eta}` : ""}`;
 }
 
 /** Payback as short text: "zahlt sich in ca. 4 min aus". */
 export function paybackLabel(gain: UpgradeGain) {
-  return gain.paybackSeconds === null ? "" : `zahlt sich in ${formatEta(gain.paybackSeconds)} aus`;
+  return gain.paybackSeconds === null ? "" : t("hint.payback", { time: formatEta(gain.paybackSeconds) });
 }

@@ -2,6 +2,7 @@
 // read the table the game itself uses (sortSeasonTable: points, goal difference, goals, then head to head).
 import type { SeasonResult, SeasonTableRow } from "../feature-data";
 import { SEASON_MODE_DIVISION_COUNT, SEASON_MODE_MATCHES_PER_SEASON, SEASON_PROMOTION_PLACES, SEASON_RELEGATION_PLACES, sortSeasonTable } from "../feature-data";
+import { t } from "../i18n/runtime";
 
 export type FormLetter = "S" | "U" | "N";
 
@@ -26,7 +27,7 @@ export function formGuide(teamId: string, results: readonly SeasonResult[], coun
 
 /** "Spieltag 5 · Auswärts · FC Luzern 1:2 FC Goal": the match behind one form box, from the real result only. */
 export function formMatchLabel(match: FormMatch, nameOf: (teamId: string) => string) {
-  return `Spieltag ${match.matchday} · ${match.home ? "Heim" : "Auswärts"} · ${nameOf(match.homeId)} ${match.homeScore}:${match.awayScore} ${nameOf(match.awayId)}`;
+  return t("insight.formMatch", { matchday: match.matchday, venue: match.home ? t("seasonPanel.home") : t("seasonPanel.away"), home: nameOf(match.homeId), score: `${match.homeScore}:${match.awayScore}`, away: nameOf(match.awayId) });
 }
 
 /**
@@ -43,19 +44,18 @@ export function promotionOutlook(table: readonly SeasonTableRow[], results: read
   const maxOf = (team: SeasonTableRow) => team.points + 3 * Math.max(0, SEASON_MODE_MATCHES_PER_SEASON - team.played);
   const top = division >= SEASON_MODE_DIVISION_COUNT;
   const spots = top ? 1 : SEASON_PROMOTION_PLACES;
-  const games = left === 1 ? "noch 1 Spiel" : `noch ${left} Spiele`;
-  const goal = top ? "Hall of Fame" : "Aufstieg";
+  const games = t("insight.gamesLeft", { count: left });
   // Sure: fewer than `spots` other teams can still reach the club's points.
   const chasers = rows.filter((team) => team.id !== "club" && maxOf(team) >= club.points).length;
-  if (chasers < spots) return `${goal} sicher`;
-  if (index < spots) return `${goal}splatz · ${games}`;
+  if (chasers < spots) return top ? t("insight.hofSure") : t("insight.promotionSure");
+  if (index < spots) return `${top ? t("insight.hofPlace") : t("insight.promotionPlace")} · ${games}`;
   const target = rows[spots - 1];
   const gap = target.points - club.points;
-  if (maxOf(club) < target.points) return `${goal} nicht mehr möglich · ${games}`;
+  if (maxOf(club) < target.points) return `${top ? t("insight.hofImpossible") : t("insight.promotionImpossible")} · ${games}`;
   const relegation = division > 1 && index >= rows.length - SEASON_RELEGATION_PLACES;
   const safe = rows[rows.length - SEASON_RELEGATION_PLACES - 1];
-  if (relegation && safe) return `Abstiegsplatz · ${Math.max(0, safe.points - club.points)} ${safe.points - club.points === 1 ? "Punkt" : "Punkte"} bis Platz ${rows.length - SEASON_RELEGATION_PLACES} · ${games}`;
-  return `${gap} ${gap === 1 ? "Punkt" : "Punkte"} Rückstand auf Platz ${spots} · ${games}`;
+  if (relegation && safe) return `${t("insight.relegationPlace", { count: Math.max(0, safe.points - club.points), place: rows.length - SEASON_RELEGATION_PLACES })} · ${games}`;
+  return `${t("insight.behind", { count: gap, place: spots })} · ${games}`;
 }
 
 /** The best scorers of the running season from the season statistics (career.seasonPlayers). */
