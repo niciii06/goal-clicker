@@ -3,9 +3,11 @@
 import { de, type Message, type MessageKey, type PluralForms } from "./messages/de";
 import { en } from "./messages/en";
 import { INTL_TAG, SOURCE_LOCALE, type Locale } from "./locales";
+import { PRONOUN_TOKENS } from "../player-pronouns";
 
 export type { MessageKey } from "./messages/de";
-export type MessageParams = Record<string, string | number>;
+// null and undefined print as a template literal would (the code moved here from `${…}` strings).
+export type MessageParams = Record<string, string | number | null | undefined>;
 type Catalog = Partial<Record<MessageKey, Message>>;
 
 /** French and Spanish are planned (docs/i18n-plan.md); until they have catalogs they read German. */
@@ -24,8 +26,8 @@ function isPlural(message: Message): message is PluralForms {
 }
 
 /** Numbers in placeholders use the format of the language (de-CH: 1’234). Strings go in as they are. */
-function formatParam(locale: Locale, value: string | number) {
-  return typeof value === "number" ? value.toLocaleString(INTL_TAG[locale]) : value;
+function formatParam(locale: Locale, value: string | number | null | undefined) {
+  return typeof value === "number" ? value.toLocaleString(INTL_TAG[locale]) : String(value);
 }
 
 /**
@@ -60,8 +62,9 @@ export function catalogGaps(locale: Locale, catalogs: Record<Locale, Catalog> = 
   return { missing: source.filter((key) => !own.includes(key)), unknown: own.filter((key) => !source.includes(key)) };
 }
 
-/** Placeholder names of a message (every plural form), to check that a translation keeps them. */
+/** Placeholder names of a message (every plural form), to check that a translation keeps them. Pronoun tokens such as
+ * {Er} or {he} (app/player-pronouns.ts) belong to the language and are left out. */
 export function placeholders(message: Message) {
   const texts = isPlural(message) ? Object.values(message) : [message];
-  return [...new Set(texts.flatMap((text) => [...String(text).matchAll(/\{(\w+)\}/g)].map((m) => m[1])))].sort();
+  return [...new Set(texts.flatMap((text) => [...String(text).matchAll(/\{(\w+)\}/g)].map((m) => m[1]).filter((name) => !PRONOUN_TOKENS.has(name))))].sort();
 }
