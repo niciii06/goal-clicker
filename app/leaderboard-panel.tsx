@@ -6,7 +6,8 @@ import type { LeaderboardEntry } from "./leaderboard-api";
 import { formatNumber } from "./game/format";
 import { t } from "./i18n/runtime";
 
-const SORTS: { id: LeaderboardSort; label: string }[] = [
+// Built when shown (not at import), so the labels follow the current language.
+const sorts = (): { id: LeaderboardSort; label: string }[] => [
   { id: "goals", label: t("leaderboard.goals") },
   { id: "league", label: t("leaderboard.league") },
   { id: "trophies", label: t("leaderboard.trophies") },
@@ -42,7 +43,7 @@ export function LeaderboardPanel({ playerId }: { playerId: string }) {
     <div className="feature-panel-heading"><div><p className="eyebrow">{t("leaderboard.eyebrow")}</p><h3>{t("leaderboard.bestWorlds")}</h3></div></div>
     <p className="leaderboard-note">{t("leaderboard.onlyCoop")}</p>
     <div className="leaderboard-sorts" role="radiogroup" aria-label={t("leaderboard.sortBy")}>
-      {SORTS.map((option) => <button key={option.id} type="button" role="radio" aria-checked={sort === option.id} className={sort === option.id ? "active" : ""} onClick={() => setSort(option.id)}>{option.label}</button>)}
+      {sorts().map((option) => <button key={option.id} type="button" role="radio" aria-checked={sort === option.id} className={sort === option.id ? "active" : ""} onClick={() => setSort(option.id)}>{option.label}</button>)}
     </div>
     {!playerId && <p className="leaderboard-empty">{t("leaderboard.noProfile")}</p>}
     {playerId && !current && <p className="leaderboard-empty" aria-live="polite">{t("leaderboard.loading")}</p>}

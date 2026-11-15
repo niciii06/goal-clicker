@@ -188,6 +188,7 @@ export const de = {
   "nav.home": "Home",
   "nav.games": "Spiele",
   "nav.gamesLive": "Spiele · LIVE",
+  "nav.gamesShort": "Spiele",
   "nav.season": "Saison",
   "nav.squad": "Kader",
   "nav.career": "Karriere",

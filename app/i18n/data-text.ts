@@ -17,6 +17,8 @@ const RULES: Rule[] = [
   // League labels: "Liga 15 · Chaosliga"
   [/^Liga (\d+) · (.+)$/, (m) => t("data.leagueLabel", { league: m[1], name: localizeText(m[2]) })],
   [/^Liga (\d+)$/, (m) => t("data.league", { league: m[1] })],
+  // Competition saved in match reports: "Saison 3"
+  [/^Saison (\d+)$/, (m) => t("career.seasonNumber", { seasonNumber: m[1] })],
   // Upgrade effects: "+3 Tore pro Klick", "+1.200 Tore pro Sekunde"
   [/^\+([\d.]+) Tore pro (Klick|Sekunde)$/, (m) => t(m[2] === "Klick" ? "data.upgrade.perClick" : "data.upgrade.perSecond", { amount: m[1].replace(/\./g, ",") })],
   // Home grounds of the home cities: "Heimstadion Apfelbaum"

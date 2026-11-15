@@ -187,6 +187,7 @@ export const en = {
   "nav.home": "Home",
   "nav.games": "Matches",
   "nav.gamesLive": "Matches · LIVE",
+  "nav.gamesShort": "Games",
   "nav.season": "Season",
   "nav.squad": "Squad",
   "nav.career": "Career",
