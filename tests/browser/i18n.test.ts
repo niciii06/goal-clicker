@@ -142,3 +142,39 @@ test('an English browser without a choice starts in English; French falls back t
     await page.close();
   }
 });
+
+// QA fixes of 15 November 2026: on a phone the Matches tab shows a short label that fits ("Games"), its accessible
+// name stays "Matches"; the upgrade buy button and its accessible name follow the language; switching the language
+// in the running game with an existing save changes neither the save nor the German texts on the way back.
+test('phone: short Matches tab label fits, buy button and its name follow a language switch, the save stays the same', async () => {
+  const { page, problems } = await openGame(VIEWPORTS[0]);
+  const shortLabel = (name: string) => page.getByRole('button', { name, exact: true }).first().locator('.tab-label-short');
+  const fits = (name: string) => shortLabel(name).evaluate((element) => element.scrollWidth <= element.clientWidth + 1 && getComputedStyle(element).display !== 'none');
+  const buyButton = page.locator('.upgrade-item button[aria-label]').first();
+  assert.equal(await shortLabel('Spiele').innerText(), 'Spiele');
+  assert.match((await buyButton.getAttribute('aria-label'))!, / kaufen$|Preis$/);
+  const saveBefore = await stored(page, SAVE_KEY);
+  await page.getByRole('button', { name: 'Club & Mehr', exact: true }).first().click();
+  await page.waitForTimeout(600);
+  await page.getByRole('radiogroup', { name: 'Sprache' }).getByRole('radio', { name: 'English' }).click();
+  await page.waitForTimeout(400);
+  assert.equal(await shortLabel('Matches').innerText(), 'Games', 'short label on the phone');
+  assert.ok(await fits('Matches'), 'the short label is not cut off');
+  await page.getByRole('button', { name: 'Home', exact: true }).first().click();
+  await page.waitForTimeout(600);
+  const enLabel = (await buyButton.getAttribute('aria-label'))!;
+  assert.match(enLabel, /^(Buy|Price|Buy x\d+|League \d+)(: .+)$/, enLabel);
+  assert.doesNotMatch(enLabel + await buyButton.innerText(), /kaufen|Preis/);
+  await page.getByRole('button', { name: 'Club & More', exact: true }).first().click();
+  await page.waitForTimeout(600);
+  await page.getByRole('radiogroup', { name: 'Language' }).getByRole('radio', { name: 'Deutsch' }).click();
+  await page.waitForTimeout(400);
+  assert.equal(await shortLabel('Spiele').innerText(), 'Spiele');
+  const saveAfter = JSON.parse((await stored(page, SAVE_KEY))!) as Record<string, unknown>;
+  const before = JSON.parse(saveBefore!) as Record<string, unknown>;
+  assert.deepEqual(Object.keys(saveAfter).sort(), Object.keys(before).sort());
+  assert.doesNotMatch(JSON.stringify(saveAfter), /goalClickerLocale|"locale"|Faster boots|"Buy/);
+  assert.ok(await overflow(page) <= 0);
+  assert.deepEqual(problems, []);
+  await page.close();
+});

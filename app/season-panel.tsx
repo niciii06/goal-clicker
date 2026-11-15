@@ -49,7 +49,7 @@ function StandingsTable({ table, results, division, caption }: { table: readonly
         const form = formMatches(team.id, results);
         const boxes = form.map((match) => {
             const key = `${team.id}:${match.matchday}`, text = formMatchLabel(match, nameOf);
-            return <button type="button" key={key} className={`season-form-chip form-${match.letter}`} aria-label={`${match.letter === "S" ? t("seasonPanel.win") : match.letter === "U" ? t("seasonPanel.draws") : t("seasonPanel.loss")}: ${text}`} aria-describedby={tip?.key === key ? "season-form-tip" : undefined}
+            return <button type="button" key={key} className={`season-form-chip form-${match.letter}`} aria-label={`${match.letter === "S" ? t("seasonPanel.win") : match.letter === "U" ? t("seasonPanel.draw") : t("seasonPanel.loss")}: ${text}`} aria-describedby={tip?.key === key ? "season-form-tip" : undefined}
               onPointerEnter={(event) => { if (event.pointerType === "mouse") show(event.currentTarget, key, text, "hover"); }} onPointerLeave={(event) => { if (event.pointerType === "mouse") setTip((current) => current?.key === key && current.mode === "hover" ? null : current); }}
               onFocus={(event) => show(event.currentTarget, key, text, "focus")} onBlur={() => setTip((current) => current?.key === key ? null : current)}
               onClick={(event) => { if (tip?.key === key && tip.mode === "tap") setTip(null); else show(event.currentTarget, key, text, "tap"); }}>{match.letter}</button>;

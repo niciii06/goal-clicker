@@ -9,7 +9,7 @@ import type { GameFeatures, StarXIPlayer } from './feature-data';
 import { albumGroupIncludes, nationGroupScope, CAREER_MILESTONES, GROWTH_POINTS_PER_LEVEL, getPlayerMilestones, getMilestoneStats, MILESTONE_METRIC_LABELS, emptyPlayerStats, getAlbumGroups, getCareerCard, getPlayerForm } from './career-data';
 import type { AwardWinner, PlayerMatchReport } from './career-data';
 import { formatNumber } from './game/format';
-import { localizeText, t } from './i18n/runtime';
+import { currentIntlTag, localizeText, t } from './i18n/runtime';
 import { useLocale } from './i18n/use-locale';
 import { PREF_KEYS, pickStringFields, readJsonPref, writeJsonPref } from './qol/prefs';
 import { leagueForTier } from './season-progression';
@@ -48,7 +48,7 @@ export function DisciplineTags({ features, playerId, compact = false }: { featur
 
 function PlayerReportRow({ report, motm }: { report: PlayerMatchReport; motm: boolean }) {
   return <details className={`career-rating-row ${motm ? 'motm' : ''}`}>
-    <summary><span><strong>{name(report.playerId)}{motm && <em>{t("career.motmStar")}</em>}</strong><small>{report.minutes} Minuten · {report.goals} Tore · {report.assists} {t("career.assistsWord")}{report.substitute ? t("career.jokerSuffix") : ''}</small></span><b className={report.rating >= 8 ? 'up' : report.rating < 6 ? 'down' : ''}>{report.rating.toFixed(1)} <span>⌄</span></b></summary>
+    <summary><span><strong>{name(report.playerId)}{motm && <em>{t("career.motmStar")}</em>}</strong><small>{t("career.reportMinutes", { count: report.minutes })} · {t("career.reportGoals", { count: report.goals })} · {report.assists} {t("career.assistsWord")}{report.substitute ? t("career.jokerSuffix") : ''}</small></span><b className={report.rating >= 8 ? 'up' : report.rating < 6 ? 'down' : ''}>{report.rating.toFixed(1)} <span>⌄</span></b></summary>
     <div className="career-rating-details">{report.reasons.map((r,i) => <div key={i}><span>{r.label}</span><b>{r.value === 0 ? t("career.note") : signed(r.value)}</b></div>)}<p>{t("career.ratingNote")}</p></div>
   </details>;
 }
@@ -57,12 +57,12 @@ export function MatchRatingsPanel({ features }: { features: GameFeatures; minute
   const reports = [...features.career.reports].slice(-10).reverse();
   return <section className="career-section match-archive" aria-label={t("career.matchRatings")}><div className="career-heading"><div><p className="eyebrow">{t("career.matchArchive")}</p><h4>{t("career.last10")}</h4></div><span>{reports.length} / 10</span></div>
     {!reports.length && <p className="career-empty">{t("career.reportsEmpty")}</p>}
-    {reports.map(r=><details key={r.id} className="archive-match"><summary><span><strong>{r.opponent}</strong><small>{r.competition ?? (r.mode==='season'?t("career.season"):t("career.tournament"))} · {new Date(r.createdAt).toLocaleDateString('de-CH')}{r.away === undefined ? '' : r.away ? t("career.awaySuffix") : t("career.homeSuffix")}</small></span><b>{r.homeScore}:{r.awayScore}{r.penaltyScore && <small> ({r.penaltyScore} {t("career.afterPenalties")})</small>}</b><span>{r.homeScore>r.awayScore?t("career.win"):r.homeScore<r.awayScore?t("career.loss"):r.penaltyScore?t("career.afterPenalties"):t("career.draw")} ⌄</span></summary>
+    {reports.map(r=><details key={r.id} className="archive-match"><summary><span><strong>{r.opponent}</strong><small>{r.competition ? dataText(r.competition) : (r.mode==='season'?t("career.season"):t("career.tournament"))} · {dateLabel(r.createdAt)}{r.away === undefined ? '' : r.away ? t("career.awaySuffix") : t("career.homeSuffix")}</small></span><b>{r.homeScore}:{r.awayScore}{r.penaltyScore && <small> ({r.penaltyScore} {t("career.afterPenalties")})</small>}</b><span>{r.homeScore>r.awayScore?t("career.win"):r.homeScore<r.awayScore?t("career.loss"):r.penaltyScore?t("career.afterPenalties"):t("career.draw")} ⌄</span></summary>
     <div className="career-rating-list">{[...r.players].sort((a,b)=>b.rating-a.rating).map(p=><PlayerReportRow key={p.playerId} report={p} motm={r.motmId===p.playerId}/>)}</div>
     {r.startingIds && <p>{t("career.startingXIColon")} {r.startingIds.map(name).join(', ')}</p>}{r.benchIds && <p>{t("career.benchColon")} {r.benchIds.map(name).join(', ')}</p>}
     {r.events?.length ? <ol className="archive-events">{r.events.map(e=><li key={e.id}>{e.minute}′ · {e.label}</li>)}</ol> : null}
     {r.opponentMotm&&<small>{t("career.motmPrefix")} {r.opponentMotm.name} · {r.opponentMotm.rating.toFixed(1)} ({r.opponent})</small>}
-    {r.tickets&&<small>{t("career.ticketIncome")} {r.tickets.attendance.toLocaleString('de-CH')} Zuschauer · +{formatNumber(r.tickets.income)} {t("career.goals")}</small>}
+    {r.tickets&&<small>{t("career.ticketIncome")} {t("career.spectators", { count: r.tickets.attendance })} · +{formatNumber(r.tickets.income)} {t("career.goals")}</small>}
     {r.derbyReward>0&&<small>{t("career.derbyPrize")} {r.derbyReward} {t("career.fragments")}</small>}</details>)}
   </section>;
 }
@@ -177,13 +177,14 @@ export function PostMatchSummary({features,onCareer,onContinue,next}:{features:G
   <div className="summary-actions">{next&&<button className="mode-primary" disabled={next.disabled} onClick={next.onClick}>{next.label}</button>}<button className={next?"mode-secondary":"mode-primary"} onClick={onContinue}>{t("career.toSquad")}</button><button className="mode-secondary" onClick={onCareer}>{t("career.matchReport")}</button></div></section>;
 }
 
-const dateLabel = (at: number) => at ? new Date(at).toLocaleDateString('de-CH') : t("career.noDate");
+const dateLabel = (at: number) => at ? new Date(at).toLocaleDateString(currentIntlTag()) : t("career.noDate");
 const runLabel = (prestige: number | null) => prestige === null ? '' : t("career.run", { run: prestige + 1 });
-const SEASON_OUTCOME_LABELS: Record<string, string> = { promoted: t("career.promotion"), relegated: t("career.relegation"), stayed: t("career.survival"), 'hall-of-fame': t("career.hallOfFame") };
+// Built when shown (not at import), so the labels follow the current language.
+const seasonOutcomeLabel = (outcome: string) => ({ promoted: t("career.promotion"), relegated: t("career.relegation"), stayed: t("career.survival"), 'hall-of-fame': t("career.hallOfFame") } as Record<string, string>)[outcome] ?? '';
 type AllTimeSort = 'name' | 'appearances' | 'minutes' | 'goals' | 'assists' | 'average' | 'motm' | 'points';
-const ALL_TIME_COLUMNS: { id: Exclude<AllTimeSort, 'name'>; label: string; short: string }[] = [
-  { id: 'appearances', label: t("career.appearances"), short: 'Sp.' }, { id: 'minutes', label: t("career.minutes"), short: t("career.minutesShort") }, { id: 'goals', label: t("career.goals"), short: t("career.goals") },
-  { id: 'assists', label: t("career.assistsWord"), short: t("career.assistsShort") }, { id: 'average', label: t("career.averageRating"), short: 'Ø' }, { id: 'motm', label: t("career.motm"), short: t("career.motmShort") }, { id: 'points', label: t("career.points"), short: t("career.pointsShort") },
+const allTimeColumns = (): { id: Exclude<AllTimeSort, 'name'>; label: string; short: string }[] => [
+  { id: 'appearances', label: t("career.appearances"), short: t("career.appearancesShort") }, { id: 'minutes', label: t("career.minutes"), short: t("career.minutesShort") }, { id: 'goals', label: t("career.goals"), short: t("career.goals") },
+  { id: 'assists', label: t("career.assistsWord"), short: t("career.assistsShort") }, { id: 'average', label: t("career.averageRating"), short: t("career.averageShort") }, { id: 'motm', label: t("career.motm"), short: t("career.motmShort") }, { id: 'points', label: t("career.points"), short: t("career.pointsShort") },
 ];
 const ALL_TIME_PAGE = 50;
 
@@ -204,7 +205,7 @@ export function AllTimePlayerTable({ features }: { features: GameFeatures }) {
   return <section className="career-section" aria-label={t("career.allTimeLabel")}><div className="career-heading"><div><p className="eyebrow">{t("career.allTimeTable")}</p><h4>{t("career.everyoneWhoPlayed")}</h4></div><span className="feature-stat">{rows.length} {t("career.playerCaps")}</span></div>
     <p className="career-note">{t("career.allTimeIntro")}</p>
     <label className="chronicle-toggle"><input type="checkbox" checked={squadOnly} onChange={(e) => setSquadOnly(e.target.checked)} /> {t("career.onlySquad")}</label>
-    {visible.length ? <div className="chronicle-table-wrap"><table className="chronicle-table all-time-table"><thead><tr><th scope="col">#</th>{header('name', t("career.player"), t("career.sortByName"))}{ALL_TIME_COLUMNS.map((c) => header(c.id, c.short, t("career.sortBy", { label: c.label })))}</tr></thead>
+    {visible.length ? <div className="chronicle-table-wrap"><table className="chronicle-table all-time-table"><thead><tr><th scope="col">#</th>{header('name', t("career.player"), t("career.sortByName"))}{allTimeColumns().map((c) => header(c.id, c.short, t("career.sortBy", { label: c.label })))}</tr></thead>
       <tbody>{visible.slice(0, shown).map((row, index) => <tr key={row.id} className={owned.has(row.id) ? 'in-squad' : ''}><td>{index + 1}</td><th scope="row"><span>{row.player.name}</span><small>{getStarXIPositions(row.player).join(' / ') || t("career.bench")}{owned.has(row.id) ? t("career.inSquadSuffix") : ''}</small></th><td>{row.stats.appearances}</td><td>{Math.round(row.stats.minutes).toLocaleString('de-CH')}</td><td>{row.stats.goals}</td><td>{row.stats.assists}</td><td>{row.average ? row.average.toFixed(2) : ''}</td><td>{row.stats.motm}</td><td>{row.stats.points}</td></tr>)}</tbody></table></div>
       : <p className="career-empty">{t("career.statsEmpty")}</p>}
     {visible.length > shown && <button type="button" className="mode-secondary chronicle-more" onClick={() => setShown(shown + ALL_TIME_PAGE)}>{t("career.more")} {Math.min(ALL_TIME_PAGE, visible.length - shown)} {t("career.showPlayers")}</button>}
@@ -212,7 +213,7 @@ export function AllTimePlayerTable({ features }: { features: GameFeatures }) {
 }
 
 function RecordCard({ label, record, value, empty }: { label: string; record: ChronicleMatchRecord | null; value: (r: ChronicleMatchRecord) => string; empty: string }) {
-  return <article className="career-award"><span>{label}</span><strong>{record ? value(record) : t("career.stillOpen")}</strong><small>{record ? `gegen ${record.opponent} · ${record.competition ? `${record.competition} · ` : ''}${dateLabel(record.at)}` : empty}</small></article>;
+  return <article className="career-award"><span>{label}</span><strong>{record ? value(record) : t("career.stillOpen")}</strong><small>{record ? `${t("career.against", { opponent: record.opponent })} · ${record.competition ? `${dataText(record.competition)} · ` : ''}${dateLabel(record.at)}` : empty}</small></article>;
 }
 
 /** Club chronicle: totals, records, titles with dates, one row per finished season and the final Hall of Fame tables. */
@@ -231,8 +232,8 @@ export function ClubChroniclePanel({ features }: { features: GameFeatures }) {
       <div className="career-award-grid chronicle-records">
         <RecordCard label={t("career.biggestWin")} record={records.biggestWin} value={(r) => r.score} empty={t("career.firstWinMark")} />
         <RecordCard label={t("career.mostGoalsMatch")} record={records.mostGoals} value={(r) => `${r.value} ${r.value === 1 ? t('career.goalWord') : t('career.goalsWord')} (${r.score})`} empty={t("career.firstGoalMark")} />
-        <RecordCard label={t("career.attendanceRecord")} record={records.recordCrowd} value={(r) => `${r.value.toLocaleString('de-CH')} Zuschauer`} empty={t("career.homeLeagueOnly")} />
-        <article className="career-award"><span>{t("career.streaks")}</span><strong>{records.unbeaten.best} {records.unbeaten.best === 1 ? t('career.matchWord') : t('career.matchesWord')} ungeschlagen</strong><small>{t("career.current")} {records.unbeaten.current} ungeschlagen · längste Siegesserie {records.winning.best}, aktuell {records.winning.current}{records.unbeaten.bestAt ? t("career.recordSince", { date: dateLabel(records.unbeaten.bestAt) }) : ''}</small></article>
+        <RecordCard label={t("career.attendanceRecord")} record={records.recordCrowd} value={(r) => t("career.spectators", { count: r.value })} empty={t("career.homeLeagueOnly")} />
+        <article className="career-award"><span>{t("career.streaks")}</span><strong>{t("career.unbeatenRun", { count: records.unbeaten.best })}</strong><small>{t("career.streakDetail", { unbeaten: records.unbeaten.current, bestWins: records.winning.best, currentWins: records.winning.current })}{records.unbeaten.bestAt ? t("career.recordSince", { date: dateLabel(records.unbeaten.bestAt) }) : ''}</small></article>
       </div>
     </section>
     <section className="career-section" aria-label={t("career.titles")}><div className="career-heading"><div><p className="eyebrow">{t("career.titlesDated")}</p><h4>{t("career.everyTrophy")}</h4></div><span className="feature-stat">{titles.length + undatedTitles.reduce((n, t) => n + t.count, 0)} {t("career.titlesCaps")}</span></div>
@@ -240,14 +241,14 @@ export function ClubChroniclePanel({ features }: { features: GameFeatures }) {
       {undatedTitles.length > 0 && <p className="career-note">{t("career.undatedWins")} {undatedTitles.map((t) => `${t.count}× ${t.label}`).join(', ')}.</p>}
     </section>
     <section className="career-section" aria-label={t("career.seasonArchive")}><div className="career-heading"><div><p className="eyebrow">{t("career.seasonArchiveCaps")}</p><h4>{t("career.everySeason")}</h4></div><span className="feature-stat">{seasons.length} {t("career.seasonsCaps")}</span></div>
-      {archive.length ? <div className="chronicle-table-wrap"><table className="chronicle-table season-archive-table"><thead><tr><th scope="col">{t("career.season")}</th><th scope="col">{t("career.league")}</th><th scope="col">{t("career.place")}</th><th scope="col">{t("career.pointsShort")}</th><th scope="col">S / U / N</th><th scope="col">{t("career.goals")}</th><th scope="col">{t("career.topScorer")}</th><th scope="col">{t("career.bestPlayer")}</th><th scope="col">{t("career.outcome")}</th></tr></thead>
-        <tbody>{archive.map((row) => <tr key={row.id}><th scope="row"><span>{t("career.season")} {row.season}</span><small>{[runLabel(row.prestige), dateLabel(row.at)].filter(Boolean).join(' · ')}</small></th><td data-label={t("career.league")}>{leagueForTier(row.division)}</td><td data-label={t("career.place")}>{row.place ?? ''}</td><td data-label={t("career.pointsShort")}>{row.points ?? ''}</td><td data-label="S / U / N">{row.wins === null ? '' : `${row.wins} / ${row.draws} / ${row.losses}`}</td><td data-label={t("career.goals")}>{row.goalsFor === null ? '' : `${row.goalsFor}:${row.goalsAgainst}`}</td><td className="wide" data-label={t("career.topScorer")}>{row.topScorer ? `${name(row.topScorer.playerId)} (${row.topScorer.goals})` : ''}</td><td className="wide" data-label={t("career.bestPlayer")}>{row.bestPlayerId ? name(row.bestPlayerId) : ''}</td><td className="wide" data-label={t("career.outcome")}>{row.outcome ? SEASON_OUTCOME_LABELS[row.outcome] : ''}</td></tr>)}</tbody></table></div>
+      {archive.length ? <div className="chronicle-table-wrap"><table className="chronicle-table season-archive-table"><thead><tr><th scope="col">{t("career.season")}</th><th scope="col">{t("career.league")}</th><th scope="col">{t("career.place")}</th><th scope="col">{t("career.pointsShort")}</th><th scope="col">{t("career.winsDrawsLosses")}</th><th scope="col">{t("career.goals")}</th><th scope="col">{t("career.topScorer")}</th><th scope="col">{t("career.bestPlayer")}</th><th scope="col">{t("career.outcome")}</th></tr></thead>
+        <tbody>{archive.map((row) => <tr key={row.id}><th scope="row"><span>{t("career.season")} {row.season}</span><small>{[runLabel(row.prestige), dateLabel(row.at)].filter(Boolean).join(' · ')}</small></th><td data-label={t("career.league")}>{leagueForTier(row.division)}</td><td data-label={t("career.place")}>{row.place ?? ''}</td><td data-label={t("career.pointsShort")}>{row.points ?? ''}</td><td data-label={t("career.winsDrawsLosses")}>{row.wins === null ? '' : `${row.wins} / ${row.draws} / ${row.losses}`}</td><td data-label={t("career.goals")}>{row.goalsFor === null ? '' : `${row.goalsFor}:${row.goalsAgainst}`}</td><td className="wide" data-label={t("career.topScorer")}>{row.topScorer ? `${name(row.topScorer.playerId)} (${row.topScorer.goals})` : ''}</td><td className="wide" data-label={t("career.bestPlayer")}>{row.bestPlayerId ? name(row.bestPlayerId) : ''}</td><td className="wide" data-label={t("career.outcome")}>{row.outcome ? seasonOutcomeLabel(row.outcome) : ''}</td></tr>)}</tbody></table></div>
         : <p className="career-empty">{t("career.archiveEmpty")}</p>}
       {archive.some((row) => row.place === null) && <p className="career-note">{t("career.preChronicle")}</p>}
     </section>
     <section className="career-section" aria-label={t("career.hofTables")}><div className="career-heading"><div><p className="eyebrow">{t("career.hofEyebrow")}</p><h4>{t("career.championTables")}</h4></div><span className="feature-stat">{hallOfFame.length} {t("career.runsCaps")}</span></div>
       {hallOfFame.length ? [...hallOfFame].reverse().map((table) => <details key={`${table.prestige}-${table.at}`} className="archive-match chronicle-hof"><summary><span><strong>{runLabel(table.prestige)}</strong><small>{dateLabel(table.at)}</small></span><b>{table.rows.find((r) => r.club)?.points ?? 0} {t("career.pointsShort")}</b><span>⌄</span></summary>
-        <div className="chronicle-table-wrap"><table className="chronicle-table"><thead><tr><th scope="col">#</th><th scope="col">{t("career.club")}</th><th scope="col">S / U / N</th><th scope="col">{t("career.goals")}</th><th scope="col">{t("career.pointsShort")}</th></tr></thead><tbody>{table.rows.map((r, index) => <tr key={`${r.name}-${index}`} className={r.club ? 'in-squad' : ''}><td>{index + 1}</td><th scope="row">{r.name}</th><td>{r.wins} / {r.draws} / {r.losses}</td><td>{r.goalsFor}:{r.goalsAgainst}</td><td>{r.points}</td></tr>)}</tbody></table></div></details>)
+        <div className="chronicle-table-wrap"><table className="chronicle-table"><thead><tr><th scope="col">#</th><th scope="col">{t("career.club")}</th><th scope="col">{t("career.winsDrawsLosses")}</th><th scope="col">{t("career.goals")}</th><th scope="col">{t("career.pointsShort")}</th></tr></thead><tbody>{table.rows.map((r, index) => <tr key={`${r.name}-${index}`} className={r.club ? 'in-squad' : ''}><td>{index + 1}</td><th scope="row">{r.name}</th><td>{r.wins} / {r.draws} / {r.losses}</td><td>{r.goalsFor}:{r.goalsAgainst}</td><td>{r.points}</td></tr>)}</tbody></table></div></details>)
         : <p className="career-empty">{t("career.hofIntro")}</p>}
     </section>
     <AllTimePlayerTable features={features} />
