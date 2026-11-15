@@ -375,7 +375,7 @@
 .gc-goal-burst{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);z-index:3;padding:10px 22px;border-radius:14px;background:#116443ed;box-shadow:0 6px 25px #0005;display:grid;text-align:center;gap:3px;pointer-events:none;animation:gc-goal-pop .25s ease-out}
 .gc-goal-burst strong{font-size:22px}
 .gc-goal-burst span{font-size: var(--text-footnote)}
-.gc-viewer-pitch-shell{position:relative}
+.gc-viewer-pitch-shell{position:relative;isolation:isolate}
 @keyframes gc-goal-pop{from{opacity:0;transform:translateX(-50%) scale(.85)}to{opacity:1;transform:translateX(-50%) scale(1)}}
 @media(prefers-reduced-motion:reduce){.gc-goal-burst{animation:none}}
 .post-match-summary{background:var(--surface-raised);border-color:var(--line);color:var(--text)}
