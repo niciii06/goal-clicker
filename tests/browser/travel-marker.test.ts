@@ -41,15 +41,22 @@ after(async () => {
 });
 
 /** A trip from Zurich to the Wankdorf, started a little while ago. */
-function wankdorfSave(now: number) {
+function wankdorfSave(now: number, startedAgoMs = 60000) {
   const f = normalizeGameFeatures(structuredClone(baseSave.features));
   f.nextEventAt = now + 1e9; f.nextVarAt = now + 1e9; f.transferSaga.nextAt = now + 1e9;
   (f.seasonMode as { homeCity: string }).homeCity = 'zurich';
   const fixture = fixtureFor(f, 'season');
   const wankdorf = { ...fixture, away: true, venue: { ...VENUES.bern } } as typeof fixture;
-  f.travel.journey = createJourney(wankdorf, now - 60000, () => 0.5, f);
+  f.travel.journey = createJourney(wankdorf, now - startedAgoMs, () => 0.5, f);
   const journey = f.travel.journey!;
   return { json: JSON.stringify({ ...baseSave, goals: 5e12, totalGoals: 9e12, seasonGoals: 5e12, clicks: 12345, seasons: 14, features: normalizeGameFeatures(f), lastSaved: now }), city: journey.fixture.venue.city };
+}
+/** A real trip from Bern to the tournament in Zurich (bus, train, bus), started `startedAgoMs` ago. */
+function tripSave(now: number, startedAgoMs: number) {
+  const f = normalizeGameFeatures(structuredClone(baseSave.features));
+  f.nextEventAt = now + 1e9; f.nextVarAt = now + 1e9; f.transferSaga.nextAt = now + 1e9;
+  f.travel.journey = createJourney(fixtureFor(f, 'tournament', 'stadium'), now - startedAgoMs, () => 0.5, f);
+  return JSON.stringify({ ...baseSave, goals: 5e12, totalGoals: 9e12, seasonGoals: 5e12, clicks: 12345, seasons: 14, features: normalizeGameFeatures(f), lastSaved: now });
 }
 const metersPerPixel = (zoom: number, lat: number) => 156543.03392 * Math.cos(lat * Math.PI / 180) / 2 ** zoom;
 
@@ -94,5 +101,44 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 900 }, { name: '
     }
     assert.deepEqual(problems, []);
     await page.close();
+  });
+}
+
+// «Busanimation wieder entlang der Strasse führen»: while the bus is on its way, the vehicle sits on the drawn road, not on the straight line.
+for (const viewport of [{ name: 'desktop', width: 1280, height: 900 }, { name: 'phone', width: 390, height: 844 }]) {
+  test(`${viewport.name}: the bus drives on the drawn road at several moments of the trip`, async () => {
+    const onRoad: string[] = [];
+    for (const minutes of [1, 2, 3, 5, 8, 12, 20, 40, 60, 80]) {
+      const now = Date.now();
+      const json = tripSave(now, minutes * 60000);
+      const page = await browser.newPage({ viewport, locale: 'de-CH' });
+      await page.addInitScript('globalThis.__name = (fn) => fn;');
+      await page.route('https://tile.openstreetmap.org/**', (route) => route.abort());
+      await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+      await page.evaluate(([key, value, seenKey, seen]) => { localStorage.clear(); localStorage.setItem(key, value); localStorage.setItem(seenKey, seen); }, [SAVE_KEY, json, WHATS_NEW_STORAGE_KEY, WHATS_NEW[0].id]);
+      await page.goto(`${BASE}/spiele`, { waitUntil: 'networkidle' });
+      await page.locator('.travel-map').waitFor({ timeout: 20000 });
+      await page.waitForTimeout(1200);
+      const sample = await page.evaluate(() => {
+        const body = document.querySelector('.travel-map circle[r="23"]')?.parentElement;
+        const m = body?.getAttribute('transform')?.match(/translate\(([-\d.]+)[ ,]+([-\d.]+)\)/);
+        const icon = body?.querySelector('text')?.textContent ?? '';
+        const lines = [...document.querySelectorAll('.travel-map polyline[stroke="white"]')].map((l) => (l.getAttribute('points') ?? '').trim().split(' ').map((pair) => pair.split(',').map(Number)));
+        if (!m) return null;
+        const p = [Number(m[1]), Number(m[2])];
+        let best = Infinity;
+        for (const line of lines) for (let i = 1; i < line.length; i++) {
+          const [a, b] = [line[i - 1], line[i]], dx = b[0] - a[0], dy = b[1] - a[1], len2 = dx * dx + dy * dy || 1;
+          const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2));
+          best = Math.min(best, Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy)));
+        }
+        return { icon, best, points: Math.max(...lines.map((l) => l.length)) };
+      });
+      assert.ok(sample, `vehicle drawn at ${minutes} min`);
+      if (sample!.icon.includes('🚌')) { assert.ok(sample!.points >= 20, `the drawn course follows a road with many points, not a straight line (${sample!.points})`); onRoad.push(`${minutes}min ${sample!.best.toFixed(2)}px`); assert.ok(sample!.best < 2, `the bus sits on the drawn road at ${minutes} min (${sample!.best.toFixed(2)} px away)`); }
+      await page.close();
+    }
+    assert.ok(onRoad.length >= 2, `the bus was on the way at least twice (${onRoad.join(', ')})`);
+    console.log(`${viewport.name}: ${onRoad.join(', ')}`);
   });
 }
