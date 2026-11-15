@@ -158,9 +158,24 @@ test('Club & Mehr: the club identity is a section of its own, set apart from the
   assert.match(css, /\.club-identity \{ margin-top: 16px; padding: 16px; border: 1px solid var\(--line-soft\)/);
 });
 
-test('the iPhone and iPad header is a nearly opaque glass (WebKit only), so logo and icons keep their contrast', async () => {
-  const css = readStyles();
-  assert.match(css, /@supports \(-webkit-touch-callout: none\) \{\s*\.topbar \{ background: color-mix\(in srgb, var\(--surface-raised\) 94%, transparent\); \}/);
-  // The rule comes after the glass header definition, so it wins on iOS only.
-  assert.ok(css.indexOf('@supports (-webkit-touch-callout: none) {\n  .topbar') > css.indexOf('.topbar { top: 0; margin: 0 calc(var(--space-2) * -1)'));
+test('the header on iPhone, iPad and every touch screen is a solid bar without blur, so logo, balance and icons stay sharp', async () => {
+  const { readStyles } = await import('./helpers/styles.mjs');
+  const css = await readStyles();
+  const solid = '.topbar { background: var(--surface-raised); -webkit-backdrop-filter: none; backdrop-filter: none; }';
+  assert.ok(css.includes(`@supports (-webkit-touch-callout: none) {\n  ${solid}`), 'WebKit on iOS and iPadOS');
+  assert.ok(css.includes(`@media (hover: none) and (pointer: coarse) {\n  ${solid}`), 'every touch screen');
+  // Both rules come after the glass header definition, so they win on touch devices only.
+  assert.ok(css.indexOf('@media (hover: none) and (pointer: coarse) {\n  .topbar') > css.indexOf('.topbar { top: 0; margin: 0 calc(var(--space-2) * -1)'));
 });
+
+
+test('wide screens: mouse keeps header and balance pinned with the tab bar below them, touch (iPad) pins only the tab bar; the match viewer cannot paint over the header', async () => {
+  const { readStyles } = await import('./helpers/styles.mjs');
+  const css = await readStyles();
+  assert.ok(css.includes('@media (min-width: 781px) {\n  .section-navigation { top: calc(var(--topbar-h, 72px) + var(--space-2)); }\n}'));
+  assert.ok(css.includes('@media (min-width: 781px) and (hover: none) and (pointer: coarse) {\n  .topbar { position: relative; top: auto; z-index: auto; }\n  .section-navigation { top: var(--space-2); }\n}'));
+  // The touch rule comes last, so it wins on touch screens only.
+  assert.ok(css.indexOf('(hover: none) and (pointer: coarse) {\n  .topbar { position: relative') > css.indexOf('.section-navigation { top: calc(var(--topbar-h'));
+  assert.match(css, /\.gc-viewer-pitch-shell\{position:relative;isolation:isolate\}/);
+});
+

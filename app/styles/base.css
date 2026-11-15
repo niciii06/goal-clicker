@@ -1216,11 +1216,26 @@ button { font: inherit; }
 }
 /* Header: a quiet glass bar. On phones brand and actions share one row and the balance sits below. */
 .topbar { top: 0; margin: 0 calc(var(--space-2) * -1); padding: var(--space-3) var(--space-2); border-bottom: 0; border-radius: 0 0 var(--radius-lg) var(--radius-lg); background: var(--glass-bg); box-shadow: inset 0 -.5px 0 var(--glass-edge); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
-/* iPhone and iPad (WebKit only): the blurred, translucent header let the content behind it wash out the logo and icons.
-   A nearly opaque glass keeps the contrast; Chromium and Firefox keep the lighter glass. */
+/* Touch devices (iPhone, iPad, tablets; Safari on iOS answers the first query, every touch screen the second): the header holds the
+   logo, the balance and three icon buttons, so it must never be a blurred, translucent glass. A solid bar keeps logo, balance and
+   icons sharp at every scroll position; desktop keeps the light glass. Modal backdrops keep their blur, they are separate. */
 @supports (-webkit-touch-callout: none) {
-  .topbar { background: color-mix(in srgb, var(--surface-raised) 94%, transparent); }
+  .topbar { background: var(--surface-raised); -webkit-backdrop-filter: none; backdrop-filter: none; }
   .topbar .top-actions button, .topbar .brand-copy h1 { opacity: 1; }
+}
+@media (hover: none) and (pointer: coarse) {
+  .topbar { background: var(--surface-raised); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .topbar .top-actions button, .topbar .brand-copy h1 { opacity: 1; }
+}
+/* Wide screens (from 781 px) carry the tab bar at the top as a pinned pill. With a mouse or trackpad the header stays pinned as well, so the
+   pill sits right below it (--topbar-h is the measured header height) and never covers the logo or the goal balance. On touch screens (iPad)
+   the header scrolls away and only the pill stays pinned. Phones keep the pinned header, their tab bar is at the bottom. */
+@media (min-width: 781px) {
+  .section-navigation { top: calc(var(--topbar-h, 72px) + var(--space-2)); }
+}
+@media (min-width: 781px) and (hover: none) and (pointer: coarse) {
+  .topbar { position: relative; top: auto; z-index: auto; }
+  .section-navigation { top: var(--space-2); }
 }
 .brand-copy .eyebrow { font-size: var(--text-caption2); letter-spacing: .08em; }
 .brand-copy h1 { font-size: var(--text-title3); letter-spacing: -.02em; }

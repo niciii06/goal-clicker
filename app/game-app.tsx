@@ -400,6 +400,16 @@ export function App() {
     window.addEventListener("popstate", sync);
     return () => window.removeEventListener("popstate", sync);
   }, []);
+  // The pinned tab bar on wide screens sits right below the pinned header; the header's height (it grows with the text size) comes from here.
+  useLayoutEffect(() => {
+    const bar = document.querySelector<HTMLElement>(".topbar");
+    if (!bar) return;
+    const sync = () => document.documentElement.style.setProperty("--topbar-h", `${Math.ceil(bar.getBoundingClientRect().height)}px`);
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, []);
   const [clubDraft, setClubDraft] = useState(initialGameFeatures().club);
   const [eventAnnouncement, setEventAnnouncement] = useState<RandomEvent | null>(null);
   const [transferAnnouncement, setTransferAnnouncement] = useState<TransferInsiderEvent | null>(null);
