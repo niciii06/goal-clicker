@@ -29,6 +29,7 @@ export const metadata: Metadata = {
     type: "website",
   },
   twitter: { card: "summary_large_image" },
+  other: { "google-adsense-account": "ca-pub-8639135654787161" },
   appleWebApp: { capable: true, title: "Goal Clicker", statusBarStyle: "black-translucent" },
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }, { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
