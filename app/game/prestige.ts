@@ -20,8 +20,10 @@ export type PrestigeGameState = {
 /**
  * One Prestige, all or nothing: open travel fines are paid from the goals the club still has, then season, squad,
  * album and card improvements change (applySeasonPrestige), the goal balance goes to 0 and every Club Office upgrade
- * goes back to level 0. Lifetime counters (`totalGoals`, `seasonGoals`, clicks), stars, fragments, packs and the
- * highest league (all unlocks) stay. A blocked or repeated request returns the given state unchanged.
+ * goes back to level 0. Lifetime counters (`totalGoals`, `seasonGoals`, clicks), stars, fragments, unopened packs and
+ * the highest league stay. Upgrades and buyable packs unlock again from Liga 15 with the new run (runHighestDivision,
+ * getShopReachedLeague); formations and tournaments keep the highest league. A blocked or repeated request returns the
+ * given state unchanged.
  */
 /** `homeCity`: the home city of the new run (the only moment it changes); the current one when not given. */
 export function applyGamePrestige<T extends PrestigeGameState>(game: T, keepNormalId: string | null, now = Date.now(), requestId = "", homeCity?: HomeCityId): { game: T; error: string; duplicate?: boolean } {
@@ -40,7 +42,8 @@ export function applyGamePrestige<T extends PrestigeGameState>(game: T, keepNorm
       features: result.features,
       goals: 0,
       seasonGoals: Math.max(0, game.seasonGoals - fine),
-      // A new game has no upgrade levels at all; unlocks follow the highest league, which stays.
+      // A new game has no upgrade levels at all. `seasons` keeps the highest league for the other unlocks; upgrades and
+      // buyable packs follow the league of the new run (seasonMode.runHighestDivision).
       upgrades: {},
       seasons: Math.max(game.seasons, MAX_CAREER_SEASON - 1),
     },

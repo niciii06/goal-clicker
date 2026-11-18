@@ -136,18 +136,18 @@ test('the starter squad does not come back and Season 1 can be rebuilt with pack
   assert.ok(getClickPower({}, 0, features, 0) > 0, 'clicks earn goals from 0');
 });
 
-test('the goal income bonus is additive: +20 %, +40 %, +60 % on clicks and passive goals, not on base rewards', () => {
+test('the goal income bonus is additive: +10 %, +20 %, +30 % on clicks and passive goals, not on base rewards', () => {
   const upgrades = { ballboy: 5, boots: 3 } as Record<string, number>;
   const withCount = (count: number) => ({ ...hallOfFame(count) });
-  assert.deepEqual([0, 1, 2, 3].map((count) => getPrestigeGoalMultiplier(withCount(count)).toFixed(2)), ['1.00', '1.20', '1.40', '1.60']);
+  assert.deepEqual([0, 1, 2, 3].map((count) => getPrestigeGoalMultiplier(withCount(count)).toFixed(2)), ['1.00', '1.10', '1.20', '1.30']);
   const base = withCount(0), third = withCount(3);
   const ratio = (a: number, b: number) => Number((a / b).toFixed(6));
   assert.ok(getBasePassivePower(upgrades, 0, base) > 0);
   {
-    assert.equal(ratio(getPassivePower(upgrades, 0, third, 0), getPassivePower(upgrades, 0, base, 0)), 1.6);
-    assert.equal(ratio(getPassiveIncomePower(upgrades, 0, third), getBasePassivePower(upgrades, 0, third)), 1.6);
+    assert.equal(ratio(getPassivePower(upgrades, 0, third, 0), getPassivePower(upgrades, 0, base, 0)), 1.3);
+    assert.equal(ratio(getPassiveIncomePower(upgrades, 0, third), getBasePassivePower(upgrades, 0, third)), 1.3);
   }
-  assert.equal(ratio(getClickPower(upgrades, 0, third, 0), getClickPower(upgrades, 0, base, 0)), 1.6);
+  assert.equal(ratio(getClickPower(upgrades, 0, third, 0), getClickPower(upgrades, 0, base, 0)), 1.3);
   // Tickets, daily and press rewards read the Base values: unchanged by Prestige.
   assert.equal(getBaseClickPower(upgrades, 0, third), getBaseClickPower(upgrades, 0, base));
   assert.equal(getBasePassivePower(upgrades, 0, third), getBasePassivePower(upgrades, 0, base));
@@ -156,7 +156,7 @@ test('the goal income bonus is additive: +20 %, +40 %, +60 % on clicks and passi
   const state = (features: GameFeatures) => ({ goals: 0, seasonGoals: 0, totalGoals: 0, upgrades: passiveUpgrades, stars: 0, features, lastSaved: 0 }) as unknown as Parameters<typeof advanceLocalGameWhileOpen>[0];
   const plain = advanceLocalGameWhileOpen(state(base), 60_000, 60_000).goals, boosted = advanceLocalGameWhileOpen(state(withCount(2)), 60_000, 60_000).goals;
   assert.ok(plain > 0);
-  assert.equal(ratio(boosted, plain), 1.4);
+  assert.equal(ratio(boosted, plain), 1.2);
 });
 
 test('Pfuschi, GOAT Nicu, Champ Simu, Flurin and Mätthu are Swiss, also for collected copies', () => {

@@ -15,11 +15,11 @@ import { HomeCityPicker } from "./home-city-picker";
 import { HOME_CITIES, homeCityOf } from "./home-cities";
 import type { HomeCityId } from "./home-cities";
 
-/** Goal income bonus in percent after `count` Prestiges: 20, 40, 60, … */
+/** Goal income bonus in percent after `count` Prestiges: 10, 20, 30, … */
 export const prestigeBonusPercent = (count: number) => Math.round(Math.max(0, count) * PRESTIGE_GOAL_BONUS_PER_LEVEL * 100);
 const percent = prestigeBonusPercent;
 
-/** "Prestige 2 · +40 % Tore" next to the goal counter; nothing before the first Prestige. */
+/** "Prestige 2 · +20 % Tore" next to the goal counter; nothing before the first Prestige. */
 export function prestigeBonusLabel(prestigeCount: number) {
   return prestigeCount > 0 ? `Prestige ${prestigeCount} · +${percent(prestigeCount)} % Tore` : "";
 }
@@ -55,11 +55,11 @@ export function PrestigeDialog({ features, goals, upgradeLevels, busy, error, on
   return createPortal(<div className="account-overlay" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) onCancel(); }}>
     <div ref={dialogRef} className="account-dialog confirm-dialog prestige-dialog" role="dialog" aria-modal="true" aria-labelledby="prestige-dialog-title">
       <h2 id="prestige-dialog-title">Prestige {next} starten?</h2>
-      <p>Der Aufstiegslauf beginnt wieder in Saison 1. Alle {UPGRADES.length} Upgrades im Club Office starten wieder bei Stufe 0. Freischaltungen, Fragmente, ungeöffnete Packs und Vereinssterne bleiben.</p>
+      <p>Der Aufstiegslauf beginnt wieder in Saison 1. Alle {UPGRADES.length} Upgrades im Club Office starten wieder bei Stufe 0. Upgrades und Packs werden wie in einem neuen Spiel ab Liga 15 wieder Liga für Liga freigeschaltet. Fragmente, ungeöffnete Packs und Vereinssterne bleiben.</p>
       <dl className="prestige-summary">
         <div><dt>Torbonus</dt><dd>+{percent(next - 1)} % → <strong>+{percent(next)} % Tore</strong> auf Klicks und passives Einkommen</dd></div>
         <div><dt>Torkontostand</dt><dd>{formatNumber(goals)} → <strong>0</strong></dd></div>
-        <div><dt>Upgrades</dt><dd>{formatNumber(upgradeLevels)} {upgradeLevels === 1 ? "Stufe" : "Stufen"} → <strong>Stufe 0</strong>. Freigeschaltete Upgrades kannst du sofort wieder kaufen.</dd></div>
+        <div><dt>Upgrades</dt><dd>{formatNumber(upgradeLevels)} {upgradeLevels === 1 ? "Stufe" : "Stufen"} → <strong>Stufe 0</strong>. Upgrades und Packs werden ab Liga 15 wieder Liga für Liga freigeschaltet.</dd></div>
         <div><dt>Heimstadt</dt><dd>{homeCityOf(features.seasonMode.homeCity).name} → <strong>{HOME_CITIES[homeCity].name}</strong>. Der neue Lauf startet in den Ligen dieser Stadt, Auswärtsreisen beginnen dort.</dd></div>
         <div><dt>Kader</dt><dd>{features.starXI.ownedIds.length} Karten → <strong>{squadAfter} Karten</strong>. Alle anderen bleiben im Album («Nicht im Kader»).</dd></div>
         <div><dt>Kartenboni</dt><dd>Spezialkarten und die gewählte Karte behalten Meilensteine und Wachstum. Abgegebene Karten verlieren ihre Verbesserungen: Ziehst du sie wieder, starten sie mit ihrer Grundwertung. Statistiken und abgeholte Albumprämien bleiben.</dd></div>

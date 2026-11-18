@@ -14,7 +14,7 @@ import { createHash } from "node:crypto";
 import { SPECIAL_CARD_PACK, coalesceHistory, toggleFavoriteCard, togglePinnedStarter, maybeGrantStarterSquad, purchaseSpecialCardPack, queueMatchChanges, applyPendingMatchChanges, releaseMatchSquad, activatePendingTransferLoans, addHistory, addStarXIPlayer, advanceCupMatch, applyCupSubstitution, beginCupMatch, beginSeasonCupMatch, canStarXIPlayerFillSlot, completeTournamentRun, finishActiveTransferLoans, getCupMatchMinute, getGoalBoostedPassiveReward, getOpenTransferSquadVacancies, getRandomEventDelay, getStarFormation, getStarPack, getStarXIEffectiveMatchRating, getStarXIPlayer, getStarXIPositions, getStarXISelection, getStarXIRating, getTournament, getTournamentRewardPack, isRewardPack, openEarnedPack, getBestXIUnavailablePlayerIds, getUnavailableStarXIPlayerIds, initialGameFeatures, normalizeGameFeatures, openStarPack, pauseGameFeatureTimers, recordSeasonModeMatch, resolveCupPenalty, resolveRandomEvent, resolveTransferInsiderEvent, acceptTransferOffer, declineTransferOffer, expireTransferOffer, resolveVarEvent, restoreStarXIAfterMatch, resumeCupMatch, setBestStarXI, setStarXIBenchPlayer, setStarXIFormation, setStarXIStarter, shouldTriggerPackTroll, STAR_FORMATIONS, STAR_XI_BENCH_SIZE, STAR_XI_MAX_SUBSTITUTIONS, STAR_XI_SQUAD_SIZE } from "../../feature-data";
 import type { GameFeatures, PenaltyDirection, StarFormationId } from "../../feature-data";
 import { isSupportedMultiplayerProtocol, MULTIPLAYER_UPDATE_MESSAGE } from "../../multiplayer-protocol";
-import { getFormationUnlockLeague, getPackUnlockLeague, getReachedLeague, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked } from "../../season-progression";
+import { getFormationUnlockLeague, getPackUnlockLeague, getReachedLeague, getShopReachedLeague, getTournamentUnlockLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked } from "../../season-progression";
 import { calculateBulkUpgradePurchase } from "../../upgrade-purchase";
 import { MAX_MULTIPLAYER_BODY_BYTES, readJsonBody, refuseUnsafePost, RequestBodyTooLargeError } from "../request-body";
 import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "../../daily-reward";
@@ -479,6 +479,11 @@ function readGame(row: RoomRow, light = false): CoopGameState {
 /** Best league the shared world ever reached; unlocks never depend on the season counter alone. */
 function reachedLeagueOf(game: CoopGameState) {
   return getReachedLeague(game.seasons, game.features.seasonMode.highestDivision);
+}
+
+/** Upgrades and buyable packs: after a Prestige only the league this run reached, for every seat (the browser shows the same). */
+function shopReachedLeagueOf(game: CoopGameState) {
+  return getShopReachedLeague(game.seasons, game.features.seasonMode);
 }
 
 function unlockAchievements(game: CoopGameState) {
@@ -1433,7 +1438,7 @@ async function handlePost(request: Request) {
       const requestedCount = finite(payload.count, 1);
       // Checked and paid against the game of this attempt; mutateWorld retries a conflict on the newest goals.
       const upgradeUnlockLeague = getUpgradeUnlockLeague(upgradeId);
-      if (getLevel(game.upgrades, upgradeId) === 0 && !isLeagueContentUnlocked(upgradeUnlockLeague, reachedLeagueOf(game), testMode)) return jsonError(`Dieses Upgrade wird ab Liga ${upgradeUnlockLeague} freigeschaltet.`, 409);
+      if (getLevel(game.upgrades, upgradeId) === 0 && !isLeagueContentUnlocked(upgradeUnlockLeague, shopReachedLeagueOf(game), testMode)) return jsonError(`Dieses Upgrade wird ab Liga ${upgradeUnlockLeague} freigeschaltet.`, 409);
       const purchase = getBulkPurchase(upgradeId, game, requestedCount, testMode);
       if (purchase.count === 0) {
         const price = getCost(getUpgrade(upgradeId)!, game.upgrades);
@@ -1622,7 +1627,7 @@ async function handlePost(request: Request) {
       const pack = getStarPack(packId);
       if (!pack || isRewardPack(pack.id)) return jsonError("Dieses Pack gibt es nicht im Shop.");
       const packUnlockLeague = getPackUnlockLeague(pack.id);
-      if (!isLeagueContentUnlocked(packUnlockLeague, reachedLeagueOf(game), testMode)) return jsonError(`Dieses Pack wird ab Liga ${packUnlockLeague} freigeschaltet.`, 409);
+      if (!isLeagueContentUnlocked(packUnlockLeague, shopReachedLeagueOf(game), testMode)) return jsonError(`Dieses Pack wird ab Liga ${packUnlockLeague} freigeschaltet.`, 409);
       if (game.features.cup.active) return jsonError("Während eines Pokalspiels keine Packs öffnen.", 409);
       if (!testMode && game.goals < pack.price) return jsonError(`${pack.label} kostet ${pack.price.toLocaleString("de-CH")} Tore.`);
       const opening = openStarPack(pack.id, game.features.starXI.ownedIds, Math.random, game.features.starXI.formationPositions);
@@ -1645,7 +1650,7 @@ async function handlePost(request: Request) {
     if (action === "special-pack") {
       const purchaseId = typeof payload.purchaseId === "string" ? payload.purchaseId : "";
       const unlockLeague = getPackUnlockLeague(SPECIAL_CARD_PACK.id);
-      if (!isLeagueContentUnlocked(unlockLeague, reachedLeagueOf(game), testMode)) return jsonError(`Dieses Pack wird ab Liga ${unlockLeague} freigeschaltet.`, 409);
+      if (!isLeagueContentUnlocked(unlockLeague, shopReachedLeagueOf(game), testMode)) return jsonError(`Dieses Pack wird ab Liga ${unlockLeague} freigeschaltet.`, 409);
       const result = purchaseSpecialCardPack(game.features, purchaseId, { openedBy: roomPlayerName(room, role), unlimited: testMode });
       if (!result.ok) return result.duplicateRequest ? Response.json({ error: result.error, errorCode: "DUPLICATE_PURCHASE", serverNow: Date.now(), room: shapeRoom(room, playerId), role }, { status: 409 }) : jsonError(result.error, 409);
       return persistGameResponse(db, room, game, timestamp, playerId, role, {}, { packReveal: result.reveal });
