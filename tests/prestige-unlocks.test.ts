@@ -121,30 +121,53 @@ test('a second Prestige locks again; the bonus grows to +20 %', () => {
   assert.deepEqual(shop(second), shop(freshGame()));
 });
 
-test('saves: no Prestige stays exactly as before; an old Prestige save proves its run by its league and chronicle', () => {
+/** A save or world that prestiged before runHighestDivision existed: Prestige 1, Liga 13 now, best league ever 1, an
+ * incomplete chronicle (only one season of this run, none of the promotions), the field absent. */
+function legacyPrestigeGame(): Game {
+  const f = roundTrip(hallOfFameGame(1).features) as unknown as Record<string, Record<string, unknown>>;
+  f.seasonMode = { ...f.seasonMode, prestigeCount: 1, division: 3, highestDivision: 15, hallOfFame: false, matchday: 4 };
+  delete f.seasonMode.runHighestDivision;
+  f.chronicle = { ...(f.chronicle ?? {}), seasons: [{ id: 'old', season: 2, prestige: 1, division: 1, place: 3, points: 15, wins: 4, draws: 3, losses: 3, goalsFor: 12, goalsAgainst: 10, outcome: 'stayed', topScorer: null, bestPlayerId: null, at: 2 }] } as never;
+  return { ...hallOfFameGame(1), upgrades: { boots: 4, ballboy: 2 }, features: normalizeGameFeatures(f) };
+}
+
+test('saves: no Prestige stays exactly as before; an older Prestige save keeps its unlocks until its next Prestige (decision B)', () => {
   // Never prestiged: the shop league is the old getReachedLeague and no new field is written.
   const plain = normalizeGameFeatures({ ...roundTrip(initialGameFeatures(NOW)), seasonMode: { ...initialGameFeatures(NOW).seasonMode, division: 5, highestDivision: 7 } });
   assert.equal(plain.seasonMode.runHighestDivision, undefined);
   assert.equal(getShopReachedLeague(6, plain.seasonMode), getReachedLeague(6, 7));
-  // A Prestige save from before the field: current league only ...
-  const legacy = roundTrip(initialGameFeatures(NOW)) as unknown as Record<string, Record<string, unknown>>;
-  legacy.seasonMode = { ...legacy.seasonMode, prestigeCount: 1, division: 3, highestDivision: 15 };
-  delete legacy.seasonMode.runHighestDivision;
-  const onlyLeague = normalizeGameFeatures(legacy);
-  assert.equal(onlyLeague.seasonMode.runHighestDivision, 3);
-  assert.equal(getShopReachedLeague(14, onlyLeague.seasonMode), 13);
-  // ... plus finished seasons of this run in the chronicle (a promotion counts one higher); other runs do not count.
-  legacy.chronicle = { ...(legacy.chronicle ?? {}), seasons: [
-    { id: 'a', season: 1, prestige: 0, division: 15, place: 1, points: 30, wins: 9, draws: 0, losses: 1, goalsFor: 30, goalsAgainst: 5, outcome: 'hall-of-fame', topScorer: null, bestPlayerId: null, at: 1 },
-    { id: 'b', season: 2, prestige: 1, division: 4, place: 1, points: 30, wins: 9, draws: 0, losses: 1, goalsFor: 30, goalsAgainst: 5, outcome: 'promoted', topScorer: null, bestPlayerId: null, at: 2 },
-    { id: 'c', season: 3, prestige: 1, division: 5, place: 6, points: 3, wins: 1, draws: 0, losses: 9, goalsFor: 5, goalsAgainst: 30, outcome: 'relegated', topScorer: null, bestPlayerId: null, at: 3 },
-  ] } as never;
-  const proven = normalizeGameFeatures(legacy);
-  assert.equal(proven.seasonMode.runHighestDivision, 5);
-  assert.equal(normalizeGameFeatures(roundTrip(proven)).seasonMode.runHighestDivision, 5, 'stable on reload');
-  // Never above the best league ever, never below the current league.
-  assert.equal(normalizeGameFeatures({ ...roundTrip(proven), seasonMode: { ...proven.seasonMode, runHighestDivision: 99 } }).seasonMode.runHighestDivision, 15);
-  assert.equal(normalizeGameFeatures({ ...roundTrip(proven), seasonMode: { ...proven.seasonMode, runHighestDivision: 1 } }).seasonMode.runHighestDivision, 3);
+  // An older Prestige save: the field stays absent and the earlier unlocks stay, whatever the chronicle is missing.
+  let legacy = legacyPrestigeGame();
+  assert.equal('runHighestDivision' in legacy.features.seasonMode, false, 'absent after normalization');
+  assert.equal(getShopReachedLeague(legacy.seasons, legacy.features.seasonMode), getReachedLeague(legacy.seasons, legacy.features.seasonMode.highestDivision));
+  assert.deepEqual(shop(legacy), { league: 1, upgrades: UPGRADES.map((u) => u.id), packs: PACKS }, 'every upgrade and pack the save had stays open');
+  // Save, sync and reload keep it absent and open.
+  for (let i = 0; i < 3; i++) legacy = { ...legacy, features: normalizeGameFeatures(roundTrip(legacy.features)) };
+  assert.equal('runHighestDivision' in legacy.features.seasonMode, false, 'absent after reloads');
+  assert.equal(shop(legacy).league, 1);
+  // Promotion and relegation before the next Prestige neither create the field nor relock anything.
+  legacy = finishSeason(legacy, 'first');
+  assert.equal(legacy.features.seasonMode.division, 4);
+  assert.equal('runHighestDivision' in legacy.features.seasonMode, false, 'absent after promotion');
+  legacy = finishSeason(legacy, 'last');
+  assert.equal(legacy.features.seasonMode.division, 3);
+  assert.equal('runHighestDivision' in legacy.features.seasonMode, false, 'absent after relegation');
+  assert.equal(shop(legacy).league, 1);
+  // The next Prestige starts tracking at Liga 15 (distinct from absent) and relocks exactly like a new game.
+  const hof = { ...legacy, features: normalizeGameFeatures({ ...roundTrip(legacy.features), seasonMode: { ...legacy.features.seasonMode, division: SEASON_MODE_DIVISION_COUNT, hallOfFame: true } }) };
+  assert.equal('runHighestDivision' in hof.features.seasonMode, false);
+  assert.equal(shop(hof).league, 1);
+  const next = prestige(hof, 'legacy-next');
+  assert.equal(next.features.seasonMode.prestigeCount, 2);
+  assert.equal(next.features.seasonMode.runHighestDivision, 1, 'tracked Liga 15');
+  assert.deepEqual(shop(next), shop(freshGame()));
+  assert.equal(normalizeGameFeatures(roundTrip(next.features)).seasonMode.runHighestDivision, 1, 'tracked Liga 15 survives a reload');
+  assert.equal(getPrestigeGoalMultiplier(next.features), 1.2);
+  assert.deepEqual(next.features.earnedPacks.map((pack) => pack.id), ['kept-reward']);
+  // Tracked values are kept within the current and the best league; unusable values count as absent, never as a lock.
+  const tracked = roundTrip(next.features);
+  assert.equal(normalizeGameFeatures({ ...tracked, seasonMode: { ...tracked.seasonMode, runHighestDivision: 99 } }).seasonMode.runHighestDivision, 15);
+  for (const broken of [0, -3, 'x', null]) assert.equal('runHighestDivision' in normalizeGameFeatures({ ...tracked, seasonMode: { ...tracked.seasonMode, runHighestDivision: broken } }).seasonMode, false, String(broken));
   // Minimal or broken state loads as a new game.
   for (const value of [{}, null, { seasonMode: null }, { seasonMode: { prestigeCount: 'x' } }]) {
     const f = normalizeGameFeatures(value);
@@ -202,4 +225,26 @@ test('co-op: host and guest get the same locks from the server after a Prestige,
   assert.equal(await post(GUEST, 'buy', { upgradeId: topUpgrade, count: 1 }), 409);
   world(hallOfFameGame());
   assert.equal(await post(GUEST, 'buy', { upgradeId: topUpgrade, count: 1 }), 200);
+});
+
+test('co-op: an older Prestige world keeps its unlocks for host and guest until its next Prestige, then both are relocked', async () => {
+  const legacy = legacyPrestigeGame();
+  for (const seat of [HOST, GUEST]) {
+    world(legacy);
+    assert.equal(await post(seat, 'buy', { upgradeId: topUpgrade, count: 1 }), 200, `${seat}: top upgrade stays open`);
+    world(legacy);
+    assert.equal(await post(seat, 'star-pack', { packId: topPack }), 200, `${seat}: top pack stays open`);
+    world(legacy);
+    assert.equal(await post(seat, 'special-pack', {}), 200, `${seat}: special card pack stays open`);
+    assert.equal('runHighestDivision' in JSON.parse(row.sharedFeaturesJson).seasonMode, false, `${seat}: the world stays untracked`);
+  }
+  const hof = { ...legacy, features: normalizeGameFeatures({ ...roundTrip(legacy.features), seasonMode: { ...legacy.features.seasonMode, division: SEASON_MODE_DIVISION_COUNT, hallOfFame: true } }) };
+  const next = prestige(hof, 'legacy-coop');
+  for (const seat of [HOST, GUEST]) {
+    world(next);
+    assert.equal(await post(seat, 'buy', { upgradeId: topUpgrade, count: 1 }), 409, `${seat}: relocked after the next Prestige`);
+    assert.equal(await post(seat, 'star-pack', { packId: topPack }), 409);
+    assert.equal(await post(seat, 'special-pack', {}), 409);
+    assert.equal(await post(seat, 'buy', { upgradeId: entryUpgrade, count: 1 }), 200);
+  }
 });

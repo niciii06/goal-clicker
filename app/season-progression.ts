@@ -136,10 +136,12 @@ export function getReachedLeague(completedSeasons: number, highestDivision = 1) 
  * The league that unlocks Club Office upgrades and buyable packs (decision of 16 November 2026). Before the first
  * Prestige exactly getReachedLeague; after a Prestige the best league of the current run, so a new run starts at
  * Liga 15 like a new game and unlocks again on the same league limits. Other content keeps getReachedLeague.
+ * Without a tracked run (`runHighestDivision` absent: no Prestige yet, or an older save or world that prestiged before
+ * the field existed, decision B) the earlier calculation applies unchanged until the next Prestige.
  */
 export function getShopReachedLeague(completedSeasons: number, seasonMode: { prestigeCount?: number; division?: number; highestDivision?: number; runHighestDivision?: number }) {
-  if (!(Math.floor(Number(seasonMode.prestigeCount) || 0) > 0)) return getReachedLeague(completedSeasons, seasonMode.highestDivision);
-  const run = Math.floor(Number(seasonMode.runHighestDivision) || 0) || Math.floor(Number(seasonMode.division) || 1);
+  const run = Math.floor(Number(seasonMode.runHighestDivision) || 0);
+  if (!(Math.floor(Number(seasonMode.prestigeCount) || 0) > 0) || !(run > 0)) return getReachedLeague(completedSeasons, seasonMode.highestDivision);
   return leagueForTier(Math.min(run, Math.floor(Number(seasonMode.highestDivision) || run)));
 }
 
