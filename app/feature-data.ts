@@ -97,8 +97,10 @@ export type SeasonModeState = {
   prestigeCount: number;
   /**
    * Best division reached since the last Prestige (decision of 16 November 2026): after a Prestige the upgrades and the
-   * buyable packs unlock again league by league from Liga 15, like in a new game. Only set once there was a Prestige;
+   * buyable packs unlock again league by league from Liga 15, like in a new game. Set by a Prestige (1 = tracked Liga 15);
    * `highestDivision` stays the best ever (leaderboard, reward pack tiers, formations, tournaments).
+   * Absent means not tracked (decision B of 18 November 2026): a save or world that prestiged before this field keeps
+   * its earlier unlocks (getReachedLeague) until its next Prestige; promotion and relegation do not create the field.
    */
   runHighestDivision?: number;
   /** League of every AI club in this world; missing means every club plays in its catalogue league (old saves). */
@@ -983,10 +985,10 @@ export function normalizeSeasonModeState(value: unknown, clubName = "FC Goal", l
   // Saves from before lastResults: during a season (and after the Hall of Fame) lastTable is the running table.
   const lastResults = Array.isArray(source.lastResults) ? readResults(source.lastResults) : matchday > 0 || hallOfFame ? results : [];
   const prestigeCount = Math.max(0, Math.floor(Number(source.prestigeCount) || 0));
-  // Never below the league the club plays in now and never above the best ever. A Prestige save without the value
-  // starts from its current league here; normalizeGameFeatures adds what the club chronicle knows about this run.
+  // Tracked only when a Prestige wrote it; never below the current league, never above the best ever. A missing or
+  // unusable value stays absent: that save keeps its earlier unlocks until its next Prestige (decision B).
   const savedRun = Math.floor(Number(source.runHighestDivision)) || 0;
-  const runHighestDivision = prestigeCount > 0 ? Math.min(highestDivision, Math.max(division, savedRun || division)) : 0;
+  const runHighestDivision = prestigeCount > 0 && savedRun > 0 ? Math.min(highestDivision, Math.max(division, savedRun)) : 0;
   return {
     fixtures,
     results,
@@ -1128,7 +1130,8 @@ export function recordSeasonModeMatch(value: unknown, clubScore: number, opponen
     division: nextDivision,
     highestDivision: nextHighestDivision,
     // Relegation never takes back what this run unlocked, as in a new game.
-    ...(state.prestigeCount > 0 ? { runHighestDivision: Math.max(state.runHighestDivision ?? state.division, nextDivision) } : {}),
+    // An untracked older run stays untracked until its next Prestige.
+    ...(state.prestigeCount > 0 && state.runHighestDivision ? { runHighestDivision: Math.max(state.runHighestDivision, nextDivision) } : {}),
     matchday: completedSeason ? 0 : matchday,
     table: completedSeason && !hallOfFame ? createSeasonTable(nextDivision, clubName, nextAiLeagues, state.homeCity) : lastTable,
     fixtures: completedSeason && !hallOfFame ? createSeasonFixtures(createSeasonTable(nextDivision,clubName,nextAiLeagues,state.homeCity),homeVenueOf(state.homeCity)) : state.fixtures,
@@ -3330,13 +3333,6 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     ...(welcomePack ? { welcomePack } : {}),
   };
   normalized.chronicle = normalizeChronicle(source.chronicle, normalized.career);
-  // A Prestige save from before runHighestDivision: the best league of this run is what the save still proves, the
-  // current league and the finished seasons of this run in the chronicle (a promotion counts one division higher).
-  if (normalized.seasonMode.prestigeCount > 0 && !(Math.floor(Number(seasonModeSource.runHighestDivision)) > 0)) {
-    const run = normalized.seasonMode.prestigeCount;
-    const proven = normalized.chronicle.seasons.filter((row) => row.prestige === run).map((row) => row.division + (row.outcome === "promoted" ? 1 : 0));
-    normalized.seasonMode.runHighestDivision = Math.min(normalized.seasonMode.highestDivision, Math.max(normalized.seasonMode.division, ...proven));
-  }
   repairAbandonedTournamentJourney(normalized, Date.now());
   if (migration.removed) addHistory(normalized, { title: "Spezialkarten neu verteilt", detail: `${migration.removed} 100er ${migration.removed === 1 ? "Karte wurde" : "Karten wurden"} entfernt. Das Spezialkarten-Pack öffnet ab Liga ${getPackUnlockLeague(SPECIAL_CARD_PACK.id)}.`, tone: "neutral" });
   if (album.cleared) addHistory(normalized, { title: "Sammelalbum bereinigt", detail: "100er Karten zählen nicht mehr als gesammelt, ihre Meilensteine sind entfernt.", tone: "neutral" });
