@@ -95,6 +95,12 @@ export type SeasonModeState = {
   history: SeasonMatchHistoryEntry[];
   hallOfFame: boolean;
   prestigeCount: number;
+  /**
+   * Best division reached since the last Prestige (decision of 16 November 2026): after a Prestige the upgrades and the
+   * buyable packs unlock again league by league from Liga 15, like in a new game. Only set once there was a Prestige;
+   * `highestDivision` stays the best ever (leaderboard, reward pack tiers, formations, tournaments).
+   */
+  runHighestDivision?: number;
   /** League of every AI club in this world; missing means every club plays in its catalogue league (old saves). */
   aiLeagues?: AiLeagues;
   /** The AI clubs that changed league after the last finished season. */
@@ -976,6 +982,11 @@ export function normalizeSeasonModeState(value: unknown, clubName = "FC Goal", l
   const hallOfFame = source.hallOfFame === true || legacyHallOfFame;
   // Saves from before lastResults: during a season (and after the Hall of Fame) lastTable is the running table.
   const lastResults = Array.isArray(source.lastResults) ? readResults(source.lastResults) : matchday > 0 || hallOfFame ? results : [];
+  const prestigeCount = Math.max(0, Math.floor(Number(source.prestigeCount) || 0));
+  // Never below the league the club plays in now and never above the best ever. A Prestige save without the value
+  // starts from its current league here; normalizeGameFeatures adds what the club chronicle knows about this run.
+  const savedRun = Math.floor(Number(source.runHighestDivision)) || 0;
+  const runHighestDivision = prestigeCount > 0 ? Math.min(highestDivision, Math.max(division, savedRun || division)) : 0;
   return {
     fixtures,
     results,
@@ -989,7 +1000,8 @@ export function normalizeSeasonModeState(value: unknown, clubName = "FC Goal", l
     lastMatchAt: Math.max(0, Math.floor(Number(source.lastMatchAt) || 0)),
     history,
     hallOfFame,
-    prestigeCount: Math.max(0, Math.floor(Number(source.prestigeCount) || 0)),
+    prestigeCount,
+    ...(runHighestDivision ? { runHighestDivision } : {}),
     ...(aiLeagues ? { aiLeagues } : {}),
     lastAiMoves: normalizeAiMoves(source.lastAiMoves),
     ...(homeCity ? { homeCity } : {}),
@@ -1115,6 +1127,8 @@ export function recordSeasonModeMatch(value: unknown, clubScore: number, opponen
     ...(aiMovement && movedLeagues ? { lastAiMoves: aiMovement.moves } : {}),
     division: nextDivision,
     highestDivision: nextHighestDivision,
+    // Relegation never takes back what this run unlocked, as in a new game.
+    ...(state.prestigeCount > 0 ? { runHighestDivision: Math.max(state.runHighestDivision ?? state.division, nextDivision) } : {}),
     matchday: completedSeason ? 0 : matchday,
     table: completedSeason && !hallOfFame ? createSeasonTable(nextDivision, clubName, nextAiLeagues, state.homeCity) : lastTable,
     fixtures: completedSeason && !hallOfFame ? createSeasonFixtures(createSeasonTable(nextDivision,clubName,nextAiLeagues,state.homeCity),homeVenueOf(state.homeCity)) : state.fixtures,
@@ -1194,14 +1208,17 @@ export function startSeasonPrestige(value: unknown, clubName = "FC Goal", now = 
     lastMatchAt: now,
     hallOfFame: false,
     prestigeCount: state.prestigeCount + 1,
+    // Upgrades and buyable packs unlock again from Liga 15 (getShopReachedLeague).
+    runHighestDivision: 1,
     // A new run starts in the catalogue leagues again.
     aiLeagues: undefined,
     lastAiMoves: [],
   };
 }
 
-/** Each completed Prestige adds 20 percentage points to base goal income (additive, not compounding). */
-export const PRESTIGE_GOAL_BONUS_PER_LEVEL = 0.2;
+/** Each completed Prestige adds 10 percentage points to base goal income (additive, not compounding; decision of
+ * 17 November 2026, before 20). Derived from prestigeCount only: saves keep their count, nothing is written back. */
+export const PRESTIGE_GOAL_BONUS_PER_LEVEL = 0.1;
 export function getPrestigeGoalMultiplier(features?: { seasonMode?: { prestigeCount?: number } }) {
   const count = Math.max(0, Math.floor(Number(features?.seasonMode?.prestigeCount) || 0));
   return 1 + PRESTIGE_GOAL_BONUS_PER_LEVEL * count;
@@ -3313,6 +3330,13 @@ export function normalizeGameFeatures(value: unknown): GameFeatures {
     ...(welcomePack ? { welcomePack } : {}),
   };
   normalized.chronicle = normalizeChronicle(source.chronicle, normalized.career);
+  // A Prestige save from before runHighestDivision: the best league of this run is what the save still proves, the
+  // current league and the finished seasons of this run in the chronicle (a promotion counts one division higher).
+  if (normalized.seasonMode.prestigeCount > 0 && !(Math.floor(Number(seasonModeSource.runHighestDivision)) > 0)) {
+    const run = normalized.seasonMode.prestigeCount;
+    const proven = normalized.chronicle.seasons.filter((row) => row.prestige === run).map((row) => row.division + (row.outcome === "promoted" ? 1 : 0));
+    normalized.seasonMode.runHighestDivision = Math.min(normalized.seasonMode.highestDivision, Math.max(normalized.seasonMode.division, ...proven));
+  }
   repairAbandonedTournamentJourney(normalized, Date.now());
   if (migration.removed) addHistory(normalized, { title: "Spezialkarten neu verteilt", detail: `${migration.removed} 100er ${migration.removed === 1 ? "Karte wurde" : "Karten wurden"} entfernt. Das Spezialkarten-Pack öffnet ab Liga ${getPackUnlockLeague(SPECIAL_CARD_PACK.id)}.`, tone: "neutral" });
   if (album.cleared) addHistory(normalized, { title: "Sammelalbum bereinigt", detail: "100er Karten zählen nicht mehr als gesammelt, ihre Meilensteine sind entfernt.", tone: "neutral" });

@@ -603,7 +603,7 @@ test('Prestige opens from the Hall of Fame despite an incomplete squad, cancels 
     await start.click();
     const dialog = page.getByRole('dialog', { name: /Prestige 1 starten/ });
     await dialog.waitFor();
-    assert.match(await dialog.innerText(), /\+20 % Tore/);
+    assert.match(await dialog.innerText(), /\+10 % Tore/);
     assert.match(await dialog.innerText(), /GOAT Nicu/);
     assert.match(await dialog.innerText(), /44 Stufen → Stufe 0/);
     assert.deepEqual(await layoutProblems(page), [], `${viewport.name}: Prestige dialog`);
@@ -635,10 +635,13 @@ test('Prestige opens from the Hall of Fame despite an incomplete squad, cancels 
     const ownedSpecials = f.starXI.ownedIds.filter((id) => STAR_XI_PLAYERS.find((player) => player.id === id)?.isCustom);
     assert.ok(specials.every((id) => ownedSpecials.includes(id)));
     assert.deepEqual([...after.features.starXI.ownedIds].sort(), [...ownedSpecials, keep].sort());
-    assert.match(await page.locator('.header-goals').innerText(), /Prestige 1 ·\s*\+20 % Tore/);
+    assert.match(await page.locator('.header-goals').innerText(), /Prestige 1 ·\s*\+10 % Tore/);
     // A card that left the squad is still in the album, marked as not in the squad.
     const removedName = STAR_XI_PLAYERS.find((player) => player.id === removed)!.name;
     await openTab(page, 'Packs & Album');
+    // Decision of 16 November 2026: the shop is the one of a new game again, only the scrap pack at Liga 15.
+    assert.equal(await page.locator('.star-pack-card.scrap.season-locked').count(), 0, `${viewport.name}: scrap pack open`);
+    assert.equal(await page.locator('.star-pack-card.season-locked').count(), await page.locator('.star-pack-card').count() - 1, `${viewport.name}: every other pack locked again`);
     await page.getByRole('tab', { name: 'Sammelalbum' }).click();
     await page.getByLabel('Sammelalbum durchsuchen').fill(removedName);
     const card = page.locator('.career-album-card').filter({ hasText: removedName }).first();

@@ -18,7 +18,7 @@ import { applyGamePrestige } from '../app/game/prestige.ts';
 import { normalizeRuntimeGame } from '../app/game/storage.ts';
 import type { GameState } from '../app/game/types.ts';
 import { UPGRADES } from '../app/game/upgrades.ts';
-import { getReachedLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked } from '../app/season-progression.ts';
+import { getReachedLeague, getShopReachedLeague, getUpgradeUnlockLeague, isLeagueContentUnlocked } from '../app/season-progression.ts';
 import { selectSafestStoredGame, shouldRejectRegressedSave } from '../app/save-safety.ts';
 import { createJourney, fixtureFor } from '../app/travel-data.ts';
 import { VENUES } from '../app/travel-geography.ts';
@@ -102,17 +102,23 @@ test('1 every Club Office upgrade goes back to level 0; unlocks, click and passi
   const after = soloPrestige(before, KEEPER_NORMAL);
   for (const upgrade of UPGRADES) assert.equal(getLevel(after.upgrades, upgrade.id), 0, upgrade.id);
   assert.deepEqual(after.upgrades, {});
-  // Exactly as in a new game: no passive income from upgrades, clicks at the base value (with the +20 % bonus).
+  // Exactly as in a new game: no passive income from upgrades, clicks at the base value (with the +10 % bonus).
   assert.equal(getBasePassivePower(after.upgrades, after.stars, after.features), getBasePassivePower({}, after.stars, after.features));
   assert.equal(getBasePassivePower(after.upgrades, 0, after.features), 0);
   assert.equal(getBaseClickPower(after.upgrades, after.stars, after.features), getBaseClickPower({}, after.stars, after.features));
   assert.ok(getClickPower(after.upgrades, after.stars, after.features, NOW) < getClickPower(before.upgrades, before.stars, before.features, NOW) / 100);
   assert.equal(getPassivePower(after.upgrades, 0, after.features, NOW), 0);
-  // Unlock eligibility stays: the highest league is kept, every upgrade can be bought again right away.
+  // Decision of 16 November 2026: the highest league stays as history (formations, tournaments), but upgrades unlock
+  // again from Liga 15 exactly like in a new game.
   assert.equal(after.features.seasonMode.highestDivision, SEASON_MODE_DIVISION_COUNT);
-  const reached = getReachedLeague(after.seasons, after.features.seasonMode.highestDivision);
-  for (const upgrade of UPGRADES) assert.ok(isLeagueContentUnlocked(getUpgradeUnlockLeague(upgrade.id), reached), upgrade.id);
-  // Spendable goals 0, lifetime counters, stars and fragments unchanged, +20 % additive.
+  assert.equal(getReachedLeague(after.seasons, after.features.seasonMode.highestDivision), 1);
+  const shop = getShopReachedLeague(after.seasons, after.features.seasonMode);
+  const fresh = getShopReachedLeague(0, initialGameFeatures(NOW).seasonMode);
+  assert.equal(shop, 15);
+  assert.equal(shop, fresh);
+  for (const upgrade of UPGRADES) assert.equal(isLeagueContentUnlocked(getUpgradeUnlockLeague(upgrade.id), shop), isLeagueContentUnlocked(getUpgradeUnlockLeague(upgrade.id), fresh), upgrade.id);
+  assert.ok(UPGRADES.some((upgrade) => !isLeagueContentUnlocked(getUpgradeUnlockLeague(upgrade.id), shop)), 'higher upgrades are locked again');
+  // Spendable goals 0, lifetime counters, stars and fragments unchanged, +10 % additive.
   assert.equal(after.goals, 0);
   assert.equal(after.totalGoals, before.totalGoals);
   assert.equal(after.clicks, before.clicks);

@@ -43,11 +43,15 @@ test("client and multiplayer server apply AZB to every season gated category", a
 
   assert.match(pageSource, /isLeagueContentUnlocked\(unlockLeague, reachedLeague, hasFullTestAccess\)/);
   assert.match(pageSource, /isLeagueContentUnlocked\(getFormationUnlockLeague\(formation\.id\), reachedLeague, hasFullTestAccess\)/);
+  // Upgrades and buyable packs read the league of the current Prestige run (decision of 16 November 2026), with AZB too.
+  assert.match(pageSource, /isLeagueContentUnlocked\(unlockLeague, shopReachedLeague, hasFullTestAccess\)/);
+  assert.match(pageSource, /isLeagueContentUnlocked\(getUpgradeUnlockLeague\(upgrade\.id\), shopReachedLeague, hasFullTestAccess\)/);
   assert.doesNotMatch(pageSource, /isSeasonContentUnlocked|Ab Saison|in Saison \$\{unlock/);
 
   for (const unlockVariable of ["upgradeUnlockLeague", "formationUnlockLeague", "packUnlockLeague", "tournamentUnlockLeague"]) {
     const gameVariable = unlockVariable === "upgradeUnlockLeague" ? "(?:game|purchaseGame)" : "game";
-    assert.match(apiSource, new RegExp(`isLeagueContentUnlocked\\(${unlockVariable}, reachedLeagueOf\\(${gameVariable}\\), testMode\\)`));
+    const leagueOf = unlockVariable === "upgradeUnlockLeague" || unlockVariable === "packUnlockLeague" ? "shopReachedLeagueOf" : "reachedLeagueOf";
+    assert.match(apiSource, new RegExp(`isLeagueContentUnlocked\\(${unlockVariable}, ${leagueOf}\\(${gameVariable}\\), testMode\\)`));
   }
 });
 
