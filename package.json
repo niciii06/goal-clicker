@@ -28,7 +28,7 @@
     "bcryptjs": "3.0.3",
     "country-flag-icons": "^1.6.20",
     "drizzle-orm": "0.45.2",
-    "next": "16.4.2",
+    "next": "16.4.6",
     "postgres": "3.4.9",
     "react": "19.2.9",
     "react-dom": "19.2.9"
