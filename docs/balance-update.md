@@ -105,7 +105,7 @@ Die Turnierprämien nutzen dieselben Stufen: Gewöhnlich bis 64, Gewöhnlich 65 
 
 Am 29. Oktober stand der Hobby Plan bei 9,08 von 10 GB "Fast Origin Transfer" (3,5 GB eingehend, 5,59 GB ausgehend). Ursachen: Der Cloud Upload schickte alle 15 Sekunden den ganzen Spielstand (150 bis 400 KB), Koop Abfragen alle 1,5 Sekunden lieferten bei jeder Änderung der Spielfunktionen den ganzen Stand, und laufende Reisen fragten alle 5 Sekunden ihre Route ab (bis 31 KB).
 
-* `app/api/compression.ts`: JSON Antworten ab 1 KB gehen gzip-komprimiert raus, wenn der Browser es annimmt (Koop, Cloud Speichern, Reisen). Spielstände schrumpfen etwa auf ein Zehntel.
+* `app/api/compression.ts`: Koop, Cloud Speichern und Reisen antworten mit Klartext JSON; die Komprimierung (gzip, wenn der Browser es annimmt) übernimmt genau einmal die Next.js Compress Schicht. Eine eigene `content-encoding` Kopfzeile der Route würde ab Next.js 16.4.5 verworfen und der Body doppelt komprimiert.
 * `app/cloud-sync.ts`: Uploads gehen gzip-komprimiert raus und nur noch jede Minute (plus beim Wegschalten und Schliessen der Seite). Beim Schliessen wird unkomprimiert sofort gesendet.
 * `app/api/request-body.ts` liest komprimierte Anfragen; ausgepackt gilt dasselbe Grössenlimit wie vorher.
 

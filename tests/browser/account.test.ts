@@ -6,6 +6,8 @@
 import assert from 'node:assert/strict';
 import { hash } from 'bcryptjs';
 import { spawn, spawnSync } from 'node:child_process';
+import { request as httpRequest } from 'node:http';
+import { gunzipSync } from 'node:zlib';
 import type { ChildProcess } from 'node:child_process';
 import { after, before, test } from 'node:test';
 import { drizzle } from 'drizzle-orm/postgres-js';
@@ -478,4 +480,78 @@ test('a deleted Google account stays locked: signing in with Google again shows 
   // The world the account played in stays for the other player.
   assert.equal((await admin`select count(*)::int as n from coop_rooms where host_player_id = ${ORIGINAL_PASSWORD.playerId}`)[0].n, 1);
   assert.deepEqual(problems, []);
+});
+
+/** One raw HTTP exchange (no browser decoding), so the real body and headers can be asserted. */
+function rawHttp(method: string, path: string, headers: Record<string, string>, body?: string) {
+  return new Promise<{ status: number; headers: Record<string, string | string[] | undefined>; body: Buffer }>((resolve, reject) => {
+    const req = httpRequest(BASE + path, { method, headers }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk: Buffer) => chunks.push(chunk));
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks) }));
+    });
+    req.on('error', reject);
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
+test('a seeded cloud save loads on a fresh device, one game update saves, and a third fresh device shows it; save answers are compressed once', { skip }, async () => {
+  const first = await device('seed1');
+  await register(first, 'Seeded', 'Sam', 'seeded-passwort-1');
+  await clickBall(first, 3);
+  await hideTab(first);
+  await waitFor(() => cloudSave('Seeded'), (row) => row !== null, 'the first save reached the cloud');
+  // Deterministic seed: the stored save is rewritten to a known progress with a newer version.
+  const SEED = 777000;
+  const [row] = await admin`select s.user_id, s.version, s.save_json from cloud_saves s join profiles p on p.user_id = s.user_id where p.username_key = 'seeded'`;
+  const outer = JSON.parse(row.save_json) as Record<string, string>;
+  const inner = JSON.parse(outer[SAVE_KEY]) as Record<string, number>;
+  Object.assign(inner, { goals: SEED, totalGoals: SEED, seasonGoals: SEED });
+  outer[SAVE_KEY] = JSON.stringify(inner);
+  const seededVersion = Number(row.version) + 1;
+  await admin`update cloud_saves set save_json = ${JSON.stringify(outer)}, version = ${seededVersion} where user_id = ${row.user_id}`;
+  await first.context().close();
+
+  // Fresh browser context: no local state, the save must come from the cloud.
+  const second = await device('seed2');
+  await login(second, 'Seeded', 'seeded-passwort-1');
+  await second.getByRole('button', { name: 'Fussball anklicken' }).waitFor();
+  await second.waitForLoadState('networkidle');
+  assert.equal(await localGoals(second), SEED);
+  await closeWelcomePack(second).catch(() => undefined);
+
+  // The real HTTP exchange: one compression layer, valid JSON, error answers readable.
+  const cookie = (await devices.seed2.context.cookies()).map((item) => `${item.name}=${item.value}`).join('; ');
+  const gz = await rawHttp('GET', '/api/save', { cookie, 'accept-encoding': 'gzip' });
+  assert.equal(gz.status, 200);
+  assert.equal(gz.headers['content-encoding'], 'gzip');
+  assert.notEqual(gunzipSync(gz.body)[0], 0x1f, 'the body is gzipped once, not twice');
+  assert.equal((JSON.parse(gunzipSync(gz.body).toString('utf8')) as { version: number }).version, seededVersion);
+  assert.ok(gz.body.byteLength > 512 && gz.body.byteLength < gunzipSync(gz.body).byteLength, 'a large answer is smaller on the wire');
+  const plain = await rawHttp('GET', '/api/save', { cookie, 'accept-encoding': 'identity' });
+  assert.equal(plain.headers['content-encoding'], undefined);
+  assert.equal((JSON.parse(plain.body.toString('utf8')) as { version: number }).version, seededVersion);
+  for (const [method, path, body] of [['GET', '/api/save', undefined], ['GET', '/api/multiplayer?code=XXXXXX', undefined], ['POST', '/api/multiplayer', '{}'], ['POST', '/api/travel', '{}']] as const) {
+    for (const encoding of ['gzip', 'identity']) {
+      const answer = await rawHttp(method, path, { 'accept-encoding': encoding, 'content-type': 'application/json' }, body);
+      assert.ok(answer.status >= 400 && answer.status < 500, `${method} ${path} unauthenticated answers ${answer.status}`);
+      const text = answer.headers['content-encoding'] === 'gzip' ? gunzipSync(answer.body).toString('utf8') : answer.body.toString('utf8');
+      assert.equal(typeof JSON.parse(text), 'object', `${method} ${path} ${encoding}: the error body is valid JSON`);
+    }
+  }
+
+  // One legitimate game update: clicks, uploaded as a PUT.
+  await clickBall(second, 4);
+  await hideTab(second);
+  const saved = await waitFor(() => cloudSave('Seeded'), (cloud) => (cloud?.version ?? 0) > seededVersion && (cloud?.totalGoals ?? 0) > SEED, 'the update was saved');
+  assert.ok(saved!.totalGoals > SEED);
+  await devices.seed2.context.close();
+
+  // A third fresh context shows the saved update.
+  const third = await device('seed3');
+  await login(third, 'Seeded', 'seeded-passwort-1');
+  await third.getByRole('button', { name: 'Fussball anklicken' }).waitFor();
+  await third.waitForLoadState('networkidle');
+  assert.equal(await localGoals(third), saved!.totalGoals);
 });
