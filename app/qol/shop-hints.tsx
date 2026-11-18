@@ -22,7 +22,7 @@ export function UpgradeHints({ gain, best, goals, passivePerSecond, pinned, onPi
   return <span className="upgrade-hints">
     {best && <b className="best-value-chip">{t("qol.bestValue")}</b>}
     {gainText && <span>{gainText}{gain.paybackSeconds !== null ? ` · ${paybackLabel(gain)}` : ""}</span>}
-    {missing > 0 && <span className="upgrade-savings">noch {format(missing)}{eta ? ` · ${eta}` : ""}</span>}
+    {missing > 0 && <span className="upgrade-savings">{t("hint.toGo", { amount: format(missing) })}{eta ? ` · ${eta}` : ""}</span>}
     {Number.isFinite(gain.cost) && <button type="button" className={`savings-pin${pinned ? " active" : ""}`} aria-pressed={pinned} onClick={onPin}>{pinned ? t("qol.goalSet") : t("qol.asGoal")}</button>}
   </span>;
 }

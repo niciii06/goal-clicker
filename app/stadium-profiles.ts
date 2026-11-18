@@ -3,6 +3,8 @@
 // without a published figure get a conservative estimate from the club's league tier
 // (source "estimated"). The home ground of the player's club grows with its league.
 import { HOME_VENUE, SEASON_CLUBS } from './travel-geography';
+import { t } from './i18n/runtime';
+import { dataText } from './i18n/data-text';
 import type { Venue } from './travel-geography';
 
 export type StadiumCategory = 'amateur' | 'regional' | 'pro-small' | 'pro-medium' | 'national' | 'elite';
@@ -148,8 +150,9 @@ export function stadiumProfile(venue: Venue | undefined, options: { homeDivision
   return { name: v.stadium, category, capacity, attendance: Math.round(capacity * fill / 10) * 10, capacitySource, ...LAYOUT[category], signature };
 }
 
+/** The stadium line under the match, in the current language (German exactly as before; numbers in the format of the language). */
 export function stadiumLabel(profile: StadiumProfile) {
-  const number = (n: number) => n.toLocaleString('de-CH');
-  return `${profile.name} · ${STADIUM_CATEGORY_LABELS[profile.category]} · ${number(profile.attendance)} Zuschauer${profile.capacitySource === 'estimated' ? ' (Kapazität geschätzt)' : ` von ${number(profile.capacity)}`}`;
+  const values = { name: dataText(profile.name), category: dataText(STADIUM_CATEGORY_LABELS[profile.category]), attendance: profile.attendance, capacity: profile.capacity };
+  return profile.capacitySource === 'estimated' ? t('stadium.labelEstimated', values) : t('stadium.label', values);
 }
 
