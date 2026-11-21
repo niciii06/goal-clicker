@@ -44,7 +44,7 @@ import { answerPressConference, getPressReward } from "./press-conference";
 import { canVibrate, readVibrationSetting, setVibrationOn, vibrate, vibrationOn } from "./game/device";
 import { albumMilestonesFromStorage, claimAlbumRewards, getCareerCard, getPlayerForm, prepareCareerMatch, recordCareerMatch, rivalryKey } from "./career-data";
 import { competitionFor, competitionLabel, competitionOfCup, getBannedPlayerIds, nextCompetition, squadBanError, suspensionLabel } from "./discipline";
-import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "./daily-reward";
+import { WORLD_DAILY_KEY, claimDailyReward, describeDailyReward, mergeDailyRewardsForWorld } from "./daily-reward";
 import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
 import { consumeTravel, eligibilityError, fixtureFor, journeyView, payTravelFines, settleTravel, travelTiming } from "./travel-data";
 import { COOP_UPDATE_REQUIRED_EVENT, coopLastActiveLabel, coopRetryDelay, coopRoleLabel, createCoopGameNormalizer, isCoopRole, multiplayerUrl, newCoopActionId, notifyCoopOffline, occupiedCoopPlayers, prestigeVoteMessage, readCoopResponse, reloadForUpdate, upsertSavedRoom } from "./game/coop";
@@ -3081,7 +3081,8 @@ export function App() {
       try {
         const data = await sendCoopAction("daily-claim");
         if (data?.dailyReward) {
-          showToast(`${t("logic.dailyToast", { day: data.dailyReward.dayIndex, amount: formatNumber(data.dailyReward.amount) })}${data.dailyReward.pack ? t("logic.dailyPackWorld") : ""}`);
+          // A pack only day (day 7) names the pack and never a zero amount (app/daily-reward.ts describeDailyReward).
+          showToast(data.dailyReward.pack && data.dailyReward.amount <= 0 ? t("logic.dailyToastPackOnlyWorld", { day: data.dailyReward.dayIndex }) : `${t("logic.dailyToast", { day: data.dailyReward.dayIndex, amount: formatNumber(data.dailyReward.amount) })}${data.dailyReward.pack ? t("logic.dailyPackWorld") : ""}`);
           vibrate([40, 30, 90]);
         }
       } finally {
@@ -3098,11 +3099,12 @@ export function App() {
       const features = normalizeGameFeatures(current.features);
       features.dailyRewards = claim.state;
       if (claim.pack && !features.earnedPacks.some((pack) => pack.id === claim.pack!.id)) features.earnedPacks.push(claim.pack);
-      addHistory(features, { title: `Tägliche Prämie · Tag ${claim.dayIndex}`, detail: `+${formatNumber(claim.amount)} Tore${claim.pack ? " und ein Spezialkarten-Pack" : ""}. Serie: ${claim.streak} ${claim.streak === 1 ? "Tag" : "Tage"}.`, tone: "positive" }, now);
+      addHistory(features, { title: `Tägliche Prämie · Tag ${claim.dayIndex}`, detail: `${describeDailyReward(claim.amount, Boolean(claim.pack), formatNumber)}. Serie: ${claim.streak} ${claim.streak === 1 ? "Tag" : "Tage"}.`, tone: "positive" }, now);
       return { ...current, goals: current.goals + claim.amount, seasonGoals: current.seasonGoals + claim.amount, totalGoals: current.totalGoals + claim.amount, features };
     });
-    addFeed(t("logic.dailyAmount", { dayIndex: preview.dayIndex, amount: formatNumber(preview.amount) }), "star");
-    showToast(`${t("logic.dailyToast", { day: preview.dayIndex, amount: formatNumber(preview.amount) })}${preview.pack ? t("logic.dailyPackAlbum") : ""}`);
+    const packOnly = Boolean(preview.pack) && preview.amount <= 0;
+    addFeed(packOnly ? t("logic.dailyPackOnly", { dayIndex: preview.dayIndex }) : t("logic.dailyAmount", { dayIndex: preview.dayIndex, amount: formatNumber(preview.amount) }), "star");
+    showToast(packOnly ? t("logic.dailyToastPackOnlyAlbum", { day: preview.dayIndex }) : `${t("logic.dailyToast", { day: preview.dayIndex, amount: formatNumber(preview.amount) })}${preview.pack ? t("logic.dailyPackAlbum") : ""}`);
     playTone(659, 0.1, "triangle", 0.04);
     playTone(988, 0.18, "triangle", 0.045, 0.1);
     vibrate([40, 30, 90]);
