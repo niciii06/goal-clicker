@@ -84,8 +84,9 @@ function finishedMatch(now: number) {
 }
 
 /** `whatsNewSeen: false` leaves the newest release notes unread, so the "Was ist neu" window opens. */
-async function openWithSave(viewport: { width: number; height: number }, saveJson: string, colorScheme: 'light' | 'dark' = 'light', whatsNewSeen = true) {
-  const page = await browser.newPage({ viewport, colorScheme, locale: 'de-CH' });
+async function openWithSave(viewport: { width: number; height: number }, saveJson: string, colorScheme: 'light' | 'dark' = 'light', whatsNewSeen = true, touch = false) {
+  // `touch` emulates a phone: coarse pointer (media query pointer: coarse) and a mobile viewport.
+  const page = await browser.newPage({ viewport, colorScheme, locale: 'de-CH', ...(touch ? { hasTouch: true, isMobile: true } : {}) });
   // tsx keeps function names with a __name helper; functions passed to page.evaluate need it in the browser too.
   await page.addInitScript('globalThis.__name = (fn) => fn;');
   const problems: string[] = [];
@@ -716,5 +717,54 @@ test('the layout checker itself reports overlapping text, unreadable text and ho
   assert.match(found, /overlap: "Erster Text"/);
   assert.match(found, /low contrast .*Kaum lesbar/);
   assert.match(found, /horizontal overflow/);
+  await page.close();
+});
+
+// Touch targets (Apple HIG: controls are at least 44 x 44 pt, CLAUDE.md "Frontend"). The buttons below were 26 to 40 px
+// high on a phone: the coarse pointer rules in base.css lost the cascade to later 40 px rules, and some chips and rows
+// had no rule at all. The test measures real layout on a touch viewport, light and dark, on the screens that show them.
+const TOUCH_SCREENS: { path: string; label: string; features: (now: number) => GameFeatures; selectors: string[] }[] = [
+  { path: '/', label: 'Home', features: richFeatures, selectors: ['.buy-button', '.next-step-chip', '.bulk-options button', '.season-roadmap > summary'] },
+  { path: '/packs', label: 'Packs', features: (now) => { const f = richFeatures(now); f.starXI.fragments = 200000; return f; }, selectors: ['.feature-buy-button'] },
+  { path: '/kader', label: 'Kader', features: richFeatures, selectors: ['.starxi-best-button', '.card-favorite-toggle', '.starxi-filter-row button', '.starxi-pagination button', '.starxi-squad-tools .mode-secondary'] },
+  { path: '/saison', label: 'Saison', features: richFeatures, selectors: ['.season-hub-day-card > summary'] },
+  { path: '/karriere', label: 'Karriere', features: richFeatures, selectors: ['.career-view-switch button'] },
+  { path: '/club', label: 'Club', features: richFeatures, selectors: ['.club-choice-row button'] },
+  { path: '/spiele', label: 'Spiele (Reise)', features: (now) => { const f = richFeatures(now); f.travel.journey = createJourney(fixtureFor(f, 'tournament', 'stadium'), now - 600000, () => 0.5, f); return normalizeGameFeatures(f); }, selectors: ['.travel-map-controls button', '.season-overview > summary'] },
+];
+const SIZE_OF = `(selector) => [...document.querySelectorAll(selector)].filter((e) => { const r = e.getBoundingClientRect(); const s = getComputedStyle(e); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && !e.disabled; }).map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.width * 10) / 10, Math.round(r.height * 10) / 10]; })`;
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`touch targets ${colorScheme}: the buttons of the 44 px patch are at least 44 x 44 on a phone`, async () => {
+    const failures: string[] = [];
+    for (const screen of TOUCH_SCREENS) {
+      const now = Date.now();
+      const { page, problems } = await openWithSave({ width: 390, height: 844 }, save(screen.features(now), now), colorScheme, true, true);
+      await page.goto(BASE + screen.path, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(800);
+      assert.equal(await page.evaluate(() => matchMedia('(pointer: coarse)').matches), true, 'the viewport has a coarse pointer');
+      for (const selector of screen.selectors) {
+        const sizes = (await page.evaluate(`(${SIZE_OF})(${JSON.stringify(selector)})`)) as [number, number][];
+        if (!sizes.length) { failures.push(`${screen.label}: nothing matches ${selector} (the check would be empty)`); continue; }
+        const small = sizes.filter(([w, h]) => w < 44 || h < 44);
+        if (small.length) failures.push(`${screen.label} ${selector}: ${small.length} of ${sizes.length} below 44 px, smallest ${Math.min(...small.map(([w]) => w))} x ${Math.min(...small.map(([, h]) => h))}`);
+      }
+      // The travel screen asks /api/travel, which has no database in this run (503); everything else must be clean.
+      assert.deepEqual(problems.filter((problem) => !problem.includes('/api/travel')), []);
+      await page.close();
+    }
+    assert.deepEqual(failures, []);
+  });
+}
+
+test('touch targets: with a mouse the compact sizes stay, only a coarse pointer gets the large targets', async () => {
+  const now = Date.now();
+  const { page } = await openWithSave({ width: 1280, height: 900 }, save(richFeatures(now), now));
+  await page.goto(`${BASE}/kader`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(500);
+  assert.equal(await page.evaluate(() => matchMedia('(pointer: coarse)').matches), false);
+  const sizes = (await page.evaluate(`(${SIZE_OF})('.card-favorite-toggle')`)) as [number, number][];
+  assert.ok(sizes.length > 0);
+  assert.ok(sizes.every(([w, h]) => w === 32 && h === 32), 'the favourite star keeps its compact 32 px with a mouse');
   await page.close();
 });
