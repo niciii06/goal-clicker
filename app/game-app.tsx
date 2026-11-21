@@ -691,6 +691,8 @@ export function App() {
   const starWalkoutElapsed = Math.min(starWalkoutAnimationDuration, Math.max(0, starRevealLag - starRevealTrollDelay));
   const starRareElapsed = Math.min(STAR_RARE_REVEAL_DURATION_MS, starRevealLag);
   const starWalkoutPresentation = starReveal ? getWalkoutPresentation(starReveal.player) : null;
+  // Screen readers hear the card (tier, name, country, position, rating) only once the reveal is ready, never earlier than the sighted player sees it.
+  const starWalkoutAnnouncement = starReveal && starWalkoutPresentation && starWalkoutReady && !starRevealTrollActive ? `${starRevealIsLegendary ? "Legendärer Walkout" : starRevealIsIconic ? "Icon Walkout" : starWalkoutIsTop ? "Top Walkout, 90 plus" : "Walkout, 86 plus"}: ${starReveal.player.name}, ${starWalkoutPresentation.country}, ${formatStarXIPositions(starReveal.player)}, Rating ${starReveal.player.rating}.` : "";
   const starWalkoutStyle = starWalkoutPresentation ? {
     "--walkout-skin": starWalkoutPresentation.skin,
     "--walkout-hair": starWalkoutPresentation.hairColor,
@@ -3918,7 +3920,7 @@ export function App() {
             {/* The tier (86+, 90+, Icon, Legendary) is a spoiler: its label appears only once the walkout is over. */}
             <span className={`star-reveal-walkout-label${starWalkoutReady || starRevealTrollActive ? "" : " pending"}`} aria-hidden={!starWalkoutReady && !starRevealTrollActive}>{starRevealTrollActive ? "WALKOUT? · ETWAS KOMMT" : !starWalkoutReady ? "\u00a0" : starRevealIsLegendary ? "LEGENDÄRER WALKOUT · EINZIGARTIG" : starRevealIsIconic ? "ICON WALKOUT · SILBER" : starWalkoutIsTop ? "TOP WALKOUT · 90+" : "WALKOUT · 86+"}</span>
             <span className="star-reveal-kicker">{starRevealTrollActive ? "STADION / FALSCHE SPUR" : starRevealIsCustomDraw ? "ZUFALLSZUG / STADION ENTHÜLLUNG" : `${starReveal.packName} / STADION ENTHÜLLUNG`}</span>
-            {starRevealTrollActive ? <div className="star-pack-troll-stage" aria-live="assertive"><div className="star-pack-troll-mascot" aria-hidden="true"><i className="mascot-ear left" /><i className="mascot-ear right" /><span>GC</span><b>⚽</b></div><strong>Das Maskottchen!</strong><small>Falscher Walkout. Die echte Karte kommt sofort.</small></div> : <div className="star-walkout-stage" aria-live="assertive" style={starWalkoutStyle}>
+            {starRevealTrollActive ? <div className="star-pack-troll-stage" aria-live="assertive"><div className="star-pack-troll-mascot" aria-hidden="true"><i className="mascot-ear left" /><i className="mascot-ear right" /><span>GC</span><b>⚽</b></div><strong>Das Maskottchen!</strong><small>Falscher Walkout. Die echte Karte kommt sofort.</small></div> : <div className="star-walkout-stage" aria-hidden="true" style={starWalkoutStyle}>
               <div className="star-walkout-pyro" aria-hidden="true">{Array.from({ length: starWalkoutIsTop ? 17 : 11 }, (_, index) => <i key={index} style={{ "--pyro-index": index } as CSSProperties} />)}</div>
               <div className="star-walkout-confetti" aria-hidden="true">{GOAL_CONFETTI.map((particle, index) => <i key={index} style={{ left: particle.left, animationDelay: `calc(${900 + index * 28}ms + var(--walkout-delay, 0ms))`, animationDuration: particle.duration, background: starWalkoutConfetti ? starWalkoutConfetti[index % starWalkoutConfetti.length] : particle.color }} />)}</div>
               {starWalkoutPresentation && <>
@@ -3928,6 +3930,7 @@ export function App() {
                 <div className="star-walkout-nameplate"><span><WalkoutCountryFlag compact code={starWalkoutPresentation.countryCode} country={starWalkoutPresentation.country} /> {starWalkoutPresentation.countryCode} · {formatStarXIPositions(starReveal.player)}</span><h2>{starReveal.player.name}</h2></div>
               </>}
             </div>}
+            <span className="sr-only" role="status">{starWalkoutAnnouncement}</span>
             <p className={`star-walkout-copy${starWalkoutReady ? " ready" : ""}`}>{starRevealTrollActive ? "Das Stadion wurde kurz getrollt. Gleich beginnt der echte Walkout." : !starWalkoutReady ? "\u00a0" : `${isCoopLive ? `${starReveal.openedBy} hat ${starRevealAction}. ` : ""}${starReveal.duplicate ? `Doppelt gezogen. Du bekommst automatisch ${formatNumber(starReveal.fragmentCompensation)} Fragmente für Custom-Karten.` : `${formatStarXIPositions(starReveal.player)} · Rating ${starReveal.player.rating}. Der Walkout gehört jetzt deinem Club.`}`}</p>
             <span className={`star-reveal-status star-walkout-status${starWalkoutReady ? " ready" : ""}`}>{starRevealTrollActive ? "PACK TROLL" : starWalkoutReady ? starReveal.duplicate ? "DOPPELT · FRAGMENTE" : starRevealIsLegendary ? "LEGENDÄR · STAR XI" : starRevealIsIconic ? "ICON · STAR XI" : "WALKOUT · STAR XI" : "WALKOUT LÄUFT"}</span>
             {starWalkoutReady && !starRevealTrollActive && revealLineupButton}

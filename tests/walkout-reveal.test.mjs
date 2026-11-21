@@ -252,6 +252,15 @@ test("no card reveal can be skipped, and the card type is not shown before the a
   assert.match(pageSource, /\{starWalkoutReady \? "SELTENE KARTE · 80 BIS 85" : "\\u00a0"\}/);
   assert.equal((pageSource.match(/!starWalkoutReady \? "\\u00a0" : `\$\{/g) ?? []).length, 2, "walkout and rare descriptions wait for the end");
   assert.match(styleSource, /\.star-reveal-walkout-label\.pending \{ visibility: hidden; \}/);
+  // The invisible pending label is a rule of its own for every variant (it was scoped to the icon variant, so the other variants showed an empty bordered pill).
+  assert.match(styleSource, /^\.star-reveal-walkout-label\.pending \{ visibility: hidden; \}/m);
+  // Screen readers get the card once, when it is ready: the animated scene is decorative and no live region announces it early.
+  assert.match(pageSource, /className="star-walkout-stage" aria-hidden="true"/);
+  assert.doesNotMatch(pageSource, /className="star-walkout-stage" aria-live/);
+  assert.match(pageSource, /starWalkoutReady && !starRevealTrollActive \? `\$\{starRevealIsLegendary/);
+  assert.match(pageSource, /<span className="sr-only" role="status">\{starWalkoutAnnouncement\}<\/span>/);
+  // Reduced motion: the staggered reveal of country, rating, tier caption and name is instant, so the label never comes before the card.
+  assert.match(styleSource, /@media \(prefers-reduced-motion: reduce\) \{\n  \.star-walkout-country, \.star-walkout-rating-panel > span[^}]*animation-delay: 0ms !important/);
   // The way out after the reveal stays: the continue button is enabled only once the reveal is ready.
   assert.match(pageSource, /disabled=\{!starWalkoutReady\} onClick=\{dismissStarReveal\}/);
 });
