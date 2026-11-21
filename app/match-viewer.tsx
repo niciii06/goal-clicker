@@ -104,7 +104,7 @@ export function LegacyLiveMatchViewer({ features, now, clubName, clubColor, disa
     <div className="gc-viewer-tab-panel" role="tabpanel">
       {tab === "live" && <div className="gc-viewer-events">{history.length ? history.slice().reverse().map(event=><button key={event.id} type="button" onClick={()=>setReplay({event,startedAt:clock})}><time>{event.minute}′</time><span>{eventLabel(event)} · {event.player}</span><b>▶</b></button>) : <span>{t("viewer.running")}</span>}</div>}
       {tab === "statistics" && <MatchStatistics features={features} clubName={clubName} />}
-      {tab === "team" && <div className="gc-viewer-tactics"><p>{t("viewer.formation")} {getStarFormation(features.starXI.formationId).label} · {cup.substitutionsUsed}/5 Wechsel · {cup.subWindowsUsed??0}/3 Fenster</p>{cup.pendingSubstitutions&&<p>{t("viewer.subsWaiting")}</p>}</div>}
+      {tab === "team" && <div className="gc-viewer-tactics"><p>{t("viewer.formation")} {getStarFormation(features.starXI.formationId).label} · {t("viewer.subsAndWindows", { used: cup.substitutionsUsed, windows: cup.subWindowsUsed??0 })}</p>{cup.pendingSubstitutions&&<p>{t("viewer.subsWaiting")}</p>}</div>}
 
 
     </div>
