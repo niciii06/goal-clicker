@@ -13,6 +13,7 @@ import type { CameraMode } from './match-pitch-canvas';
 import { computeAmbience, stadiumView } from './stadium-ambience';
 import { matchStadium } from './match-stadium';
 import type { Ambience } from './stadium-ambience';
+import { t } from './i18n/runtime';
 
 const ambienceCache=new Map<string,Ambience>();
 function ambienceFor(features:GameFeatures){
@@ -130,5 +131,5 @@ export function InteractivePitchCanvas({features,now,replay,colours,camera,reduc
   const p=displayed.current.find(p=>Math.hypot(p.x-x,p.y-y)<3.2);if(p)onSelect(p.id);
  };
  const shape=stadiumView(ambienceFor(features).stadium);
- return <canvas key={workerDisabled?'main-thread':'worker-capable'} ref={canvas} className="gc-viewer-pitch" style={{'--stadium-ratio':(shape.width/shape.height).toFixed(4)} as React.CSSProperties} role="img" aria-label="Live Fussballfeld mit 22 bewegten Spielern und Ball; Spieler antippen für Details" onPointerDown={select}><svg viewBox="-3 -3 111 74" aria-label="Fussballfeld"><rect width="105" height="68" fill="#237648"/><path d="M52.5 0V68" stroke="white"/></svg></canvas>;
+ return <canvas key={workerDisabled?'main-thread':'worker-capable'} ref={canvas} className="gc-viewer-pitch" style={{'--stadium-ratio':(shape.width/shape.height).toFixed(4)} as React.CSSProperties} role="img" aria-label={t("viewer.pitchAria")} onPointerDown={select}><svg viewBox="-3 -3 111 74" aria-label={t("viewer.pitchFallbackAria")}><rect width="105" height="68" fill="#237648"/><path d="M52.5 0V68" stroke="white"/></svg></canvas>;
 }

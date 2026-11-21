@@ -6,6 +6,7 @@ import test from "node:test";
 import { SEASON_MODE_MATCHES_PER_SEASON, initialSeasonMode, normalizeSeasonModeState, recordSeasonModeMatch, sortSeasonTable } from "../app/feature-data.ts";
 import type { SeasonModeState } from "../app/feature-data.ts";
 import { getSeasonTitle } from "../app/season-trophy.tsx";
+import { germanSource } from "./helpers/german-source.mjs";
 
 type Row = SeasonModeState["table"][number];
 const row = (id: string, name: string, points: number, goalsFor: number, goalsAgainst: number): Row => ({ id, name, rating: id === "club" ? 0 : 50, played: 9, wins: 0, draws: 0, losses: 0, goalsFor, goalsAgainst, points });
@@ -84,8 +85,8 @@ test("old saves without lastResults rank the running table with its results", ()
 });
 
 test("the trophy and the season panel use the same ranking (the separate result card on Spiele is gone)", () => {
-  const page = readFileSync(new URL("../app/game-app.tsx", import.meta.url), "utf8");
-  const panel = readFileSync(new URL("../app/season-panel.tsx", import.meta.url), "utf8");
+  const page = germanSource(readFileSync(new URL("../app/game-app.tsx", import.meta.url), "utf8"));
+  const panel = germanSource(readFileSync(new URL("../app/season-panel.tsx", import.meta.url), "utf8"));
   assert.doesNotMatch(page, /seasonStandingsAnnouncement/);
   assert.match(page, /getSeasonTitle\(latest, displayGame\.features\.seasonMode\.lastTable, displayGame\.features\.seasonMode\.lastResults\)/);
   assert.match(panel, /results=\{season\.results \?\? \[\]\}/);

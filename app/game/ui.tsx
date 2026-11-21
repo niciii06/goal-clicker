@@ -3,14 +3,17 @@ import type { ReactNode } from "react";
 import type { IconName, StarXIPositionBadgeVariant } from "./types";
 import { memo } from "react";
 import { getStarXIPositions } from "../feature-data";
+import { t } from "../i18n/runtime";
+import { useLocale } from "../i18n/use-locale";
 export { GameErrorBoundary } from "./error-boundary";
 
 // Pure leaves rendered many times per App render are memoized (audit P09).
 export const StarXIPositionBadges = memo(function StarXIPositionBadges({ player, variant = "reveal" }: { player: Parameters<typeof getStarXIPositions>[0]; variant?: StarXIPositionBadgeVariant }) {
-  if(player.benchOnly)return <span className="starxi-position-badge">{player.symbol} Nur Bank</span>;
-  const positions = player.id === "star-goat-nicu" ? ["Alle Positionen"] : getStarXIPositions(player);
-  return <span className={`starxi-position-badges starxi-position-badges-${variant}`} aria-label={`Positionen: ${positions.join(", ")}`}>
-    {positions.map((position) => <span key={position}>{position === "Alle Positionen" ? "ALLE POSITIONEN" : position}</span>)}
+  useLocale(); // memo: follows a language switch on its own
+  if(player.benchOnly)return <span className="starxi-position-badge">{player.symbol} {t("ui.benchOnly")}</span>;
+  const positions = player.id === "star-goat-nicu" ? [t("ui.allPositions")] : getStarXIPositions(player);
+  return <span className={`starxi-position-badges starxi-position-badges-${variant}`} aria-label={t("ui.positions", { positions: positions.join(", ") })}>
+    {positions.map((position) => <span key={position}>{position === t("ui.allPositions") ? t("ui.allPositionsCaps") : position}</span>)}
   </span>;
 });
 

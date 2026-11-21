@@ -3752,11 +3752,20 @@ export const TRANSFER_DECLINE_REASONS = {
 } as const;
 
 /** What keeping the player of an open offer costs, for the offer dialog (shown before the answer). */
-export function transferKeepConsequence(features: Pick<GameFeatures, "career">, offer: Pick<TransferOffer, "playerId" | "fee">) {
+/** What keeping the offered player would cost, as data: the dialog words it in the player's language. */
+export function transferKeepOutcome(features: Pick<GameFeatures, "career">, offer: Pick<TransferOffer, "playerId" | "fee">): { kind: "none" } | { kind: "special"; player: StarXIPlayer } | { kind: "reset"; player: StarXIPlayer; bonus: number } {
   const player = offer.playerId ? getStarXIPlayer(offer.playerId) : undefined;
-  if (!player || offer.fee <= 0) return "Behalten hat keine Folgen.";
-  if (hasPotential(player)) return pronounText("Behalten kostet nichts: Als Spezialkarte behält {er} Upgrades und Potential.", player);
-  const bonus = getCareerCard(features.career, player).bonus;
+  if (!player || offer.fee <= 0) return { kind: "none" };
+  if (hasPotential(player)) return { kind: "special", player };
+  return { kind: "reset", player, bonus: getCareerCard(features.career, player).bonus };
+}
+
+export function transferKeepConsequence(features: Pick<GameFeatures, "career">, offer: Pick<TransferOffer, "playerId" | "fee">) {
+  const outcome = transferKeepOutcome(features, offer);
+  if (outcome.kind === "none") return "Behalten hat keine Folgen.";
+  const { player } = outcome;
+  if (outcome.kind === "special") return pronounText("Behalten kostet nichts: Als Spezialkarte behält {er} Upgrades und Potential.", player);
+  const bonus = outcome.bonus;
   return bonus > 0
     ? pronounText(`Behalten setzt {seine} Meilensteine zurück (−${bonus} OVR). {Er} muss sie mit neuen Einsätzen wieder erspielen.`, player)
     : pronounText("Behalten setzt {seine} Meilensteine zurück. {Er} beginnt wieder bei null.", player);

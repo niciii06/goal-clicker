@@ -116,10 +116,11 @@ function topScorer(cup: CupState) {
   return { name, player: scorerId ? getStarXIPlayer(scorerId) : undefined };
 }
 
-function fill(text: string, cup: CupState, clubName: string) {
+/** Fills the placeholders of a question or answer; the display fills the English text the same way (opponent fallback given). */
+export function fillPressText(text: string, cup: CupState, clubName: string, noOpponent = 'den Gegner') {
   const scorer = topScorer(cup);
   // Questions about the scorer say "sie" and "ihr" for a woman player.
-  return pronounText(text, scorer.player).replaceAll('{gegner}', cup.opponent || 'den Gegner').replaceAll('{club}', clubName).replaceAll('{torschuetze}', scorer.name).replaceAll('{resultat}', `${cup.homeScore}:${cup.awayScore}`);
+  return pronounText(text, scorer.player).replaceAll('{gegner}', cup.opponent || noOpponent).replaceAll('{club}', clubName).replaceAll('{torschuetze}', scorer.name).replaceAll('{resultat}', `${cup.homeScore}:${cup.awayScore}`);
 }
 
 /** Deterministic per match, so every coop player sees the same question. Recent questions are skipped. */
@@ -138,7 +139,7 @@ export function getPressConference(press: PressState | undefined, cup: CupState,
   const question = pool[seed % pool.length];
   const order = [0, 1, 2];
   for (let i = order.length - 1; i > 0; i--) { const j = (seed >>> (i * 3)) % (i + 1); [order[i], order[j]] = [order[j], order[i]]; }
-  return { matchId, question, text: fill(question.text, cup, clubName), answers: order.map((index) => ({ index, text: fill(question.answers[index].text, cup, clubName), mood: question.answers[index].mood })) };
+  return { matchId, question, text: fillPressText(question.text, cup, clubName), answers: order.map((index) => ({ index, text: fillPressText(question.answers[index].text, cup, clubName), mood: question.answers[index].mood })) };
 }
 
 /** Pure answer step used by singleplayer and the shared world API. */
@@ -153,9 +154,9 @@ export function answerPressConference(press: PressState | undefined, cup: CupSta
     fanMood,
     answered: [...state.answered, matchId].slice(-40),
     recentQuestions: [...state.recentQuestions.filter((id) => id !== questionId), questionId].slice(-RECENT_LIMIT),
-    last: { matchId, questionId, answer: fill(answer.text, cup, clubName), mood: answer.mood, at: now },
+    last: { matchId, questionId, answer: fillPressText(answer.text, cup, clubName), mood: answer.mood, at: now },
   };
-  return { press: next, answer: fill(answer.text, cup, clubName), mood: answer.mood, fanMood };
+  return { press: next, answer: fillPressText(answer.text, cup, clubName), mood: answer.mood, fanMood };
 }
 
 export function getPressReward(passivePerSecond: number, clickPower: number) {

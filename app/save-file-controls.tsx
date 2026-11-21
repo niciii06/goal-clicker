@@ -8,9 +8,10 @@ import { summarizeSave } from "./cloud-save-rules";
 import type { CloudSaveKeys, SaveSummary } from "./cloud-save-rules";
 import { collectSaveKeys, downloadSaveFile, parseSaveFile, replaceLocalSave } from "./game/save-export";
 import { resumeLocalPersistence, suspendLocalPersistence } from "./game/persistence";
+import { currentIntlTag, t } from "./i18n/runtime";
 
 const number = (value: number) => Math.floor(value).toLocaleString("de-CH");
-const describe = (summary: SaveSummary | null) => summary ? `${number(summary.totalGoals)} Tore insgesamt, ${number(summary.seasons)} Saisons, ${number(summary.stars)} Sterne` : "kein Spielstand";
+const describe = (summary: SaveSummary | null) => summary ? t("saveFile.summary", { goals: number(summary.totalGoals), seasons: number(summary.seasons), stars: number(summary.stars) }) : t("saveFile.none");
 
 /** Saves the game as it is on screen (it may be newer than the stored one when the browser storage is full). */
 export function exportCurrentSave(currentGame: unknown) {
@@ -28,7 +29,7 @@ export function SaveFileControls({ getGame, onMessage }: { getGame: () => unknow
   const [pending, setPending] = useState<PendingImport | null>(null);
 
   function exportSave() {
-    onMessage(exportCurrentSave(getGame()) ? "Spielstand als Datei gesichert." : "Der Spielstand konnte nicht als Datei gesichert werden.");
+    onMessage(exportCurrentSave(getGame()) ? t("saveFile.saved") : t("saveFile.failed"));
   }
 
   async function chooseFile(event: ChangeEvent<HTMLInputElement>) {
@@ -39,7 +40,7 @@ export function SaveFileControls({ getGame, onMessage }: { getGame: () => unknow
     try {
       text = await file.text();
     } catch {
-      onMessage("Die Datei konnte nicht gelesen werden.");
+      onMessage(t("saveFile.unreadable"));
       return;
     }
     const parsed = parseSaveFile(text);
@@ -52,7 +53,7 @@ export function SaveFileControls({ getGame, onMessage }: { getGame: () => unknow
     // The current game goes into a file first, so nothing is lost even if the imported one was the wrong file.
     if (!exportCurrentSave(getGame())) {
       setPending(null);
-      onMessage("Der aktuelle Spielstand konnte nicht gesichert werden. Es wurde nichts ersetzt.");
+      onMessage(t("saveFile.backupFailed"));
       return;
     }
     suspendLocalPersistence();
@@ -62,7 +63,7 @@ export function SaveFileControls({ getGame, onMessage }: { getGame: () => unknow
     } catch {
       resumeLocalPersistence();
       setPending(null);
-      onMessage("Der Spielstand konnte nicht geladen werden, der Browser Speicher ist voll. Dein bisheriger Spielstand ist unverändert.");
+      onMessage(t("saveFile.storageFull"));
       return;
     }
     window.location.reload();
@@ -70,13 +71,13 @@ export function SaveFileControls({ getGame, onMessage }: { getGame: () => unknow
 
   const exportedAt = pending?.exportedAt ? new Date(pending.exportedAt) : null;
   return <div className="save-file-controls" style={{ display: "flex", flexWrap: "wrap", gap: 9 }}>
-    <button type="button" className="mode-secondary" onClick={exportSave}>Spielstand als Datei sichern</button>
-    <button type="button" className="mode-secondary" onClick={() => inputRef.current?.click()}>Spielstand aus Datei laden</button>
+    <button type="button" className="mode-secondary" onClick={exportSave}>{t("saveFile.saveAs")}</button>
+    <button type="button" className="mode-secondary" onClick={() => inputRef.current?.click()}>{t("saveFile.load")}</button>
     <input ref={inputRef} type="file" accept="application/json,.json" hidden onChange={(event) => void chooseFile(event)} />
-    {pending && <ConfirmDialog title="Spielstand aus Datei laden?" confirmLabel="Spielstand ersetzen" onCancel={() => setPending(null)} onConfirm={confirmImport}>
-      <p>Datei{exportedAt && !Number.isNaN(exportedAt.getTime()) ? ` vom ${exportedAt.toLocaleString("de-CH")}` : ""}: {describe(pending.summary)}.</p>
-      <p>Aktueller Spielstand: {describe(pending.current)}.</p>
-      <p>Dein aktueller Spielstand wird vorher als Datei gesichert und bleibt als Sicherung in diesem Browser. Mit einem Konto wird der geladene Spielstand danach in deinem Profil gespeichert.</p>
+    {pending && <ConfirmDialog title={t("saveFile.loadTitle")} confirmLabel={t("saveFile.replace")} onCancel={() => setPending(null)} onConfirm={confirmImport}>
+      <p>{t("saveFile.file")}{exportedAt && !Number.isNaN(exportedAt.getTime()) ? t("saveFile.from", { date: exportedAt.toLocaleString(currentIntlTag()) }) : ""}: {describe(pending.summary)}.</p>
+      <p>{t("saveFile.current")} {describe(pending.current)}.</p>
+      <p>{t("saveFile.loadBody")}</p>
     </ConfirmDialog>}
   </div>;
 }
