@@ -9,12 +9,12 @@ Entscheid von Nicolas (12. November 2026): Pro Saison und Ligagrenze steigt **ei
 
 | Liga | Neuer Club | Spielort |
 |---|---|---|
-| 1 | Paris Saint German (Parodie wie die übrige Weltliga) | Stadion Paris aus dem Katalog |
+| 1 | Paris Saint-Germain (echt, offizieller Name seit der Katalogkorrektur, siehe `docs/real-club-catalog.md`) | Stadion Paris aus dem Katalog |
 | 2 | Grasshopper Club Zürich (echt) | Letzigrund (geprüfter Katalogeintrag) |
 | 3 | FC Winterthur (echt) | Schützenwiese (geprüfter Katalogeintrag) |
 | 4 bis 14 | FC Alpenfestung, FC Gotthard Murmeltiere, FC Léman Mouettes, FC Zürisee Böötler, FC Röstigraben United, FC Seeland Hechte, FC Emmental Käsekicker, FC Gürbetal Kickers, FC Worblental Rangers, SC Marzili Bern, FC Aarefüchse Bern (**fiktiv**, `fictional: true`) | teilen den geprüften Platz des ersten Clubs ihrer Liga |
 
-**Warum fiktiv:** Spielort und Route jedes Clubs sind quellengestützt (OSM Fussballfeld, Routencache). Für echte Amateurclubs hätte ich Plätze und Routen neu beschaffen müssen. Die öffentlichen Kartendienste lieferten aus dieser Umgebung keine verlässlichen Felder (Overpass war nicht erreichbar, die Suche in Nominatim fand für viele Orte keine Fussballfelder). Eine falsche Zuordnung eines echten Clubs zu einem Platz wollte ich nicht erfinden. Die Namen lassen sich später ersetzen, ohne die Mechanik zu ändern (`EXTRA_CLUBS` in `app/travel-geography.ts`).
+**Überholt (Stand 21. November 2026):** Fiktive Clubs dürfen nur in Liga 15 starten; der Ersatz der übrigen fiktiven sechsten Clubs ist in `docs/real-club-catalog.md` geplant. **Warum sie so gewählt wurden:** Spielort und Route jedes Clubs sind quellengestützt (OSM Fussballfeld, Routencache). Für echte Amateurclubs hätte ich Plätze und Routen neu beschaffen müssen. Die öffentlichen Kartendienste lieferten aus dieser Umgebung keine verlässlichen Felder (Overpass war nicht erreichbar, die Suche in Nominatim fand für viele Orte keine Fussballfelder). Eine falsche Zuordnung eines echten Clubs zu einem Platz wollte ich nicht erfinden. Die Namen lassen sich später ersetzen, ohne die Mechanik zu ändern (`EXTRA_CLUBS` in `app/travel-geography.ts`).
 
 ## Der Tausch
 

@@ -1,7 +1,7 @@
 // Kits of the real clubs represented by the game's established fictional aliases.
 const KITS: [RegExp,string,string][] = [
- [/real madreto|galácticos/i,'#ffffff','#242424'],[/barcelon/i,'#a50044','#004d98'],
- [/liverp/i,'#c8102e','#ffffff'],[/manchester cité/i,'#6cabdd','#1c2c5b'],
+ [/real madreto|real madrid|galácticos/i,'#ffffff','#242424'],[/barcelon/i,'#a50044','#004d98'],
+ [/liverp/i,'#c8102e','#ffffff'],[/manchester cité|manchester city/i,'#6cabdd','#1c2c5b'],
  [/manchester united/i,'#da291c','#ffffff'],[/bayern/i,'#dc052d','#ffffff'],
  [/arsenal/i,'#ef0107','#063672'],[/chelsea/i,'#034694','#ffffff'],
  [/tottenham/i,'#ffffff','#132257'],[/paris/i,'#004170','#e30613'],

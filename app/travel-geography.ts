@@ -82,8 +82,14 @@ const FICTIONAL_NAMES = ['FC Tabellenkeller','SV Unentschieden','Real Zufall','F
 const FICTIONAL_GROUNDS = ['Stolperacker','Remiswiese','Zufallsrasen','Bierdeckel-Arena','Timeout-Platz'];
 const FICTIONAL = FICTIONAL_NAMES.map((name,i):SeasonClub=>({id:`geo-1-${i+1}`,name,league:15,fictional:true,venue:{...HOME_VENUE,id:`chaos-ground-${i+1}`,stadium:FICTIONAL_GROUNDS[i],lat:HOME_VENUE.lat+[.003,-.006,.009,-.003,.006][i],lon:HOME_VENUE.lon+[.009,-.005,.005,-.009,.012][i],verification:'fictional',source:'Fiktives Spielfeld in Bern',coordinateNote:'Absichtlich fiktiver Platz in Bern'}}));
 for(const club of FICTIONAL){const record=STADIUM_AUDIT.fictional.find(r=>r.venueId===club.venue.id);if(record)club.venue={...club.venue,registeredStadium:club.venue.stadium,stadium:record.osmName||'Fussballplatz Bern',lat:record.lat,lon:record.lon,verification:'pitch-fallback',source:record.source,coordinateSource:record.source,coordinateNote:'Fiktiver Club auf einem realen kartierten Fussballfeld.'};}
-const WORLD_IDS=['world-real-madreto','world-fc-barceloneta','world-liverpuhl-fc','world-manchester-cite','world-bayern-muenchan'];
-const WORLD = LEGACY_POOLS[7].map(([name,key],i):SeasonClub=>({id:WORLD_IDS[i],name,league:1,venue:VENUES[key]}));
+/**
+ * The world league: real clubs under their official names. The IDs are the stable ones of older saves (they were
+ * minted when these clubs still had parody names, so "real-madreto" is today's Real Madrid CF); only the names changed.
+ * The grounds stay the audited catalogue venues. LEGACY_POOLS keeps the old parody names so a saved table or journey
+ * that still carries one resolves to the same ground.
+ */
+const WORLD_CLUBS=[['world-real-madreto','Real Madrid CF','madrid'],['world-fc-barceloneta','FC Barcelona','barcelona'],['world-liverpuhl-fc','Liverpool FC','liverpool'],['world-manchester-cite','Manchester City','city'],['world-bayern-muenchan','FC Bayern München','munich']] as const;
+const WORLD = WORLD_CLUBS.map(([id,name,key]):SeasonClub=>({id,name,league:1,venue:VENUES[key]}));
 const BASE_CLUBS: SeasonClub[] = [...FICTIONAL,...SWISS_CLUBS as SeasonClub[],...WORLD];
 /** The first club of a league lends its audited ground to a fictional sixth club (ground sharing, no new geodata). */
 const groundOfLeague=(league:number)=>BASE_CLUBS.find(c=>c.league===league)!.venue;
@@ -95,7 +101,7 @@ const fictionalSixth=(league:number,name:string):SeasonClub=>({id:`extra-${leagu
  * every route stays source backed. Placed after the original clubs, so the original five of a league keep their slots.
  */
 const EXTRA_CLUBS: SeasonClub[] = [
- {id:'world-paris-saint-german',name:'Paris Saint German',league:1,venue:VENUES.paris},
+ {id:'world-paris-saint-german',name:'Paris Saint-Germain',league:1,venue:VENUES.paris},
  {id:'extra-2-grasshopper',name:'Grasshopper Club Zürich',league:2,venue:VENUES.zurich},
  {id:'extra-3-winterthur',name:'FC Winterthur',league:3,venue:VENUES.winterthur},
  fictionalSixth(4,'FC Alpenfestung'),fictionalSixth(5,'FC Gotthard Murmeltiere'),fictionalSixth(6,'FC Léman Mouettes'),fictionalSixth(7,'FC Zürisee Böötler'),
