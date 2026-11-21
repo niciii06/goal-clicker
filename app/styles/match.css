@@ -432,8 +432,12 @@
 .summary-motm { margin: 10px 0 0; color: var(--soft); font-size: var(--text-footnote); }
 .summary-motm strong { color: var(--text); }
 .summary-tickets { width: fit-content; max-width: 100%; margin: 10px 0 0; padding: 6px 12px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: var(--radius-pill); background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised)); color: var(--text); font-size: var(--text-footnote); font-weight: 750; }
-/* Readable text in the interactive match editor: the pause bar is light, the tactic buttons are dark green. */
-.gc-interactive-pause { color:#183c32; }
+/* The pause bar ("Spiel pausiert", half time pauses) and its button follow the theme tokens. They used to be a fixed
+   light panel (#f4f7f4) with a white button, which stayed white in dark mode. The tactic buttons above keep their own colours. */
+.gc-interactive-pause { border:1px solid var(--line); background:var(--surface-raised); color:var(--text); }
+.gc-interactive-pause button { border-color:transparent; background:var(--accent); color:var(--on-accent); }
+.gc-interactive-pause button:hover:not(:disabled) { background:color-mix(in srgb, var(--accent) 88%, var(--text)); }
+.gc-interactive-pause button:disabled { opacity:.55; cursor:not-allowed; }
 .gc-sub-panel .gc-viewer-tactics button { color:#edfff2; }
 /* Half time: an opaque card over the whole stadium canvas while the teams change ends. */
 .gc-halftime-cover { position: absolute; inset: 0; z-index: 20; display: flex; padding: 12px; overflow: auto; background: radial-gradient(circle at 50% 30%, #17362a 0%, #0b1c15 70%); color: #fff; animation: gc-halftime-in .32s ease-out both; }
