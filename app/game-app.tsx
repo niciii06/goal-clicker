@@ -44,7 +44,7 @@ import { answerPressConference, getPressReward } from "./press-conference";
 import { canVibrate, readVibrationSetting, setVibrationOn, vibrate, vibrationOn } from "./game/device";
 import { albumMilestonesFromStorage, claimAlbumRewards, getCareerCard, getPlayerForm, prepareCareerMatch, recordCareerMatch, rivalryKey } from "./career-data";
 import { competitionFor, competitionLabel, competitionOfCup, getBannedPlayerIds, nextCompetition, squadBanError, suspensionLabel } from "./discipline";
-import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "./daily-reward";
+import { WORLD_DAILY_KEY, claimDailyReward, describeDailyReward, mergeDailyRewardsForWorld } from "./daily-reward";
 import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
 import { consumeTravel, eligibilityError, fixtureFor, journeyView, payTravelFines, settleTravel, travelTiming } from "./travel-data";
 import { COOP_UPDATE_REQUIRED_EVENT, coopLastActiveLabel, coopRetryDelay, coopRoleLabel, createCoopGameNormalizer, isCoopRole, multiplayerUrl, newCoopActionId, notifyCoopOffline, occupiedCoopPlayers, prestigeVoteMessage, readCoopResponse, reloadForUpdate, upsertSavedRoom } from "./game/coop";
@@ -3075,7 +3075,7 @@ export function App() {
       try {
         const data = await sendCoopAction("daily-claim");
         if (data?.dailyReward) {
-          showToast(`Tag ${data.dailyReward.dayIndex}: +${formatNumber(data.dailyReward.amount)} Tore${data.dailyReward.pack ? " und ein Spezialkarten-Pack für die ganze Welt" : ""}`);
+          showToast(`Tag ${data.dailyReward.dayIndex}: ${describeDailyReward(data.dailyReward.amount, data.dailyReward.pack, formatNumber, " für die ganze Welt")}`);
           vibrate([40, 30, 90]);
         }
       } finally {
@@ -3092,11 +3092,11 @@ export function App() {
       const features = normalizeGameFeatures(current.features);
       features.dailyRewards = claim.state;
       if (claim.pack && !features.earnedPacks.some((pack) => pack.id === claim.pack!.id)) features.earnedPacks.push(claim.pack);
-      addHistory(features, { title: `Tägliche Prämie · Tag ${claim.dayIndex}`, detail: `+${formatNumber(claim.amount)} Tore${claim.pack ? " und ein Spezialkarten-Pack" : ""}. Serie: ${claim.streak} ${claim.streak === 1 ? "Tag" : "Tage"}.`, tone: "positive" }, now);
+      addHistory(features, { title: `Tägliche Prämie · Tag ${claim.dayIndex}`, detail: `${describeDailyReward(claim.amount, Boolean(claim.pack), formatNumber)}. Serie: ${claim.streak} ${claim.streak === 1 ? "Tag" : "Tage"}.`, tone: "positive" }, now);
       return { ...current, goals: current.goals + claim.amount, seasonGoals: current.seasonGoals + claim.amount, totalGoals: current.totalGoals + claim.amount, features };
     });
-    addFeed(`Tägliche Prämie Tag ${preview.dayIndex}: +${formatNumber(preview.amount)} Tore.`, "star");
-    showToast(`Tag ${preview.dayIndex}: +${formatNumber(preview.amount)} Tore${preview.pack ? " und ein Spezialkarten-Pack unter Packs & Album" : ""}`);
+    addFeed(`Tägliche Prämie Tag ${preview.dayIndex}: ${describeDailyReward(preview.amount, Boolean(preview.pack), formatNumber)}.`, "star");
+    showToast(`Tag ${preview.dayIndex}: ${describeDailyReward(preview.amount, Boolean(preview.pack), formatNumber, " unter Packs & Album")}`);
     playTone(659, 0.1, "triangle", 0.04);
     playTone(988, 0.18, "triangle", 0.045, 0.1);
     vibrate([40, 30, 90]);

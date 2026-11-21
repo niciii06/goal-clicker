@@ -21,11 +21,11 @@ export function DailyRewardCard({ state, claimKey, now, passivePerSecond, clickP
       return <li key={day.day} className={`${claimed ? 'claimed' : ''}${current ? ' current' : ''}${day.pack ? ' pack' : ''}`} aria-current={current ? 'step' : undefined}>
         <small>Tag {day.day}</small>
         <strong>{claimed ? '✓' : day.pack ? '🎁' : '⚽'}</strong>
-        <span>{format(getDailyRewardAmount(day, passivePerSecond, clickPower))}{day.pack === 'special' ? ' + Spezialpack' : day.pack ? ' + Pack' : ''}</span>
+        <span>{day.packOnly ? 'Spezialpack' : `${format(getDailyRewardAmount(day, passivePerSecond, clickPower))}${day.pack === 'special' ? ' + Spezialpack' : day.pack ? ' + Pack' : ''}`}</span>
       </li>;
     })}</ol>
     {status.available
-      ? <button type="button" className="daily-reward-claim" disabled={busy} onClick={onClaim}>Prämie abholen · +{format(getDailyRewardAmount(status.reward, passivePerSecond, clickPower))} Tore{status.reward.pack === 'special' ? ' + Spezialkarten-Pack' : status.reward.pack ? ' + Prämienpack' : ''}</button>
+      ? <button type="button" className="daily-reward-claim" disabled={busy} onClick={onClaim}>Prämie abholen · {status.reward.packOnly ? 'Spezialkarten-Pack' : `+${format(getDailyRewardAmount(status.reward, passivePerSecond, clickPower))} Tore${status.reward.pack === 'special' ? ' + Spezialkarten-Pack' : status.reward.pack ? ' + Prämienpack' : ''}`}</button>
       : <p className="daily-reward-next" aria-live="off">Nächste Prämie in <b>{countdown(status.msUntilNext)}</b>. Morgen abholen, sonst beginnt die Serie neu.</p>}
   </section>;
 }
