@@ -49,7 +49,7 @@ export function DisciplineTags({ features, playerId, compact = false }: { featur
 function PlayerReportRow({ report, motm }: { report: PlayerMatchReport; motm: boolean }) {
   return <details className={`career-rating-row ${motm ? 'motm' : ''}`}>
     <summary><span><strong>{name(report.playerId)}{motm && <em>{t("career.motmStar")}</em>}</strong><small>{t("career.reportMinutes", { count: report.minutes })} · {t("career.reportGoals", { count: report.goals })} · {report.assists} {t("career.assistsWord")}{report.substitute ? t("career.jokerSuffix") : ''}</small></span><b className={report.rating >= 8 ? 'up' : report.rating < 6 ? 'down' : ''}>{report.rating.toFixed(1)} <span>⌄</span></b></summary>
-    <div className="career-rating-details">{report.reasons.map((r,i) => <div key={i}><span>{r.label}</span><b>{r.value === 0 ? t("career.note") : signed(r.value)}</b></div>)}<p>{t("career.ratingNote")}</p></div>
+    <div className="career-rating-details">{report.reasons.map((r,i) => <div key={i}><span>{dataText(r.label)}</span><b>{r.value === 0 ? t("career.note") : signed(r.value)}</b></div>)}<p>{t("career.ratingNote")}</p></div>
   </details>;
 }
 export function MatchRatingsPanel({ features }: { features: GameFeatures; minute?: number }) {

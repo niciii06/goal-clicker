@@ -44,7 +44,7 @@ export function TutorialCoach({ state, game, onShow, onEnd }: { state: TutorialS
       <strong>{dataText(step.title)}</strong>
       <small>{dataText(step.text)}</small>
       {progress && <div className="tutorial-coach-progress"><span><i style={{ width: `${Math.round(share * 100)}%` }} /></span><b>{progress.value} / {progress.goal}</b></div>}
-      <ol className="tutorial-coach-steps" aria-label={t("tutorialPanel.progress")}>{TUTORIAL_STEPS.map((item) => <li key={item.id} className={state.done.includes(item.id) ? "done" : item === step ? "current" : ""} aria-label={`${item.title}${state.done.includes(item.id) ? ", erledigt" : ""}`} />)}</ol>
+      <ol className="tutorial-coach-steps" aria-label={t("tutorialPanel.progress")}>{TUTORIAL_STEPS.map((item) => <li key={item.id} className={state.done.includes(item.id) ? "done" : item === step ? "current" : ""} aria-label={`${dataText(item.title)}${state.done.includes(item.id) ? t("tutorialPanel.doneSuffix") : ""}`} />)}</ol>
     </div>
     <div className="tutorial-coach-actions">
       <button type="button" className="mode-primary" onClick={() => onShow(step)}>{t("tutorialPanel.showMe")}</button>

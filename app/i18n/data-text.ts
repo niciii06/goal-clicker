@@ -14,6 +14,8 @@ type Rule = [RegExp, (match: RegExpExecArray) => string];
 const RULES: Rule[] = [
   // Pack odds rows: "Gewöhnlich 55–59", "Gewöhnlich bis 70", "Legendär 100"
   [/^(Gewöhnlich|Profi|Selten|Top Walkout|Walkout|Legendär) (bis )?([\d–]+)$/, (m) => `${t(ODDS_TIERS[m[1]])} ${m[2] ? t("data.upTo", { value: m[3] }) : m[3]}`],
+  // Match rating reasons saved in match reports (app/career-data.ts): "1 Tor", "3 Vorlagen"
+  [/^(\d+) (Tor|Tore|Vorlage|Vorlagen)$/, (m) => t(m[2].startsWith("Tor") ? "data.reason.goals" : "data.reason.assists", { count: Number(m[1]) })],
   // League labels: "Liga 15 · Chaosliga"
   [/^Liga (\d+) · (.+)$/, (m) => t("data.leagueLabel", { league: m[1], name: localizeText(m[2]) })],
   [/^Liga (\d+)$/, (m) => t("data.league", { league: m[1] })],
@@ -44,4 +46,17 @@ export function dataText(text: string | null | undefined): string {
     if (match) return build(match);
   }
   return text;
+}
+
+// Live match event names (app/match-visual-frame.ts eventLabel). Own table instead of the catalogue lookup: short words
+// such as "Wechsel" or "Tor" exist elsewhere in the catalogue with another meaning.
+const EVENT_KEYS: Record<string, MessageKey> = {
+  "Tor": "viewer.event.goal", "Rote Karte": "viewer.event.card", "Verletzung": "viewer.event.injury", "Penalty": "viewer.event.penalty",
+  "Spielaufbau": "viewer.event.buildUp", "Konter": "viewer.event.counter", "Flügelangriff": "viewer.event.wide", "Doppelpass": "viewer.event.combination",
+  "Torschuss": "viewer.event.shot", "Ecke": "viewer.event.corner", "Freistoss": "viewer.event.freeKick", "Einwurf": "viewer.event.throwIn",
+  "Gelbe Karte": "viewer.event.yellow", "Wechsel": "viewer.event.substitution", "Abseits · indirekter Freistoss": "viewer.event.offside", "Spielereignis": "viewer.event.other",
+};
+export function eventText(label: string) {
+  const key = EVENT_KEYS[label];
+  return key ? t(key) : label;
 }
