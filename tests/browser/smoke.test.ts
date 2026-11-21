@@ -163,7 +163,10 @@ for (const viewport of VIEWPORTS) for (const colorScheme of ['light', 'dark'] as
 test('click combo reaches x1,5 and the daily reward can be claimed once', async () => {
   const now = Date.now();
   const { page, problems } = await openWithSave(VIEWPORTS[0], save(richFeatures(now), now));
-  const ball = await page.getByRole('button', { name: 'Fussball anklicken' }).boundingBox();
+  // On Home the ball can start below the fold (its centre lies outside a 900 px high window): scroll it into view first, otherwise the mouse clicks miss it.
+  const ballButton = page.getByRole('button', { name: 'Fussball anklicken' });
+  await ballButton.scrollIntoViewIfNeeded();
+  const ball = await ballButton.boundingBox();
   for (let i = 0; i < 22; i++) await page.mouse.click(ball!.x + ball!.width / 2, ball!.y + ball!.height / 2);
   assert.match(await page.locator('.combo-label').innerText(), /COMBO x1,5|COMBO x2/);
   await page.getByRole('button', { name: /Prämie abholen/ }).click();
