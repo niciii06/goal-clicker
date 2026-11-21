@@ -3861,7 +3861,7 @@ export function App() {
           <div className="side-column-stack side-column-stack-season">
             <div className="side-card season-card">
             <div className="side-card-heading"><span className="heading-icon">★</span><div><p className="eyebrow">{t("games.seasonModeLeague")} {leagueForTier(currentSeason)}</p><h2>{dataText(currentSeasonMilestone.title)}</h2></div><span className="season-stars">★ {displayGame.stars}</span></div>
-            <p className="season-copy">{seasonCareerComplete ? t("season.topReached") : t("season.divisionRules", { division: dataText(getSeasonModeDivisionLabel(currentSeason)) })} {t("club.starBonus")}</p>
+            <p className="season-copy">{seasonCareerComplete ? t("season.topReached", { bonus: prestigeBonusPercent(1) }) : t("season.divisionRules", { division: dataText(getSeasonModeDivisionLabel(currentSeason)) })} {t("club.starBonus")}</p>
             <div className="season-unlocks"><span>{t("shop.activeUnlocks")}</span><div>{currentSeasonMilestone.rewards.map((reward) => <b key={`${currentSeason}-${reward}`}>✓ {dataText(reward)}</b>)}</div></div>
             <div className="season-stat"><span>{seasonCareerComplete ? t("games.hofReachedCaps") : t("season.matchdayOf10", { matchday: seasonMode.matchday })}</span><strong>{seasonCareerComplete ? `PRESTIGE ${seasonMode.prestigeCount}` : seasonMode.lastResult.includes("wartet") ? t("games.kickoffReady") : t("season.bestLeagueCaps", { league: leagueForTier(seasonMode.highestDivision) })}</strong></div>
             <div className="season-progress"><div style={{ width: `${seasonCareerComplete ? 100 : Math.min(100, (seasonMode.matchday / 10) * 100)}%` }} /></div>
