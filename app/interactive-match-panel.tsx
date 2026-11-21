@@ -13,6 +13,8 @@ import { MatchSquadEditor } from './match-substitutions';
 import type { MatchDraft } from './match-commands';
 import { useReducedMotion } from './use-reduced-motion';
 import { readPref, writePref } from './qol/prefs';
+import { useInjuryAutoOpen } from './match-injury';
+import type { PendingInjury } from './match-injury';
 
 // The chosen view (pitch, ticker, statistics) stays on this device (Q54).
 const INTERACTIVE_VIEW_KEY = 'goal-clicker-interactive-view';
@@ -20,6 +22,8 @@ export type InteractivePanelProps={features:GameFeatures;now:number;clubName:str
 export function InteractiveMatchPanel({features,now,clubName,clubColor,disabled,onEdit,onBatch,onResume}:InteractivePanelProps){
  const [view,setViewState]=useState<'pitch'|'ticker'|'stats'>(()=>{const saved=readPref(INTERACTIVE_VIEW_KEY);return saved==='ticker'||saved==='stats'?saved:'pitch';}),[editing,setEditing]=useState(features.cup.simulation?.status==='editing');
  const setView=(next:'pitch'|'ticker'|'stats')=>{setViewState(next);writePref(INTERACTIVE_VIEW_KEY,next);};
+ // An own player's injury opens the substitutions by itself, once per injury (app/match-injury.ts).
+ const injury=useInjuryAutoOpen(features,()=>setEditing(true),()=>setEditing(false));
  const reducedMotion=useReducedMotion();
  const c=features.cup,s=c.simulation!,away=c.fixture?.away;
  const {wall,minute}=useMatchPresentation(c,now),events=getViewerEvents(c);
@@ -36,12 +40,14 @@ export function InteractiveMatchPanel({features,now,clubName,clubColor,disabled,
   {events.at(-1)&&now-events.at(-1)!.at<3500&&<div className="gc-viewer-caption" role="status"><time>{events.at(-1)!.minute}′</time><strong>{eventLabel(events.at(-1)!)} · {events.at(-1)!.player}</strong></div>}
   {c.matchPaused&&!(s.status==='halftime'&&view==='pitch'&&c.phase!=='penalties')&&<div className="gc-interactive-pause" role="status"><strong>{s.status==='halftime'?pauseTitle:'Spiel pausiert'}</strong><button type="button" disabled={disabled} onClick={()=>{setEditing(false);onResume?.();}}>Weiterspielen</button></div>}
   <div className="gc-interactive-controls"><button type="button" disabled={disabled||c.phase==='penalties'} onClick={()=>{setEditing(true);onEdit?.();}}>Wechsel</button><button type="button" aria-pressed={view==='pitch'} onClick={()=>setView('pitch')}>2D</button><button type="button" aria-pressed={view==='ticker'} onClick={()=>setView('ticker')}>Live Ticker</button><button type="button" aria-pressed={view==='stats'} onClick={()=>setView('stats')}>Statistik</button></div>
-  {editing&&(c.matchPaused?<BatchEditor key={s.committed.sequence} features={features} disabled={Boolean(disabled)} onConfirm={d=>{onBatch?.(d);setEditing(false);}} onCancel={()=>{setEditing(false);onResume?.();}}/>:<p role="status">Der laufende Pass oder Schuss wird abgeschlossen. Danach öffnet sich die Aufstellung.</p>)}
+  {editing&&(c.matchPaused?<BatchEditor key={s.committed.sequence} features={features} injury={injury} disabled={Boolean(disabled)} onConfirm={d=>{onBatch?.(d);setEditing(false);}} onCancel={()=>{setEditing(false);onResume?.();}}/>:<p role="status">Der laufende Pass oder Schuss wird abgeschlossen. Danach öffnet sich die Aufstellung.</p>)}
  </section>;
 }
-function BatchEditor({features:f,disabled,onConfirm,onCancel}:{features:GameFeatures;disabled:boolean;onConfirm:(d:MatchDraft)=>void;onCancel:()=>void}){
+function BatchEditor({features:f,injury,disabled,onConfirm,onCancel}:{features:GameFeatures;injury:PendingInjury|null;disabled:boolean;onConfirm:(d:MatchDraft)=>void;onCancel:()=>void}){
  const formation=f.starXI.formationId;
- return <MatchSquadEditor features={f} title="Aufstellung bearbeiten" intro="Spieler ziehen oder zwei Karten antippen. Alle Änderungen werden gemeinsam bestätigt. Die Partie ist pausiert." disabled={disabled} validate={lineup=>validateMatchDraft(f,{lineup,formation})} confirmLabel={()=>'Alles bestätigen'} onConfirm={lineup=>onConfirm({lineup,formation})} onCancel={onCancel}/>;
+ // After an injury the injured player's place is already chosen; closing plays on without a substitution.
+ const intro=injury?`${injury.player} ist verletzt (Platz ${injury.slot+1} · ${f.starXI.formationPositions[injury.slot]??''}). Wähle einen Ersatz von der Bank oder spiele ohne Wechsel weiter. Die Partie ist pausiert.`:'Spieler ziehen oder zwei Karten antippen. Alle Änderungen werden gemeinsam bestätigt. Die Partie ist pausiert.';
+ return <MatchSquadEditor features={f} title={injury?'Verletzung: Wechsel':'Aufstellung bearbeiten'} intro={intro} initialSlot={injury?.slot??null} cancelLabel={injury?'Ohne Wechsel weiterspielen':'Abbrechen'} disabled={disabled} validate={lineup=>validateMatchDraft(f,{lineup,formation})} confirmLabel={()=>'Alles bestätigen'} onConfirm={lineup=>onConfirm({lineup,formation})} onCancel={onCancel}/>;
 }
 
 /** Keeps an element mounted for its exit animation after `visible` turns false. */

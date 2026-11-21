@@ -8,6 +8,7 @@ import { matchColours } from './match-colours';
 import { goalLabel, goalAssistId } from './match-goals';
 import { MatchSubstitutions } from './match-substitutions';
 import { InteractiveMatchPanel } from "./interactive-match-panel";
+import { useInjuryAutoOpen } from "./match-injury";
 import { useReducedMotion } from './use-reduced-motion';
 import type { InteractivePanelProps } from "./interactive-match-panel";
 import { getVisualFrame, getViewerEvents, eventLabel } from './match-visual-frame';
@@ -32,6 +33,9 @@ export function LegacyLiveMatchViewer({ features, now, clubName, clubColor, disa
   const [selectedPlayer,setSelectedPlayer]=useState<string>();
   const [expanded,setExpanded]=useState(false);
   const [subOpen,setSubOpen]=useState(false);
+  // An own player's injury opens the substitutions by themselves once, when substituting is possible (app/match-injury.ts).
+  const canSubstitute=!disabled&&Boolean(onSubstitute)&&features.cup.phase!=='penalties'&&features.cup.substitutionsUsed<STAR_XI_MAX_SUBSTITUTIONS;
+  useInjuryAutoOpen(features,()=>{if(canSubstitute)setSubOpen(true);},()=>setSubOpen(false));
   const viewerRef=useRef<HTMLElement>(null);
   useEffect(()=>{
     if(!expanded)return;
