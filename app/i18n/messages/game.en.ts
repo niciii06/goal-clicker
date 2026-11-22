@@ -1102,6 +1102,7 @@ export const gameEn = {
   "live.stats": "Statistics",
   "live.subs": "Substitutions",
   "live.switchSides": "The teams switch sides. Substitutions are possible without using a window.",
+  "live.scorersOf": "Goalscorers {team}",
   "live.ticker": "Live ticker",
   "liveDisplay.clickBall": "Click the football",
   "liveDisplay.clickFast": "Click fast for a combo",

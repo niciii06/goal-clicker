@@ -1103,6 +1103,7 @@ export const gameDe = {
   "live.stats": "Statistik",
   "live.subs": "Wechsel",
   "live.switchSides": "Die Teams wechseln die Seiten. Wechsel sind ohne Wechselfenster möglich.",
+  "live.scorersOf": "Torschützen {team}",
   "live.ticker": "Live Ticker",
   "liveDisplay.clickBall": "Fussball anklicken",
   "liveDisplay.clickFast": "Schnell klicken für Combo",
