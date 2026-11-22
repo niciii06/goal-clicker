@@ -11,6 +11,15 @@ function precedingGoal(s:InteractiveMatch,a:SimAction|undefined){
  return [...s.recent,...s.buffer].find(g=>g.end===a.start&&g.kind==='shot'&&g.outcome==='goal');
 }
 
+/**
+ * Rendering only: a corner is a dead ball. The engine's set-up play (restart, style 'hold') moves the ball from where it
+ * went out to the corner flag together with the taker, so drawn as one line the taker seems to carry it there. The ball
+ * instead stays where it went out for this share of the set-up, then lies at the flag (a new ball, placed) while the
+ * taker walks there without it. Engine state, events and saves are unchanged.
+ */
+export const CORNER_BALL_PLACED_AT=.35;
+const isCornerSetup=(a:SimAction|undefined)=>Boolean(a&&a.kind==='restart'&&a.setPiece==='corner'&&a.style==='hold');
+
 export function readInteractiveFrame(s:InteractiveMatch,time:number) {
  // A play that is still running wins over one that just ended, so at a period boundary (half time,
  // where the kick-off positions are already set) the frame shows the next play's starting positions.
@@ -20,7 +29,7 @@ export function readInteractiveFrame(s:InteractiveMatch,time:number) {
  const goal=precedingGoal(s,a);
  if(a&&goal)return celebrationFrame(a,goal,time,t);
  const players=c.players.filter(p=>p.active).map(p=>{const end=a?.after.players.find(q=>q.id===p.id)??p;return {...p,x:p.x+(end.x-p.x)*t,y:p.y+(end.y-p.y)*t};});
- const ball=a?{x:a.from.x+(a.to.x-a.from.x)*t,y:a.from.y+(a.to.y-a.from.y)*t}:s.committed.ball;
+ const ball=!a?s.committed.ball:isCornerSetup(a)?{...(t<CORNER_BALL_PLACED_AT?a.from:a.to)}:{x:a.from.x+(a.to.x-a.from.x)*t,y:a.from.y+(a.to.y-a.from.y)*t};
  return {players,ball,action:a,time,progress:t,celebration:undefined as FrameCelebration|undefined};
 }
 
