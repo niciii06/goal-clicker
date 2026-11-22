@@ -417,6 +417,10 @@
 .gc-interactive-controls button,.gc-interactive-pause button { min-height:44px; padding:10px 15px; border:1px solid #d9dfdf; border-radius:10px; background:#fff; color:#183c32; font-weight:700; }
 .gc-interactive-controls button[aria-pressed="true"] { background:#e2f2e9; border-color:#6da68b; }
 .gc-interactive-controls button:disabled { opacity:.5; }
+/* The match controls (Wechsel, 2D, Live Ticker, Statistik) sit on the page, not inside the dark viewer: they follow the theme.
+   They were fixed white buttons with dark green text, which stayed white in dark mode. Light mode looks as before. */
+.gc-interactive-controls button { border-color:var(--line); background:var(--surface-raised); color:var(--text); }
+.gc-interactive-controls button[aria-pressed="true"] { border-color:color-mix(in srgb, var(--accent) 55%, transparent); background:var(--accent-soft); color:var(--text); }
 .gc-interactive-pause { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; background:#f4f7f4; border-radius:12px; margin-top:10px; }
 .gc-interactive-ticker { max-height:420px; overflow:auto; padding:8px; }
 .gc-interactive-ticker>div { display:flex; gap:12px; padding:10px; border-bottom:1px solid #e7ebe8; }
