@@ -3,6 +3,8 @@ import test from 'node:test';
 import { initialGameFeatures, STAR_XI_PLAYERS, STAR_FORMATIONS, setBestStarXI, beginSeasonCupMatch, getStarXISelection, advanceCupMatch, normalizeGameFeatures, resumeCupMatch, getStarXIPlayer, pauseGameFeatureTimers, getCupRegularDurationMs } from '../app/feature-data';
 import { emptyPlayerStats, prepareCareerMatch, recordCareerMatch } from '../app/career-data';
 import { createInteractiveMatch, advanceInteractive, interactiveFrame } from '../app/interactive-match';
+import { clubIsOnLeft, readInteractiveFrame } from '../app/interactive-frame-data';
+import { HOME_VENUE } from '../app/travel-geography';
 import { requestMatchEdit, confirmMatchDraft, draftMatch } from '../app/match-commands';
 import { getVisualFrame, LiveMatchViewer } from '../app/match-viewer';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -267,4 +269,25 @@ test('regular decided matches and season matches get no extra pause; only the 45
  while(f.cup.active&&guard++<1000){if(f.cup.matchPaused){pauses++;assert.equal(f.cup.simulation!.time,2700);f.cup=resumeCupMatch(f.cup,f.cup.lastTickAt);}
   step(f,120000);}
  assert.ok(!f.cup.active);assert.equal(pauses,1);assert.ok(f.cup.phase!=='extra-time');
+});
+
+test('the side of the labels under the pitch: club left in a home game, right in an away game, switched after the teams changed ends',()=>{
+ for(const away of [false,true]){
+  const f=fixture(7);
+  f.cup.fixture={id:`side:${away}`,away,venue:HOME_VENUE,opponentId:'season-opponent-1'};
+  f.cup.simulation=createInteractiveMatch(f.cup,f.starXI.lineupIds,f.starXI.formationId);
+  const sim=()=>f.cup.simulation!;
+  // Kick off: an away game starts with the club on the right-hand side.
+  assert.equal(clubIsOnLeft(readInteractiveFrame(sim(),0)),!away,`${away?'away':'home'} kick off`);
+  let now=f.cup.matchStartedAt;
+  const playTo=(time:number)=>{for(let i=0;i<600&&f.cup.active&&sim().time<time;i++){if(f.cup.matchPaused)f.cup=resumeCupMatch(f.cup,f.cup.lastTickAt);now=Math.max(now,f.cup.lastTickAt)+3000;f.cup=advanceCupMatch(f.cup,85,now,()=>.5,getStarXISelection(f.starXI.ownedIds,f.starXI.lineupIds),f.starXI.formationPositions).cup;}};
+  playTo(1500);assert.ok(sim().time<2700);
+  assert.equal(clubIsOnLeft(readInteractiveFrame(sim(),sim().time)),!away,`${away?'away':'home'} first half`);
+  assert.equal(sim().committed.direction>0,!away,'the simulation direction says the same');
+  playTo(3200);assert.ok(sim().time>2760);
+  assert.equal(clubIsOnLeft(readInteractiveFrame(sim(),sim().time)),away,`${away?'away':'home'} second half: the club changed ends`);
+  assert.equal(sim().committed.direction>0,away);
+ }
+ // Without players the answer is a neutral one (no crash, no flip).
+ assert.equal(typeof clubIsOnLeft({players:[]}),'boolean');
 });
