@@ -300,6 +300,12 @@ export class GoalClickerDatabase {
     return identity ?? null;
   }
 
+  /** The login of an e-mail account by its (lower case) address; only real addresses of method "email" are asked for. */
+  async getIdentityByLoginEmail(issuer: string, loginEmail: string): Promise<AuthIdentity | null> {
+    const [identity] = await this.client.select().from(authIdentities).where(and(eq(authIdentities.issuer, issuer), eq(authIdentities.loginEmail, loginEmail))).limit(1);
+    return identity ?? null;
+  }
+
   async getIdentityForAccount(issuer: string, accountId: string): Promise<AuthIdentity | null> {
     const [identity] = await this.client.select().from(authIdentities).where(and(eq(authIdentities.issuer, issuer), eq(authIdentities.accountId, accountId))).limit(1);
     return identity ?? null;

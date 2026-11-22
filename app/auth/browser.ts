@@ -57,12 +57,35 @@ async function postJson<T>(path: string, body: unknown) {
 
 /** Username and password: the server signs in (and recovers an original account once, on the way). */
 export async function signInWithUsername(username: string, password: string) {
-  return postJson<{ signedIn: boolean; recovered?: boolean }>("/api/login", { username, password });
+  return postJson<{ signedIn: boolean; recovered?: boolean; verificationRequired?: boolean }>("/api/login", { username, password });
 }
 
-/** Creates the account with its profile on the server, which also signs the browser in. */
-export async function registerWithUsername(username: string, displayName: string, password: string) {
-  await postJson<{ profile: unknown }>("/api/register", { username, displayName, password });
+/**
+ * Creates the account with its profile on the server, which also signs the browser in. With e-mail sign-up switched
+ * on, the address comes along and the account stays closed until the code sent to it is entered.
+ */
+export async function registerWithUsername(username: string, displayName: string, password: string, email?: string) {
+  return postJson<{ profile: unknown; verificationRequired?: boolean; codeSent?: boolean }>("/api/register", email === undefined ? { username, displayName, password } : { username, displayName, password, email });
+}
+
+/** Confirms the e-mail address of a new account with the code sent to it. */
+export async function verifyEmailWithCode(email: string, code: string) {
+  await postJson<{ verified: boolean }>("/api/email/verify", { email, code });
+}
+
+/** Sends a new code; the answer is the same whether or not the address belongs to an account. */
+export async function resendEmailCode(email: string) {
+  await postJson<{ sent: boolean }>("/api/email/resend", { email });
+}
+
+/** Sends a reset code to the address of an e-mail account; the answer never says whether one exists. */
+export async function requestPasswordReset(email: string) {
+  await postJson<{ sent: boolean }>("/api/password-reset", { email });
+}
+
+/** Sets a new password with the reset code. */
+export async function resetPasswordWithCode(email: string, code: string, password: string) {
+  await postJson<{ reset: boolean }>("/api/password-reset", { email, code, password });
 }
 
 /** TEMPORARY: takes over an original username account with a one time code from the owner and a new password. */

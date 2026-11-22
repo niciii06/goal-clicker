@@ -1,4 +1,4 @@
-// A new account with username, display name and password; no e-mail is involved.
+// A new account with username, display name and password; with GOAL_CLICKER_EMAIL_SIGNUP also a real e-mail address that a mailed code confirms.
 import { registerResponse } from "../../account-api";
 import { withRateLimit } from "../rate-limit";
 
