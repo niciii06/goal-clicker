@@ -1,8 +1,9 @@
 'use client';
 import { useMatchPresentation } from './use-match-presentation';
+import { clubIsOnLeft, readInteractiveFrame } from './interactive-frame-data';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { GameFeatures } from './feature-data';
-import { getStarXIPlayer } from './feature-data';
+import { getCupRegularDurationMs, getStarXIPlayer } from './feature-data';
 import { MatchPitchCanvas } from './match-pitch-canvas';
 import { getViewerEvents, eventLabel, MatchStatistics } from './match-viewer';
 import { goalLabel } from './match-goals';
@@ -27,6 +28,10 @@ export function InteractiveMatchPanel({features,now,clubName,clubColor,disabled,
  const halftime=useLingering(s.status==='halftime'&&c.matchPaused,450);
  const extraPause=c.phase==='extra-time'&&s.status==='halftime',pauseTitle=extraPause?(s.time>=6300?'Halbzeit der Verlängerung':'Pause vor der Verlängerung'):'Halbzeitpause';
  const status=s.status==='halftime'?(extraPause?(s.time>=6300?'HALBZEIT VERLÄNGERUNG':'VERLÄNGERUNG'):'HALBZEIT'):s.status==='editing'?'PAUSIERT':s.pauseRequested?'Spielzug wird abgeschlossen':c.phase==='penalties'?'ELFMETERSCHIESSEN':'LIVE';
+ // The two labels under the pitch stand on the side where that team plays: the club is on the right in an away game and after the teams changed ends
+ // (the same frame the pitch draws decides). The colour dot is the kit colour of the pitch.
+ const legendClub={key:'club',name:clubName,colour:clubColor||'#17875f'},legendOpponent={key:'opponent',name:c.opponent,colour:clubColor==='#ffc857'?'#3e75dd':'#ffc857'};
+ const presentedTime=Math.max(0,(wall.current-c.matchStartedAt)*(5400/getCupRegularDurationMs(c))),legendTeams=clubIsOnLeft(readInteractiveFrame(s,presentedTime))?[legendClub,legendOpponent]:[legendOpponent,legendClub];
  // The scorer zone of the scoreboard has a fixed height (two lines), so a goal never makes the scoreboard taller: the newest goals come first, older ones scroll.
  const scorers=(side:'home'|'away')=>c.matchEvents.filter(e=>e.side===side).map(e=><span key={e.id}>{goalLabel(e)}</span>).reverse();
  const scorerZone=(side:'home'|'away',team:string)=>{const list=scorers(side);return <div className="gc-score-scorers" {...(list.length?{role:'group','aria-label':`Torschützen ${team}`}:{})} {...(list.length>2?{tabIndex:0}:{})}>{list}</div>;};
@@ -37,7 +42,7 @@ export function InteractiveMatchPanel({features,now,clubName,clubColor,disabled,
  useLayoutEffect(()=>{const el=tickerRef.current;if(!el){tickerHeight.current=0;return;}const grown=el.scrollHeight-tickerHeight.current;if(tickerHeight.current&&grown>0&&el.scrollTop>4)el.scrollTop+=grown;tickerHeight.current=el.scrollHeight;},[tickerEvents.length,view]);
  return <section className="gc-match-viewer gc-interactive-match" aria-label="Interaktive Matchsimulation">
   <div className="gc-viewer-scoreboard"><div><small>HEIM</small><strong title={away?c.opponent:clubName}>{away?c.opponent:clubName}</strong>{scorerZone(away?'away':'home',away?c.opponent:clubName)}</div><div className="gc-viewer-score"><span>{away?c.awayScore:c.homeScore} : {away?c.homeScore:c.awayScore}</span><small>{status} · {minute}′</small></div><div><small>AUSWÄRTS</small><strong title={away?clubName:c.opponent}>{away?clubName:c.opponent}</strong>{scorerZone(away?'home':'away',away?clubName:c.opponent)}</div></div>
-  {c.phase!=='penalties'&&view==='pitch'&&<div className="gc-viewer-pitch-shell">{halftime.visible&&<HalftimeOverlay features={features} clubName={clubName} leaving={halftime.leaving} disabled={disabled} onSubstitutions={()=>{setEditing(true);onEdit?.();}} onResume={()=>{setEditing(false);onResume?.();}}/>}<MatchPitchCanvas features={features} now={now} playbackWall={wall} colours={{club:clubColor||'#17875f',opponent:clubColor==='#ffc857'?'#3e75dd':'#ffc857'}} camera="full" reducedMotion={reducedMotion} onSelect={()=>{}} onFps={()=>{}}/><div className="gc-viewer-legend"><span>{clubName}</span><span>{c.opponent}</span><span className="gc-stadium-label">{stadiumLabel(matchStadium(features))}</span></div></div>}
+  {c.phase!=='penalties'&&view==='pitch'&&<div className="gc-viewer-pitch-shell">{halftime.visible&&<HalftimeOverlay features={features} clubName={clubName} leaving={halftime.leaving} disabled={disabled} onSubstitutions={()=>{setEditing(true);onEdit?.();}} onResume={()=>{setEditing(false);onResume?.();}}/>}<MatchPitchCanvas features={features} now={now} playbackWall={wall} colours={{club:clubColor||'#17875f',opponent:clubColor==='#ffc857'?'#3e75dd':'#ffc857'}} camera="full" reducedMotion={reducedMotion} onSelect={()=>{}} onFps={()=>{}}/><div className="gc-viewer-legend">{legendTeams.map(team=><span key={team.key} className={team===legendTeams[0]?'gc-legend-left':'gc-legend-right'} title={team.name}><i style={{background:team.colour}} aria-hidden="true"/>{team.name}</span>)}<span className="gc-stadium-label">{stadiumLabel(matchStadium(features))}</span></div></div>}
   {view==='ticker'&&<><div className="gc-ticker-status" aria-hidden="true">{status} · {minute}′</div><div ref={tickerRef} className="gc-viewer-events gc-interactive-ticker" role="log" aria-label="Live Ticker">{events.length?tickerEvents.map(e=><div key={e.id}><time>{e.minute}′</time><span>{eventLabel(e)} · {e.player}{e.assistId?` (${getStarXIPlayer(e.assistId)?.name??c.simulation?.committed.players.find(p=>p.id===e.assistId)?.name??''})`:''}{e.kind==='shot'?` · ${e.outcome==='save'?'Gehalten':e.outcome==='blocked'?'Geblockt':'Vorbei'}`:''}</span></div>):<p>Anpfiff. Die Partie läuft.</p>}</div></>}
   {view==='stats'&&<MatchStatistics features={features} clubName={clubName}/>}
   {events.at(-1)&&now-events.at(-1)!.at<3500&&<div className="gc-viewer-caption" role="status"><time>{events.at(-1)!.minute}′</time><strong>{eventLabel(events.at(-1)!)} · {events.at(-1)!.player}</strong></div>}

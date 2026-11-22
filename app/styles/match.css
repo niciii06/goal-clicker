@@ -432,6 +432,13 @@
 .gc-interactive-match .gc-score-scorers { height:calc(2 * 1.4em + 3px); overflow-y:auto; overscroll-behavior:contain; align-content:start; scrollbar-width:thin; }
 @media(max-width:700px) { .gc-interactive-match .gc-viewer-scoreboard strong { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; min-height:2.6em; white-space:normal; overflow-wrap:anywhere; } }
 @media(max-width:650px) { .gc-interactive-match .gc-viewer-scoreboard { column-gap:5px; } }
+/* The labels under the pitch: the team on the left half at the left, the team on the right half at the right; the stadium line centred below. */
+.gc-interactive-match .gc-viewer-legend { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px 12px; align-items:start; }
+.gc-interactive-match .gc-viewer-legend span { min-width:0; overflow-wrap:anywhere; }
+.gc-interactive-match .gc-viewer-legend .gc-legend-right { justify-self:end; text-align:right; flex-direction:row-reverse; }
+.gc-interactive-match .gc-viewer-legend .gc-legend-left { justify-self:start; }
+.gc-interactive-match .gc-viewer-legend i { flex:none; }
+.gc-interactive-match .gc-viewer-legend .gc-stadium-label { grid-column:1 / -1; justify-self:center; margin-left:0; text-align:center; }
 /* Live ticker: newest event on top. The status line sits above the list (it is not an event); scroll anchoring is off because the component keeps the reading position itself. */
 .gc-interactive-ticker { overflow-anchor:none; }
 .gc-ticker-status { margin-top:8px; color:#afc9bb; font-size: var(--text-caption2); font-weight:800; letter-spacing:.07em; text-align:center; }

@@ -11,6 +11,16 @@ function precedingGoal(s:InteractiveMatch,a:SimAction|undefined){
  return [...s.recent,...s.buffer].find(g=>g.end===a.start&&g.kind==='shot'&&g.outcome==='goal');
 }
 
+/**
+ * Which team stands on the left half of the pitch in a frame. The formation anchors are what the renderer draws around (they
+ * turn when the teams change ends, and an away game starts with the club on the right), while the live positions follow the
+ * ball and a goal celebration, so the anchors are the stable answer.
+ */
+export function clubIsOnLeft(frame:{players:readonly {side:'club'|'opponent';anchor:{x:number}}[]}) {
+ const mean=(side:'club'|'opponent')=>{const xs=frame.players.filter(p=>p.side===side).map(p=>p.anchor.x);return xs.length?xs.reduce((a,b)=>a+b,0)/xs.length:52.5;};
+ return mean('club')<mean('opponent');
+}
+
 export function readInteractiveFrame(s:InteractiveMatch,time:number) {
  // A play that is still running wins over one that just ended, so at a period boundary (half time,
  // where the kick-off positions are already set) the frame shows the next play's starting positions.
