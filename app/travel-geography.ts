@@ -84,7 +84,17 @@ const FICTIONAL = FICTIONAL_NAMES.map((name,i):SeasonClub=>({id:`geo-1-${i+1}`,n
 for(const club of FICTIONAL){const record=STADIUM_AUDIT.fictional.find(r=>r.venueId===club.venue.id);if(record)club.venue={...club.venue,registeredStadium:club.venue.stadium,stadium:record.osmName||'Fussballplatz Bern',lat:record.lat,lon:record.lon,verification:'pitch-fallback',source:record.source,coordinateSource:record.source,coordinateNote:'Fiktiver Club auf einem realen kartierten Fussballfeld.'};}
 const WORLD_IDS=['world-real-madreto','world-fc-barceloneta','world-liverpuhl-fc','world-manchester-cite','world-bayern-muenchan'];
 const WORLD = LEGACY_POOLS[7].map(([name,key],i):SeasonClub=>({id:WORLD_IDS[i],name,league:1,venue:VENUES[key]}));
-const BASE_CLUBS: SeasonClub[] = [...FICTIONAL,...SWISS_CLUBS as SeasonClub[],...WORLD];
+/**
+ * BSC Young Boys play in the Stadion Wankdorf, which the tournament anchor VENUES.bern already holds as an audited ground
+ * (OSM way 48124462). The club's own audit request failed (HTTP 509), so its season venue stayed at the municipality
+ * centre of Bern, 3.5 km away, with a different road route. The season club now shares the audited coordinates. Club id,
+ * venue id and every other field stay, so saves, tables and route keys are unchanged; journeys already under way keep
+ * the venue copy they started with (travel-data fixtureFor).
+ */
+const WANKDORF_CLUB_ID='bsc-young-boys';
+const wankdorfOf=(venue:Venue):Venue=>{const next:Venue&{coordinateLabel?:string}={...venue,lat:VENUES.bern.lat,lon:VENUES.bern.lon,verification:VENUES.bern.verification,coordinateSource:VENUES.bern.coordinateSource,coordinateNote:'Stadion Wankdorf: gleicher geprüfter Anker wie das Turnier (VENUES.bern), Mittelpunkt des kartierten Spielfelds in OpenStreetMap.'};delete next.coordinateLabel;return next;};
+const SWISS_SEASON_CLUBS=(SWISS_CLUBS as SeasonClub[]).map((club):SeasonClub=>club.id===WANKDORF_CLUB_ID?{...club,venue:wankdorfOf(club.venue)}:club);
+const BASE_CLUBS: SeasonClub[] = [...FICTIONAL,...SWISS_SEASON_CLUBS,...WORLD];
 /** The first club of a league lends its audited ground to a fictional sixth club (ground sharing, no new geodata). */
 const groundOfLeague=(league:number)=>BASE_CLUBS.find(c=>c.league===league)!.venue;
 const fictionalSixth=(league:number,name:string):SeasonClub=>({id:`extra-${league}-${name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'')}`,name,league,fictional:true,venue:groundOfLeague(league)});
