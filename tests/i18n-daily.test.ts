@@ -78,3 +78,24 @@ test('saved German history lines of a claim are shown in English, the data stays
   assert.equal(runtime.localizeText('Tägliche Prämie · Tag 7'), 'Daily reward · day 7');
   german();
 });
+
+test('co-op history: the member who claimed day 7 is named once in German and English, other entries keep their name', async () => {
+  const { historyLine } = await import('../app/qol/history-filter.ts');
+  // The world stores the German line with the name inside and also marks who did it (app/api/multiplayer/route.ts).
+  const claim = { actor: 'Lea', detail: 'Lea holt ein Spezialkarten-Pack. Serie: 7 Tage.' };
+  german();
+  assert.equal(historyLine(claim.actor, runtime.localizeText(claim.detail)), 'Lea holt ein Spezialkarten-Pack. Serie: 7 Tage.');
+  english();
+  assert.equal(historyLine(claim.actor, runtime.localizeText(claim.detail)), 'Lea collects a special card pack. Streak: 7 days.');
+  german();
+  // Entries whose text does not start with the member keep the name in front; no name, no prefix.
+  assert.equal(historyLine('Lea', '5 × Pack geöffnet.'), 'Lea · 5 × Pack geöffnet.');
+  assert.equal(historyLine('Lea', 'Mia wurde vom Host aus der Welt entfernt.'), 'Lea · Mia wurde vom Host aus der Welt entfernt.');
+  assert.equal(historyLine('Lea', 'Leander spielt jetzt auf Platz 9.'), 'Lea · Leander spielt jetzt auf Platz 9.');
+  assert.equal(historyLine('Lea', 'Lea hat die Welt verlassen.'), 'Lea hat die Welt verlassen.');
+  assert.equal(historyLine(undefined, 'Lea holt ein Spezialkarten-Pack. Serie: 7 Tage.'), 'Lea holt ein Spezialkarten-Pack. Serie: 7 Tage.');
+  // A name cut to 24 characters still counts as the same member.
+  const long = 'Maximilian Alexander Muster';
+  assert.equal(historyLine(long.slice(0, 24), `${long} holt ein Spezialkarten-Pack. Serie: 7 Tage.`), `${long} holt ein Spezialkarten-Pack. Serie: 7 Tage.`);
+  assert.match(readFileSync('app/game-app.tsx', 'utf8'), /<small>\{historyLine\(entry\.actor, localizeText\(entry\.detail\)\)\}<\/small>/, 'the history list uses it');
+});
