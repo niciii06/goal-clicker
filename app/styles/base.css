@@ -894,7 +894,7 @@ button { font: inherit; }
 }
 @media (max-width: 540px) {
   .topbar { flex-wrap: wrap; }
-  .header-goals { position: static; order: 3; width: 100%; justify-content: center; margin-top: 1px; transform: none; }
+  .header-goals { position: static; order: 3; width: 100%; flex-wrap: wrap; justify-content: center; margin-top: 1px; transform: none; }
   .header-goal-boost { padding-left: 7px; font-size: var(--text-footnote); }
   .star-pack-roulette-track { --roulette-finish: -1075px; }
   .star-pack-roulette-card { width: 94px; flex-basis: 94px; }
