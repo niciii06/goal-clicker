@@ -423,6 +423,18 @@
 .gc-interactive-match .gc-sub-confirm { flex-wrap:wrap; }
 .gc-interactive-match .gc-sub-confirm>span { flex-basis:100%; }
 .gc-interactive-match .gc-score-scorers { overflow-wrap:anywhere; }
+/* Scoreboard of the interactive match: a fixed height whatever the score, and both team names on one line (they were centred in
+   columns of different height, so a goal made the black area taller and pushed one name down). The three columns share three rows
+   (label, name, scorers); the scorer zone is two lines high, newest goal first, older ones scroll. */
+.gc-interactive-match .gc-viewer-scoreboard { grid-template-rows:auto auto auto; align-items:start; gap:0 10px; }
+.gc-interactive-match .gc-viewer-scoreboard>div:not(.gc-viewer-score) { display:grid; grid-row:1 / span 3; grid-template-rows:subgrid; align-content:start; min-width:0; }
+.gc-interactive-match .gc-viewer-score { grid-row:1 / span 3; align-self:start; }
+.gc-interactive-match .gc-score-scorers { height:calc(2 * 1.4em + 3px); overflow-y:auto; overscroll-behavior:contain; align-content:start; scrollbar-width:thin; }
+@media(max-width:700px) { .gc-interactive-match .gc-viewer-scoreboard strong { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; min-height:2.6em; white-space:normal; overflow-wrap:anywhere; } }
+@media(max-width:650px) { .gc-interactive-match .gc-viewer-scoreboard { column-gap:5px; } }
+/* Live ticker: newest event on top. The status line sits above the list (it is not an event); scroll anchoring is off because the component keeps the reading position itself. */
+.gc-interactive-ticker { overflow-anchor:none; }
+.gc-ticker-status { margin-top:8px; color:#afc9bb; font-size: var(--text-caption2); font-weight:800; letter-spacing:.07em; text-align:center; }
 @media(max-width:600px) { .gc-interactive-controls button{ flex:1 1 40%; } .gc-interactive-match .gc-viewer-scoreboard{ min-width:0; }}
 .summary-match-stats,.summary-goals { display:flex; flex-wrap:wrap; gap:8px 18px; margin:12px 0; font-size: var(--text-footnote); }
 .summary-motm { margin: 10px 0 0; color: var(--soft); font-size: var(--text-footnote); }
