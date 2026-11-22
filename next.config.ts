@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   env: {
     NEXT_PUBLIC_AUTH_MODE: authBuildMode,
+    // E-mail registration with a confirmation code (app/auth/config.ts emailSignupEnabled); off unless set.
+    NEXT_PUBLIC_EMAIL_SIGNUP: process.env.GOAL_CLICKER_EMAIL_SIGNUP === "1" ? "1" : "",
     // Baked into the server bundle too: a build made on a host stays fail closed even if its runtime lacks the flags.
     GOAL_CLICKER_HOSTED_BUILD: hostedBuild ? "1" : "",
   },

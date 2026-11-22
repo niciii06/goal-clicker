@@ -37,11 +37,14 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts",
     ".next-account/types/**/*.ts",
-    ".next-account/dev/types/**/*.ts"
+    ".next-account/dev/types/**/*.ts",
+    ".next-email/types/**/*.ts",
+    ".next-email/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
     ".next-account",
+    ".next-email",
     "examples",
     "out",
     "outputs",

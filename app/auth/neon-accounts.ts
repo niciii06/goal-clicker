@@ -2,14 +2,14 @@
 // generated login address (p-<random>@players.goal-clicker.vercel.app) never leaves the server.
 import { AuthUnavailableError, neonAuthFetch, sessionCookieFromSetCookies, verifySessionCookie } from "./server";
 
-export type NeonLogin = { ok: true; subject: string; setCookies: string[]; sessionCookie: string } | { ok: false; reason: "exists" | "invalid" | "rate-limited" | "rejected"; code?: string };
+export type NeonLogin = { ok: true; subject: string; setCookies: string[]; sessionCookie: string; emailVerified?: boolean } | { ok: false; reason: "exists" | "invalid" | "rate-limited" | "rejected"; code?: string };
 
-type AuthBody = { user?: { id?: string } | null; token?: string | null };
+type AuthBody = { user?: { id?: string; emailVerified?: boolean | null } | null; token?: string | null };
 
 function loginResult(result: { status: number; data: AuthBody | null; setCookies: string[]; code?: string }): NeonLogin {
   const subject = result.data?.user?.id;
   const sessionCookie = sessionCookieFromSetCookies(result.setCookies);
-  if (result.status === 200 && typeof subject === "string" && sessionCookie) return { ok: true, subject, setCookies: result.setCookies, sessionCookie };
+  if (result.status === 200 && typeof subject === "string" && sessionCookie) return { ok: true, subject, setCookies: result.setCookies, sessionCookie, emailVerified: result.data?.user?.emailVerified === true };
   if (result.status === 429) return { ok: false, reason: "rate-limited", code: result.code };
   if (result.status === 422 || /ALREADY_EXISTS/.test(result.code ?? "")) return { ok: false, reason: "exists", code: result.code };
   if (result.status === 401 || result.status === 403) return { ok: false, reason: "invalid", code: result.code };
@@ -52,4 +52,39 @@ export async function deleteNeonUser(sessionCookie: string, origin: string, pass
     if (error instanceof AuthUnavailableError) return "not-deleted";
     throw error;
   }
+}
+
+// ---- One time e-mail codes (Better Auth Email OTP plugin, part of Managed Better Auth) ----
+// Neon creates, mails, expires and limits the codes; this server only passes them on. A code works once.
+
+export type CodeResult = { ok: true; setCookies: string[] } | { ok: false; reason: "invalid" | "too-many" | "rate-limited" | "rejected" };
+
+function codeResult(result: { status: number; setCookies: string[]; code?: string }): CodeResult {
+  if (result.status === 200) return { ok: true, setCookies: result.setCookies };
+  if (/TOO_MANY_ATTEMPTS/.test(result.code ?? "")) return { ok: false, reason: "too-many" };
+  if (result.status === 429) return { ok: false, reason: "rate-limited" };
+  if (result.status === 400 || result.status === 401 || result.status === 403 || /OTP|INVALID|EXPIRED/.test(result.code ?? "")) return { ok: false, reason: "invalid" };
+  return { ok: false, reason: "rejected" };
+}
+
+/** Mails a confirmation code to the address of a login. True when Neon accepted the request. */
+export async function sendVerificationCode(email: string, origin: string) {
+  const result = await neonAuthFetch("email-otp/send-verification-otp", { origin, body: { email, type: "email-verification" } });
+  return result.status === 200;
+}
+
+/** Confirms the address with the mailed code; Neon may answer with a fresh session (auto sign in). */
+export async function verifyEmailCode(email: string, otp: string, origin: string): Promise<CodeResult> {
+  return codeResult(await neonAuthFetch("email-otp/verify-email", { origin, body: { email, otp } }));
+}
+
+/** Mails a password reset code (forget password, Email OTP). */
+export async function sendPasswordResetCode(email: string, origin: string) {
+  const result = await neonAuthFetch("forget-password/email-otp", { origin, body: { email } });
+  return result.status === 200;
+}
+
+/** Sets a new password with the mailed reset code. */
+export async function resetPasswordWithCode(email: string, otp: string, password: string, origin: string): Promise<CodeResult> {
+  return codeResult(await neonAuthFetch("email-otp/reset-password", { origin, body: { email, otp, password } }));
 }

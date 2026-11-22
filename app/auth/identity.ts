@@ -44,6 +44,10 @@ export const identityDefaults: IdentityDeps = { store: getDb, listAccounts: list
 
 const fail = (status: number, errorCode: string, error: string): AccountResolution => ({ ok: false, status, errorCode, error });
 export const ACCOUNT_SETUP_REQUIRED = fail(409, "ACCOUNT_SETUP_REQUIRED", "Dein Konto wird noch eingerichtet. Bitte lade die Seite neu.");
+/** An account registered with an e-mail address opens only once Neon Auth has confirmed the address. */
+export const EMAIL_UNVERIFIED = fail(403, "EMAIL_UNVERIFIED", "Bestätige zuerst deine E-Mail-Adresse mit dem Code, den wir dir geschickt haben.");
+const waitsForEmail = (method: string, session: AuthSession) => method === "email" && session.emailVerified !== true;
+
 export const DELETION_PENDING = fail(410, "ACCOUNT_DELETION_PENDING", "Dein Profil und dein Spielstand sind gelöscht. Dieser Login ist gesperrt und wird vom Besitzer des Spiels endgültig entfernt.");
 
 // Bound logins per server instance; a binding never changes, only a deletion removes it (see forgetIdentity).
@@ -63,11 +67,12 @@ export function clearIdentityCacheForTests() {
 export async function lookupAccount(session: AuthSession, deps: Pick<IdentityDeps, "store"> = identityDefaults): Promise<AccountResolution> {
   const key = cacheKey(session);
   const cached = identityCache.get(key);
-  if (cached && cached.until > Date.now()) return { ok: true, accountId: cached.accountId, method: cached.method, created: false };
+  if (cached && cached.until > Date.now()) return waitsForEmail(cached.method, session) ? EMAIL_UNVERIFIED : { ok: true, accountId: cached.accountId, method: cached.method, created: false };
   const identity = await deps.store().getIdentity(session.issuer, session.subject);
   if (!identity) return ACCOUNT_SETUP_REQUIRED;
   if (identity.deletedAt) return DELETION_PENDING;
   identityCache.set(key, { accountId: identity.accountId, method: identity.method, until: Date.now() + IDENTITY_CACHE_MS });
+  if (waitsForEmail(identity.method, session)) return EMAIL_UNVERIFIED;
   return { ok: true, accountId: identity.accountId, method: identity.method, created: false };
 }
 
@@ -82,6 +87,7 @@ export async function resolveAccount(session: AuthSession, origin: string, deps:
   if (existing?.deletedAt) return DELETION_PENDING;
   if (existing) {
     identityCache.set(cacheKey(session), { accountId: existing.accountId, method: existing.method, until: Date.now() + IDENTITY_CACHE_MS });
+    if (waitsForEmail(existing.method, session)) return EMAIL_UNVERIFIED;
     return { ok: true, accountId: existing.accountId, method: existing.method, created: false };
   }
   // Any failure from here on throws: an unreadable login list must never turn into a new empty account.

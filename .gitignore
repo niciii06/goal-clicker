@@ -16,6 +16,7 @@
 # next.js
 /.next/
 /.next-account/
+/.next-email/
 /out/
 
 # misc
