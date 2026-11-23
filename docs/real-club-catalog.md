@@ -34,14 +34,14 @@ Pro Welt 89 Clubs, 15 Ligen. Fiktiv und zu ersetzen:
 
 | Heimstadt | Gemeinsame Plätze Liga 4 bis 7 | Regionale Ligen 8 bis 14 (42 Clubs) | Summe |
 |---|---|---|---|
-| Bern | 2 | 3 fiktiv, 39 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil ersetzt, siehe unten) | 5 |
+| Bern | 2 | 2 fiktiv, 40 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil, Goldstern ersetzt, siehe unten) | 4 |
 | Zürich | 2 | 41 fiktiv, 1 echt (FC Oerlikon/Polizei ZH) | 43 |
 | Basel | 2 | 39 fiktiv, 3 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach) | 41 |
 | Genève | 2 | 40 fiktiv, 2 echt (Signal FC Bernex-Confignon, Meyrin FC) | 42 |
 
 **Gemeinsame Plätze (wirken in allen vier Welten, deshalb zuerst):** ~~`extra-4-fc-alpenfestung`~~ (ersetzt durch Yverdon Sport FC), ~~`extra-5-fc-gotthard-murmeltiere`~~ (ersetzt durch FC Wil 1900), `extra-6-fc-l-man-mouettes` (Liga 6), `extra-7-fc-z-risee-b-tler` (Liga 7). Ihre Spielorte sind geliehene geprüfte Plätze anderer Clubs der Liga.
 
-**Nur Bern, Liga 8 bis 14:** `extra-8-fc-r-stigraben-united`, `extra-9-fc-seeland-hechte`, `extra-10-fc-emmental-k-sekicker`, `extra-11-fc-g-rbetal-kickers`, ~~`extra-11-fc-g-rbetal-kickers`~~ (ersetzt durch FC Stettlen 08), ~~`extra-12-fc-worblental-rangers`~~ (ersetzt durch FC Heimberg), `extra-13-sc-marzili-bern`, `extra-14-fc-aaref-chse-bern`.
+**Nur Bern, Liga 8 bis 14:** `extra-8-fc-r-stigraben-united`, `extra-9-fc-seeland-hechte`, `extra-10-fc-emmental-k-sekicker`, `extra-11-fc-g-rbetal-kickers`, ~~`extra-11-fc-g-rbetal-kickers`~~ (ersetzt durch FC Stettlen 08), ~~`extra-12-fc-worblental-rangers`~~ (ersetzt durch FC Heimberg), ~~`extra-13-sc-marzili-bern`~~ (ersetzt durch FC Goldstern), `extra-14-fc-aaref-chse-bern`.
 
 **Zürich, Basel, Genève:** IDs `zh-D-N`, `bs-D-N`, `ge-D-N` (Division D = 2 bis 8, Liga 16 minus D), pro Liga bis zu sechs fiktive Clubs. Anzahl je Liga (Liga 14, 13, ..., 8): Zürich 5, 6, 6, 6, 6, 6, 6. Basel 5, 6, 5, 6, 6, 6, 5. Genève 6, 6, 5, 6, 6, 5, 6.
 
@@ -126,7 +126,6 @@ Es kamen nur diese zwei Routen in den Cache, bestehende Routen blieben unveränd
 
 | Kandidat | Stand | Was fehlt |
 |---|---|---|
-| FC Goldstern, Waldruhe | Adresse Löhrwaldweg 9 (Bundesregister) und Platz way 26531887 (4950 m²) passen zum FVBJ Eintrag | Spielstätte der 1. Mannschaft (Clubseite nennt auch «Buvette Bremgarten»), öffentliche Zufahrt (Löhrwaldweg teils privat) |
 | SC Aegerten Brügg, Moos | FVBJ: Hauptplatz 102 × 64 m, Moosweg 14 (swisstopo: 47.11648, 7.28313). Drei beleuchtete Rasenplätze in OSM: way 35960672 (97.3 × 62.8 m), way 35960673 (110.0 × 68.0 m, am nächsten zu Moosweg 14), way 35960674 (103.2 × 72.1 m) | Keiner passt: der erste ist kleiner als das FVBJ Mass, der zweite 8 m länger, der dritte 8 m breiter (Auslauf der Karte rund +3 bis +7 m). Die Karte stimmt hier nicht sicher mit der Anlage überein, ein Orthofoto Abgleich oder die Masse des Platzes 2 und 3 aus dem FVBJ Eintrag würden es klären |
 | FC Steffisburg, Schönau | Schönau ist ein Neubau (Schul, Kultur und Sportanlage), der alte Platz ist Eichfeld | aktuelle Heimspielstätte |
 
@@ -145,11 +144,28 @@ Ersetzen `extra-4-fc-alpenfestung` und `extra-5-fc-gotthard-murmeltiere` in Bern
 
 Es kamen nur diese drei Routen neu in den Cache, bestehende Routen blieben unverändert. Die Matchcenter Seite des FVBJ ist für Super und Challenge League nicht zuständig (SFL Clubs).
 
+## Phase 4: FC Goldstern (Bern, Liga 13)
+
+Ersetzt `extra-13-sc-marzili-bern` (SC Marzili Bern). **Die ID bleibt**, der alte Name führt weiter zu seinem früheren Spielort (`REPLACED_CLUB_GROUNDS`). Liga 13 («Berner Stadtliga», bis 5 km) passt zur Entfernung: Bremgarten bei Bern liegt 4.5 km vom Heimstadion.
+
+**Korrektur gegenüber dem früheren Stand:** Die erste Mannschaft (2. Liga regional) spielt ihre Ligaspiele auf dem Hauptplatz der **Sportanlage Bremgarten bB**, nicht am Clubhaus Waldruhe (FVBJ Ligaspiel vom 5.9. und 24.10.2026). Die Adresse Löhrwaldweg 9 und das Feld way 26531887 bei Uettligen gehören nur zum Clubhaus.
+
+| Angabe | Beleg |
+|---|---|
+| FVBJ Anlage: Kalchackerstrasse, 3047 Bremgarten, genau ein Kunstrasenfeld 90,2 × 57,7 m | FVBJ Anlageneintrag (von Work abgerufen, Matchcenter blockiert automatische Zugriffe) |
+| Platz: OSM way 72707053, Kunstrasen, 6074 m², kleinstes Rechteck 96.1 × 63.6 m | passt auf 90,2 × 57,7 m plus rund 5,9 m Auslauf je Richtung (gleiche Auslaufbreite wie in Leimen und Arniacher); der einzige Kunstrasenplatz der Anlage, die anderen Felder sind kleiner (45 × 43, 45 × 41, 24 × 16 m) |
+| Mittelpunkt 46.9767239, 7.4337845 | Schwerpunkt des OSM Polygons, liegt innerhalb |
+| Strasse | Kalchackerstrasse (Tertiärstrasse) 136 m vom Mittelpunkt, Johanniterstrasse (Wohnstrasse, öffentlich) 68 m |
+| Parkplatz | Die Gemeinde bestätigt öffentliche Parkplätze bei den Sportanlagen (Parkierungsverordnung vom 1.9.2025, Art. 1). In OSM: Strassenparkplätze ohne Gebühr 64 und 89 m, öffentlicher Parkplatz mit 28 Plätzen 114 m vom Mittelpunkt |
+| Strassenendpunkt | Route Bern bis Sportanlage: 8,1 km, 12 Minuten, endet bei 46.977333, 7.433776 auf der Johanniterstrasse, 68 m vom Mittelpunkt (die letzten Meter sind geschätzt) |
+
+Nur diese eine Route kam neu in den Cache, bestehende Routen blieben unverändert.
+
 ## Phase 3, weiter geprüft und nicht übernommen
 
 | Kandidat | Was fehlt |
 |---|---|
 | FC Steffisburg, Schönau | FVBJ: aktuelle Spiele auf dem Hauptplatz Schönau, Anlage Schönauweg 46 (3612 Steffisburg, Schulhaus Schönau), Hauptplatz 100 × 64 m. In OpenStreetMap ist dort **kein Fussballfeld** kartiert: die Anlage ist neu. Das nächste Grasfeld (way 334213888, 110 × 81 m, `sport=multi`, bearbeitet am 3.11.2025) liegt 285 m von der Adresse entfernt und passt nicht zu 100 × 64 m (+10/+17 m). Ohne Feldpolygon bleibt der Mittelpunkt offen (kein provisorischer Punkt). Der Parkplatz beim Schulhaus ist in OSM kartiert (way 124614207, 10 m von der Adresse) |
-| FC Rapperswil-Jona, Stadion Grünfeld | Zwei Hinweise widersprechen sich: der Stadionpunkt 47.22206, 8.84398 liegt neben way 195667482 (106.1 × 70.0 m), das swisstopo Gebäude «Stadion Grünfeld» (47.22098, 8.84158) liegt neben way 203509029 (102.4 × 70.6 m) und way 203508979 (115.6 × 76.1 m). Welches Feld das Stadionfeld ist, belegt keine Quelle |
+| FC Rapperswil-Jona, Stadion Grünfeld | Die Gemeinde nennt ein Hauptspielfeld mit Tribüne (Grünfeldstrasse 8), der Club die Zufahrt über den gebührenpflichtigen Parkplatz an der Grünfeldstrasse (Blumenaustrasse gesperrt). Die OSM Tribüne (way 220366252) liegt 6 bis 7 m neben zwei Feldern (way 203508979, 115.6 × 76.1 m, und way 203509029, 102.4 × 70.6 m), ohne Mass des Clubs bleibt offen, welches das Hauptspielfeld ist. Frühere Hinweise: der Stadionpunkt 47.22206, 8.84398 liegt neben way 195667482 (106.1 × 70.0 m), das swisstopo Gebäude «Stadion Grünfeld» (47.22098, 8.84158) liegt neben way 203509029 (102.4 × 70.6 m) und way 203508979 (115.6 × 76.1 m). Welches Feld das Stadionfeld ist, belegt keine Quelle |
 | FC Schaffhausen, Stadion Breite | Zwei verschachtelte OSM Umrisse mit demselben Namen (111.0 × 76.5 m und 107.7 × 73.9 m), kein Mass des Clubs, das den Feldumriss bestimmt |
 | FC Locarno, Stadio del Lido | Zwei beleuchtete Rasenfelder (99.9 × 64.4 m und 100.3 × 62.8 m) neben dem Stadion, kein Beleg für das Spielfeld der 1. Mannschaft |

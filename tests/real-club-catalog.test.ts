@@ -40,7 +40,7 @@ test("the world league has six real clubs with official names in all four home c
  * allowed to be fictional and is not counted.
  */
 const BACKLOG: Record<string, Record<number, number>> = {
-  bern: { 6: 1, 7: 1, 8: 1, 13: 1, 14: 1 },
+  bern: { 6: 1, 7: 1, 8: 1, 14: 1 },
   zurich: { 6: 1, 7: 1, 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 6, 14: 5 },
   basel: { 6: 1, 7: 1, 8: 5, 9: 6, 10: 6, 11: 6, 12: 5, 13: 6, 14: 5 },
   geneve: { 6: 1, 7: 1, 8: 6, 9: 5, 10: 6, 11: 6, 12: 5, 13: 6, 14: 6 },
@@ -227,7 +227,7 @@ test("all verified replacements together: ids and names unique, six clubs per le
   const catalog = catalogOf("bern");
   assert.equal(new Set(catalog.map((club) => club.id)).size, catalog.length);
   assert.equal(new Set(catalog.map((club) => club.name)).size, catalog.length);
-  for (const league of [4, 5, 9, 10, 11, 12]) assert.equal(catalog.filter((club) => club.league === league).length, 6, `league ${league}`);
+  for (const league of [4, 5, 9, 10, 11, 12, 13]) assert.equal(catalog.filter((club) => club.league === league).length, 6, `league ${league}`);
   const replaced = [
     [YVERDON_ID, "Yverdon Sport FC", 4, "FC Alpenfestung"],
     [WIL_ID, "FC Wil 1900", 5, "FC Gotthard Murmeltiere"],
@@ -235,6 +235,7 @@ test("all verified replacements together: ids and names unique, six clubs per le
     [STETTLEN_ID, "FC Stettlen 08", 11, "FC Gürbetal Kickers"],
     [OBERDIESSBACH_ID, "FC Oberdiessbach", 9, "FC Seeland Hechte"],
     [GROSSHOECHSTETTEN_ID, "FC Grosshöchstetten-Schlosswil", 10, "FC Emmental Käsekicker"],
+    [GOLDSTERN_ID, "FC Goldstern", 13, "SC Marzili Bern"],
   ] as const;
   for (const [id, name, league, oldName] of replaced) {
     const club = catalog.find((item) => item.id === id)!;
@@ -358,4 +359,37 @@ test("Stade Municipal and Lidl Arena: the points lie inside the mapped stadium p
   assert.ok(metresBetween([yverdon.lat, yverdon.lon], [46.783612, 6.646213]) < 100, "road endpoint of the route: Rue des Pêcheurs");
   assert.ok(metresBetween([wil.lat, wil.lon], [47.45815, 9.03685]) < 80, "the Lidl Arena building (swisstopo) is next to the pitch");
   assert.ok(metresBetween([wil.lat, wil.lon], [47.458705, 9.035941]) < 100, "road endpoint of the route: the stadium car park");
+});
+
+// ---- FC Goldstern (Liga 13, Bern). The current men's first team (2. Liga regional) plays its league games on the main pitch of the
+// Sportanlage Bremgarten bB (FVBJ ground listing, Kalchackerstrasse, 3047 Bremgarten: exactly one synthetic field of 90.2 x 57.7 m),
+// not at the clubhouse Waldruhe. The municipality confirms the public parking of the sports grounds (Parkierungsverordnung 2025).
+const GOLDSTERN_ID = "extra-13-sc-marzili-bern";
+/** Corners of OpenStreetMap way 72707053, the only artificial turf pitch of the site. */
+const GOLDSTERN_PITCH: [number, number][] = [[46.9771363, 7.4333282], [46.9762766, 7.4334089], [46.976313, 7.4342411], [46.9771726, 7.4341604]];
+
+test("FC Goldstern is the real sixth club of Liga 13 in Bern: old id, real name, no longer fictional, one club of that name", () => {
+  const bern = worldCatalog("bern");
+  const club = bern.find((item) => item.id === GOLDSTERN_ID)!;
+  assert.ok(club, "the id of the old fictional club is kept");
+  assert.equal(club.name, "FC Goldstern");
+  assert.equal(club.league, 13);
+  assert.ok(!club.fictional);
+  assert.equal(bern.filter((item) => item.name === "FC Goldstern").length, 1);
+  assert.ok(!bern.some((item) => item.name === "SC Marzili Bern"));
+});
+
+test("FC Goldstern ground: the Bremgarten synthetic pitch, not the clubhouse Waldruhe; size of the FVBJ listing plus run-off; street and parking approach next to it", () => {
+  const venue = worldCatalog("bern").find((item) => item.id === GOLDSTERN_ID)!.venue;
+  assert.equal(venue.verification, "stadium");
+  assert.equal(venue.city, "Bremgarten bei Bern");
+  assert.equal(venue.postalCode, "3047");
+  assert.equal(venue.coordinateSource, "https://www.openstreetmap.org/way/72707053");
+  assert.ok(inPolygon(venue.lat, venue.lon, GOLDSTERN_PITCH), "inside the pitch polygon");
+  const best = minRectangle(GOLDSTERN_PITCH);
+  assert.ok(best.length >= 90.2 && best.length <= 98.2, `length ${best.length.toFixed(1)}`);
+  assert.ok(best.width >= 57.7 && best.width <= 65.7, `width ${best.width.toFixed(1)}`);
+  // The Waldruhe pitch in Uettligen (46.9826, 7.4058) is not the ground of the first team.
+  assert.ok(metresBetween([venue.lat, venue.lon], [46.982589, 7.4058465]) > 2000, "not the Waldruhe pitch");
+  assert.ok(metresBetween([venue.lat, venue.lon], [46.977333, 7.433776]) < 100, "road endpoint of the route: Johanniterstrasse next to the sports grounds parking");
 });

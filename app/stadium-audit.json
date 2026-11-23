@@ -760,6 +760,19 @@
       "source": "https://www.openstreetmap.org/way/581466821",
       "verifiedAt": "2026-11-23",
       "pitchAreaSquareMetres": 8257
+    },
+    {
+      "club": "FC Goldstern",
+      "venueId": "venue-fc-goldstern",
+      "lat": 46.9767239,
+      "lon": 7.4337845,
+      "osmWay": "72707053",
+      "osmName": "",
+      "registeredStadium": "Sportanlage Bremgarten bB",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/72707053",
+      "verifiedAt": "2026-11-23",
+      "pitchAreaSquareMetres": 6074
     }
   ],
   "international": [

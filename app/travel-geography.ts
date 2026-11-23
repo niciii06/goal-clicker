@@ -144,6 +144,19 @@ const WIL_VENUE: Venue = {
  coordinateSource:'https://www.openstreetmap.org/way/581466821',coordinateNote:'Mittelpunkt des Spielfelds im Stadion Lidl Arena, in OpenStreetMap als Fussballfeld kartiert.',
 };
 const WIL:SeasonClub={id:'extra-5-fc-gotthard-murmeltiere',name:'FC Wil 1900',league:5,venue:WIL_VENUE};
+/**
+ * FC Goldstern replaces the fictional sixth club of Liga 13 in the Bern world. The current men's first team (2. Liga regional) plays
+ * its league games on the main pitch of the Sportanlage Bremgarten bB (FVBJ ground listing, Kalchackerstrasse, 3047 Bremgarten:
+ * exactly one synthetic field of 90.2 x 57.7 m), not at the clubhouse Waldruhe in Uettligen. The only artificial turf pitch of the site
+ * is OpenStreetMap way 72707053 (96.1 x 63.6 m, about 6 m larger in both directions, the run-off the map includes). The public parking of
+ * the sports grounds is confirmed by the municipality (Parkierungsverordnung 2025); the route ends on the Johanniterstrasse next to it.
+ */
+const GOLDSTERN_VENUE: Venue = {
+ id:'venue-fc-goldstern',stadium:'Sportanlage Bremgarten bB',city:'Bremgarten bei Bern',country:'Schweiz',canton:'BE',lat:46.9767239,lon:7.4337845,
+ source:'https://matchcenter.fvbj-afbj.ch/default.aspx?a=sa&lng=1&oid=6&sa=511756&v=1338',verification:'stadium',registeredStadium:'Sportanlage Bremgarten bB',address:'Kalchackerstrasse',postalCode:'3047',
+ coordinateSource:'https://www.openstreetmap.org/way/72707053',coordinateNote:'Mittelpunkt des Hauptplatzes (Kunstrasen 90,2 × 57,7 m laut FVBJ Anlageneintrag), in OpenStreetMap als Fussballfeld kartiert.',
+};
+const GOLDSTERN:SeasonClub={id:'extra-13-sc-marzili-bern',name:'FC Goldstern',league:13,venue:GOLDSTERN_VENUE};
 const STETTLEN:SeasonClub={id:'extra-11-fc-g-rbetal-kickers',name:'FC Stettlen 08',league:11,venue:STETTLEN_VENUE};
 /**
  * FC Oberdiessbach (Sportanlage Leimen, Helisbühlstrasse) replaces the fictional sixth club of Liga 9 in the Bern world.
@@ -169,14 +182,14 @@ const GROSSHOECHSTETTEN_VENUE: Venue = {
 };
 const GROSSHOECHSTETTEN:SeasonClub={id:'extra-10-fc-emmental-k-sekicker',name:'FC Grosshöchstetten-Schlosswil',league:10,venue:GROSSHOECHSTETTEN_VENUE};
 /** Names of clubs that were replaced by a real club: a saved table or journey that still carries the old name keeps its old ground until the season ends. */
-const REPLACED_CLUB_GROUNDS:Record<string,()=>Venue>={'FC Worblental Rangers':()=>groundOfLeague(12),'FC Gürbetal Kickers':()=>groundOfLeague(11),'FC Seeland Hechte':()=>groundOfLeague(9),'FC Alpenfestung':()=>groundOfLeague(4),'FC Gotthard Murmeltiere':()=>groundOfLeague(5),'FC Emmental Käsekicker':()=>groundOfLeague(10)};
+const REPLACED_CLUB_GROUNDS:Record<string,()=>Venue>={'FC Worblental Rangers':()=>groundOfLeague(12),'FC Gürbetal Kickers':()=>groundOfLeague(11),'FC Seeland Hechte':()=>groundOfLeague(9),'SC Marzili Bern':()=>groundOfLeague(13),'FC Alpenfestung':()=>groundOfLeague(4),'FC Gotthard Murmeltiere':()=>groundOfLeague(5),'FC Emmental Käsekicker':()=>groundOfLeague(10)};
 const EXTRA_CLUBS: SeasonClub[] = [
  {id:'world-paris-saint-german',name:'Paris Saint-Germain',league:1,venue:VENUES.paris},
  {id:'extra-2-grasshopper',name:'Grasshopper Club Zürich',league:2,venue:VENUES.zurich},
  {id:'extra-3-winterthur',name:'FC Winterthur',league:3,venue:VENUES.winterthur},
  YVERDON,WIL,fictionalSixth(6,'FC Léman Mouettes'),fictionalSixth(7,'FC Zürisee Böötler'),
  fictionalSixth(8,'FC Röstigraben United'),OBERDIESSBACH,GROSSHOECHSTETTEN,STETTLEN,
- HEIMBERG,fictionalSixth(13,'SC Marzili Bern'),fictionalSixth(14,'FC Aarefüchse Bern'),
+ HEIMBERG,GOLDSTERN,fictionalSixth(14,'FC Aarefüchse Bern'),
 ];
 export const SEASON_CLUBS: SeasonClub[] = [...BASE_CLUBS,...EXTRA_CLUBS];
 /** Which league (division) each AI club plays in this world; see defaultAiLeagues for clubs that are not listed. */
