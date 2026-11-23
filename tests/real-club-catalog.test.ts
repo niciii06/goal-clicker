@@ -40,7 +40,7 @@ test("the world league has six real clubs with official names in all four home c
  * allowed to be fictional and is not counted.
  */
 const BACKLOG: Record<string, Record<number, number>> = {
-  bern: { 8: 1, 14: 1 },
+  bern: {},
   zurich: { 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 6, 14: 5 },
   basel: { 8: 5, 9: 6, 10: 6, 11: 6, 12: 5, 13: 6, 14: 5 },
   geneve: { 8: 6, 9: 5, 10: 6, 11: 6, 12: 5, 13: 6, 14: 6 },
@@ -227,12 +227,14 @@ test("all verified replacements together: ids and names unique, six clubs per le
   const catalog = catalogOf("bern");
   assert.equal(new Set(catalog.map((club) => club.id)).size, catalog.length);
   assert.equal(new Set(catalog.map((club) => club.name)).size, catalog.length);
-  for (const league of [4, 5, 6, 7, 9, 10, 11, 12, 13]) assert.equal(catalog.filter((club) => club.league === league).length, 6, `league ${league}`);
+  for (const league of [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]) assert.equal(catalog.filter((club) => club.league === league).length, 6, `league ${league}`);
   const replaced = [
     [YVERDON_ID, "Yverdon Sport FC", 4, "FC Alpenfestung"],
     [WIL_ID, "FC Wil 1900", 5, "FC Gotthard Murmeltiere"],
     [RAPPERSWIL_ID, "FC Rapperswil-Jona", 6, "FC Léman Mouettes"],
     [LOCARNO_ID, "FC Locarno", 7, "FC Zürisee Böötler"],
+    [ORPUND_ID, "FC Orpund Safnern", 8, "FC Röstigraben United"],
+    [ITTIGEN_ID, "SC Ittigen", 14, "FC Aarefüchse Bern"],
     [HEIMBERG_ID, "FC Heimberg", 12, "FC Worblental Rangers"],
     [STETTLEN_ID, "FC Stettlen 08", 11, "FC Gürbetal Kickers"],
     [OBERDIESSBACH_ID, "FC Oberdiessbach", 9, "FC Seeland Hechte"],
@@ -244,7 +246,7 @@ test("all verified replacements together: ids and names unique, six clubs per le
     assert.equal(club.name, name);
     assert.equal(club.league, league);
     assert.ok(!club.fictional, name);
-    assert.equal(defaultAiLeagues(8, catalog)[id], 16 - league, `${name}: same division as the old club`);
+    assert.equal(defaultAiLeagues(1, catalog)[id], 16 - league, `${name}: same division as the old club (own league below, so the sixth club of the own league rule does not apply)`);
     const last = planJourney(club.venue).segments.at(-1)!.points.at(-1)!;
     assert.ok(metresBetween([last.lat, last.lon], [club.venue.lat, club.venue.lon]) < 100, `${name}: the journey ends at the ground`);
     // A saved table or journey that still carries the old name keeps the old ground of that league.
@@ -489,4 +491,53 @@ test("Stadio del Lido: the point lies in the pitch inside the track, not in the 
   const arrival = plan.segments.filter((segment) => segment.mode === "bus").at(-1)!.points.at(-2)!;
   assert.ok(metresBetween([arrival.lat, arrival.lon], [46.162161, 8.801525]) < 30, "the road ends at the junction of the public streets");
   assert.ok(metresBetween([venue.lat, venue.lon], [46.16316, 8.80154]) < 80, "the swisstopo building Stadio del Lido is next to the pitch");
+});
+
+// ---- SC Ittigen (Liga 14) and FC Orpund Safnern (Liga 8): the last two fictional regional slots of the Bern world.
+// Ittigen: club page "Hubelgut: Hier trägt der SC-Ittigen die Heimspiele in den Meisterschaften aus", men's first team in the 3. Liga;
+// FVBJ main pitch 96 x 62 m. Orpund: club page (ground "an der Aare in Orpund", 3. Liga men, Garderobeneinteilung Orpund for the home games),
+// FVBJ main pitch 99 x 60 m; OpenStreetMap describes way 228514411 as "Aare Hauptplatz FC Orpund", way 228514412 is the "Nebenplatz".
+const ITTIGEN_ID = "extra-14-fc-aaref-chse-bern";
+const ORPUND_ID = "extra-8-fc-r-stigraben-united";
+/** Corners of OpenStreetMap way 26463168 (Hubelgut) and way 228514411 (Aare Hauptplatz). */
+const ITTIGEN_PITCH: [number, number][] = [[46.9791342, 7.4559486], [46.9791576, 7.4567811], [46.9782441, 7.4568357], [46.9782265, 7.4560087]];
+const ORPUND_PITCH: [number, number][] = [[47.136885, 7.3093583], [47.1371391, 7.3106198], [47.1366013, 7.3108604], [47.1363421, 7.3096015]];
+
+test("SC Ittigen and FC Orpund Safnern are real clubs in the last two Bern slots, with the old ids and no duplicates, in Bern only", () => {
+  for (const city of HOME_CITY_IDS) {
+    const names = worldCatalog(city).map((item) => item.name);
+    for (const name of ["SC Ittigen", "FC Orpund Safnern"]) assert.equal(names.includes(name), city === "bern", `${city}: ${name}`);
+  }
+  const bern = worldCatalog("bern");
+  for (const [id, name, league] of [[ITTIGEN_ID, "SC Ittigen", 14], [ORPUND_ID, "FC Orpund Safnern", 8]] as const) {
+    const club = bern.find((item) => item.id === id)!;
+    assert.ok(club, `${name}: the id of the old fictional club is kept`);
+    assert.equal(club.name, name);
+    assert.equal(club.league, league);
+    assert.ok(!club.fictional);
+    assert.equal(bern.filter((item) => item.name === name).length, 1);
+  }
+  assert.ok(!bern.some((item) => item.name === "FC Aarefüchse Bern" || item.name === "FC Röstigraben United"));
+  assert.equal(bern.filter((item) => item.league < 15 && item.fictional).length, 0, "no fictional club left outside Liga 15 in the Bern world");
+});
+
+test("Hubelgut and Aare: the points lie inside the mapped main pitches, which match the FVBJ sizes plus run-off; the routes end on public streets next to them", () => {
+  const bern = worldCatalog("bern");
+  const hubelgut = bern.find((item) => item.id === ITTIGEN_ID)!.venue, aare = bern.find((item) => item.id === ORPUND_ID)!.venue;
+  for (const [venue, polygon, lengths, widths, source] of [
+    [hubelgut, ITTIGEN_PITCH, [96, 108], [62, 70], "https://www.openstreetmap.org/way/26463168"],
+    [aare, ORPUND_PITCH, [99, 107], [60, 68], "https://www.openstreetmap.org/way/228514411"],
+  ] as const) {
+    assert.equal(venue.verification, "stadium");
+    assert.equal(venue.coordinateSource, source);
+    assert.ok(inPolygon(venue.lat, venue.lon, [...polygon]), `${venue.stadium}: inside the pitch polygon`);
+    const best = minRectangle([...polygon]);
+    assert.ok(best.length >= lengths[0] && best.length <= lengths[1], `${venue.stadium}: length ${best.length.toFixed(1)}`);
+    assert.ok(best.width >= widths[0] && best.width <= widths[1], `${venue.stadium}: width ${best.width.toFixed(1)}`);
+  }
+  // The Aare training pitch (way 228514412, "Nebenplatz") lies 60 m south of the main pitch point.
+  assert.ok(metresBetween([aare.lat, aare.lon], [47.136209, 7.310367]) > 40, "not the Nebenplatz");
+  assert.ok(metresBetween([hubelgut.lat, hubelgut.lon], [46.9799, 7.45598]) < 200, "Hubelgutstrasse 1 (swisstopo) is next to the pitch");
+  assert.ok(metresBetween([hubelgut.lat, hubelgut.lon], [46.97871, 7.457047]) < 100, "road endpoint of the route: Tiefenaustrasse");
+  assert.ok(metresBetween([aare.lat, aare.lon], [47.137119, 7.310013]) < 100, "road endpoint of the route: Byfangstrasse / service road at the Aare grounds");
 });

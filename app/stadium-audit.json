@@ -799,6 +799,32 @@
       "source": "https://www.openstreetmap.org/way/278977348",
       "verifiedAt": "2026-11-23",
       "pitchAreaSquareMetres": 6397
+    },
+    {
+      "club": "SC Ittigen",
+      "venueId": "venue-sc-ittigen",
+      "lat": 46.9786904,
+      "lon": 7.4563938,
+      "osmWay": "26463168",
+      "osmName": "",
+      "registeredStadium": "Sportanlage Hubelgut (Worblaufen)",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/26463168",
+      "verifiedAt": "2026-11-23",
+      "pitchAreaSquareMetres": 6398
+    },
+    {
+      "club": "FC Orpund Safnern",
+      "venueId": "venue-fc-orpund-safnern",
+      "lat": 47.1367418,
+      "lon": 7.310109,
+      "osmWay": "228514411",
+      "osmName": "",
+      "registeredStadium": "Aare Hauptplatz",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/228514411",
+      "verifiedAt": "2026-11-23",
+      "pitchAreaSquareMetres": 6264
     }
   ],
   "international": [

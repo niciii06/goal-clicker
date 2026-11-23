@@ -185,6 +185,30 @@ const LOCARNO_VENUE: Venue = {
  coordinateSource:'https://www.openstreetmap.org/way/278977348',coordinateNote:'Mittelpunkt des Feldes innerhalb der Laufbahn des Stadio Lido (Hauptfeld 105 × 68 m laut Club), in OpenStreetMap als Fussballfeld kartiert.',
 };
 const LOCARNO:SeasonClub={id:'extra-7-fc-z-risee-b-tler',name:'FC Locarno',league:7,venue:LOCARNO_VENUE};
+/**
+ * SC Ittigen replaces the fictional sixth club of Liga 14 in the Bern world. Club page (Infrastruktur): "Hubelgut: Hier trägt der SC-Ittigen die
+ * Heimspiele in den Meisterschaften aus"; the first team of the men plays in the 3. Liga. FVBJ ground listing: main pitch 96 x 62 m. The
+ * grass pitch at the Hubelgut (OpenStreetMap way 26463168, 101.8 x 63.9 m, 140 m south of Hubelgutstrasse 1, Worblaufen) is the only full-size
+ * pitch of the site; the other pitch there is a small tartan court. The route ends on the Tiefenaustrasse (primary road), 50 m east of the pitch.
+ */
+const ITTIGEN_VENUE: Venue = {
+ id:'venue-sc-ittigen',stadium:'Sportanlage Hubelgut',city:'Ittigen',country:'Schweiz',canton:'BE',lat:46.9786904,lon:7.4563938,
+ source:'https://www.scittigen.ch/infrastruktur/',verification:'stadium',registeredStadium:'Sportanlage Hubelgut (Worblaufen)',address:'Hubelgutstrasse',postalCode:'3048',
+ coordinateSource:'https://www.openstreetmap.org/way/26463168',coordinateNote:'Mittelpunkt des Hauptplatzes (96 × 62 m laut FVBJ Anlageneintrag), in OpenStreetMap als Fussballfeld kartiert.',
+};
+const ITTIGEN:SeasonClub={id:'extra-14-fc-aaref-chse-bern',name:'SC Ittigen',league:14,venue:ITTIGEN_VENUE};
+/**
+ * FC Orpund Safnern (official name since the 2026 merger) replaces the fictional sixth club of Liga 8 in the Bern world. Club page: the football
+ * ground was built "an der Aare in Orpund", the men's team plays in the 3. Liga and the changing rooms of Orpund are assigned to its home games.
+ * FVBJ ground listing "Aare": main pitch 99 x 60 m. OpenStreetMap way 228514411 carries the description "Aare Hauptplatz FC Orpund"
+ * (99.7 x 63.5 m); the second pitch (way 228514412, "Aare Nebenplatz FC Orpund") is the training pitch.
+ */
+const ORPUND_VENUE: Venue = {
+ id:'venue-fc-orpund-safnern',stadium:'Sportanlage Aare',city:'Orpund',country:'Schweiz',canton:'BE',lat:47.1367418,lon:7.310109,
+ source:'https://fcorpundsafnern.ch/verein/geschichte',verification:'stadium',registeredStadium:'Aare Hauptplatz',postalCode:'2552',
+ coordinateSource:'https://www.openstreetmap.org/way/228514411',coordinateNote:'Mittelpunkt des Hauptplatzes Aare (99 × 60 m laut FVBJ Anlageneintrag), in OpenStreetMap als «Aare Hauptplatz FC Orpund» kartiert.',
+};
+const ORPUND:SeasonClub={id:'extra-8-fc-r-stigraben-united',name:'FC Orpund Safnern',league:8,venue:ORPUND_VENUE};
 const STETTLEN:SeasonClub={id:'extra-11-fc-g-rbetal-kickers',name:'FC Stettlen 08',league:11,venue:STETTLEN_VENUE};
 /**
  * FC Oberdiessbach (Sportanlage Leimen, Helisbühlstrasse) replaces the fictional sixth club of Liga 9 in the Bern world.
@@ -210,14 +234,14 @@ const GROSSHOECHSTETTEN_VENUE: Venue = {
 };
 const GROSSHOECHSTETTEN:SeasonClub={id:'extra-10-fc-emmental-k-sekicker',name:'FC Grosshöchstetten-Schlosswil',league:10,venue:GROSSHOECHSTETTEN_VENUE};
 /** Names of clubs that were replaced by a real club: a saved table or journey that still carries the old name keeps its old ground until the season ends. */
-const REPLACED_CLUB_GROUNDS:Record<string,()=>Venue>={'FC Worblental Rangers':()=>groundOfLeague(12),'FC Gürbetal Kickers':()=>groundOfLeague(11),'FC Seeland Hechte':()=>groundOfLeague(9),'SC Marzili Bern':()=>groundOfLeague(13),'FC Léman Mouettes':()=>groundOfLeague(6),'FC Zürisee Böötler':()=>groundOfLeague(7),'FC Alpenfestung':()=>groundOfLeague(4),'FC Gotthard Murmeltiere':()=>groundOfLeague(5),'FC Emmental Käsekicker':()=>groundOfLeague(10)};
+const REPLACED_CLUB_GROUNDS:Record<string,()=>Venue>={'FC Worblental Rangers':()=>groundOfLeague(12),'FC Gürbetal Kickers':()=>groundOfLeague(11),'FC Seeland Hechte':()=>groundOfLeague(9),'SC Marzili Bern':()=>groundOfLeague(13),'FC Léman Mouettes':()=>groundOfLeague(6),'FC Zürisee Böötler':()=>groundOfLeague(7),'FC Aarefüchse Bern':()=>groundOfLeague(14),'FC Röstigraben United':()=>groundOfLeague(8),'FC Alpenfestung':()=>groundOfLeague(4),'FC Gotthard Murmeltiere':()=>groundOfLeague(5),'FC Emmental Käsekicker':()=>groundOfLeague(10)};
 const EXTRA_CLUBS: SeasonClub[] = [
  {id:'world-paris-saint-german',name:'Paris Saint-Germain',league:1,venue:VENUES.paris},
  {id:'extra-2-grasshopper',name:'Grasshopper Club Zürich',league:2,venue:VENUES.zurich},
  {id:'extra-3-winterthur',name:'FC Winterthur',league:3,venue:VENUES.winterthur},
  YVERDON,WIL,RAPPERSWIL,LOCARNO,
- fictionalSixth(8,'FC Röstigraben United'),OBERDIESSBACH,GROSSHOECHSTETTEN,STETTLEN,
- HEIMBERG,GOLDSTERN,fictionalSixth(14,'FC Aarefüchse Bern'),
+ ORPUND,OBERDIESSBACH,GROSSHOECHSTETTEN,STETTLEN,
+ HEIMBERG,GOLDSTERN,ITTIGEN,
 ];
 export const SEASON_CLUBS: SeasonClub[] = [...BASE_CLUBS,...EXTRA_CLUBS];
 /** Which league (division) each AI club plays in this world; see defaultAiLeagues for clubs that are not listed. */

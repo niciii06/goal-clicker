@@ -34,14 +34,14 @@ Pro Welt 89 Clubs, 15 Ligen. Fiktiv und zu ersetzen:
 
 | Heimstadt | Gemeinsame Plätze Liga 4 bis 7 | Regionale Ligen 8 bis 14 (42 Clubs) | Summe |
 |---|---|---|---|
-| Bern | 0 | 2 fiktiv, 40 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil, Goldstern ersetzt, siehe unten) | 2 |
+| Bern | 0 | 0 fiktiv, 42 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil, Goldstern, Orpund Safnern, Ittigen ersetzt, siehe unten) | 0 |
 | Zürich | 0 | 41 fiktiv, 1 echt (FC Oerlikon/Polizei ZH) | 41 |
 | Basel | 0 | 39 fiktiv, 3 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach) | 39 |
 | Genève | 0 | 40 fiktiv, 2 echt (Signal FC Bernex-Confignon, Meyrin FC) | 40 |
 
 **Gemeinsame Plätze (wirken in allen vier Welten, deshalb zuerst):** ~~`extra-4-fc-alpenfestung`~~ (ersetzt durch Yverdon Sport FC), ~~`extra-5-fc-gotthard-murmeltiere`~~ (ersetzt durch FC Wil 1900), ~~`extra-6-fc-l-man-mouettes`~~ (ersetzt durch FC Rapperswil-Jona), ~~`extra-7-fc-z-risee-b-tler`~~ (ersetzt durch FC Locarno). Ihre Spielorte sind geliehene geprüfte Plätze anderer Clubs der Liga.
 
-**Nur Bern, Liga 8 bis 14:** `extra-8-fc-r-stigraben-united`, `extra-9-fc-seeland-hechte`, `extra-10-fc-emmental-k-sekicker`, `extra-11-fc-g-rbetal-kickers`, ~~`extra-11-fc-g-rbetal-kickers`~~ (ersetzt durch FC Stettlen 08), ~~`extra-12-fc-worblental-rangers`~~ (ersetzt durch FC Heimberg), ~~`extra-13-sc-marzili-bern`~~ (ersetzt durch FC Goldstern), `extra-14-fc-aaref-chse-bern`.
+**Nur Bern, Liga 8 bis 14:** ~~`extra-8-fc-r-stigraben-united`~~ (ersetzt durch FC Orpund Safnern), `extra-9-fc-seeland-hechte`, `extra-10-fc-emmental-k-sekicker`, `extra-11-fc-g-rbetal-kickers`, ~~`extra-11-fc-g-rbetal-kickers`~~ (ersetzt durch FC Stettlen 08), ~~`extra-12-fc-worblental-rangers`~~ (ersetzt durch FC Heimberg), ~~`extra-13-sc-marzili-bern`~~ (ersetzt durch FC Goldstern), ~~`extra-14-fc-aaref-chse-bern`~~ (ersetzt durch SC Ittigen).
 
 **Zürich, Basel, Genève:** IDs `zh-D-N`, `bs-D-N`, `ge-D-N` (Division D = 2 bis 8, Liga 16 minus D), pro Liga bis zu sechs fiktive Clubs. Anzahl je Liga (Liga 14, 13, ..., 8): Zürich 5, 6, 6, 6, 6, 6, 6. Basel 5, 6, 5, 6, 6, 6, 5. Genève 6, 6, 5, 6, 6, 5, 6.
 
@@ -194,6 +194,23 @@ Ersetzt `extra-7-fc-z-risee-b-tler` (FC Zürisee Böötler) in Bern, Zürich, Ba
 | Neue Routen | Bern bis Stadio del Lido: 275.9 km, 209 Minuten; Lugano bis Stadio del Lido: 38.6 km, 39 Minuten (bestehender Tessiner Stützpunkt) |
 
 Die Stelle von Schaffhausen (Stadion Breite, zwei verschachtelte Umrisse) bleibt offen und hat keinen freien gemeinsamen Platz mehr; sie käme nur als Austausch eines echten Clubs in Frage.
+
+## Phase 7: SC Ittigen (Liga 14) und FC Orpund Safnern (Liga 8), die letzten zwei Berner Plätze
+
+Damit hat die **Berner Welt ausserhalb von Liga 15 keinen fiktiven Club mehr**. Beide Clubs ersetzen die fiktiven Plätze `extra-14-fc-aaref-chse-bern` (FC Aarefüchse Bern) und `extra-8-fc-r-stigraben-united` (FC Röstigraben United) und behalten deren IDs; die alten Namen führen weiter zu ihrem früheren Platz. Die Liga ergibt sich aus der Entfernung: Worblaufen liegt 5.9 km vom Heimstadion (Liga 14 «Berner Quartier», Clubs bis rund 6 km), Orpund 22 km (Liga 8 «Nachbarkantone», die fernste der Berner Regionalligen). Beide Clubs spielen in der 3. Liga, die Katalogstufe ist wie überall eine Näherung.
+
+| | SC Ittigen (Liga 14) | FC Orpund Safnern (Liga 8) |
+|---|---|---|
+| Heimspiele der Herren laut Club | scittigen.ch/infrastruktur: «Hubelgut: Hier trägt der SC-Ittigen die Heimspiele in den Meisterschaften aus», Herren 1. Mannschaft 3. Liga | fcorpundsafnern.ch: Fussballplatz «an der Aare in Orpund», 3. Liga Herren, Garderobeneinteilung Orpund (Heimspiele 2027 gelistet); Name seit der Fusion «FC Orpund Safnern» |
+| FVBJ Hauptplatz | 96 × 62 m | 99 × 60 m (Anlage «Aare») |
+| OSM Hauptplatz | way 26463168: Rasen, 101.8 × 63.9 m, 6398 m², Mittelpunkt 46.9786904, 7.4563938; der einzige Vollfeld Platz, daneben nur ein kleiner Tartanplatz | way 228514411 mit der Beschreibung «Aare Hauptplatz FC Orpund»: 99.7 × 63.5 m, 6264 m², Mittelpunkt 47.1367418, 7.310109; way 228514412 «Aare Nebenplatz FC Orpund» ist das Trainingsfeld, 60 m südlich |
+| Adresse | Hubelgutstrasse 1, 3048 Worblaufen (swisstopo) bei 46.9799, 7.45598 | Sportanlage Aare, 2552 Orpund |
+| Strassenendpunkt | Tiefenaustrasse (Hauptstrasse, öffentlich) bei 46.97871, 7.457047, 50 m vom Mittelpunkt | Byfangstrasse (Wohnstrasse, öffentlich) und Servicestrasse am Platz, bei 47.137119, 7.310013, 43 m vom Mittelpunkt |
+| Neue Route | Bern bis Hubelgut: 7.4 km, 11 Minuten | Bern bis Aare: 45.9 km, 39 Minuten |
+
+Der FVBJ Anlageneintrag und die Spielansetzung (Matchcenter) sind für automatische Zugriffe gesperrt; Masse und aktuelle Teamspiele stammen aus den Notion Notizen, die Heimspielorte zusätzlich aus den Seiten der Clubs.
+
+**Folge für den Start:** In `defaultAiLeagues` spielt der sechste Club der eigenen Liga in der untersten Liga. Wer in Liga 8 oder Liga 14 startet, trifft in Liga 15 jetzt einen echten Club statt einen erfundenen; die Regel erlaubt das ausdrücklich.
 
 ## Phase 3, weiter geprüft und nicht übernommen
 
