@@ -417,6 +417,38 @@ test('a new player gets the welcome window first (no walkout), then guided tasks
   }
 });
 
+test('skipping the restarted welcome window while a tutorial step ticks off keeps it closed (no stale update)', async () => {
+  // The tutorial ticks steps off one timer slot later. Escape pressed in exactly that gap used to be undone by the older
+  // result, so the welcome window came back and covered the page (the sporadic "account-overlay intercepts" timeout).
+  const page = await browser.newPage({ viewport: VIEWPORTS[0], locale: 'de-CH' });
+  await page.addInitScript('globalThis.__name = (fn) => fn;');
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.getByRole('dialog').getByRole('button', { name: 'Überspringen' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Beenden' }).click();
+  const ball = page.getByRole('button', { name: 'Fussball anklicken' });
+  await ball.scrollIntoViewIfNeeded();
+  for (let i = 0; i < 50; i++) await ball.click({ delay: 5 });
+  await page.waitForTimeout(2500);
+  await openTab(page, 'Club & Mehr');
+  // Escape right after the next zero delay timer is set while the welcome window is open: the deferred tick of the restart.
+  await page.evaluate(() => {
+    const flag = window as unknown as { armed?: boolean; hit?: boolean };
+    const original = window.setTimeout.bind(window);
+    window.setTimeout = ((handler: TimerHandler, delay?: number, ...rest: unknown[]) => {
+      if (flag.armed && !delay && document.querySelector('.tutorial-dialog')) { flag.armed = false; flag.hit = true; queueMicrotask(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); }
+      return original(handler, delay, ...rest);
+    }) as typeof window.setTimeout;
+    flag.armed = true;
+  });
+  await page.getByRole('button', { name: 'Tutorial erneut starten' }).click();
+  await page.waitForTimeout(1500);
+  assert.equal(await page.evaluate(() => (window as unknown as { hit?: boolean }).hit), true, 'the gap was hit');
+  assert.equal(await page.locator('.tutorial-dialog').count(), 0, 'the welcome window stays closed');
+  assert.equal(JSON.parse((await page.evaluate((key) => localStorage.getItem(key), TUTORIAL_STORAGE_KEY))!).status, 'done');
+  await openTab(page, 'Packs & Album');
+  await page.close();
+});
+
 test('the welcome pack opens once from the shop at its tutorial step: one walkout, no odds, then the season match is the last step', async () => {
   const now = Date.now();
   const features = richFeatures(now);

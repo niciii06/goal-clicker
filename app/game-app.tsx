@@ -276,6 +276,9 @@ export function App() {
   const [tutorial, setTutorialState] = useState<TutorialState>(finishedTutorial);
   // Ending the tutorial before the welcome pack was opened asks first: the pack would be lost for good.
   const [tutorialEndDialog, setTutorialEndDialog] = useState(false);
+  // Counts every change of the tutorial by the player or the game. A deferred tick (below) applies only when nothing
+  // changed in between, so skipping, starting or ending the tutorial is never undone by an older result.
+  const tutorialVersionRef = useRef(0);
   const [appMode, setAppMode] = useState<AppMode>("single");
   const [playerId, setPlayerId] = useState("");
   const [playerName, setPlayerName] = useState("");
@@ -3256,6 +3259,7 @@ export function App() {
   }
 
   function setTutorial(next: TutorialState) {
+    tutorialVersionRef.current += 1;
     setTutorialState(next);
     try {
       // A synced key: the cloud upload carries the progress to the player's other devices.
@@ -3530,7 +3534,10 @@ export function App() {
     const next = advanceTutorial(tutorial, game, featureTab);
     if (next === tutorial) return;
     const finished = next.status === "done";
+    const version = tutorialVersionRef.current;
     window.setTimeout(() => {
+      // Skipped, started or ended meanwhile: this result is out of date; the effect runs again on the new state.
+      if (tutorialVersionRef.current !== version) return;
       setTutorial(next);
       if (finished) {
         showToast(t("logic.tutorialDone"));
