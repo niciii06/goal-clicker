@@ -138,3 +138,6 @@
 .player-compare-table { width: 100%; margin-top: 10px; border-collapse: collapse; table-layout: fixed; font-size: var(--text-footnote, 13px); }
 .player-compare-table th, .player-compare-table td { padding: 5px 6px; border-bottom: 1px solid var(--line-soft); text-align: left; overflow-wrap: anywhere; }
 .player-compare-table td.better { color: var(--accent); font-weight: 800; }
+
+/* Phones: while the welcome pack is offered in the shop its button lies right above the navigation, where the status toasts sit. The toasts move to the top then and are back at the bottom once the pack is gone. */
+@media (max-width: 780px) { .toast.toast-top { top: calc(12px + env(safe-area-inset-top)); bottom: auto; } }
