@@ -157,6 +157,20 @@ const GOLDSTERN_VENUE: Venue = {
  coordinateSource:'https://www.openstreetmap.org/way/72707053',coordinateNote:'Mittelpunkt des Hauptplatzes (Kunstrasen 90,2 × 57,7 m laut FVBJ Anlageneintrag), in OpenStreetMap als Fussballfeld kartiert.',
 };
 const GOLDSTERN:SeasonClub={id:'extra-13-sc-marzili-bern',name:'FC Goldstern',league:13,venue:GOLDSTERN_VENUE};
+/**
+ * FC Rapperswil-Jona replaces the fictional sixth club of Liga 6 in every world. The club plays at the Stadion Grünfeld; the OFV ground
+ * listing gives the main pitch 105 x 68 m, the municipality a "Hauptspielfeld mit Zuschauertribüne (800 Plätze)". On the municipal site
+ * plan (Sportanlagen Grünfeld, 2024, drawn with north at the bottom) it is "Fussballfeld 1" (G1) next to "Fussballstadion, Garderoben".
+ * That is OpenStreetMap way 203508979 (115.6 x 76.1 m with its run-off, 7 m from the mapped grandstand); the neighbouring way 203509029
+ * (102.4 m long) is shorter than the main pitch and so is not it. The club allows no direct access over the Blumenaustrasse or the
+ * Blaubrunnenstrasse: the journey ends at the paid public car park at the Grünfeldstrasse (footpath in front of the Grünfeld hall to the stadium).
+ */
+const RAPPERSWIL_VENUE: Venue = {
+ id:'venue-fc-rapperswil-jona',stadium:'Stadion Grünfeld',city:'Rapperswil-Jona',country:'Schweiz',canton:'SG',lat:47.2205209,lon:8.8415371,
+ source:'https://fcrj.ch/pages/verkehrsanbindung',verification:'stadium',registeredStadium:'Stadion Grünfeld',address:'Grünfeldstrasse 3',postalCode:'8645',
+ coordinateSource:'https://www.openstreetmap.org/way/203508979',coordinateNote:'Mittelpunkt des Hauptspielfelds (105 × 68 m laut OFV Anlageneintrag) neben der Tribüne, in OpenStreetMap als Fussballfeld kartiert.',
+};
+const RAPPERSWIL:SeasonClub={id:'extra-6-fc-l-man-mouettes',name:'FC Rapperswil-Jona',league:6,venue:RAPPERSWIL_VENUE};
 const STETTLEN:SeasonClub={id:'extra-11-fc-g-rbetal-kickers',name:'FC Stettlen 08',league:11,venue:STETTLEN_VENUE};
 /**
  * FC Oberdiessbach (Sportanlage Leimen, Helisbühlstrasse) replaces the fictional sixth club of Liga 9 in the Bern world.
@@ -182,12 +196,12 @@ const GROSSHOECHSTETTEN_VENUE: Venue = {
 };
 const GROSSHOECHSTETTEN:SeasonClub={id:'extra-10-fc-emmental-k-sekicker',name:'FC Grosshöchstetten-Schlosswil',league:10,venue:GROSSHOECHSTETTEN_VENUE};
 /** Names of clubs that were replaced by a real club: a saved table or journey that still carries the old name keeps its old ground until the season ends. */
-const REPLACED_CLUB_GROUNDS:Record<string,()=>Venue>={'FC Worblental Rangers':()=>groundOfLeague(12),'FC Gürbetal Kickers':()=>groundOfLeague(11),'FC Seeland Hechte':()=>groundOfLeague(9),'SC Marzili Bern':()=>groundOfLeague(13),'FC Alpenfestung':()=>groundOfLeague(4),'FC Gotthard Murmeltiere':()=>groundOfLeague(5),'FC Emmental Käsekicker':()=>groundOfLeague(10)};
+const REPLACED_CLUB_GROUNDS:Record<string,()=>Venue>={'FC Worblental Rangers':()=>groundOfLeague(12),'FC Gürbetal Kickers':()=>groundOfLeague(11),'FC Seeland Hechte':()=>groundOfLeague(9),'SC Marzili Bern':()=>groundOfLeague(13),'FC Léman Mouettes':()=>groundOfLeague(6),'FC Alpenfestung':()=>groundOfLeague(4),'FC Gotthard Murmeltiere':()=>groundOfLeague(5),'FC Emmental Käsekicker':()=>groundOfLeague(10)};
 const EXTRA_CLUBS: SeasonClub[] = [
  {id:'world-paris-saint-german',name:'Paris Saint-Germain',league:1,venue:VENUES.paris},
  {id:'extra-2-grasshopper',name:'Grasshopper Club Zürich',league:2,venue:VENUES.zurich},
  {id:'extra-3-winterthur',name:'FC Winterthur',league:3,venue:VENUES.winterthur},
- YVERDON,WIL,fictionalSixth(6,'FC Léman Mouettes'),fictionalSixth(7,'FC Zürisee Böötler'),
+ YVERDON,WIL,RAPPERSWIL,fictionalSixth(7,'FC Zürisee Böötler'),
  fictionalSixth(8,'FC Röstigraben United'),OBERDIESSBACH,GROSSHOECHSTETTEN,STETTLEN,
  HEIMBERG,GOLDSTERN,fictionalSixth(14,'FC Aarefüchse Bern'),
 ];

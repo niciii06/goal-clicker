@@ -111,6 +111,9 @@ function roadFromHome(to: GeoPoint) {
   return routes.reduce((best, r) => r.seconds < best.seconds ? r : best);
 }
 
+// Rapperswil-Jona: the club allows no direct access over the Blumenaustrasse / Blaubrunnenstrasse (the nearest road would be the agricultural
+// Blaubrunnenstrasse); the journey ends at the paid public car park at the Grünfeldstrasse. The last point of the cached route is still the pitch.
+const routeTarget = (p: GeoPoint) => Math.abs(p.lat - 47.2205209) < 1e-6 && Math.abs(p.lon - 8.8415371) < 1e-6 ? { lat: 47.22211, lon: 8.844756 } : p;
 const venues = new Map<string, (typeof SEASON_CLUBS)[number]['venue']>();
 for (const club of SEASON_CLUBS) venues.set(club.venue.id, club.venue);
 for (const venue of Object.values(VENUES)) if (!venues.has(venue.id)) venues.set(venue.id, venue);
@@ -134,10 +137,10 @@ for (const [key, s] of legs) {
     const rail = brouterRail(s.from, s.to), points = anchored(s.from, rail.points, s.to), km = pathKm(points);
     cache[key] = { points: simplify(points, km), seconds: km / 95 * 3600 + 600, km, geometry: 'rail', source: `© OpenStreetMap contributors / BRouter rail profile, ${DATE}. Railway track geometry; station approaches approximate; journey time estimated, not a verified passenger service.` };
   } else if (key.startsWith(homePrefix)) {
-    const road = roadFromHome(s.to), points = [...road.points, { lat: s.to.lat, lon: s.to.lon }], km = pathKm(points);
+    const road = roadFromHome(routeTarget(s.to)), points = [...road.points, { lat: s.to.lat, lon: s.to.lon }], km = pathKm(points);
     cache[key] = { points: simplify(points, km), seconds: road.seconds, km, geometry: 'road', source: `© OpenStreetMap contributors / Overpass, 2026-10-12 (local first kilometres) and FOSSGIS OSRM, ${DATE}. Road geometry; the home origin was not sent to a routing service; bus time estimated.` };
   } else {
-    const road = osrm(s.from, s.to), points = anchored(s.from, road.points, s.to), km = pathKm(points);
+    const road = osrm(s.from, routeTarget(s.to)), points = anchored(s.from, road.points, s.to), km = pathKm(points);
     cache[key] = { points: simplify(points, km), seconds: road.seconds, km, geometry: 'road', source: `© OpenStreetMap contributors / FOSSGIS OSRM, ${DATE}. Road geometry; endpoint approaches approximate; bus time estimated.` };
   }
   done++;

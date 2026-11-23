@@ -9,5 +9,6 @@ import part6 from './route-cache/part-6.json';
 import part7 from './route-cache/part-7.json';
 import part8 from './route-cache/part-8.json';
 import part9 from './route-cache/part-9.json';
-const routes = {...part0,...part1,...part2,...part3,...part4,...part5,...part6,...part7,...part8,...part9};
+import part10 from './route-cache/part-10.json';
+const routes = {...part0,...part1,...part2,...part3,...part4,...part5,...part6,...part7,...part8,...part9,...part10};
 export default routes;

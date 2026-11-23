@@ -773,6 +773,19 @@
       "source": "https://www.openstreetmap.org/way/72707053",
       "verifiedAt": "2026-11-23",
       "pitchAreaSquareMetres": 6074
+    },
+    {
+      "club": "FC Rapperswil-Jona",
+      "venueId": "venue-fc-rapperswil-jona",
+      "lat": 47.2205209,
+      "lon": 8.8415371,
+      "osmWay": "203508979",
+      "osmName": "",
+      "registeredStadium": "Stadion Grünfeld",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/203508979",
+      "verifiedAt": "2026-11-23",
+      "pitchAreaSquareMetres": 8730
     }
   ],
   "international": [

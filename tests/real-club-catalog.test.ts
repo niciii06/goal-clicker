@@ -40,10 +40,10 @@ test("the world league has six real clubs with official names in all four home c
  * allowed to be fictional and is not counted.
  */
 const BACKLOG: Record<string, Record<number, number>> = {
-  bern: { 6: 1, 7: 1, 8: 1, 14: 1 },
-  zurich: { 6: 1, 7: 1, 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 6, 14: 5 },
-  basel: { 6: 1, 7: 1, 8: 5, 9: 6, 10: 6, 11: 6, 12: 5, 13: 6, 14: 5 },
-  geneve: { 6: 1, 7: 1, 8: 6, 9: 5, 10: 6, 11: 6, 12: 5, 13: 6, 14: 6 },
+  bern: { 7: 1, 8: 1, 14: 1 },
+  zurich: { 7: 1, 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 6, 14: 5 },
+  basel: { 7: 1, 8: 5, 9: 6, 10: 6, 11: 6, 12: 5, 13: 6, 14: 5 },
+  geneve: { 7: 1, 8: 6, 9: 5, 10: 6, 11: 6, 12: 5, 13: 6, 14: 6 },
 };
 test("fictional clubs outside Liga 15 are only the documented backlog, and the world league is not part of it", () => {
   for (const city of HOME_CITY_IDS) {
@@ -227,10 +227,11 @@ test("all verified replacements together: ids and names unique, six clubs per le
   const catalog = catalogOf("bern");
   assert.equal(new Set(catalog.map((club) => club.id)).size, catalog.length);
   assert.equal(new Set(catalog.map((club) => club.name)).size, catalog.length);
-  for (const league of [4, 5, 9, 10, 11, 12, 13]) assert.equal(catalog.filter((club) => club.league === league).length, 6, `league ${league}`);
+  for (const league of [4, 5, 6, 9, 10, 11, 12, 13]) assert.equal(catalog.filter((club) => club.league === league).length, 6, `league ${league}`);
   const replaced = [
     [YVERDON_ID, "Yverdon Sport FC", 4, "FC Alpenfestung"],
     [WIL_ID, "FC Wil 1900", 5, "FC Gotthard Murmeltiere"],
+    [RAPPERSWIL_ID, "FC Rapperswil-Jona", 6, "FC Léman Mouettes"],
     [HEIMBERG_ID, "FC Heimberg", 12, "FC Worblental Rangers"],
     [STETTLEN_ID, "FC Stettlen 08", 11, "FC Gürbetal Kickers"],
     [OBERDIESSBACH_ID, "FC Oberdiessbach", 9, "FC Seeland Hechte"],
@@ -252,7 +253,7 @@ test("all verified replacements together: ids and names unique, six clubs per le
   // The shared slots (Liga 4 to 7) change in every world, the Bern slots only in Bern.
   for (const city of HOME_CITY_IDS) {
     const names = worldCatalog(city).map((club) => club.name);
-    for (const [id, name] of replaced) assert.equal(names.includes(name), id === YVERDON_ID || id === WIL_ID || city === "bern", `${city}: ${name}`);
+    for (const [id, name] of replaced) assert.equal(names.includes(name), id === YVERDON_ID || id === WIL_ID || id === RAPPERSWIL_ID || city === "bern", `${city}: ${name}`);
     assert.equal(new Set(worldCatalog(city).map((club) => club.id)).size, worldCatalog(city).length, `${city}: ids unique`);
   }
 });
@@ -392,4 +393,50 @@ test("FC Goldstern ground: the Bremgarten synthetic pitch, not the clubhouse Wal
   // The Waldruhe pitch in Uettligen (46.9826, 7.4058) is not the ground of the first team.
   assert.ok(metresBetween([venue.lat, venue.lon], [46.982589, 7.4058465]) > 2000, "not the Waldruhe pitch");
   assert.ok(metresBetween([venue.lat, venue.lon], [46.977333, 7.433776]) < 100, "road endpoint of the route: Johanniterstrasse next to the sports grounds parking");
+});
+
+// ---- FC Rapperswil-Jona (Liga 6, all worlds). OFV ground listing: main pitch 105 x 68 m; municipality: "Hauptspielfeld mit Zuschauertribüne
+// (800 Plätze), Garderobentrakt und Clubraum (FC Rapperswil-Jona)". The municipal site plan (2024, drawn with north at the bottom: the tennis
+// courts, the sports hall and the artificial turf field 3 lie opposite to the map) shows it as "Fussballfeld 1" (G1) next to the
+// "Fussballstadion, Garderoben". That is OpenStreetMap way 203508979, 7 m from the mapped grandstand (way 220366252). The neighbouring way
+// 203509029 (102.4 x 70.6 m) is shorter than the 105 m main pitch and is not it. The club allows no direct access over the Blumenaustrasse:
+// the journey ends at the paid public car park at the Grünfeldstrasse.
+const RAPPERSWIL_ID = "extra-6-fc-l-man-mouettes";
+/** Corners of OpenStreetMap way 203509029, the neighbouring pitch (102.4 m long). */
+const RAPPERSWIL_NEIGHBOUR: [number, number][] = [[47.221718, 8.8414558], [47.2217311, 8.8428075], [47.2210999, 8.8428207], [47.2210868, 8.841469]];
+/** Corners of OpenStreetMap way 203508979. */
+const RAPPERSWIL_PITCH: [number, number][] = [[47.2208534, 8.8407673], [47.2208682, 8.8422925], [47.2201883, 8.8423068], [47.2201735, 8.8407816]];
+
+test("FC Rapperswil-Jona is a real club in Liga 6 of all four worlds, with the old id and no duplicates", () => {
+  for (const city of HOME_CITY_IDS) {
+    const catalog = worldCatalog(city);
+    const club = catalog.find((item) => item.id === RAPPERSWIL_ID)!;
+    assert.ok(club, `${city}: the id of the old fictional club is kept`);
+    assert.equal(club.name, "FC Rapperswil-Jona");
+    assert.equal(club.league, 6);
+    assert.ok(!club.fictional);
+    assert.equal(catalog.filter((item) => item.name === "FC Rapperswil-Jona").length, 1);
+    assert.ok(!catalog.some((item) => item.name === "FC Léman Mouettes"), city);
+  }
+});
+
+test("Stadion Grünfeld: the point lies in the main pitch next to the grandstand, which is at least 105 x 68 m; the other candidate is too short; the route ends at the legal car park", () => {
+  const venue = worldCatalog("bern").find((item) => item.id === RAPPERSWIL_ID)!.venue;
+  assert.equal(venue.verification, "stadium");
+  assert.equal(venue.coordinateSource, "https://www.openstreetmap.org/way/203508979");
+  assert.ok(inPolygon(venue.lat, venue.lon, RAPPERSWIL_PITCH), "inside the pitch polygon");
+  const best = minRectangle(RAPPERSWIL_PITCH);
+  assert.ok(best.length >= 105 && best.length <= 120, `length ${best.length.toFixed(1)}`);
+  assert.ok(best.width >= 68 && best.width <= 80, `width ${best.width.toFixed(1)}`);
+  // The mapped grandstand (way 220366252) and the swisstopo building "Stadion Grünfeld" lie at the pitch; way 203509029 is only 102.4 m long.
+  assert.ok(metresBetween([venue.lat, venue.lon], [47.220963, 8.841258]) < 80, "the grandstand is next to the pitch");
+  assert.ok(metresBetween([venue.lat, venue.lon], [47.22098, 8.84158]) < 80, "the swisstopo building Stadion Grünfeld is next to the pitch");
+  const shorter = minRectangle(RAPPERSWIL_NEIGHBOUR);
+  assert.ok(shorter.length < 105, "the neighbouring pitch (way 203509029, about 102 m) cannot be the 105 m main pitch");
+  // Both routes end at the car park Grünfeldstrasse (parking aisle at 47.22211, 8.844756), not at the restricted Blaubrunnenstrasse south of the pitch.
+  const plan = planJourney(venue);
+  const road = plan.segments.filter((segment) => segment.mode === "bus").at(-1)!;
+  const arrival = road.points.at(-2)!;
+  assert.ok(metresBetween([arrival.lat, arrival.lon], [47.22211, 8.844756]) < 40, "the road ends at the car park");
+  assert.ok(metresBetween([arrival.lat, arrival.lon], [47.2201, 8.84155]) > 150, "not at the Blaubrunnenstrasse (agricultural access only)");
 });

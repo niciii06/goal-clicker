@@ -34,12 +34,12 @@ Pro Welt 89 Clubs, 15 Ligen. Fiktiv und zu ersetzen:
 
 | Heimstadt | Gemeinsame Plätze Liga 4 bis 7 | Regionale Ligen 8 bis 14 (42 Clubs) | Summe |
 |---|---|---|---|
-| Bern | 2 | 2 fiktiv, 40 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil, Goldstern ersetzt, siehe unten) | 4 |
-| Zürich | 2 | 41 fiktiv, 1 echt (FC Oerlikon/Polizei ZH) | 43 |
-| Basel | 2 | 39 fiktiv, 3 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach) | 41 |
-| Genève | 2 | 40 fiktiv, 2 echt (Signal FC Bernex-Confignon, Meyrin FC) | 42 |
+| Bern | 1 | 2 fiktiv, 40 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil, Goldstern ersetzt, siehe unten) | 3 |
+| Zürich | 1 | 41 fiktiv, 1 echt (FC Oerlikon/Polizei ZH) | 42 |
+| Basel | 1 | 39 fiktiv, 3 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach) | 40 |
+| Genève | 1 | 40 fiktiv, 2 echt (Signal FC Bernex-Confignon, Meyrin FC) | 41 |
 
-**Gemeinsame Plätze (wirken in allen vier Welten, deshalb zuerst):** ~~`extra-4-fc-alpenfestung`~~ (ersetzt durch Yverdon Sport FC), ~~`extra-5-fc-gotthard-murmeltiere`~~ (ersetzt durch FC Wil 1900), `extra-6-fc-l-man-mouettes` (Liga 6), `extra-7-fc-z-risee-b-tler` (Liga 7). Ihre Spielorte sind geliehene geprüfte Plätze anderer Clubs der Liga.
+**Gemeinsame Plätze (wirken in allen vier Welten, deshalb zuerst):** ~~`extra-4-fc-alpenfestung`~~ (ersetzt durch Yverdon Sport FC), ~~`extra-5-fc-gotthard-murmeltiere`~~ (ersetzt durch FC Wil 1900), ~~`extra-6-fc-l-man-mouettes`~~ (ersetzt durch FC Rapperswil-Jona), `extra-7-fc-z-risee-b-tler` (Liga 7). Ihre Spielorte sind geliehene geprüfte Plätze anderer Clubs der Liga.
 
 **Nur Bern, Liga 8 bis 14:** `extra-8-fc-r-stigraben-united`, `extra-9-fc-seeland-hechte`, `extra-10-fc-emmental-k-sekicker`, `extra-11-fc-g-rbetal-kickers`, ~~`extra-11-fc-g-rbetal-kickers`~~ (ersetzt durch FC Stettlen 08), ~~`extra-12-fc-worblental-rangers`~~ (ersetzt durch FC Heimberg), ~~`extra-13-sc-marzili-bern`~~ (ersetzt durch FC Goldstern), `extra-14-fc-aaref-chse-bern`.
 
@@ -161,11 +161,27 @@ Ersetzt `extra-13-sc-marzili-bern` (SC Marzili Bern). **Die ID bleibt**, der alt
 
 Nur diese eine Route kam neu in den Cache, bestehende Routen blieben unverändert.
 
+## Phase 5: FC Rapperswil-Jona (Liga 6, alle vier Welten)
+
+Ersetzt `extra-6-fc-l-man-mouettes` (FC Léman Mouettes) in Bern, Zürich, Basel und Genève zugleich. **Die ID bleibt**, der alte Name führt weiter zu seinem früheren Platz. Der Club spielt in der Promotion League; Liga 6 enthält Promotion League und 1. Liga Clubs (Näherung wie überall).
+
+**Welches Feld ist das Hauptspielfeld?** OFV Anlageneintrag: Hauptplatz 105 × 68 m. Die Gemeinde nennt ein «Hauptspielfeld mit Zuschauertribüne (800 Plätze), Garderobentrakt und Clubraum (FC Rapperswil-Jona)». Der Übersichtsplan der Gemeinde (Sportanlagen Grünfeld, Juli 2024) ist mit Norden **unten** gezeichnet: Tennisplätze und Tennishalle liegen im Plan links unten, in OSM nordöstlich; die Sporthalle und die Grünfeldstrasse liegen im Plan unten, in OSM nördlich der Felder; das Kunstrasenfeld 3 (G11) liegt im Plan oben, in OSM der einzige Kunstrasenplatz im Südwesten. Mit dieser Drehung um 180 Grad ist «Fussballfeld 1» (G1) neben «Fussballstadion, Garderoben» das Feld unmittelbar an der in OSM kartierten Tribüne (way 220366252, 7 m Abstand).
+
+| | Beleg |
+|---|---|
+| Feld | OSM way 203508979: Rasen, beleuchtet, 115.6 × 76.1 m (105 × 68 m plus Auslauf der Stadionanlage, 5 m je Seite), 8730 m², Mittelpunkt 47.2205209, 8.8415371 |
+| Nachbarfeld | way 203509029 (G2, 102.4 × 70.6 m) liegt ebenfalls 6 m neben der Tribüne, ist aber kürzer als das 105 m lange Hauptfeld und scheidet damit aus; way 195667482 (106.1 × 70.0 m) liegt 88 m von der Tribüne entfernt und ist nach Plan nicht das Stadionfeld |
+| Gebäude | swisstopo «Stadion Grünfeld» bei 47.22098, 8.84158 (die Tribüne), Anschrift laut Club Grünfeldstrasse 3, laut Gemeinde Grünfeldstrasse 8, 8645 Jona |
+| Zufahrt laut Club | Keine direkte Zufahrt über die Blumenaustrasse; der Zugang erfolgt vom Parkplatz an der Grünfeldstrasse über den Fussweg vor der Grünfeld-Halle zum Stadion (fcrj.ch/pages/stadionordnung und /verkehrsanbindung); Zufahrt über die Blaubrunnenstrasse nur mit Bewilligung |
+| Strassenendpunkt | Die Standardroute (OSRM, nächste Strasse) würde auf der Blaubrunnenstrasse 47 m südlich des Feldes enden, in OSM `motor_vehicle=agricultural`. Deshalb endet die Route am gebührenpflichtigen öffentlichen Parkplatz an der Grünfeldstrasse (OSM way 26458013, Parkierungsweg bei 47.22211, 8.844756), erreicht über die Grünfeldstrasse (öffentlich), und läuft von dort zum Feld. Der Parkplatz liegt 190 m vom Feld. |
+| Neue Routen | Bern bis Stadion Grünfeld: 167.5 km, 122 Minuten; Zürich bis Stadion Grünfeld: 42.5 km, 36 Minuten (der bestehende Zürcher Stützpunkt) |
+
+Die Routen wurden mit dem Parkplatz als Routenziel erzeugt, der letzte Punkt der Strecke bleibt das Feld. Dieselbe Regel steht jetzt in `scripts/travel/fetch-real-routes.mts` (`routeTarget`): ohne sie würde eine Neuerzeugung die Blaubrunnenstrasse wählen.
+
 ## Phase 3, weiter geprüft und nicht übernommen
 
 | Kandidat | Was fehlt |
 |---|---|
 | FC Steffisburg, Schönau | FVBJ: aktuelle Spiele auf dem Hauptplatz Schönau, Anlage Schönauweg 46 (3612 Steffisburg, Schulhaus Schönau), Hauptplatz 100 × 64 m. In OpenStreetMap ist dort **kein Fussballfeld** kartiert: die Anlage ist neu. Das nächste Grasfeld (way 334213888, 110 × 81 m, `sport=multi`, bearbeitet am 3.11.2025) liegt 285 m von der Adresse entfernt und passt nicht zu 100 × 64 m (+10/+17 m). Ohne Feldpolygon bleibt der Mittelpunkt offen (kein provisorischer Punkt). Der Parkplatz beim Schulhaus ist in OSM kartiert (way 124614207, 10 m von der Adresse) |
-| FC Rapperswil-Jona, Stadion Grünfeld | Die Gemeinde nennt ein Hauptspielfeld mit Tribüne (Grünfeldstrasse 8), der Club die Zufahrt über den gebührenpflichtigen Parkplatz an der Grünfeldstrasse (Blumenaustrasse gesperrt). Die OSM Tribüne (way 220366252) liegt 6 bis 7 m neben zwei Feldern (way 203508979, 115.6 × 76.1 m, und way 203509029, 102.4 × 70.6 m), ohne Mass des Clubs bleibt offen, welches das Hauptspielfeld ist. Frühere Hinweise: der Stadionpunkt 47.22206, 8.84398 liegt neben way 195667482 (106.1 × 70.0 m), das swisstopo Gebäude «Stadion Grünfeld» (47.22098, 8.84158) liegt neben way 203509029 (102.4 × 70.6 m) und way 203508979 (115.6 × 76.1 m). Welches Feld das Stadionfeld ist, belegt keine Quelle |
 | FC Schaffhausen, Stadion Breite | Zwei verschachtelte OSM Umrisse mit demselben Namen (111.0 × 76.5 m und 107.7 × 73.9 m), kein Mass des Clubs, das den Feldumriss bestimmt |
 | FC Locarno, Stadio del Lido | Zwei beleuchtete Rasenfelder (99.9 × 64.4 m und 100.3 × 62.8 m) neben dem Stadion, kein Beleg für das Spielfeld der 1. Mannschaft |
