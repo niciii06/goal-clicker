@@ -7,6 +7,7 @@ import { HOME_CITY_IDS, catalogOf, worldCatalog } from "../app/home-cities.ts";
 import { OWN_CLUB_ID, advanceAiLeagues, normalizeAiLeagues } from "../app/season-leagues.ts";
 import { LEAGUE_MEMBERS, SEASON_CLUBS, VENUES, defaultAiLeagues, seasonClubsOf, venueForClubName } from "../app/travel-geography.ts";
 import { matchColours } from "../app/match-colours.ts";
+import { planJourney } from "../app/journey-routing.ts";
 
 /** The six clubs of the world league: stable id (minted for the old parody names), official name, catalogue ground. */
 const WORLD_LEAGUE = [
@@ -39,7 +40,7 @@ test("the world league has six real clubs with official names in all four home c
  * allowed to be fictional and is not counted.
  */
 const BACKLOG: Record<string, Record<number, number>> = {
-  bern: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1 },
+  bern: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 10: 1, 11: 1, 13: 1, 14: 1 },
   zurich: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 6, 14: 5 },
   basel: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 5, 9: 6, 10: 6, 11: 6, 12: 5, 13: 6, 14: 5 },
   geneve: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 6, 9: 5, 10: 6, 11: 6, 12: 5, 13: 6, 14: 6 },
@@ -113,4 +114,70 @@ test("promotion and relegation are unchanged: one up and one down per boundary i
     assert.ok(seenLowestClubUp, `${city}: the best Liga 15 club (fictional or real) rises normally`);
   }
   assert.equal(SEASON_CLUBS.filter((club) => club.league === 1).length, 6);
+});
+
+// ---- FC Heimberg replaces the fictional sixth club of Liga 12 in the Bern world (first verified regional slot).
+// Evidence: FVBJ ground listing "Waldgarten" (Hauptplatz natural grass 96 x 61 m, floodlights, training pitch 84 x 42 m, club at
+// Schützenstrasse 73), swisstopo address register (Schützenstrasse 73, 3627 Heimberg at 46.79110, 7.59736), OpenStreetMap soccer pitch way 93077552.
+const HEIMBERG_ID = "extra-12-fc-worblental-rangers";
+/** Corners of OpenStreetMap way 93077552 (lat, lon). */
+const HEIMBERG_PITCH: [number, number][] = [[46.7912046, 7.5974467], [46.7913326, 7.5982535], [46.7904685, 7.5985459], [46.7903405, 7.5977392]];
+const METRES = (lat: number) => ({ y: 111320, x: 111320 * Math.cos((lat * Math.PI) / 180) });
+const inPolygon = (lat: number, lon: number, polygon: [number, number][]) => polygon.some((_, i) => {
+  const [aLat, aLon] = polygon[i], [bLat, bLon] = polygon[(i + 1) % polygon.length];
+  return (aLat > lat) !== (bLat > lat) && lon < ((bLon - aLon) * (lat - aLat)) / (bLat - aLat) + aLon;
+}) && polygon.filter((_, i) => { const [aLat, aLon] = polygon[i], [bLat, bLon] = polygon[(i + 1) % polygon.length]; return (aLat > lat) !== (bLat > lat) && lon < ((bLon - aLon) * (lat - aLat)) / (bLat - aLat) + aLon; }).length % 2 === 1;
+const metresBetween = (a: [number, number], b: [number, number]) => { const m = METRES(a[0]); return Math.hypot((a[0] - b[0]) * m.y, (a[1] - b[1]) * m.x); };
+
+test("FC Heimberg is the real sixth club of Liga 12 in Bern: old id, real name, no longer fictional, no other club of that name", () => {
+  const bern = worldCatalog("bern");
+  const club = bern.find((item) => item.id === HEIMBERG_ID)!;
+  assert.ok(club, "the id of the old fictional club is kept");
+  assert.equal(club.name, "FC Heimberg");
+  assert.equal(club.league, 12);
+  assert.ok(!club.fictional);
+  assert.equal(bern.filter((item) => item.name === "FC Heimberg").length, 1);
+  assert.equal(bern.filter((item) => item.league === 12).length, 6);
+  assert.ok(!bern.some((item) => item.name === "FC Worblental Rangers"));
+});
+
+test("FC Heimberg ground: the point lies inside the mapped main pitch, the pitch matches the FVBJ size, the address and the public road are next to it", () => {
+  const venue = worldCatalog("bern").find((item) => item.id === HEIMBERG_ID)!.venue;
+  assert.equal(venue.verification, "stadium");
+  assert.equal(venue.address, "Schützenstrasse 73");
+  assert.equal(venue.postalCode, "3627");
+  assert.equal(venue.coordinateSource, "https://www.openstreetmap.org/way/93077552");
+  assert.ok(inPolygon(venue.lat, venue.lon, HEIMBERG_PITCH), "inside the pitch polygon");
+  // Size of the mapped pitch (smallest rectangle) against the FVBJ Hauptplatz 96 x 61 m: the map includes about 1.5 m run-off on each side.
+  const mid = METRES(venue.lat);
+  const points = HEIMBERG_PITCH.map(([lat, lon]) => ({ x: lon * mid.x, y: lat * mid.y }));
+  let best = { area: Infinity, length: 0, width: 0 };
+  for (let degrees = 0; degrees < 180; degrees += 0.5) {
+    const c = Math.cos((degrees * Math.PI) / 180), s = Math.sin((degrees * Math.PI) / 180);
+    const us = points.map((p) => p.x * c + p.y * s), vs = points.map((p) => -p.x * s + p.y * c);
+    const w = Math.max(...us) - Math.min(...us), h = Math.max(...vs) - Math.min(...vs);
+    if (w * h < best.area) best = { area: w * h, length: Math.max(w, h), width: Math.min(w, h) };
+  }
+  assert.ok(best.length >= 96 && best.length <= 101, `length ${best.length.toFixed(1)}`);
+  assert.ok(best.width >= 61 && best.width <= 66, `width ${best.width.toFixed(1)}`);
+  assert.ok(best.area >= 3500, "full size pitch");
+  // Address Schützenstrasse 73 (swisstopo address register) and the public road in front of the ground (OSRM nearest road: Schützenstrasse).
+  assert.ok(metresBetween([venue.lat, venue.lon], [46.79110, 7.59736]) < 80, "the club address is next to the pitch");
+  assert.ok(metresBetween([venue.lat, venue.lon], [46.791334, 7.597882]) < 80, "the public road endpoint is next to the pitch");
+});
+
+test("FC Heimberg: old saved league assignments and journeys keep working, the old club name still finds its old ground, the journey ends at the new ground", () => {
+  const catalog = catalogOf("bern");
+  const defaults = defaultAiLeagues(8, catalog);
+  assert.ok(HEIMBERG_ID in defaults, "the id is still keyed");
+  assert.deepEqual(normalizeAiLeagues(defaults, 8, catalog), defaults);
+  assert.equal(defaults[HEIMBERG_ID], 16 - 12, "still in the division of the old club (Liga 12)");
+  const oldGround = venueForClubName("FC Worblental Rangers", 12, 0, catalog);
+  const club = catalog.find((item) => item.id === HEIMBERG_ID)!;
+  assert.notEqual(oldGround, club.venue, "a saved table that still carries the old name keeps its old ground");
+  assert.equal(oldGround, catalog.find((item) => item.league === 12 && item.id !== HEIMBERG_ID)!.venue);
+  assert.equal(venueForClubName("FC Heimberg", 12, 0, catalog), club.venue);
+  const plan = planJourney(club.venue);
+  const last = plan.segments.at(-1)!.points.at(-1)!;
+  assert.ok(metresBetween([last.lat, last.lon], [club.venue.lat, club.venue.lon]) < 100, "the journey ends at the ground");
 });

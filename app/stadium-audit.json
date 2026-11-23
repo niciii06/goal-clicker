@@ -682,6 +682,19 @@
     {
       "club": "FC St. Gallen 1879",
       "error": "HTTP Error 509: Unknown Error"
+    },
+    {
+      "club": "FC Heimberg",
+      "venueId": "venue-fc-heimberg",
+      "lat": 46.7908374,
+      "lon": 7.5979965,
+      "osmWay": "93077552",
+      "osmName": "",
+      "registeredStadium": "Sportanlage Waldgarten",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/93077552",
+      "verifiedAt": "2026-11-23",
+      "pitchAreaSquareMetres": 6232
     }
   ],
   "international": [

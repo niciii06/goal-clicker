@@ -100,13 +100,28 @@ const fictionalSixth=(league:number,name:string):SeasonClub=>({id:`extra-${leagu
  * the others are explicitly fictional and share the audited ground of a club of their league, so every ground and
  * every route stays source backed. Placed after the original clubs, so the original five of a league keep their slots.
  */
+/**
+ * FC Heimberg replaces the fictional sixth club of Liga 12 in the Bern world (real club rule, docs/real-club-catalog.md).
+ * The id stays the one of the old club, so saved league assignments, tables and lastAiMoves remain valid.
+ * Ground: main pitch of the Sportanlage Waldgarten (natural grass 96 x 61 m, floodlights, FVBJ ground listing; club address
+ * Schützenstrasse 73, 3627 Heimberg). The point is the centre of the OpenStreetMap soccer pitch way 93077552 (6232 m²
+ * including the run-off). The public vehicle access is the Schützenstrasse, about 55 m from the centre.
+ */
+const HEIMBERG_VENUE: Venue = {
+ id:'venue-fc-heimberg',stadium:'Sportanlage Waldgarten',city:'Heimberg',country:'Schweiz',canton:'BE',lat:46.7908374,lon:7.5979965,
+ source:'https://www.fcheimberg.ch/verein/',verification:'stadium',registeredStadium:'Sportanlage Waldgarten',address:'Schützenstrasse 73',postalCode:'3627',
+ coordinateSource:'https://www.openstreetmap.org/way/93077552',coordinateNote:'Mittelpunkt des Hauptplatzes (Naturrasen 96 × 61 m, Flutlicht), in OpenStreetMap als Fussballfeld kartiert.',
+};
+const HEIMBERG:SeasonClub={id:'extra-12-fc-worblental-rangers',name:'FC Heimberg',league:12,venue:HEIMBERG_VENUE};
+/** Names of clubs that were replaced by a real club: a saved table or journey that still carries the old name keeps its old ground until the season ends. */
+const REPLACED_CLUB_GROUNDS:Record<string,()=>Venue>={'FC Worblental Rangers':()=>groundOfLeague(12)};
 const EXTRA_CLUBS: SeasonClub[] = [
  {id:'world-paris-saint-german',name:'Paris Saint-Germain',league:1,venue:VENUES.paris},
  {id:'extra-2-grasshopper',name:'Grasshopper Club Zürich',league:2,venue:VENUES.zurich},
  {id:'extra-3-winterthur',name:'FC Winterthur',league:3,venue:VENUES.winterthur},
  fictionalSixth(4,'FC Alpenfestung'),fictionalSixth(5,'FC Gotthard Murmeltiere'),fictionalSixth(6,'FC Léman Mouettes'),fictionalSixth(7,'FC Zürisee Böötler'),
  fictionalSixth(8,'FC Röstigraben United'),fictionalSixth(9,'FC Seeland Hechte'),fictionalSixth(10,'FC Emmental Käsekicker'),fictionalSixth(11,'FC Gürbetal Kickers'),
- fictionalSixth(12,'FC Worblental Rangers'),fictionalSixth(13,'SC Marzili Bern'),fictionalSixth(14,'FC Aarefüchse Bern'),
+ HEIMBERG,fictionalSixth(13,'SC Marzili Bern'),fictionalSixth(14,'FC Aarefüchse Bern'),
 ];
 export const SEASON_CLUBS: SeasonClub[] = [...BASE_CLUBS,...EXTRA_CLUBS];
 /** Which league (division) each AI club plays in this world; see defaultAiLeagues for clubs that are not listed. */
@@ -141,6 +156,7 @@ export function regionForDivision(division:number) { return DIVISION_REGIONS[Mat
 export function venueForClubName(name:string,division:number,index:number,catalog:readonly SeasonClub[]=SEASON_CLUBS):Venue {
  const current=catalog.find(c=>c.name===name)??SEASON_CLUBS.find(c=>c.name===name);if(current)return current.venue;
  const legacy=LEGACY_POOLS.flat().find(([n])=>n===name);if(legacy)return VENUES[legacy[1]];
+ const replaced=REPLACED_CLUB_GROUNDS[name];if(replaced)return replaced();
  return seasonGeography(division,index,undefined,catalog).venue;
 }
 /** Most specific location wins; category 13 is explicitly configured neutral elite venues only.

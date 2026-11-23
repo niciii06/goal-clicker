@@ -34,14 +34,14 @@ Pro Welt 89 Clubs, 15 Ligen. Fiktiv und zu ersetzen:
 
 | Heimstadt | Gemeinsame Plätze Liga 4 bis 7 | Regionale Ligen 8 bis 14 (42 Clubs) | Summe |
 |---|---|---|---|
-| Bern | 4 | 7 fiktiv, 35 echt | 11 |
+| Bern | 4 | 6 fiktiv, 36 echt (FC Heimberg ersetzt, siehe unten) | 10 |
 | Zürich | 4 | 41 fiktiv, 1 echt (FC Oerlikon/Polizei ZH) | 45 |
 | Basel | 4 | 39 fiktiv, 3 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach) | 43 |
 | Genève | 4 | 40 fiktiv, 2 echt (Signal FC Bernex-Confignon, Meyrin FC) | 44 |
 
 **Gemeinsame Plätze (wirken in allen vier Welten, deshalb zuerst):** `extra-4-fc-alpenfestung` (FC Alpenfestung, Liga 4), `extra-5-fc-gotthard-murmeltiere` (Liga 5), `extra-6-fc-l-man-mouettes` (Liga 6), `extra-7-fc-z-risee-b-tler` (Liga 7). Ihre Spielorte sind geliehene geprüfte Plätze anderer Clubs der Liga.
 
-**Nur Bern, Liga 8 bis 14:** `extra-8-fc-r-stigraben-united`, `extra-9-fc-seeland-hechte`, `extra-10-fc-emmental-k-sekicker`, `extra-11-fc-g-rbetal-kickers`, `extra-12-fc-worblental-rangers`, `extra-13-sc-marzili-bern`, `extra-14-fc-aaref-chse-bern`.
+**Nur Bern, Liga 8 bis 14:** `extra-8-fc-r-stigraben-united`, `extra-9-fc-seeland-hechte`, `extra-10-fc-emmental-k-sekicker`, `extra-11-fc-g-rbetal-kickers`, ~~`extra-12-fc-worblental-rangers`~~ (ersetzt durch FC Heimberg), `extra-13-sc-marzili-bern`, `extra-14-fc-aaref-chse-bern`.
 
 **Zürich, Basel, Genève:** IDs `zh-D-N`, `bs-D-N`, `ge-D-N` (Division D = 2 bis 8, Liga 16 minus D), pro Liga bis zu sechs fiktive Clubs. Anzahl je Liga (Liga 14, 13, ..., 8): Zürich 5, 6, 6, 6, 6, 6, 6. Basel 5, 6, 5, 6, 6, 6, 5. Genève 6, 6, 5, 6, 6, 5, 6.
 
@@ -74,3 +74,19 @@ Ligazuordnung wäre wie bei den übrigen Clubs eine Karrierestufe, keine exakte 
 1. **Anzahl Aufsteiger:** Code und Tests nutzen 1 und 1 (Entscheid vom 12. November). Hier unverändert.
 2. **Turnier, Transfer und News Texte** (`app/features/catalog.ts`, `app/features/news-data.ts`) nennen weiter die Parodienamen (zum Beispiel «Real Madreto», «Liverpuhl FC») und Parodien der Spielernamen. Ob diese ebenfalls echt werden sollen (auch aus Marken und Lizenzgründen), ist nicht entschieden und gehört nicht in den Start Katalog der Ligen.
 3. **Der sechste Club der eigenen Liga** (`defaultAiLeagues`) spielt in der untersten Liga. Sobald die fiktiven sechsten Clubs ersetzt sind, kann dort ein echter Club starten; das erlaubt die Regel, ändert aber die gewohnte Zusammensetzung von Liga 15.
+
+## Phase 2, erster regionaler Platz: FC Heimberg (Bern, Liga 12)
+
+Ersetzt `extra-12-fc-worblental-rangers` (FC Worblental Rangers). **Die ID bleibt**, damit gespeicherte Ligazuteilungen, Tabellen und `lastAiMoves` gültig bleiben. Der alte Name führt weiter zu seinem früheren Spielort (`REPLACED_CLUB_GROUNDS`), solange eine gespeicherte Tabelle oder Reise ihn trägt. Liga 12 ist wie bei allen Katalogclubs eine Karrierestufe, keine Abbildung der Schweizer Pyramide.
+
+| Angabe | Beleg |
+|---|---|
+| Heimspielstätte, Hauptplatz Naturrasen 96 × 61 m mit Flutlicht, Trainingsplatz 84 × 42 m, Club an der Schützenstrasse 73 | Anlageneintrag «Waldgarten» des FVBJ (von Work abgerufen, Matchcenter blockiert automatische Zugriffe) und fcheimberg.ch/verein/ (hinter einer Browser Prüfseite, nicht abgerufen) |
+| Adresse Schützenstrasse 73, 3627 Heimberg bei 46.79110, 7.59736 | swisstopo Adressdienst (Bundesregister), 56 m vom Platzmittelpunkt |
+| Platz: OpenStreetMap way 93077552, beleuchtet, Rasen, 6232 m² inklusive Auslauf, kleinstes Rechteck 98.8 × 63.2 m | passt zu 96 × 61 m (Auslauf je 1.4 m). Die beiden Nachbarplätze way 333174875 (94 × 54 m) und way 333174873 (91 × 44 m, wohl der Trainingsplatz) passen nicht |
+| Platzmittelpunkt 46.7908374, 7.5979965 | Schwerpunkt des OSM Polygons, liegt innerhalb |
+| Öffentlicher Fahrzeugpunkt 46.791334, 7.597882 | Schützenstrasse (öffentlich, ohne Zufahrtsbeschränkung in OSM), nächste befahrbare Strasse nach OSRM, 56 m vom Platzmittelpunkt |
+
+Die Strecke von Bern zum Platz ist neu im Routencache (`bus:46.94689,7.39373:46.79084,7.59800`, 34.1 km, 30 Minuten) und endet auf diesem Punkt an der Schützenstrasse, die letzten 56 m bis zum Platz sind geschätzt (wie bei anderen Plätzen). Es wurden keine bestehenden Routen verändert. `app/stadium-audit.json` führt den Platz mit OSM way und Fläche.
+
+**Bern Rest:** 6 fiktive Plätze (Liga 8, 9, 10, 11, 13, 14) und die gemeinsamen Plätze Liga 4 bis 7. Offen bleiben ausserdem Goldstern (Waldruhe, Löhrwaldweg 9, Adresse und Platz belegt, aber Spielstätte der 1. Mannschaft gegenüber Bremgarten und öffentliche Zufahrt noch offen) und die anderen Kandidaten aus dem Notion Kommentar.

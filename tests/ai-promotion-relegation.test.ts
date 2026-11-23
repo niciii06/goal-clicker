@@ -3,6 +3,7 @@
 // club in its league, six AI clubs everywhere else, and the own club keeps its ten fixtures.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import audit from "../app/stadium-audit.json";
 import test from "node:test";
 import { SEASON_MODE_MATCHES_PER_SEASON, SEASON_MODE_TABLE_SIZE, SEASON_PROMOTION_PLACES, SEASON_RELEGATION_PLACES, createSeasonFixtures, getSeasonOpponentRating, normalizeSeasonModeState, recordSeasonModeMatch, startSeasonPrestige } from "../app/feature-data.ts";
 import type { SeasonModeState } from "../app/feature-data.ts";
@@ -68,11 +69,13 @@ test("the catalogue has six clubs per league, five in the lowest league where th
   for (const club of added) {
     // Source backed grounds only: the venue is a ground the catalogue already audits, or a catalogue venue of the world league.
     const owners = SEASON_CLUBS.filter((other) => other.venue.id === club.venue.id);
-    assert.ok(owners.length >= 2 || Object.values(VENUES).some((venue) => venue.id === club.venue.id), `${club.name} has an existing ground`);
+    // A real club may bring its own ground when it has an audit record (OpenStreetMap soccer pitch, at least 3500 m², app/stadium-audit.json).
+    const audited = !club.fictional && audit.swiss.some((record) => record.venueId === club.venue.id && "lat" in record);
+    assert.ok(owners.length >= 2 || Object.values(VENUES).some((venue) => venue.id === club.venue.id) || audited, `${club.name} has an existing ground`);
     assert.ok(club.venue.lat && club.venue.lon);
   }
   assert.ok(added.filter((club) => club.fictional).every((club) => seasonClubsOf(16 - club.league, defaultAiLeagues(1)).some((other) => !other.fictional && other.venue.id === club.venue.id)), "a fictional sixth club shares the ground of a real club of its league");
-  assert.equal(added.filter((club) => !club.fictional).length, 3, "real clubs only where their audited stadium exists");
+  assert.equal(added.filter((club) => !club.fictional).length, 4, "real clubs only where their audited stadium exists (Grasshopper, Winterthur, Paris Saint-Germain, FC Heimberg)");
 });
 
 test("legacy saves and new worlds keep their five opponents; the sixth club of the own league plays in the lowest league", () => {
