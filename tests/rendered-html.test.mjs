@@ -63,3 +63,33 @@ test("the app manifest, its icons, the service worker and the offline page are s
   }
   assert.match((await fetch(`${BASE}/sw.js`)).headers.get("content-type") ?? "", /javascript/);
 });
+
+// Notion SEO ticket: what a crawler gets without login. The start page and a tab address name the one canonical
+// address and allow indexing; robots.txt and the sitemap are served; nothing says noindex.
+test("the start page and a tab address name the canonical address and allow indexing", async () => {
+  for (const path of ["/", "/kader"]) {
+    const response = await fetch(`${BASE}${path}`, { headers: { accept: "text/html" } });
+    assert.equal(response.status, 200, path);
+    assert.equal(response.headers.get("x-robots-tag"), null, path);
+    const html = await response.text();
+    const canonicals = html.match(/<link rel="canonical"[^>]*>/g) ?? [];
+    assert.deepEqual(canonicals, ['<link rel="canonical" href="https://goalclicker.ch"/>'], path);
+    assert.match(html, /<meta name="robots" content="index, follow"\/>/, path);
+    assert.doesNotMatch(html, /noindex|nofollow/i, path);
+    assert.match(html, /<title>Goal Clicker \| Football Idle Club<\/title>/, path);
+    assert.match(html, /<meta name="description" content="Klick den Ball, sammle Tore und baue dein eigenes Fussball Imperium."\/>/, path);
+  }
+});
+
+test("robots.txt and the sitemap are served for the canonical address", async () => {
+  const robots = await fetch(`${BASE}/robots.txt`);
+  assert.equal(robots.status, 200);
+  assert.match(robots.headers.get("content-type") ?? "", /^text\/plain\b/);
+  const rules = (await robots.text()).trim().split("\n").map((line) => line.trim());
+  assert.deepEqual(rules.filter(Boolean), ["User-Agent: *", "Allow: /", "Disallow: /api/", "Disallow: /auth/", "Sitemap: https://goalclicker.ch/sitemap.xml"]);
+  const sitemap = await fetch(`${BASE}/sitemap.xml`);
+  assert.equal(sitemap.status, 200);
+  assert.match(sitemap.headers.get("content-type") ?? "", /xml/);
+  const xml = await sitemap.text();
+  assert.deepEqual([...xml.matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1]), ["https://goalclicker.ch/"]);
+});
