@@ -34,7 +34,7 @@ Pro Welt 89 Clubs, 15 Ligen. Fiktiv und zu ersetzen:
 
 | Heimstadt | Gemeinsame Plätze Liga 4 bis 7 | Regionale Ligen 8 bis 14 (42 Clubs) | Summe |
 |---|---|---|---|
-| Bern | 4 | 5 fiktiv, 37 echt (FC Heimberg und FC Stettlen 08 ersetzt, siehe unten) | 9 |
+| Bern | 4 | 3 fiktiv, 39 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil ersetzt, siehe unten) | 7 |
 | Zürich | 4 | 41 fiktiv, 1 echt (FC Oerlikon/Polizei ZH) | 45 |
 | Basel | 4 | 39 fiktiv, 3 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach) | 43 |
 | Genève | 4 | 40 fiktiv, 2 echt (Signal FC Bernex-Confignon, Meyrin FC) | 44 |
@@ -105,12 +105,27 @@ Ersetzt `extra-11-fc-g-rbetal-kickers` (FC Gürbetal Kickers). **Die ID bleibt**
 
 Neu im Routencache ist nur `bus:46.94689,7.39373:46.94963,7.61905` (26.2 km, 32 Minuten). Die Matchcenter Seite des FVBJ blockiert automatische Zugriffe; die Platzangabe stützt sich auf die Vereinsseite.
 
+## Phase 2, Plätze drei und vier: FC Oberdiessbach (Liga 9) und FC Grosshöchstetten-Schlosswil (Liga 10)
+
+Beide Plätze stützen sich auf die FVBJ Anlageneinträge (von Work am 23. November 2026 abgerufen; das Matchcenter blockiert automatische Zugriffe). Die IDs der ersetzten Clubs bleiben (`extra-9-fc-seeland-hechte`, `extra-10-fc-emmental-k-sekicker`), die alten Namen führen weiter zu ihrem früheren Spielort. Die Ligen sind Näherungen nach Entfernung: Oberdiessbach liegt 21 km vom Heimstadion (Liga 9: Münsingen, Köniz, Muri), Grosshöchstetten 19 km (Liga 10: Langnau, Burgdorf, Emmental).
+
+| | FC Oberdiessbach, Sportanlage Leimen | FC Grosshöchstetten-Schlosswil, Arniacher |
+|---|---|---|
+| FVBJ Eintrag | Hauptplatz Naturrasen 100 × 64 m, Kunstrasenplatz 90 × 57.6 m, Helisbühlstrasse | Hauptplatz 100 × 64 m |
+| OSM Hauptplatz | way 208125381: Rasen, beleuchtet, 106.5 × 69.4 m, 7374 m² | way 185813961: Rasen, 107.0 × 70.9 m, 7498 m² |
+| Abweichung zum FVBJ Mass | +6.5 / +5.4 m (Auslauf der Karte) | +7.0 / +6.9 m (Auslauf der Karte) |
+| Gegenprobe | der zweite Platz way 208125372 (Kunstrasen, 95.6 × 63.5 m) liegt ebenfalls rund 6 m über dem FVBJ Mass 90 × 57.6 m, also gleiche Auslaufbreite | der einzige Fussballplatz beim Flurnamen Arniacher (swisstopo, 95 m entfernt); die nächsten Plätze liegen 580 m (108 × 45 m) und 1 km weg |
+| Adresse | Helisbühlstrasse 6a (swisstopo) bei 46.83212, 7.61709, 70 m vom Mittelpunkt | keine Adresse im FVBJ Text, Flurname und Platz genügen für die Lage |
+| Mittelpunkt | 46.8321558, 7.6161992 | 46.9112538, 7.6317333 |
+| Strassenendpunkt | Route endet bei 46.832562, 7.615532 auf der Thunstrasse (Kantonsstrasse), 68 m vom Mittelpunkt | Route endet bei 46.911278, 7.632258 auf dem Gwattbergweg (asphaltiert, ohne Zugangsbeschränkung), 40 m vom Mittelpunkt |
+| Neue Route | `bus:46.94689,7.39373:46.83216,7.61620`, 29.3 km, 31 Minuten | `bus:46.94689,7.39373:46.91125,7.63173`, 22.3 km, 31 Minuten |
+
+Es kamen nur diese zwei Routen in den Cache, bestehende Routen blieben unverändert.
+
 ## Geprüft, aber (noch) nicht übernommen
 
 | Kandidat | Stand | Was fehlt |
 |---|---|---|
 | FC Goldstern, Waldruhe | Adresse Löhrwaldweg 9 (Bundesregister) und Platz way 26531887 (4950 m²) passen zum FVBJ Eintrag | Spielstätte der 1. Mannschaft (Clubseite nennt auch «Buvette Bremgarten»), öffentliche Zufahrt (Löhrwaldweg teils privat) |
-| SC Aegerten Brügg, Moos | Clubseite: «Regionale Sportanlage Aegerten-Brügg-Studen, bekannt als Moos» | Drei beleuchtete Rasenplätze nebeneinander (OSM 35960672: 97 × 63 m, 35960673: 110 × 68 m, 35960674: 103 × 72 m); welcher der Hauptplatz ist, steht nur im Bild der Spielfeldkunde oder im FVBJ Eintrag |
-| FC Oberdiessbach, Leimen | OSM: Rasen beleuchtet 107 × 70 m (way 208125381) und Kunstrasen 96 × 64 m (way 208125372) | Hauptplatz laut Club oder FVBJ, Vereinsseite lädt nur per JavaScript |
-| FC Grosshöchstetten-Schlosswil, Arniacher | Flurname Arniacher bei 46.9120, 7.6313, ein Rasenplatz (way 185813961, 107 × 71 m) 100 m daneben | Beleg des Clubs oder des FVBJ (Adresse, Masse), dass dort gespielt wird; Matchcenter blockiert |
-| FC Steffisburg, Schönau | Schönau ist ein Neubau (Schul-, Kultur- und Sportanlage), der alte Platz ist Eichfeld | aktuelle Heimspielstätte |
+| SC Aegerten Brügg, Moos | FVBJ: Hauptplatz 102 × 64 m, Moosweg 14 (swisstopo: 47.11648, 7.28313). Drei beleuchtete Rasenplätze in OSM: way 35960672 (97.3 × 62.8 m), way 35960673 (110.0 × 68.0 m, am nächsten zu Moosweg 14), way 35960674 (103.2 × 72.1 m) | Keiner passt: der erste ist kleiner als das FVBJ Mass, der zweite 8 m länger, der dritte 8 m breiter (Auslauf der Karte rund +3 bis +7 m). Die Karte stimmt hier nicht sicher mit der Anlage überein, ein Orthofoto Abgleich oder die Masse des Platzes 2 und 3 aus dem FVBJ Eintrag würden es klären |
+| FC Steffisburg, Schönau | Schönau ist ein Neubau (Schul, Kultur und Sportanlage), der alte Platz ist Eichfeld | aktuelle Heimspielstätte |

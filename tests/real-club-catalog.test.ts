@@ -40,7 +40,7 @@ test("the world league has six real clubs with official names in all four home c
  * allowed to be fictional and is not counted.
  */
 const BACKLOG: Record<string, Record<number, number>> = {
-  bern: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 10: 1, 13: 1, 14: 1 },
+  bern: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 13: 1, 14: 1 },
   zurich: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 6, 14: 5 },
   basel: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 5, 9: 6, 10: 6, 11: 6, 12: 5, 13: 6, 14: 5 },
   geneve: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 6, 9: 5, 10: 6, 11: 6, 12: 5, 13: 6, 14: 6 },
@@ -223,21 +223,85 @@ test("FC Stettlen 08 ground: the point lies inside the only mapped pitch of Walk
   assert.ok(metresBetween([venue.lat, venue.lon], [46.949452, 7.618341]) < 80, "the road endpoint of the route is next to the pitch");
 });
 
-test("both verified replacements together: ids and names unique, six clubs per league, old names keep their old grounds, journeys end at the new grounds", () => {
+test("all verified replacements together: ids and names unique, six clubs per league, old names keep their old grounds, journeys end at the new grounds", () => {
   const catalog = catalogOf("bern");
   assert.equal(new Set(catalog.map((club) => club.id)).size, catalog.length);
   assert.equal(new Set(catalog.map((club) => club.name)).size, catalog.length);
-  for (const league of [11, 12]) assert.equal(catalog.filter((club) => club.league === league).length, 6, `league ${league}`);
-  for (const [id, name, division] of [[HEIMBERG_ID, "FC Heimberg", 4], [STETTLEN_ID, "FC Stettlen 08", 5]] as const) {
+  for (const league of [9, 10, 11, 12]) assert.equal(catalog.filter((club) => club.league === league).length, 6, `league ${league}`);
+  const replaced = [
+    [HEIMBERG_ID, "FC Heimberg", 12, "FC Worblental Rangers"],
+    [STETTLEN_ID, "FC Stettlen 08", 11, "FC Gürbetal Kickers"],
+    [OBERDIESSBACH_ID, "FC Oberdiessbach", 9, "FC Seeland Hechte"],
+    [GROSSHOECHSTETTEN_ID, "FC Grosshöchstetten-Schlosswil", 10, "FC Emmental Käsekicker"],
+  ] as const;
+  for (const [id, name, league, oldName] of replaced) {
     const club = catalog.find((item) => item.id === id)!;
     assert.equal(club.name, name);
-    assert.equal(defaultAiLeagues(8, catalog)[id], division, `${name}: same division as the old club`);
+    assert.equal(club.league, league);
+    assert.ok(!club.fictional, name);
+    assert.equal(defaultAiLeagues(8, catalog)[id], 16 - league, `${name}: same division as the old club`);
     const last = planJourney(club.venue).segments.at(-1)!.points.at(-1)!;
     assert.ok(metresBetween([last.lat, last.lon], [club.venue.lat, club.venue.lon]) < 100, `${name}: the journey ends at the ground`);
+    // A saved table or journey that still carries the old name keeps the old ground of that league.
+    assert.equal(venueForClubName(oldName, league, 0, catalog), catalog.find((item) => item.league === league && !replaced.some(([other]) => other === item.id))!.venue, oldName);
+    assert.equal(venueForClubName(name, league, 0, catalog), club.venue, name);
   }
-  const oldGround = venueForClubName("FC Gürbetal Kickers", 11, 0, catalog);
-  assert.equal(oldGround, catalog.find((item) => item.league === 11 && item.id !== STETTLEN_ID)!.venue);
-  assert.equal(venueForClubName("FC Stettlen 08", 11, 0, catalog), catalog.find((item) => item.id === STETTLEN_ID)!.venue);
-  // Other worlds are not touched: the same ids still point to their own catalogues.
-  for (const city of HOME_CITY_IDS) if (city !== "bern") assert.ok(!worldCatalog(city).some((club) => club.name === "FC Stettlen 08" || club.name === "FC Heimberg"), city);
+  // Other worlds are not touched.
+  for (const city of HOME_CITY_IDS) if (city !== "bern") assert.ok(!worldCatalog(city).some((club) => replaced.some(([, name]) => club.name === name)), city);
+});
+
+// ---- FC Oberdiessbach (Liga 9) and FC Grosshöchstetten-Schlosswil (Liga 10) in the Bern world.
+// Evidence: FVBJ ground listings (Work, 23 November 2026). Leimen: natural grass main field 100 x 64 m, synthetic field 90 x 57.6 m,
+// Helisbühlstrasse. Arniacher: main field 100 x 64 m. The mapped pitches are larger by the run-off the map includes (about 3 m per side).
+const OBERDIESSBACH_ID = "extra-9-fc-seeland-hechte";
+const GROSSHOECHSTETTEN_ID = "extra-10-fc-emmental-k-sekicker";
+/** Corners of OpenStreetMap way 208125381 (grass, Leimen) and way 185813961 (grass, Arniacher). */
+const OBERDIESSBACH_PITCH: [number, number][] = [[46.8326755, 7.6158545], [46.8321609, 7.6170332], [46.8316364, 7.6165431], [46.8321508, 7.6153657]];
+const GROSSHOECHSTETTEN_PITCH: [number, number][] = [[46.9117204, 7.6312431], [46.9107678, 7.6312969], [46.9107821, 7.6322165], [46.9117413, 7.6321749]];
+const minRectangle = (polygon: [number, number][]) => {
+  const mid = METRES(polygon[0][0]);
+  const points = polygon.map(([lat, lon]) => ({ x: lon * mid.x, y: lat * mid.y }));
+  let best = { area: Infinity, length: 0, width: 0 };
+  for (let degrees = 0; degrees < 180; degrees += 0.5) {
+    const c = Math.cos((degrees * Math.PI) / 180), s = Math.sin((degrees * Math.PI) / 180);
+    const us = points.map((p) => p.x * c + p.y * s), vs = points.map((p) => -p.x * s + p.y * c);
+    const w = Math.max(...us) - Math.min(...us), h = Math.max(...vs) - Math.min(...vs);
+    if (w * h < best.area) best = { area: w * h, length: Math.max(w, h), width: Math.min(w, h) };
+  }
+  return best;
+};
+
+test("FC Oberdiessbach and FC Grosshöchstetten-Schlosswil are real clubs in their slots, with the old ids and no duplicates", () => {
+  const bern = worldCatalog("bern");
+  for (const [id, name, league] of [[OBERDIESSBACH_ID, "FC Oberdiessbach", 9], [GROSSHOECHSTETTEN_ID, "FC Grosshöchstetten-Schlosswil", 10]] as const) {
+    const club = bern.find((item) => item.id === id)!;
+    assert.ok(club, `${name}: the id of the old fictional club is kept`);
+    assert.equal(club.name, name);
+    assert.equal(club.league, league);
+    assert.ok(!club.fictional);
+    assert.equal(bern.filter((item) => item.name === name).length, 1);
+  }
+  assert.ok(!bern.some((item) => item.name === "FC Seeland Hechte" || item.name === "FC Emmental Käsekicker"));
+});
+
+test("Leimen and Arniacher: the points lie inside the mapped main pitches, which match the FVBJ sizes plus the map's run-off; road and address are next to them", () => {
+  const bern = worldCatalog("bern");
+  const leimen = bern.find((item) => item.id === OBERDIESSBACH_ID)!.venue, arniacher = bern.find((item) => item.id === GROSSHOECHSTETTEN_ID)!.venue;
+  for (const [venue, polygon, length, width, source] of [
+    [leimen, OBERDIESSBACH_PITCH, 100, 64, "https://www.openstreetmap.org/way/208125381"],
+    [arniacher, GROSSHOECHSTETTEN_PITCH, 100, 64, "https://www.openstreetmap.org/way/185813961"],
+  ] as const) {
+    assert.equal(venue.verification, "stadium");
+    assert.equal(venue.coordinateSource, source);
+    assert.ok(inPolygon(venue.lat, venue.lon, [...polygon]), `${venue.stadium}: inside the pitch polygon`);
+    const best = minRectangle([...polygon]);
+    assert.ok(best.length >= length && best.length <= length + 8, `${venue.stadium}: length ${best.length.toFixed(1)}`);
+    assert.ok(best.width >= width && best.width <= width + 8, `${venue.stadium}: width ${best.width.toFixed(1)}`);
+  }
+  // The second pitch at Leimen is the synthetic field (90 x 57.6 m, mapped 95.6 x 63.5 m); the main field is the natural grass one.
+  assert.equal(leimen.postalCode, "3672");
+  assert.ok(metresBetween([leimen.lat, leimen.lon], [46.83212, 7.61709]) < 80, "Helisbühlstrasse 6a (swisstopo) is next to the pitch");
+  assert.ok(metresBetween([leimen.lat, leimen.lon], [46.832562, 7.615532]) < 100, "public road endpoint at Leimen (Thunstrasse)");
+  assert.ok(metresBetween([arniacher.lat, arniacher.lon], [46.91203, 7.63131]) < 150, "the field name Arniacher (swisstopo) is next to the pitch");
+  assert.ok(metresBetween([arniacher.lat, arniacher.lon], [46.911278, 7.632258]) < 100, "public road endpoint at Arniacher (Gwattbergweg)");
 });

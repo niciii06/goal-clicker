@@ -708,6 +708,32 @@
       "source": "https://www.openstreetmap.org/way/318117223",
       "verifiedAt": "2026-11-23",
       "pitchAreaSquareMetres": 6198
+    },
+    {
+      "club": "FC Oberdiessbach",
+      "venueId": "venue-fc-oberdiessbach",
+      "lat": 46.8321558,
+      "lon": 7.6161992,
+      "osmWay": "208125381",
+      "osmName": "",
+      "registeredStadium": "Sportanlage Leimen",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/208125381",
+      "verifiedAt": "2026-11-23",
+      "pitchAreaSquareMetres": 7374
+    },
+    {
+      "club": "FC Grosshöchstetten-Schlosswil",
+      "venueId": "venue-fc-grosshoechstetten-schlosswil",
+      "lat": 46.9112538,
+      "lon": 7.6317333,
+      "osmWay": "185813961",
+      "osmName": "",
+      "registeredStadium": "Sportanlage Arniacher",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/185813961",
+      "verifiedAt": "2026-11-23",
+      "pitchAreaSquareMetres": 7498
     }
   ],
   "international": [

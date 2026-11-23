@@ -12,9 +12,11 @@ Entscheid von Nicolas (12. November 2026): Pro Saison und Ligagrenze steigt **ei
 | 1 | Paris Saint-Germain (echt, offizieller Name seit der Katalogkorrektur, siehe `docs/real-club-catalog.md`) | Stadion Paris aus dem Katalog |
 | 2 | Grasshopper Club Zürich (echt) | Letzigrund (geprüfter Katalogeintrag) |
 | 3 | FC Winterthur (echt) | Schützenwiese (geprüfter Katalogeintrag) |
+| 9 | FC Oberdiessbach (echt, ersetzt in Bern den fiktiven FC Seeland Hechte, gleiche ID) | Sportanlage Leimen, Oberdiessbach |
+| 10 | FC Grosshöchstetten-Schlosswil (echt, ersetzt in Bern den fiktiven FC Emmental Käsekicker, gleiche ID) | Sportanlage Arniacher, Grosshöchstetten |
 | 11 | FC Stettlen 08 (echt, ersetzt in Bern den fiktiven FC Gürbetal Kickers, gleiche ID, siehe `docs/real-club-catalog.md`) | Sportplatz beim Schulhaus Walkringen |
 | 12 | FC Heimberg (echt, ersetzt in Bern den fiktiven FC Worblental Rangers, gleiche ID, siehe `docs/real-club-catalog.md`) | Sportanlage Waldgarten, Heimberg |
-| 4 bis 14 (ohne Liga 11 und 12 in Bern) | FC Alpenfestung, FC Gotthard Murmeltiere, FC Léman Mouettes, FC Zürisee Böötler, FC Röstigraben United, FC Seeland Hechte, FC Emmental Käsekicker, SC Marzili Bern, FC Aarefüchse Bern (**fiktiv**, `fictional: true`) | teilen den geprüften Platz des ersten Clubs ihrer Liga |
+| 4 bis 14 (ohne Liga 9 bis 12 in Bern) | FC Alpenfestung, FC Gotthard Murmeltiere, FC Léman Mouettes, FC Zürisee Böötler, FC Röstigraben United, SC Marzili Bern, FC Aarefüchse Bern (**fiktiv**, `fictional: true`) | teilen den geprüften Platz des ersten Clubs ihrer Liga |
 
 **Überholt (Stand 21. November 2026):** Fiktive Clubs dürfen nur in Liga 15 starten; der Ersatz der übrigen fiktiven sechsten Clubs ist in `docs/real-club-catalog.md` geplant. **Warum sie so gewählt wurden:** Spielort und Route jedes Clubs sind quellengestützt (OSM Fussballfeld, Routencache). Für echte Amateurclubs hätte ich Plätze und Routen neu beschaffen müssen. Die öffentlichen Kartendienste lieferten aus dieser Umgebung keine verlässlichen Felder (Overpass war nicht erreichbar, die Suche in Nominatim fand für viele Orte keine Fussballfelder). Eine falsche Zuordnung eines echten Clubs zu einem Platz wollte ich nicht erfinden. Die Namen lassen sich später ersetzen, ohne die Mechanik zu ändern (`EXTRA_CLUBS` in `app/travel-geography.ts`).
 
