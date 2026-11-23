@@ -445,6 +445,63 @@ test('the welcome pack opens once from the shop at its tutorial step: one walkou
   await page.close();
 });
 
+// Status toasts sit above the bottom navigation on a phone, exactly where the welcome pack button of the shop lies. While the
+// pack is offered, the toasts move to the top, so the button stays visible and tappable and is still opened once.
+test('on a phone status toasts never cover the welcome pack; it opens once during them, and the toast returns to the bottom afterwards', async () => {
+  const now = Date.now();
+  const features = richFeatures(now);
+  features.welcomePack = 'available';
+  const { page, problems } = await openWithSave(VIEWPORTS[1], save(features, now), 'light', true);
+  await page.evaluate(([key, value]) => localStorage.setItem(key, value), [TUTORIAL_STORAGE_KEY, JSON.stringify({ status: 'active', done: ['clicks', 'upgrade', 'lineup'], visited: ['squad'] })] as [string, string]);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.getByRole('region', { name: 'Tutorial' }).waitFor();
+  await openTab(page, 'Packs & Album');
+  const card = page.getByRole('article', { name: 'Willkommenspack' });
+  await card.waitFor();
+  // The savings goal pins of the other packs answer with a status toast each time they are tapped ("Sparziel gesetzt" / "entfernt"), one after the other.
+  const tapOtherPack = (n: number) => page.evaluate((index) => {
+    const pins = [...document.querySelectorAll<HTMLElement>('.savings-pin')].filter((pin) => !pin.closest('.welcome-pack-card'));
+    pins[index % Math.max(1, pins.length)]?.click();
+  }, n);
+  const sample = () => page.evaluate(() => {
+    const button = [...document.querySelectorAll('button')].find((element) => /Willkommenspack öffnen/.test(element.getAttribute('aria-label') || element.textContent || ''))!;
+    const b = button.getBoundingClientRect(), toast = document.querySelector('.toast')?.getBoundingClientRect();
+    const top = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+    return { b: [b.left, b.top, b.width, b.height], toast: toast ? [toast.left, toast.top, toast.width, toast.height] : null, buttonHit: Boolean(top && (top === button || button.contains(top))), inView: b.top >= 0 && b.bottom <= innerHeight };
+  });
+  let withToast = 0;
+  const covered: string[] = [];
+  for (let i = 0; i < 30; i++) {
+    if (i % 4 === 0) await tapOtherPack(i);
+    const r = await sample();
+    if (r.toast) {
+      withToast++;
+      const [bx, by, bw, bh] = r.b, [tx, ty, tw, th] = r.toast;
+      if (tx < bx + bw && tx + tw > bx && ty < by + bh && ty + th > by) covered.push(`sample ${i}: toast ${JSON.stringify(r.toast.map(Math.round))} covers the button ${JSON.stringify(r.b.map(Math.round))}`);
+      assert.ok(ty >= 0 && ty + th <= 844, 'the toast stays on screen');
+    }
+    assert.ok(r.buttonHit && r.inView, `sample ${i}: the pack button is visible and the touch point hits it`);
+    await page.waitForTimeout(200);
+  }
+  assert.ok(withToast >= 20, `the messages are still shown (${withToast} of 30 samples with a toast)`);
+  assert.deepEqual(covered, []);
+  // Tapping the pack while a message is on screen opens it, once.
+  await tapOtherPack(1);
+  await card.getByRole('button', { name: 'Willkommenspack öffnen' }).click({ timeout: 3000 });
+  await closeWelcomePack(page);
+  await page.waitForFunction(() => /SCHRITT 5 \/ 5/.test(document.querySelector('.tutorial-coach')?.textContent ?? ''), undefined, { timeout: 10000 });
+  assert.equal(await page.getByRole('article', { name: 'Willkommenspack' }).count(), 0, 'given once');
+  await page.waitForTimeout(2500);
+  assert.equal(JSON.parse((await page.evaluate((key) => localStorage.getItem(key), SAVE_KEY))!).features.welcomePack, 'claimed');
+  // Without the offered pack the toast is back at the bottom, above the navigation, as before.
+  await tapOtherPack(2);
+  await page.locator('.toast').waitFor({ timeout: 3000 });
+  const after = (await page.locator('.toast').boundingBox())!;
+  assert.ok(after.y > 844 / 2, `the toast is back at the bottom (top at ${Math.round(after.y)} px)`);
+  assert.deepEqual(problems, []);
+  await page.close();
+});
+
 test('the first starting eleven is built by the player through the real lineup actions; the guide follows the steps', async () => {
   const page = await browser.newPage({ viewport: VIEWPORTS[0], locale: 'de-CH' });
   await page.addInitScript('globalThis.__name = (fn) => fn;');
