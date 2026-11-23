@@ -734,6 +734,32 @@
       "source": "https://www.openstreetmap.org/way/185813961",
       "verifiedAt": "2026-11-23",
       "pitchAreaSquareMetres": 7498
+    },
+    {
+      "club": "Yverdon Sport FC",
+      "venueId": "venue-yverdon-sport",
+      "lat": 46.7833023,
+      "lon": 6.6470583,
+      "osmWay": "79701353",
+      "osmName": "",
+      "registeredStadium": "Stade Municipal",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/79701353",
+      "verifiedAt": "2026-11-23",
+      "pitchAreaSquareMetres": 7131
+    },
+    {
+      "club": "FC Wil 1900",
+      "venueId": "venue-fc-wil-1900",
+      "lat": 47.4585499,
+      "lon": 9.0369799,
+      "osmWay": "581466821",
+      "osmName": "",
+      "registeredStadium": "Lidl Arena (Sportpark Bergholz)",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/581466821",
+      "verifiedAt": "2026-11-23",
+      "pitchAreaSquareMetres": 8257
     }
   ],
   "international": [

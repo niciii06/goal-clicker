@@ -34,12 +34,12 @@ Pro Welt 89 Clubs, 15 Ligen. Fiktiv und zu ersetzen:
 
 | Heimstadt | Gemeinsame Plätze Liga 4 bis 7 | Regionale Ligen 8 bis 14 (42 Clubs) | Summe |
 |---|---|---|---|
-| Bern | 4 | 3 fiktiv, 39 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil ersetzt, siehe unten) | 7 |
-| Zürich | 4 | 41 fiktiv, 1 echt (FC Oerlikon/Polizei ZH) | 45 |
-| Basel | 4 | 39 fiktiv, 3 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach) | 43 |
-| Genève | 4 | 40 fiktiv, 2 echt (Signal FC Bernex-Confignon, Meyrin FC) | 44 |
+| Bern | 2 | 3 fiktiv, 39 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil ersetzt, siehe unten) | 5 |
+| Zürich | 2 | 41 fiktiv, 1 echt (FC Oerlikon/Polizei ZH) | 43 |
+| Basel | 2 | 39 fiktiv, 3 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach) | 41 |
+| Genève | 2 | 40 fiktiv, 2 echt (Signal FC Bernex-Confignon, Meyrin FC) | 42 |
 
-**Gemeinsame Plätze (wirken in allen vier Welten, deshalb zuerst):** `extra-4-fc-alpenfestung` (FC Alpenfestung, Liga 4), `extra-5-fc-gotthard-murmeltiere` (Liga 5), `extra-6-fc-l-man-mouettes` (Liga 6), `extra-7-fc-z-risee-b-tler` (Liga 7). Ihre Spielorte sind geliehene geprüfte Plätze anderer Clubs der Liga.
+**Gemeinsame Plätze (wirken in allen vier Welten, deshalb zuerst):** ~~`extra-4-fc-alpenfestung`~~ (ersetzt durch Yverdon Sport FC), ~~`extra-5-fc-gotthard-murmeltiere`~~ (ersetzt durch FC Wil 1900), `extra-6-fc-l-man-mouettes` (Liga 6), `extra-7-fc-z-risee-b-tler` (Liga 7). Ihre Spielorte sind geliehene geprüfte Plätze anderer Clubs der Liga.
 
 **Nur Bern, Liga 8 bis 14:** `extra-8-fc-r-stigraben-united`, `extra-9-fc-seeland-hechte`, `extra-10-fc-emmental-k-sekicker`, `extra-11-fc-g-rbetal-kickers`, ~~`extra-11-fc-g-rbetal-kickers`~~ (ersetzt durch FC Stettlen 08), ~~`extra-12-fc-worblental-rangers`~~ (ersetzt durch FC Heimberg), `extra-13-sc-marzili-bern`, `extra-14-fc-aaref-chse-bern`.
 
@@ -129,3 +129,27 @@ Es kamen nur diese zwei Routen in den Cache, bestehende Routen blieben unveränd
 | FC Goldstern, Waldruhe | Adresse Löhrwaldweg 9 (Bundesregister) und Platz way 26531887 (4950 m²) passen zum FVBJ Eintrag | Spielstätte der 1. Mannschaft (Clubseite nennt auch «Buvette Bremgarten»), öffentliche Zufahrt (Löhrwaldweg teils privat) |
 | SC Aegerten Brügg, Moos | FVBJ: Hauptplatz 102 × 64 m, Moosweg 14 (swisstopo: 47.11648, 7.28313). Drei beleuchtete Rasenplätze in OSM: way 35960672 (97.3 × 62.8 m), way 35960673 (110.0 × 68.0 m, am nächsten zu Moosweg 14), way 35960674 (103.2 × 72.1 m) | Keiner passt: der erste ist kleiner als das FVBJ Mass, der zweite 8 m länger, der dritte 8 m breiter (Auslauf der Karte rund +3 bis +7 m). Die Karte stimmt hier nicht sicher mit der Anlage überein, ein Orthofoto Abgleich oder die Masse des Platzes 2 und 3 aus dem FVBJ Eintrag würden es klären |
 | FC Steffisburg, Schönau | Schönau ist ein Neubau (Schul, Kultur und Sportanlage), der alte Platz ist Eichfeld | aktuelle Heimspielstätte |
+
+## Phase 3: die ersten zwei gemeinsamen Plätze, in allen vier Welten (Yverdon Sport FC Liga 4, FC Wil 1900 Liga 5)
+
+Ersetzen `extra-4-fc-alpenfestung` und `extra-5-fc-gotthard-murmeltiere` in Bern, Zürich, Basel und Genève zugleich (die gemeinsamen Plätze Liga 4 bis 7 gehören zu jedem Katalog). IDs bleiben, die alten Namen führen weiter zu ihrem früheren Platz. Beide Clubs spielen heute in der Challenge League; die Katalogstufe ist wie überall eine Näherung (Liga 4 enthält schon fünf Challenge League Clubs, Liga 5 Promotion League Clubs).
+
+| | Yverdon Sport FC (Liga 4) | FC Wil 1900 (Liga 5) |
+|---|---|---|
+| Heimstadion laut Club | Stade Municipal, Rue des Pêcheurs 16, 1400 Yverdon-les-Bains, Parkplatz Patinoire (yverdonsport.ch/stade-municipal) | Lidl Arena im Sportpark Bergholz, Kunstrasenstadion, Heimstadion seit 2013/14, 6000 Plätze (fcwil.ch/wir/sportpark-bergholz) |
+| Stadiongebäude (swisstopo) | «Stade municipal d'Yverdon-les-Bains» bei 46.78357, 6.64639; Rue des Pêcheurs 16 bei 46.78309, 6.64602 | «Lidl Arena» bei 47.45815, 9.03685 |
+| OSM Stadionfeld | way 79701353: Rasen, beleuchtet, 105.6 × 67.9 m (Standardmass), 7131 m², Mittelpunkt 46.7833023, 6.6470583 | way 581466821: im Umriss way 398357405 «Lidl Arena», beleuchtet, 111.8 × 75.0 m (Standardmass plus Auslauf), 8257 m², Mittelpunkt 47.4585499, 9.0369799 |
+| Gegenprobe | die anderen Plätze der Anlage haben kein Standardmass (96 × 62 m zweimal, 100 × 64 m, 95 × 87 m) und liegen östlich, 80 bis 270 m weiter | der Umriss way 398357405 (128.8 × 98.9 m) trägt den Namen, innerhalb liegt nur dieses Feld; die anderen Plätze der Anlage liegen 150 bis 400 m weg. OSM führt das Feld als «grass», der Club nennt Kunstrasen (Eintrag in OSM veraltet, Lage und Mass stimmen) |
+| Strassenendpunkt | Rue des Pêcheurs (Wohnstrasse, öffentlich), 73 m vom Mittelpunkt | Parkplatz des Stadions (Servicestrasse parking_aisle, ohne Zugangsbeschränkung), erreicht über die öffentliche Bergholzstrasse, 80 m vom Mittelpunkt |
+| Neue Routen | Bern bis Stade Municipal: 71.1 km, 54 Minuten | Bern bis Lidl Arena: 179.9 km, 129 Minuten; Winterthur bis Lidl Arena: 32.9 km (bestehender Zürcher Stützpunkt) |
+
+Es kamen nur diese drei Routen neu in den Cache, bestehende Routen blieben unverändert. Die Matchcenter Seite des FVBJ ist für Super und Challenge League nicht zuständig (SFL Clubs).
+
+## Phase 3, weiter geprüft und nicht übernommen
+
+| Kandidat | Was fehlt |
+|---|---|
+| FC Steffisburg, Schönau | FVBJ: aktuelle Spiele auf dem Hauptplatz Schönau, Anlage Schönauweg 46 (3612 Steffisburg, Schulhaus Schönau), Hauptplatz 100 × 64 m. In OpenStreetMap ist dort **kein Fussballfeld** kartiert: die Anlage ist neu. Das nächste Grasfeld (way 334213888, 110 × 81 m, `sport=multi`, bearbeitet am 3.11.2025) liegt 285 m von der Adresse entfernt und passt nicht zu 100 × 64 m (+10/+17 m). Ohne Feldpolygon bleibt der Mittelpunkt offen (kein provisorischer Punkt). Der Parkplatz beim Schulhaus ist in OSM kartiert (way 124614207, 10 m von der Adresse) |
+| FC Rapperswil-Jona, Stadion Grünfeld | Zwei Hinweise widersprechen sich: der Stadionpunkt 47.22206, 8.84398 liegt neben way 195667482 (106.1 × 70.0 m), das swisstopo Gebäude «Stadion Grünfeld» (47.22098, 8.84158) liegt neben way 203509029 (102.4 × 70.6 m) und way 203508979 (115.6 × 76.1 m). Welches Feld das Stadionfeld ist, belegt keine Quelle |
+| FC Schaffhausen, Stadion Breite | Zwei verschachtelte OSM Umrisse mit demselben Namen (111.0 × 76.5 m und 107.7 × 73.9 m), kein Mass des Clubs, das den Feldumriss bestimmt |
+| FC Locarno, Stadio del Lido | Zwei beleuchtete Rasenfelder (99.9 × 64.4 m und 100.3 × 62.8 m) neben dem Stadion, kein Beleg für das Spielfeld der 1. Mannschaft |

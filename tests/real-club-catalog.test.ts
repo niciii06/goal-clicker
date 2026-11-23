@@ -40,10 +40,10 @@ test("the world league has six real clubs with official names in all four home c
  * allowed to be fictional and is not counted.
  */
 const BACKLOG: Record<string, Record<number, number>> = {
-  bern: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 13: 1, 14: 1 },
-  zurich: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 6, 14: 5 },
-  basel: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 5, 9: 6, 10: 6, 11: 6, 12: 5, 13: 6, 14: 5 },
-  geneve: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 6, 9: 5, 10: 6, 11: 6, 12: 5, 13: 6, 14: 6 },
+  bern: { 6: 1, 7: 1, 8: 1, 13: 1, 14: 1 },
+  zurich: { 6: 1, 7: 1, 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 6, 14: 5 },
+  basel: { 6: 1, 7: 1, 8: 5, 9: 6, 10: 6, 11: 6, 12: 5, 13: 6, 14: 5 },
+  geneve: { 6: 1, 7: 1, 8: 6, 9: 5, 10: 6, 11: 6, 12: 5, 13: 6, 14: 6 },
 };
 test("fictional clubs outside Liga 15 are only the documented backlog, and the world league is not part of it", () => {
   for (const city of HOME_CITY_IDS) {
@@ -227,8 +227,10 @@ test("all verified replacements together: ids and names unique, six clubs per le
   const catalog = catalogOf("bern");
   assert.equal(new Set(catalog.map((club) => club.id)).size, catalog.length);
   assert.equal(new Set(catalog.map((club) => club.name)).size, catalog.length);
-  for (const league of [9, 10, 11, 12]) assert.equal(catalog.filter((club) => club.league === league).length, 6, `league ${league}`);
+  for (const league of [4, 5, 9, 10, 11, 12]) assert.equal(catalog.filter((club) => club.league === league).length, 6, `league ${league}`);
   const replaced = [
+    [YVERDON_ID, "Yverdon Sport FC", 4, "FC Alpenfestung"],
+    [WIL_ID, "FC Wil 1900", 5, "FC Gotthard Murmeltiere"],
     [HEIMBERG_ID, "FC Heimberg", 12, "FC Worblental Rangers"],
     [STETTLEN_ID, "FC Stettlen 08", 11, "FC Gürbetal Kickers"],
     [OBERDIESSBACH_ID, "FC Oberdiessbach", 9, "FC Seeland Hechte"],
@@ -246,8 +248,12 @@ test("all verified replacements together: ids and names unique, six clubs per le
     assert.equal(venueForClubName(oldName, league, 0, catalog), catalog.find((item) => item.league === league && !replaced.some(([other]) => other === item.id))!.venue, oldName);
     assert.equal(venueForClubName(name, league, 0, catalog), club.venue, name);
   }
-  // Other worlds are not touched.
-  for (const city of HOME_CITY_IDS) if (city !== "bern") assert.ok(!worldCatalog(city).some((club) => replaced.some(([, name]) => club.name === name)), city);
+  // The shared slots (Liga 4 to 7) change in every world, the Bern slots only in Bern.
+  for (const city of HOME_CITY_IDS) {
+    const names = worldCatalog(city).map((club) => club.name);
+    for (const [id, name] of replaced) assert.equal(names.includes(name), id === YVERDON_ID || id === WIL_ID || city === "bern", `${city}: ${name}`);
+    assert.equal(new Set(worldCatalog(city).map((club) => club.id)).size, worldCatalog(city).length, `${city}: ids unique`);
+  }
 });
 
 // ---- FC Oberdiessbach (Liga 9) and FC Grosshöchstetten-Schlosswil (Liga 10) in the Bern world.
@@ -304,4 +310,52 @@ test("Leimen and Arniacher: the points lie inside the mapped main pitches, which
   assert.ok(metresBetween([leimen.lat, leimen.lon], [46.832562, 7.615532]) < 100, "public road endpoint at Leimen (Thunstrasse)");
   assert.ok(metresBetween([arniacher.lat, arniacher.lon], [46.91203, 7.63131]) < 150, "the field name Arniacher (swisstopo) is next to the pitch");
   assert.ok(metresBetween([arniacher.lat, arniacher.lon], [46.911278, 7.632258]) < 100, "public road endpoint at Arniacher (Gwattbergweg)");
+});
+
+// ---- Yverdon Sport FC (Liga 4) and FC Wil 1900 (Liga 5): the first two shared slots, replaced in every world.
+// Evidence: Yverdon Sport: Stade Municipal, Rue des Pêcheurs 16, 1400 Yverdon-les-Bains (club page, public parking at the Patinoire);
+// swisstopo: building "Stade municipal d'Yverdon-les-Bains" at 46.78357, 6.64639. FC Wil 1900: Lidl Arena in the Sportpark Bergholz,
+// the club's artificial turf stadium since 2013/14 (club page); swisstopo: building "Lidl Arena" at 47.45815, 9.03685, and the pitch
+// way 581466821 lies inside the OpenStreetMap way that is named Lidl Arena.
+const YVERDON_ID = "extra-4-fc-alpenfestung";
+const WIL_ID = "extra-5-fc-gotthard-murmeltiere";
+/** Corners of OpenStreetMap way 79701353 (Stade Municipal) and way 581466821 (Lidl Arena). */
+const YVERDON_PITCH: [number, number][] = [[46.7838649, 6.6469908], [46.783574, 6.6477739], [46.7827414, 6.6471254], [46.7830292, 6.6463433]];
+const WIL_PITCH: [number, number][] = [[47.4589841, 9.0363659], [47.4583337, 9.0361509], [47.4581156, 9.0375939], [47.458766, 9.037809]];
+
+test("Yverdon Sport FC and FC Wil 1900 are real clubs in their slots in all four worlds, with the old ids and no duplicates", () => {
+  for (const city of HOME_CITY_IDS) {
+    const catalog = worldCatalog(city);
+    for (const [id, name, league] of [[YVERDON_ID, "Yverdon Sport FC", 4], [WIL_ID, "FC Wil 1900", 5]] as const) {
+      const club = catalog.find((item) => item.id === id)!;
+      assert.ok(club, `${city} ${name}: the id of the old fictional club is kept`);
+      assert.equal(club.name, name);
+      assert.equal(club.league, league);
+      assert.ok(!club.fictional);
+      assert.equal(catalog.filter((item) => item.name === name).length, 1);
+    }
+    assert.ok(!catalog.some((item) => item.name === "FC Alpenfestung" || item.name === "FC Gotthard Murmeltiere"), city);
+  }
+});
+
+test("Stade Municipal and Lidl Arena: the points lie inside the mapped stadium pitches, which have stadium size; stadium building, address and road endpoint are next to them", () => {
+  const catalog = worldCatalog("bern");
+  const yverdon = catalog.find((item) => item.id === YVERDON_ID)!.venue, wil = catalog.find((item) => item.id === WIL_ID)!.venue;
+  for (const [venue, polygon, lengths, widths, source] of [
+    [yverdon, YVERDON_PITCH, [102, 110], [65, 71], "https://www.openstreetmap.org/way/79701353"],
+    [wil, WIL_PITCH, [105, 115], [68, 78], "https://www.openstreetmap.org/way/581466821"],
+  ] as const) {
+    assert.equal(venue.verification, "stadium");
+    assert.equal(venue.coordinateSource, source);
+    assert.ok(inPolygon(venue.lat, venue.lon, [...polygon]), `${venue.stadium}: inside the pitch polygon`);
+    const best = minRectangle([...polygon]);
+    assert.ok(best.length >= lengths[0] && best.length <= lengths[1], `${venue.stadium}: length ${best.length.toFixed(1)}`);
+    assert.ok(best.width >= widths[0] && best.width <= widths[1], `${venue.stadium}: width ${best.width.toFixed(1)}`);
+  }
+  assert.equal(yverdon.address, "Rue des Pêcheurs 16");
+  assert.ok(metresBetween([yverdon.lat, yverdon.lon], [46.78357, 6.64639]) < 100, "the Stade Municipal building (swisstopo) is next to the pitch");
+  assert.ok(metresBetween([yverdon.lat, yverdon.lon], [46.78309, 6.64602]) < 100, "Rue des Pêcheurs 16 (swisstopo) is next to the pitch");
+  assert.ok(metresBetween([yverdon.lat, yverdon.lon], [46.783612, 6.646213]) < 100, "road endpoint of the route: Rue des Pêcheurs");
+  assert.ok(metresBetween([wil.lat, wil.lon], [47.45815, 9.03685]) < 80, "the Lidl Arena building (swisstopo) is next to the pitch");
+  assert.ok(metresBetween([wil.lat, wil.lon], [47.458705, 9.035941]) < 100, "road endpoint of the route: the stadium car park");
 });
