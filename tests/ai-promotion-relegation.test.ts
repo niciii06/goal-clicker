@@ -75,7 +75,7 @@ test("the catalogue has six clubs per league, five in the lowest league where th
     assert.ok(club.venue.lat && club.venue.lon);
   }
   assert.ok(added.filter((club) => club.fictional).every((club) => seasonClubsOf(16 - club.league, defaultAiLeagues(1)).some((other) => !other.fictional && other.venue.id === club.venue.id)), "a fictional sixth club shares the ground of a real club of its league");
-  assert.equal(added.filter((club) => !club.fictional).length, 4, "real clubs only where their audited stadium exists (Grasshopper, Winterthur, Paris Saint-Germain, FC Heimberg)");
+  assert.equal(added.filter((club) => !club.fictional).length, 5, "real clubs only where their audited stadium exists (Grasshopper, Winterthur, Paris Saint-Germain, FC Heimberg, FC Stettlen 08)");
 });
 
 test("legacy saves and new worlds keep their five opponents; the sixth club of the own league plays in the lowest league", () => {

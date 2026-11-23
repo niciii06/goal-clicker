@@ -40,7 +40,7 @@ test("the world league has six real clubs with official names in all four home c
  * allowed to be fictional and is not counted.
  */
 const BACKLOG: Record<string, Record<number, number>> = {
-  bern: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 10: 1, 11: 1, 13: 1, 14: 1 },
+  bern: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 10: 1, 13: 1, 14: 1 },
   zurich: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 6, 14: 5 },
   basel: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 5, 9: 6, 10: 6, 11: 6, 12: 5, 13: 6, 14: 5 },
   geneve: { 4: 1, 5: 1, 6: 1, 7: 1, 8: 6, 9: 5, 10: 6, 11: 6, 12: 5, 13: 6, 14: 6 },
@@ -180,4 +180,64 @@ test("FC Heimberg: old saved league assignments and journeys keep working, the o
   const plan = planJourney(club.venue);
   const last = plan.segments.at(-1)!.points.at(-1)!;
   assert.ok(metresBetween([last.lat, last.lon], [club.venue.lat, club.venue.lon]) < 100, "the journey ends at the ground");
+});
+
+// ---- FC Stettlen 08 replaces the fictional sixth club of Liga 11 in the Bern world.
+// Evidence: the club's own page (Spieltag) says the home games are played "auf dem Naturrasen beim Schulhaus in Walkringen"
+// (training is in Stettlen, a different place). swisstopo: school area Primar and Sekundarschule Walkringen at 46.94925, 7.61889,
+// address Dornistrasse 10, 3512 Walkringen. The only soccer pitch of Walkringen in OpenStreetMap is way 318117223.
+const STETTLEN_ID = "extra-11-fc-g-rbetal-kickers";
+const STETTLEN_PITCH: [number, number][] = [[46.9492003, 7.6194637], [46.9497349, 7.6197936], [46.9500671, 7.6186215], [46.9495243, 7.6183077]];
+
+test("FC Stettlen 08 is the real sixth club of Liga 11 in Bern: old id, real name, no longer fictional, one club of that name", () => {
+  const bern = worldCatalog("bern");
+  const club = bern.find((item) => item.id === STETTLEN_ID)!;
+  assert.ok(club, "the id of the old fictional club is kept");
+  assert.equal(club.name, "FC Stettlen 08");
+  assert.equal(club.league, 11);
+  assert.ok(!club.fictional);
+  assert.equal(bern.filter((item) => item.name === "FC Stettlen 08").length, 1);
+  assert.equal(bern.filter((item) => item.league === 11).length, 6);
+  assert.ok(!bern.some((item) => item.name === "FC Gürbetal Kickers"));
+});
+
+test("FC Stettlen 08 ground: the point lies inside the only mapped pitch of Walkringen, next to the school address and the public road", () => {
+  const venue = worldCatalog("bern").find((item) => item.id === STETTLEN_ID)!.venue;
+  assert.equal(venue.verification, "stadium");
+  assert.equal(venue.city, "Walkringen", "the home games are in Walkringen, not in Stettlen");
+  assert.equal(venue.address, "Dornistrasse 10");
+  assert.equal(venue.postalCode, "3512");
+  assert.equal(venue.coordinateSource, "https://www.openstreetmap.org/way/318117223");
+  assert.ok(inPolygon(venue.lat, venue.lon, STETTLEN_PITCH), "inside the pitch polygon");
+  const mid = METRES(venue.lat);
+  const points = STETTLEN_PITCH.map(([lat, lon]) => ({ x: lon * mid.x, y: lat * mid.y }));
+  let best = { area: Infinity, length: 0, width: 0 };
+  for (let degrees = 0; degrees < 180; degrees += 0.5) {
+    const c = Math.cos((degrees * Math.PI) / 180), s = Math.sin((degrees * Math.PI) / 180);
+    const us = points.map((p) => p.x * c + p.y * s), vs = points.map((p) => -p.x * s + p.y * c);
+    const w = Math.max(...us) - Math.min(...us), h = Math.max(...vs) - Math.min(...vs);
+    if (w * h < best.area) best = { area: w * h, length: Math.max(w, h), width: Math.min(w, h) };
+  }
+  assert.ok(best.area >= 3500 && best.length >= 90 && best.width >= 55, `full size pitch ${best.length.toFixed(1)} x ${best.width.toFixed(1)}`);
+  assert.ok(metresBetween([venue.lat, venue.lon], [46.94925, 7.61889]) < 80, "the school area (swisstopo) is next to the pitch");
+  assert.ok(metresBetween([venue.lat, venue.lon], [46.949452, 7.618341]) < 80, "the road endpoint of the route is next to the pitch");
+});
+
+test("both verified replacements together: ids and names unique, six clubs per league, old names keep their old grounds, journeys end at the new grounds", () => {
+  const catalog = catalogOf("bern");
+  assert.equal(new Set(catalog.map((club) => club.id)).size, catalog.length);
+  assert.equal(new Set(catalog.map((club) => club.name)).size, catalog.length);
+  for (const league of [11, 12]) assert.equal(catalog.filter((club) => club.league === league).length, 6, `league ${league}`);
+  for (const [id, name, division] of [[HEIMBERG_ID, "FC Heimberg", 4], [STETTLEN_ID, "FC Stettlen 08", 5]] as const) {
+    const club = catalog.find((item) => item.id === id)!;
+    assert.equal(club.name, name);
+    assert.equal(defaultAiLeagues(8, catalog)[id], division, `${name}: same division as the old club`);
+    const last = planJourney(club.venue).segments.at(-1)!.points.at(-1)!;
+    assert.ok(metresBetween([last.lat, last.lon], [club.venue.lat, club.venue.lon]) < 100, `${name}: the journey ends at the ground`);
+  }
+  const oldGround = venueForClubName("FC Gürbetal Kickers", 11, 0, catalog);
+  assert.equal(oldGround, catalog.find((item) => item.league === 11 && item.id !== STETTLEN_ID)!.venue);
+  assert.equal(venueForClubName("FC Stettlen 08", 11, 0, catalog), catalog.find((item) => item.id === STETTLEN_ID)!.venue);
+  // Other worlds are not touched: the same ids still point to their own catalogues.
+  for (const city of HOME_CITY_IDS) if (city !== "bern") assert.ok(!worldCatalog(city).some((club) => club.name === "FC Stettlen 08" || club.name === "FC Heimberg"), city);
 });

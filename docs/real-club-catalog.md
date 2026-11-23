@@ -34,14 +34,14 @@ Pro Welt 89 Clubs, 15 Ligen. Fiktiv und zu ersetzen:
 
 | Heimstadt | Gemeinsame Plätze Liga 4 bis 7 | Regionale Ligen 8 bis 14 (42 Clubs) | Summe |
 |---|---|---|---|
-| Bern | 4 | 6 fiktiv, 36 echt (FC Heimberg ersetzt, siehe unten) | 10 |
+| Bern | 4 | 5 fiktiv, 37 echt (FC Heimberg und FC Stettlen 08 ersetzt, siehe unten) | 9 |
 | Zürich | 4 | 41 fiktiv, 1 echt (FC Oerlikon/Polizei ZH) | 45 |
 | Basel | 4 | 39 fiktiv, 3 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach) | 43 |
 | Genève | 4 | 40 fiktiv, 2 echt (Signal FC Bernex-Confignon, Meyrin FC) | 44 |
 
 **Gemeinsame Plätze (wirken in allen vier Welten, deshalb zuerst):** `extra-4-fc-alpenfestung` (FC Alpenfestung, Liga 4), `extra-5-fc-gotthard-murmeltiere` (Liga 5), `extra-6-fc-l-man-mouettes` (Liga 6), `extra-7-fc-z-risee-b-tler` (Liga 7). Ihre Spielorte sind geliehene geprüfte Plätze anderer Clubs der Liga.
 
-**Nur Bern, Liga 8 bis 14:** `extra-8-fc-r-stigraben-united`, `extra-9-fc-seeland-hechte`, `extra-10-fc-emmental-k-sekicker`, `extra-11-fc-g-rbetal-kickers`, ~~`extra-12-fc-worblental-rangers`~~ (ersetzt durch FC Heimberg), `extra-13-sc-marzili-bern`, `extra-14-fc-aaref-chse-bern`.
+**Nur Bern, Liga 8 bis 14:** `extra-8-fc-r-stigraben-united`, `extra-9-fc-seeland-hechte`, `extra-10-fc-emmental-k-sekicker`, `extra-11-fc-g-rbetal-kickers`, ~~`extra-11-fc-g-rbetal-kickers`~~ (ersetzt durch FC Stettlen 08), ~~`extra-12-fc-worblental-rangers`~~ (ersetzt durch FC Heimberg), `extra-13-sc-marzili-bern`, `extra-14-fc-aaref-chse-bern`.
 
 **Zürich, Basel, Genève:** IDs `zh-D-N`, `bs-D-N`, `ge-D-N` (Division D = 2 bis 8, Liga 16 minus D), pro Liga bis zu sechs fiktive Clubs. Anzahl je Liga (Liga 14, 13, ..., 8): Zürich 5, 6, 6, 6, 6, 6, 6. Basel 5, 6, 5, 6, 6, 6, 5. Genève 6, 6, 5, 6, 6, 5, 6.
 
@@ -90,3 +90,27 @@ Ersetzt `extra-12-fc-worblental-rangers` (FC Worblental Rangers). **Die ID bleib
 Die Strecke von Bern zum Platz ist neu im Routencache (`bus:46.94689,7.39373:46.79084,7.59800`, 34.1 km, 30 Minuten) und endet auf diesem Punkt an der Schützenstrasse, die letzten 56 m bis zum Platz sind geschätzt (wie bei anderen Plätzen). Es wurden keine bestehenden Routen verändert. `app/stadium-audit.json` führt den Platz mit OSM way und Fläche.
 
 **Bern Rest:** 6 fiktive Plätze (Liga 8, 9, 10, 11, 13, 14) und die gemeinsamen Plätze Liga 4 bis 7. Offen bleiben ausserdem Goldstern (Waldruhe, Löhrwaldweg 9, Adresse und Platz belegt, aber Spielstätte der 1. Mannschaft gegenüber Bremgarten und öffentliche Zufahrt noch offen) und die anderen Kandidaten aus dem Notion Kommentar.
+
+## Phase 2, zweiter regionaler Platz: FC Stettlen 08 (Bern, Liga 11)
+
+Ersetzt `extra-11-fc-g-rbetal-kickers` (FC Gürbetal Kickers). **Die ID bleibt**, der alte Name führt weiter zu seinem früheren Spielort (`REPLACED_CLUB_GROUNDS`). Liga 11 passt zur Entfernung (Walkringen liegt 17 km vom Heimstadion, wie Rubigen, Belp, Jegenstorf der Liga); die echte Spielklasse des Clubs ist tiefer, die Katalogstufe ist wie überall eine Näherung.
+
+| Angabe | Beleg |
+|---|---|
+| Heimspiele «auf dem Naturrasen beim Schulhaus in Walkringen» (Training in Stettlen, Winter in der Halle) | Vereinsseite fcstettlen08.ch/teams/aktive, Abschnitt «Spieltag» (am 23.11.2026 abgerufen) |
+| Schulareal Primar- und Sekundarschule Walkringen bei 46.94925, 7.61889, Adresse Dornistrasse 10, 3512 Walkringen | swisstopo Ortsnamen und Adressdienst |
+| Platz: OSM way 318117223, 6198 m², kleinstes Rechteck 96.4 × 65.5 m, der **einzige** kartierte Fussballplatz in Walkringen, 45 m vom Schulareal | OpenStreetMap (Quelle Bing, 2014, ohne Belagsangabe) |
+| Platzmittelpunkt 46.9496329, 7.6190465 | Schwerpunkt des OSM Polygons, liegt innerhalb |
+| Strassenendpunkt | OSRM Route endet bei 46.949452, 7.618341 auf der Servicestrasse am Schulparkplatz (57 m vom Mittelpunkt, kein Zugangsverbot in OSM), die Dornistrasse (öffentlich) liegt 126 m entfernt |
+
+Neu im Routencache ist nur `bus:46.94689,7.39373:46.94963,7.61905` (26.2 km, 32 Minuten). Die Matchcenter Seite des FVBJ blockiert automatische Zugriffe; die Platzangabe stützt sich auf die Vereinsseite.
+
+## Geprüft, aber (noch) nicht übernommen
+
+| Kandidat | Stand | Was fehlt |
+|---|---|---|
+| FC Goldstern, Waldruhe | Adresse Löhrwaldweg 9 (Bundesregister) und Platz way 26531887 (4950 m²) passen zum FVBJ Eintrag | Spielstätte der 1. Mannschaft (Clubseite nennt auch «Buvette Bremgarten»), öffentliche Zufahrt (Löhrwaldweg teils privat) |
+| SC Aegerten Brügg, Moos | Clubseite: «Regionale Sportanlage Aegerten-Brügg-Studen, bekannt als Moos» | Drei beleuchtete Rasenplätze nebeneinander (OSM 35960672: 97 × 63 m, 35960673: 110 × 68 m, 35960674: 103 × 72 m); welcher der Hauptplatz ist, steht nur im Bild der Spielfeldkunde oder im FVBJ Eintrag |
+| FC Oberdiessbach, Leimen | OSM: Rasen beleuchtet 107 × 70 m (way 208125381) und Kunstrasen 96 × 64 m (way 208125372) | Hauptplatz laut Club oder FVBJ, Vereinsseite lädt nur per JavaScript |
+| FC Grosshöchstetten-Schlosswil, Arniacher | Flurname Arniacher bei 46.9120, 7.6313, ein Rasenplatz (way 185813961, 107 × 71 m) 100 m daneben | Beleg des Clubs oder des FVBJ (Adresse, Masse), dass dort gespielt wird; Matchcenter blockiert |
+| FC Steffisburg, Schönau | Schönau ist ein Neubau (Schul-, Kultur- und Sportanlage), der alte Platz ist Eichfeld | aktuelle Heimspielstätte |

@@ -113,14 +113,26 @@ const HEIMBERG_VENUE: Venue = {
  coordinateSource:'https://www.openstreetmap.org/way/93077552',coordinateNote:'Mittelpunkt des Hauptplatzes (Naturrasen 96 × 61 m, Flutlicht), in OpenStreetMap als Fussballfeld kartiert.',
 };
 const HEIMBERG:SeasonClub={id:'extra-12-fc-worblental-rangers',name:'FC Heimberg',league:12,venue:HEIMBERG_VENUE};
+/**
+ * FC Stettlen 08 replaces the fictional sixth club of Liga 11 in the Bern world. The club's own page (Spieltag): home games
+ * are played "auf dem Naturrasen beim Schulhaus in Walkringen" (the training pitch in Stettlen is another place). The only
+ * soccer pitch of Walkringen is OpenStreetMap way 318117223, 45 m from the school area Dornistrasse 10, 3512 Walkringen
+ * (swisstopo). Point: centre of that pitch. Public vehicle access: school road next to the pitch (Dornistrasse 126 m).
+ */
+const STETTLEN_VENUE: Venue = {
+ id:'venue-fc-stettlen-08',stadium:'Sportplatz Schulhaus Walkringen',city:'Walkringen',country:'Schweiz',canton:'BE',lat:46.9496329,lon:7.6190465,
+ source:'https://www.fcstettlen08.ch/teams/aktive',verification:'stadium',registeredStadium:'Naturrasen beim Schulhaus Walkringen',address:'Dornistrasse 10',postalCode:'3512',
+ coordinateSource:'https://www.openstreetmap.org/way/318117223',coordinateNote:'Mittelpunkt des einzigen kartierten Fussballfelds von Walkringen beim Schulhaus (Heimspielfeld laut Club).',
+};
+const STETTLEN:SeasonClub={id:'extra-11-fc-g-rbetal-kickers',name:'FC Stettlen 08',league:11,venue:STETTLEN_VENUE};
 /** Names of clubs that were replaced by a real club: a saved table or journey that still carries the old name keeps its old ground until the season ends. */
-const REPLACED_CLUB_GROUNDS:Record<string,()=>Venue>={'FC Worblental Rangers':()=>groundOfLeague(12)};
+const REPLACED_CLUB_GROUNDS:Record<string,()=>Venue>={'FC Worblental Rangers':()=>groundOfLeague(12),'FC Gürbetal Kickers':()=>groundOfLeague(11)};
 const EXTRA_CLUBS: SeasonClub[] = [
  {id:'world-paris-saint-german',name:'Paris Saint-Germain',league:1,venue:VENUES.paris},
  {id:'extra-2-grasshopper',name:'Grasshopper Club Zürich',league:2,venue:VENUES.zurich},
  {id:'extra-3-winterthur',name:'FC Winterthur',league:3,venue:VENUES.winterthur},
  fictionalSixth(4,'FC Alpenfestung'),fictionalSixth(5,'FC Gotthard Murmeltiere'),fictionalSixth(6,'FC Léman Mouettes'),fictionalSixth(7,'FC Zürisee Böötler'),
- fictionalSixth(8,'FC Röstigraben United'),fictionalSixth(9,'FC Seeland Hechte'),fictionalSixth(10,'FC Emmental Käsekicker'),fictionalSixth(11,'FC Gürbetal Kickers'),
+ fictionalSixth(8,'FC Röstigraben United'),fictionalSixth(9,'FC Seeland Hechte'),fictionalSixth(10,'FC Emmental Käsekicker'),STETTLEN,
  HEIMBERG,fictionalSixth(13,'SC Marzili Bern'),fictionalSixth(14,'FC Aarefüchse Bern'),
 ];
 export const SEASON_CLUBS: SeasonClub[] = [...BASE_CLUBS,...EXTRA_CLUBS];

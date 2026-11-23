@@ -695,6 +695,19 @@
       "source": "https://www.openstreetmap.org/way/93077552",
       "verifiedAt": "2026-11-23",
       "pitchAreaSquareMetres": 6232
+    },
+    {
+      "club": "FC Stettlen 08",
+      "venueId": "venue-fc-stettlen-08",
+      "lat": 46.9496329,
+      "lon": 7.6190465,
+      "osmWay": "318117223",
+      "osmName": "",
+      "registeredStadium": "Naturrasen beim Schulhaus Walkringen",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/318117223",
+      "verifiedAt": "2026-11-23",
+      "pitchAreaSquareMetres": 6198
     }
   ],
   "international": [
