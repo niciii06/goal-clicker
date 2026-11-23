@@ -34,12 +34,12 @@ Pro Welt 89 Clubs, 15 Ligen. Fiktiv und zu ersetzen:
 
 | Heimstadt | Gemeinsame Plätze Liga 4 bis 7 | Regionale Ligen 8 bis 14 (42 Clubs) | Summe |
 |---|---|---|---|
-| Bern | 1 | 2 fiktiv, 40 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil, Goldstern ersetzt, siehe unten) | 3 |
-| Zürich | 1 | 41 fiktiv, 1 echt (FC Oerlikon/Polizei ZH) | 42 |
-| Basel | 1 | 39 fiktiv, 3 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach) | 40 |
-| Genève | 1 | 40 fiktiv, 2 echt (Signal FC Bernex-Confignon, Meyrin FC) | 41 |
+| Bern | 0 | 2 fiktiv, 40 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil, Goldstern ersetzt, siehe unten) | 2 |
+| Zürich | 0 | 41 fiktiv, 1 echt (FC Oerlikon/Polizei ZH) | 41 |
+| Basel | 0 | 39 fiktiv, 3 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach) | 39 |
+| Genève | 0 | 40 fiktiv, 2 echt (Signal FC Bernex-Confignon, Meyrin FC) | 40 |
 
-**Gemeinsame Plätze (wirken in allen vier Welten, deshalb zuerst):** ~~`extra-4-fc-alpenfestung`~~ (ersetzt durch Yverdon Sport FC), ~~`extra-5-fc-gotthard-murmeltiere`~~ (ersetzt durch FC Wil 1900), ~~`extra-6-fc-l-man-mouettes`~~ (ersetzt durch FC Rapperswil-Jona), `extra-7-fc-z-risee-b-tler` (Liga 7). Ihre Spielorte sind geliehene geprüfte Plätze anderer Clubs der Liga.
+**Gemeinsame Plätze (wirken in allen vier Welten, deshalb zuerst):** ~~`extra-4-fc-alpenfestung`~~ (ersetzt durch Yverdon Sport FC), ~~`extra-5-fc-gotthard-murmeltiere`~~ (ersetzt durch FC Wil 1900), ~~`extra-6-fc-l-man-mouettes`~~ (ersetzt durch FC Rapperswil-Jona), ~~`extra-7-fc-z-risee-b-tler`~~ (ersetzt durch FC Locarno). Ihre Spielorte sind geliehene geprüfte Plätze anderer Clubs der Liga.
 
 **Nur Bern, Liga 8 bis 14:** `extra-8-fc-r-stigraben-united`, `extra-9-fc-seeland-hechte`, `extra-10-fc-emmental-k-sekicker`, `extra-11-fc-g-rbetal-kickers`, ~~`extra-11-fc-g-rbetal-kickers`~~ (ersetzt durch FC Stettlen 08), ~~`extra-12-fc-worblental-rangers`~~ (ersetzt durch FC Heimberg), ~~`extra-13-sc-marzili-bern`~~ (ersetzt durch FC Goldstern), `extra-14-fc-aaref-chse-bern`.
 
@@ -178,10 +178,26 @@ Ersetzt `extra-6-fc-l-man-mouettes` (FC Léman Mouettes) in Bern, Zürich, Basel
 
 Die Routen wurden mit dem Parkplatz als Routenziel erzeugt, der letzte Punkt der Strecke bleibt das Feld. Dieselbe Regel steht jetzt in `scripts/travel/fetch-real-routes.mts` (`routeTarget`): ohne sie würde eine Neuerzeugung die Blaubrunnenstrasse wählen.
 
+## Phase 6: FC Locarno (Liga 7, alle vier Welten), die letzte gemeinsame Stelle
+
+Ersetzt `extra-7-fc-z-risee-b-tler` (FC Zürisee Böötler) in Bern, Zürich, Basel und Genève zugleich. **Die ID bleibt**, der alte Name führt weiter zu seinem früheren Platz. Damit sind alle vier gemeinsamen Plätze (Liga 4 bis 7) echt.
+
+| Angabe | Beleg |
+|---|---|
+| Heimstadion, Hauptfeld 105 × 68 m | Club (fclocarno.ch/societa/stadio) und regionale Tourismusstelle; Tessiner Verband (FTC): Via Respini, «Terreno principale» |
+| Stadion in OSM | way 486867520 «Stadio Lido» (`leisure=stadium`, mit Laufbahn, 195 × 114 m, geprüft 15.5.2026) |
+| Feld innerhalb der Laufbahn | way 278977348: alle vier Ecken liegen im Stadionumriss, einziges Fussballfeld darin; Mittelpunkt 46.1626832, 8.8015333, 6397 m² |
+| Trainingsfelder ausserhalb | way 278977344 (100.1 × 62.5 m) und way 486872270 (76.2 × 68.4 m): keine Ecke im Stadionumriss |
+| Grösse | die Karte zeichnet das Feld 99.9 × 64.4 m, also 5 m kürzer als die offiziellen 105 × 68 m (wohl enger gezeichnet). Es dient nur der Lage; der Mittelpunkt des Feldes ist davon kaum betroffen |
+| Gebäude | swisstopo «Stadio del Lido, Locarno» bei 46.16316, 8.80154, 53 m vom Mittelpunkt |
+| Strassenendpunkt | Route endet bei 46.162161, 8.801525 auf der Via della Posta, an der Kreuzung mit Viale al Lido und Viale Gioacchino Respini (öffentliche Wohnstrassen ohne Einschränkung, 58 m vom Mittelpunkt). Öffentliche gebührenpflichtige Strassenparkplätze am Viale Respini (OSM way 1390613598 und 1390613601) 114 und 150 m |
+| Neue Routen | Bern bis Stadio del Lido: 275.9 km, 209 Minuten; Lugano bis Stadio del Lido: 38.6 km, 39 Minuten (bestehender Tessiner Stützpunkt) |
+
+Die Stelle von Schaffhausen (Stadion Breite, zwei verschachtelte Umrisse) bleibt offen und hat keinen freien gemeinsamen Platz mehr; sie käme nur als Austausch eines echten Clubs in Frage.
+
 ## Phase 3, weiter geprüft und nicht übernommen
 
 | Kandidat | Was fehlt |
 |---|---|
 | FC Steffisburg, Schönau | FVBJ: aktuelle Spiele auf dem Hauptplatz Schönau, Anlage Schönauweg 46 (3612 Steffisburg, Schulhaus Schönau), Hauptplatz 100 × 64 m. In OpenStreetMap ist dort **kein Fussballfeld** kartiert: die Anlage ist neu. Das nächste Grasfeld (way 334213888, 110 × 81 m, `sport=multi`, bearbeitet am 3.11.2025) liegt 285 m von der Adresse entfernt und passt nicht zu 100 × 64 m (+10/+17 m). Ohne Feldpolygon bleibt der Mittelpunkt offen (kein provisorischer Punkt). Der Parkplatz beim Schulhaus ist in OSM kartiert (way 124614207, 10 m von der Adresse) |
 | FC Schaffhausen, Stadion Breite | Zwei verschachtelte OSM Umrisse mit demselben Namen (111.0 × 76.5 m und 107.7 × 73.9 m), kein Mass des Clubs, das den Feldumriss bestimmt |
-| FC Locarno, Stadio del Lido | Zwei beleuchtete Rasenfelder (99.9 × 64.4 m und 100.3 × 62.8 m) neben dem Stadion, kein Beleg für das Spielfeld der 1. Mannschaft |

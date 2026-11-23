@@ -786,6 +786,19 @@
       "source": "https://www.openstreetmap.org/way/203508979",
       "verifiedAt": "2026-11-23",
       "pitchAreaSquareMetres": 8730
+    },
+    {
+      "club": "FC Locarno",
+      "venueId": "venue-fc-locarno",
+      "lat": 46.1626832,
+      "lon": 8.8015333,
+      "osmWay": "278977348",
+      "osmName": "",
+      "registeredStadium": "Stadio del Lido",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/278977348",
+      "verifiedAt": "2026-11-23",
+      "pitchAreaSquareMetres": 6397
     }
   ],
   "international": [

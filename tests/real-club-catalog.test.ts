@@ -40,10 +40,10 @@ test("the world league has six real clubs with official names in all four home c
  * allowed to be fictional and is not counted.
  */
 const BACKLOG: Record<string, Record<number, number>> = {
-  bern: { 7: 1, 8: 1, 14: 1 },
-  zurich: { 7: 1, 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 6, 14: 5 },
-  basel: { 7: 1, 8: 5, 9: 6, 10: 6, 11: 6, 12: 5, 13: 6, 14: 5 },
-  geneve: { 7: 1, 8: 6, 9: 5, 10: 6, 11: 6, 12: 5, 13: 6, 14: 6 },
+  bern: { 8: 1, 14: 1 },
+  zurich: { 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 6, 14: 5 },
+  basel: { 8: 5, 9: 6, 10: 6, 11: 6, 12: 5, 13: 6, 14: 5 },
+  geneve: { 8: 6, 9: 5, 10: 6, 11: 6, 12: 5, 13: 6, 14: 6 },
 };
 test("fictional clubs outside Liga 15 are only the documented backlog, and the world league is not part of it", () => {
   for (const city of HOME_CITY_IDS) {
@@ -227,11 +227,12 @@ test("all verified replacements together: ids and names unique, six clubs per le
   const catalog = catalogOf("bern");
   assert.equal(new Set(catalog.map((club) => club.id)).size, catalog.length);
   assert.equal(new Set(catalog.map((club) => club.name)).size, catalog.length);
-  for (const league of [4, 5, 6, 9, 10, 11, 12, 13]) assert.equal(catalog.filter((club) => club.league === league).length, 6, `league ${league}`);
+  for (const league of [4, 5, 6, 7, 9, 10, 11, 12, 13]) assert.equal(catalog.filter((club) => club.league === league).length, 6, `league ${league}`);
   const replaced = [
     [YVERDON_ID, "Yverdon Sport FC", 4, "FC Alpenfestung"],
     [WIL_ID, "FC Wil 1900", 5, "FC Gotthard Murmeltiere"],
     [RAPPERSWIL_ID, "FC Rapperswil-Jona", 6, "FC Léman Mouettes"],
+    [LOCARNO_ID, "FC Locarno", 7, "FC Zürisee Böötler"],
     [HEIMBERG_ID, "FC Heimberg", 12, "FC Worblental Rangers"],
     [STETTLEN_ID, "FC Stettlen 08", 11, "FC Gürbetal Kickers"],
     [OBERDIESSBACH_ID, "FC Oberdiessbach", 9, "FC Seeland Hechte"],
@@ -253,7 +254,7 @@ test("all verified replacements together: ids and names unique, six clubs per le
   // The shared slots (Liga 4 to 7) change in every world, the Bern slots only in Bern.
   for (const city of HOME_CITY_IDS) {
     const names = worldCatalog(city).map((club) => club.name);
-    for (const [id, name] of replaced) assert.equal(names.includes(name), id === YVERDON_ID || id === WIL_ID || id === RAPPERSWIL_ID || city === "bern", `${city}: ${name}`);
+    for (const [id, name] of replaced) assert.equal(names.includes(name), id === YVERDON_ID || id === WIL_ID || id === RAPPERSWIL_ID || id === LOCARNO_ID || city === "bern", `${city}: ${name}`);
     assert.equal(new Set(worldCatalog(city).map((club) => club.id)).size, worldCatalog(city).length, `${city}: ids unique`);
   }
 });
@@ -439,4 +440,53 @@ test("Stadion Grünfeld: the point lies in the main pitch next to the grandstand
   const arrival = road.points.at(-2)!;
   assert.ok(metresBetween([arrival.lat, arrival.lon], [47.22211, 8.844756]) < 40, "the road ends at the car park");
   assert.ok(metresBetween([arrival.lat, arrival.lon], [47.2201, 8.84155]) > 150, "not at the Blaubrunnenstrasse (agricultural access only)");
+});
+
+// ---- FC Locarno (Liga 7, all worlds). Club page (fclocarno.ch/societa/stadio) and regional tourism: home games in the Stadio del Lido, main pitch
+// 105 x 68 m; the Ticino federation lists Via Respini, "Terreno principale". The OpenStreetMap stadium "Stadio Lido" (way 486867520, with the
+// athletics track) contains exactly one soccer pitch, way 278977348; ways 278977344 and 486872270 lie outside it and are the training pitches.
+// The mapped polygon (99.9 x 64.4 m) is 5 m shorter than the official size, so it is used for the position only.
+const LOCARNO_ID = "extra-7-fc-z-risee-b-tler";
+/** Outline of OpenStreetMap way 486867520 (Stadio Lido, stadium with track). */
+const LOCARNO_STADIUM: [number, number][] = [[46.1632502, 8.8003488], [46.1632058, 8.8003474], [46.1632036, 8.8003635], [46.1631981, 8.8003778], [46.1631897, 8.8003889], [46.1631794, 8.8003958], [46.1631681, 8.8003976], [46.1631569, 8.8003942], [46.1631469, 8.8003859], [46.1631393, 8.8003734], [46.1631348, 8.8003581], [46.163134, 8.8003462], [46.1630895, 8.8003454], [46.1630893, 8.800325], [46.1630675, 8.8003248], [46.1629143, 8.8003238], [46.1629086, 8.8002724], [46.1624848, 8.8002646], [46.1624123, 8.8002627], [46.1624116, 8.8003185], [46.1623437, 8.800316], [46.162295, 8.8003143], [46.1622382, 8.8003123], [46.1622207, 8.8027023], [46.1622205, 8.8027766], [46.162276, 8.8027768], [46.1630827, 8.8027908], [46.1630828, 8.8027701], [46.1631279, 8.8027696], [46.1631293, 8.802754], [46.163134, 8.8027398], [46.1631416, 8.8027285], [46.1631512, 8.8027211], [46.1631619, 8.8027184], [46.1631728, 8.8027207], [46.1631826, 8.8027278], [46.1631904, 8.802739], [46.1631953, 8.8027532], [46.1631969, 8.8027689], [46.1632421, 8.8027685]];
+/** The pitch inside the track (way 278977348) and the two training pitches outside (way 278977344, way 486872270). */
+const LOCARNO_PITCH: [number, number][] = [[46.1629725, 8.8008856], [46.162971, 8.8021809], [46.1623944, 8.8021792], [46.162397, 8.800887]];
+const LOCARNO_TRAINING: [number, number][][] = [
+  [[46.163862, 8.800401], [46.163851, 8.801697], [46.163292, 8.801687], [46.163303, 8.800391]],
+  [[46.164063, 8.80187], [46.163381, 8.801865], [46.163378, 8.802748], [46.16406, 8.802752]],
+];
+
+test("FC Locarno is a real club in Liga 7 of all four worlds, with the old id and no duplicates", () => {
+  for (const city of HOME_CITY_IDS) {
+    const catalog = worldCatalog(city);
+    const club = catalog.find((item) => item.id === LOCARNO_ID)!;
+    assert.ok(club, `${city}: the id of the old fictional club is kept`);
+    assert.equal(club.name, "FC Locarno");
+    assert.equal(club.league, 7);
+    assert.ok(!club.fictional);
+    assert.equal(catalog.filter((item) => item.name === "FC Locarno").length, 1);
+    assert.ok(!catalog.some((item) => item.name === "FC Zürisee Böötler"), city);
+  }
+});
+
+test("Stadio del Lido: the point lies in the pitch inside the track, not in the two training pitches; the route ends on a public street at the Viale Respini", () => {
+  const venue = worldCatalog("bern").find((item) => item.id === LOCARNO_ID)!.venue;
+  assert.equal(venue.verification, "stadium");
+  assert.equal(venue.coordinateSource, "https://www.openstreetmap.org/way/278977348");
+  assert.ok(inPolygon(venue.lat, venue.lon, LOCARNO_PITCH), "inside the pitch polygon");
+  assert.ok(inPolygon(venue.lat, venue.lon, LOCARNO_STADIUM), "inside the stadium outline with the track");
+  for (const [index, training] of LOCARNO_TRAINING.entries()) {
+    const centre: [number, number] = [training.reduce((n, p) => n + p[0], 0) / 4, training.reduce((n, p) => n + p[1], 0) / 4];
+    assert.ok(!inPolygon(centre[0], centre[1], LOCARNO_STADIUM), `training pitch ${index + 1} lies outside the stadium outline`);
+    assert.ok(!inPolygon(venue.lat, venue.lon, training), `the point is not in training pitch ${index + 1}`);
+  }
+  // The mapped pitch is 5 m shorter than 105 x 68 m, but of full size; the point is the pitch centre.
+  const best = minRectangle(LOCARNO_PITCH);
+  assert.ok(best.length >= 95 && best.length <= 112 && best.width >= 60 && best.width <= 75, `pitch ${best.length.toFixed(1)} x ${best.width.toFixed(1)}`);
+  assert.equal(venue.address, "Via Respini");
+  // Route end (Via della Posta / Viale al Lido / Viale Gioacchino Respini, public residential streets) and the stadium building (swisstopo).
+  const plan = planJourney(venue);
+  const arrival = plan.segments.filter((segment) => segment.mode === "bus").at(-1)!.points.at(-2)!;
+  assert.ok(metresBetween([arrival.lat, arrival.lon], [46.162161, 8.801525]) < 30, "the road ends at the junction of the public streets");
+  assert.ok(metresBetween([venue.lat, venue.lon], [46.16316, 8.80154]) < 80, "the swisstopo building Stadio del Lido is next to the pitch");
 });

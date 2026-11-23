@@ -171,6 +171,20 @@ const RAPPERSWIL_VENUE: Venue = {
  coordinateSource:'https://www.openstreetmap.org/way/203508979',coordinateNote:'Mittelpunkt des Hauptspielfelds (105 × 68 m laut OFV Anlageneintrag) neben der Tribüne, in OpenStreetMap als Fussballfeld kartiert.',
 };
 const RAPPERSWIL:SeasonClub={id:'extra-6-fc-l-man-mouettes',name:'FC Rapperswil-Jona',league:6,venue:RAPPERSWIL_VENUE};
+/**
+ * FC Locarno replaces the fictional sixth club of Liga 7 in every world. Club page and regional tourism: home games in the Stadio del Lido,
+ * main pitch 105 x 68 m; the Ticino federation (FTC) lists Via Respini, "Terreno principale". The stadium (OpenStreetMap way 486867520, named
+ * Stadio Lido, with the athletics track) contains exactly one soccer pitch, way 278977348; the other two pitches (way 278977344 and
+ * way 486872270) lie outside the stadium outline and are the training pitches. The mapped polygon (99.9 x 64.4 m) is 5 m shorter than the
+ * official size, so it is used for the position only. The route ends at the public junction Via della Posta / Viale al Lido /
+ * Viale Gioacchino Respini 58 m south of the pitch centre, next to the paid public parking at the Viale Respini.
+ */
+const LOCARNO_VENUE: Venue = {
+ id:'venue-fc-locarno',stadium:'Stadio del Lido',city:'Locarno',country:'Schweiz',canton:'TI',lat:46.1626832,lon:8.8015333,
+ source:'https://www.fclocarno.ch/societa/stadio',verification:'stadium',registeredStadium:'Stadio del Lido',address:'Via Respini',postalCode:'6600',
+ coordinateSource:'https://www.openstreetmap.org/way/278977348',coordinateNote:'Mittelpunkt des Feldes innerhalb der Laufbahn des Stadio Lido (Hauptfeld 105 × 68 m laut Club), in OpenStreetMap als Fussballfeld kartiert.',
+};
+const LOCARNO:SeasonClub={id:'extra-7-fc-z-risee-b-tler',name:'FC Locarno',league:7,venue:LOCARNO_VENUE};
 const STETTLEN:SeasonClub={id:'extra-11-fc-g-rbetal-kickers',name:'FC Stettlen 08',league:11,venue:STETTLEN_VENUE};
 /**
  * FC Oberdiessbach (Sportanlage Leimen, Helisbühlstrasse) replaces the fictional sixth club of Liga 9 in the Bern world.
@@ -196,12 +210,12 @@ const GROSSHOECHSTETTEN_VENUE: Venue = {
 };
 const GROSSHOECHSTETTEN:SeasonClub={id:'extra-10-fc-emmental-k-sekicker',name:'FC Grosshöchstetten-Schlosswil',league:10,venue:GROSSHOECHSTETTEN_VENUE};
 /** Names of clubs that were replaced by a real club: a saved table or journey that still carries the old name keeps its old ground until the season ends. */
-const REPLACED_CLUB_GROUNDS:Record<string,()=>Venue>={'FC Worblental Rangers':()=>groundOfLeague(12),'FC Gürbetal Kickers':()=>groundOfLeague(11),'FC Seeland Hechte':()=>groundOfLeague(9),'SC Marzili Bern':()=>groundOfLeague(13),'FC Léman Mouettes':()=>groundOfLeague(6),'FC Alpenfestung':()=>groundOfLeague(4),'FC Gotthard Murmeltiere':()=>groundOfLeague(5),'FC Emmental Käsekicker':()=>groundOfLeague(10)};
+const REPLACED_CLUB_GROUNDS:Record<string,()=>Venue>={'FC Worblental Rangers':()=>groundOfLeague(12),'FC Gürbetal Kickers':()=>groundOfLeague(11),'FC Seeland Hechte':()=>groundOfLeague(9),'SC Marzili Bern':()=>groundOfLeague(13),'FC Léman Mouettes':()=>groundOfLeague(6),'FC Zürisee Böötler':()=>groundOfLeague(7),'FC Alpenfestung':()=>groundOfLeague(4),'FC Gotthard Murmeltiere':()=>groundOfLeague(5),'FC Emmental Käsekicker':()=>groundOfLeague(10)};
 const EXTRA_CLUBS: SeasonClub[] = [
  {id:'world-paris-saint-german',name:'Paris Saint-Germain',league:1,venue:VENUES.paris},
  {id:'extra-2-grasshopper',name:'Grasshopper Club Zürich',league:2,venue:VENUES.zurich},
  {id:'extra-3-winterthur',name:'FC Winterthur',league:3,venue:VENUES.winterthur},
- YVERDON,WIL,RAPPERSWIL,fictionalSixth(7,'FC Zürisee Böötler'),
+ YVERDON,WIL,RAPPERSWIL,LOCARNO,
  fictionalSixth(8,'FC Röstigraben United'),OBERDIESSBACH,GROSSHOECHSTETTEN,STETTLEN,
  HEIMBERG,GOLDSTERN,fictionalSixth(14,'FC Aarefüchse Bern'),
 ];
