@@ -761,10 +761,23 @@ for (const colorScheme of ['light', 'dark'] as const) {
 // that is smaller than 44 x 44 fails here unless it is listed below with a reason. The list is the only place to excuse a button.
 const BUTTON_SELECTOR = 'button, summary, [role="button"], [role="tab"], [role="switch"]';
 const BUTTON_EXCEPTIONS: { selector: string; reason: string }[] = [];
-const AUDIT_SCREENS: { path: string; label: string; features: (now: number) => GameFeatures; dialog?: (page: Page) => Promise<void> }[] = [
+/** Live match: opens the live tab and one of its views, like the player does. */
+const liveView = (view: string) => async (page: Page) => {
+  assert.ok(await openTab(page, 'Spiele · LIVE'), 'live tab missing');
+  await page.locator('canvas.gc-viewer-pitch').first().waitFor({ timeout: 15000 });
+  await page.getByRole('button', { name: view, exact: true }).first().click();
+  await page.waitForTimeout(600);
+};
+const AUDIT_SCREENS: { path: string; label: string; features: (now: number) => GameFeatures; state?: (page: Page) => Promise<void> }[] = [
   ...TOUCH_SCREENS.map(({ path, label, features }) => ({ path, label, features })),
   { path: '/spiele', label: 'Spiele (Auswahl)', features: richFeatures },
-  { path: '/kader', label: 'Kader, Dialog Beste Startelf', features: (now) => { const f = richFeatures(now); f.starXI.lineupIds = [...f.starXI.lineupIds].reverse(); return f; }, dialog: async (page) => { await page.locator('button.starxi-best-button').click(); await page.getByRole('alertdialog').waitFor(); await page.waitForTimeout(400); } },
+  { path: '/kader', label: 'Kader, Dialog Beste Startelf', features: (now) => { const f = richFeatures(now); f.starXI.lineupIds = [...f.starXI.lineupIds].reverse(); return f; }, state: async (page) => { await page.locator('button.starxi-best-button').click(); await page.getByRole('alertdialog').waitFor(); await page.waitForTimeout(400); } },
+  // The running live match in each of its four views (the fixture of the live match smoke test).
+  ...['2D', 'Live Ticker', 'Statistik', 'Wechsel'].map((view) => ({ path: '/spiele', label: `Live Match, ${view}`, features: liveMatch, state: liveView(view) })),
+  // The away journey after arrival: the map with its controls and the button that starts the match.
+  // After the final whistle: the press conference answers.
+  { path: '/spiele', label: 'Nach dem Spiel, Pressekonferenz', features: finishedMatch, state: async (page) => { await page.locator('.press-conference').waitFor({ timeout: 10000 }); } },
+  { path: '/spiele', label: 'Reise, angekommen', features: (now) => { const f = richFeatures(now); f.travel.journey = createJourney(fixtureFor(f, 'tournament', 'stadium'), now - 3 * 86400000, () => 0.5, f); return normalizeGameFeatures(f); }, state: async (page) => { await page.locator('.travel-start').waitFor({ timeout: 10000 }); } },
 ];
 const AUDIT_BUTTONS = `((selector, exceptions) => {
   const sig = (el) => el.tagName.toLowerCase() + (el.getAttribute('class') || '').split(/\\s+/).filter(Boolean).slice(0, 2).map((name) => '.' + name).join('');
@@ -780,7 +793,7 @@ const AUDIT_BUTTONS = `((selector, exceptions) => {
 })`;
 
 for (const colorScheme of ['light', 'dark'] as const) {
-  test(`touch audit ${colorScheme}: every visible button of the covered screens and one dialog is at least 44 x 44 on a phone, except the documented ones`, async () => {
+  test(`touch audit ${colorScheme}: every visible button of the covered screens and one dialog, the live match, the press conference and the arrived journey are at least 44 x 44 on a phone, except the documented ones`, async () => {
     const failures: string[] = [];
     let checked = 0;
     for (const screen of AUDIT_SCREENS) {
@@ -788,11 +801,11 @@ for (const colorScheme of ['light', 'dark'] as const) {
       const { page, problems } = await openWithSave({ width: 390, height: 844 }, save(screen.features(now), now), colorScheme, true, true);
       await page.goto(BASE + screen.path, { waitUntil: 'networkidle' });
       await page.waitForTimeout(800);
-      if (screen.dialog) await screen.dialog(page);
+      if (screen.state) await screen.state(page);
       assert.equal(await page.evaluate(() => matchMedia('(pointer: coarse)').matches), true, 'the viewport has a coarse pointer');
       const rows = (await page.evaluate(`${AUDIT_BUTTONS}(${JSON.stringify(BUTTON_SELECTOR)}, ${JSON.stringify(BUTTON_EXCEPTIONS.map((exception) => exception.selector))})`)) as { sig: string; w: number; h: number; text: string }[];
       assert.ok(rows.length > 3, `${screen.label}: the audit found only ${rows.length} buttons (the check would be empty)`);
-      checked += rows.length;
+      checked += rows.length; if (process.env.AUDIT_VERBOSE) console.log('AUDIT', screen.label, rows.length, 'buttons, smallest', Math.min(...rows.map((row) => Math.min(row.w, row.h))));
       const groups = new Map<string, { n: number; w: number; h: number; text: string }>();
       for (const row of rows) {
         if (row.w >= 44 && row.h >= 44) continue;
@@ -825,5 +838,12 @@ test('touch targets: with a mouse the compact sizes stay, only a coarse pointer 
   assert.ok(pills.every(([, h]) => h === 32), `the statistics pills keep their compact 32 px with a mouse (${JSON.stringify(pills)})`);
   const minimum = (await page.evaluate(`[...document.querySelectorAll('.career-filters button')].map((e) => getComputedStyle(e).minHeight)`)) as string[];
   assert.ok(minimum.length > 0 && minimum.every((value) => value !== '44px'), `the filter reset button has no 44 px minimum with a mouse (${JSON.stringify(minimum)})`);
+  // The kickoff checklist (here: the open press conference after a match) keeps its 36 px action buttons with a mouse.
   await page.close();
+  const kickoff = await openWithSave({ width: 1280, height: 900 }, save(finishedMatch(now), now));
+  assert.ok(await openTab(kickoff.page, 'Spiele'), 'games tab missing');
+  await kickoff.page.locator('.kickoff-checklist .mode-secondary').first().waitFor({ timeout: 10000 });
+  const actions = (await kickoff.page.evaluate(`(${SIZE_OF})('.kickoff-checklist .mode-secondary')`)) as [number, number][];
+  assert.ok(actions.length > 0 && actions.every(([, h]) => h === 36), `the kickoff action buttons keep their compact 36 px with a mouse (${JSON.stringify(actions)})`);
+  await kickoff.page.close();
 });
