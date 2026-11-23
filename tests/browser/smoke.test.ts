@@ -754,6 +754,57 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
+// Automatic audit of every visible button on the covered screens (and one dialog) on a touch phone. A new or changed button
+// that is smaller than 44 x 44 fails here unless it is listed below with a reason. The list is the only place to excuse a button.
+const BUTTON_SELECTOR = 'button, summary, [role="button"], [role="tab"], [role="switch"]';
+const BUTTON_EXCEPTIONS: { selector: string; reason: string }[] = [];
+const AUDIT_SCREENS: { path: string; label: string; features: (now: number) => GameFeatures; dialog?: (page: Page) => Promise<void> }[] = [
+  ...TOUCH_SCREENS.map(({ path, label, features }) => ({ path, label, features })),
+  { path: '/spiele', label: 'Spiele (Auswahl)', features: richFeatures },
+  { path: '/kader', label: 'Kader, Dialog Beste Startelf', features: (now) => { const f = richFeatures(now); f.starXI.lineupIds = [...f.starXI.lineupIds].reverse(); return f; }, dialog: async (page) => { await page.locator('button.starxi-best-button').click(); await page.getByRole('alertdialog').waitFor(); await page.waitForTimeout(400); } },
+];
+const AUDIT_BUTTONS = `((selector, exceptions) => {
+  const sig = (el) => el.tagName.toLowerCase() + (el.getAttribute('class') || '').split(/\\s+/).filter(Boolean).slice(0, 2).map((name) => '.' + name).join('');
+  const rows = [];
+  for (const el of document.querySelectorAll(selector)) {
+    const r = el.getBoundingClientRect(), s = getComputedStyle(el);
+    if (r.width <= 2 && r.height <= 2) continue; // visually hidden helpers (clipped to one pixel)
+    if (s.visibility === 'hidden' || s.display === 'none' || el.closest('[hidden], [aria-hidden="true"]')) continue;
+    if (exceptions.some((selector) => el.matches(selector))) continue;
+    rows.push({ sig: sig(el), w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10, text: (el.getAttribute('aria-label') || el.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 24) });
+  }
+  return rows;
+})`;
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`touch audit ${colorScheme}: every visible button of the covered screens and one dialog is at least 44 x 44 on a phone, except the documented ones`, async () => {
+    const failures: string[] = [];
+    let checked = 0;
+    for (const screen of AUDIT_SCREENS) {
+      const now = Date.now();
+      const { page, problems } = await openWithSave({ width: 390, height: 844 }, save(screen.features(now), now), colorScheme, true, true);
+      await page.goto(BASE + screen.path, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(800);
+      if (screen.dialog) await screen.dialog(page);
+      assert.equal(await page.evaluate(() => matchMedia('(pointer: coarse)').matches), true, 'the viewport has a coarse pointer');
+      const rows = (await page.evaluate(`${AUDIT_BUTTONS}(${JSON.stringify(BUTTON_SELECTOR)}, ${JSON.stringify(BUTTON_EXCEPTIONS.map((exception) => exception.selector))})`)) as { sig: string; w: number; h: number; text: string }[];
+      assert.ok(rows.length > 3, `${screen.label}: the audit found only ${rows.length} buttons (the check would be empty)`);
+      checked += rows.length;
+      const groups = new Map<string, { n: number; w: number; h: number; text: string }>();
+      for (const row of rows) {
+        if (row.w >= 44 && row.h >= 44) continue;
+        const group = groups.get(row.sig) ?? { n: 0, w: 999, h: 999, text: row.text };
+        groups.set(row.sig, { n: group.n + 1, w: Math.min(group.w, row.w), h: Math.min(group.h, row.h), text: group.text });
+      }
+      for (const [sig, group] of groups) failures.push(`${screen.label} ${sig}: ${group.n} below 44 px, smallest ${group.w} x ${group.h} ("${group.text}")`);
+      assert.deepEqual(problems.filter((problem) => !problem.includes('/api/travel')), []);
+      await page.close();
+    }
+    assert.ok(checked > 150, `${checked} buttons audited`);
+    assert.deepEqual(failures, []);
+  });
+}
+
 test('touch targets: with a mouse the compact sizes stay, only a coarse pointer gets the large targets', async () => {
   const now = Date.now();
   const { page } = await openWithSave({ width: 1280, height: 900 }, save(richFeatures(now), now));
@@ -763,5 +814,13 @@ test('touch targets: with a mouse the compact sizes stay, only a coarse pointer 
   const sizes = (await page.evaluate(`(${SIZE_OF})('.card-favorite-toggle')`)) as [number, number][];
   assert.ok(sizes.length > 0);
   assert.ok(sizes.every(([w, h]) => w === 32 && h === 32), 'the favourite star keeps its compact 32 px with a mouse');
+  // Career: with a mouse the statistics pills keep their compact 32 px and the filter reset button gets no 44 px minimum.
+  await page.goto(`${BASE}/karriere`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(500);
+  const pills = (await page.evaluate(`(${SIZE_OF})('.player-stats-heading button')`)) as [number, number][];
+  assert.ok(pills.length === 2, 'the Karriere / Saison pills are found');
+  assert.ok(pills.every(([, h]) => h === 32), `the statistics pills keep their compact 32 px with a mouse (${JSON.stringify(pills)})`);
+  const minimum = (await page.evaluate(`[...document.querySelectorAll('.career-filters button')].map((e) => getComputedStyle(e).minHeight)`)) as string[];
+  assert.ok(minimum.length > 0 && minimum.every((value) => value !== '44px'), `the filter reset button has no 44 px minimum with a mouse (${JSON.stringify(minimum)})`);
   await page.close();
 });
