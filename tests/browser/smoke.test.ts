@@ -484,13 +484,30 @@ test('on a phone status toasts never cover the welcome pack; it opens once durin
   const now = Date.now();
   const features = richFeatures(now);
   features.welcomePack = 'available';
-  const { page, problems } = await openWithSave(VIEWPORTS[1], save(features, now), 'light', true);
+  // A real phone: touch input, coarse pointer, mobile viewport.
+  const { page, problems } = await openWithSave(VIEWPORTS[1], save(features, now), 'light', true, true);
   await page.evaluate(([key, value]) => localStorage.setItem(key, value), [TUTORIAL_STORAGE_KEY, JSON.stringify({ status: 'active', done: ['clicks', 'upgrade', 'lineup'], visited: ['squad'] })] as [string, string]);
   await page.reload({ waitUntil: 'networkidle' });
   await page.getByRole('region', { name: 'Tutorial' }).waitFor();
   await openTab(page, 'Packs & Album');
   const card = page.getByRole('article', { name: 'Willkommenspack' });
   await card.waitFor();
+  // Where the page starts depends on the font: with the wider fallback font of the CI runner (DejaVu Sans) the card is 17 px taller and
+  // everything above it 38 px, so the button begins at 798 px, behind the fixed navigation (772 to 836 px), and the first sample hit the
+  // navigation although no toast was involved (CI run 45187295906). A player scrolls the button into the free area. The test does the same
+  // and puts it where the toast problem occurs: its lower edge 8 px above the navigation, right where a toast at the bottom would sit.
+  await page.evaluate(() => {
+    const button = [...document.querySelectorAll('button')].find((element) => /Willkommenspack öffnen/.test(element.getAttribute('aria-label') || element.textContent || ''))!;
+    const nav = document.querySelector('nav.section-navigation')!.getBoundingClientRect();
+    scrollBy({ top: button.getBoundingClientRect().bottom - (nav.top - 8), behavior: 'instant' });
+  });
+  // Ready when the position no longer changes for several frames.
+  await page.waitForFunction(() => new Promise<boolean>((resolve) => {
+    const button = [...document.querySelectorAll('button')].find((element) => /Willkommenspack öffnen/.test(element.getAttribute('aria-label') || element.textContent || ''))!;
+    let last = -1, same = 0;
+    const frame = () => { const top = button.getBoundingClientRect().top; same = top === last ? same + 1 : 0; last = top; if (same >= 5) resolve(true); else requestAnimationFrame(frame); };
+    frame();
+  }), undefined, { timeout: 5000 });
   // The savings goal pins of the other packs answer with a status toast each time they are tapped ("Sparziel gesetzt" / "entfernt"), one after the other.
   const tapOtherPack = (n: number) => page.evaluate((index) => {
     const pins = [...document.querySelectorAll<HTMLElement>('.savings-pin')].filter((pin) => !pin.closest('.welcome-pack-card'));
@@ -520,7 +537,7 @@ test('on a phone status toasts never cover the welcome pack; it opens once durin
   assert.deepEqual(covered, []);
   // Tapping the pack while a message is on screen opens it, once.
   await tapOtherPack(1);
-  await card.getByRole('button', { name: 'Willkommenspack öffnen' }).click({ timeout: 3000 });
+  await card.getByRole('button', { name: 'Willkommenspack öffnen' }).tap({ timeout: 3000 });
   await closeWelcomePack(page);
   await page.waitForFunction(() => /SCHRITT 5 \/ 5/.test(document.querySelector('.tutorial-coach')?.textContent ?? ''), undefined, { timeout: 10000 });
   assert.equal(await page.getByRole('article', { name: 'Willkommenspack' }).count(), 0, 'given once');
