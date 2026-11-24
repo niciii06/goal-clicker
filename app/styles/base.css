@@ -1094,7 +1094,8 @@ button { font: inherit; }
 .account-card > p, .account-card section > p { margin: 0 0 16px; color: var(--soft); font-size: var(--text-footnote); line-height: 1.5; }
 .account-brand { display: flex; align-items: center; gap: 12px; }
 .account-brand .eyebrow { margin: 0 0 2px; }
-.account-brand strong { color: var(--text); font-size: 20px; font-weight: 760; letter-spacing: -.04em; }
+.account-brand strong, .account-brand h1 { margin: 0; color: var(--text); font-size: 20px; font-weight: 760; letter-spacing: -.04em; line-height: 1.2; }
+.account-card > .account-pitch { margin: 14px 0; }
 .account-brand-ball { display: grid; width: 46px; height: 46px; place-items: center; border-radius: 14px; background: var(--accent); font-size: 24px; }
 .account-status { margin: 18px 0 0; color: var(--muted); font-size: var(--text-footnote); }
 /* Start screen while the login and the cloud save are checked: only transform and opacity animate. */
@@ -1103,7 +1104,8 @@ button { font: inherit; }
 .account-boot-ball-wrap { position: relative; display: grid; width: 120px; height: 150px; place-items: end center; }
 .account-boot-ball { position: absolute; bottom: 14px; border-radius: 50%; animation: account-boot-bounce 900ms cubic-bezier(.33,0,.67,1) infinite; will-change: transform; }
 .account-boot-shadow { width: 64px; height: 10px; border-radius: 50%; background: color-mix(in srgb, var(--text) 24%, transparent); animation: account-boot-shadow 900ms cubic-bezier(.33,0,.67,1) infinite; }
-.account-boot-title { color: var(--text); font-size: 22px; font-weight: 760; letter-spacing: -.04em; }
+.account-boot-title { margin: 0; color: var(--text); font-size: 22px; font-weight: 760; letter-spacing: -.04em; }
+.account-boot-pitch { max-width: 340px; margin: 0; color: var(--soft); font-size: var(--text-footnote); line-height: 1.5; }
 .account-boot-status { margin: 0; color: var(--muted); font-size: var(--text-footnote); }
 @keyframes account-boot-bounce {
   0%, 100% { transform: translateY(0) rotate(0deg) scale(1.06, .94); animation-timing-function: cubic-bezier(.2,.7,.4,1); }

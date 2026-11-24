@@ -335,14 +335,17 @@ function RequiredAccount({ children }: { children: ReactNode }) {
         <svg className="account-boot-ball" viewBox="0 0 64 64" width="84" height="84" focusable="false"><circle cx="32" cy="32" r="29" fill="#fff" stroke="#1d1d1f" strokeWidth="2.4" /><g fill="#1d1d1f" stroke="#1d1d1f" strokeWidth="2" strokeLinejoin="round"><polygon points="32 22.5 40.6 28.7 37.3 38.8 26.7 38.8 23.4 28.7" /><polygon points="32 3.4 25.5 8.3 28 15.8 36 15.8 38.5 8.3" /><polygon points="56.3 20.8 58.9 28.8 52.8 34.2 46.6 30.6 48.4 23" /><polygon points="7.7 20.8 15.6 23 17.4 30.6 11.2 34.2 5.1 28.8" /><polygon points="44.5 52.8 38.5 57.6 32 54.3 33.5 47.2 41 46.7" /><polygon points="19.5 52.8 23 46.7 30.5 47.2 32 54.3 25.5 57.6" /></g><g fill="none" stroke="#1d1d1f" strokeWidth="2"><path d="M32 22.5V15.8M40.6 28.7l7.8-5.7M37.3 38.8l3.7 7.9M26.7 38.8l-3.7 7.9M23.4 28.7l-7.8-5.7" /></g></svg>
         <span className="account-boot-shadow" />
       </div>
-      <strong className="account-boot-title">Goal Clicker</strong>
+      <h1 className="account-boot-title">Goal Clicker</h1>
+      {/* What the game is, readable before any script runs: the public description of the start page (SEO ticket). */}
+      <p className="account-boot-pitch">{t("gate.pitch")}</p>
       <p className="account-boot-status" role="status">{t("gate.checking")}</p>
     </div>
   </main>;
 
   return <main className="account-screen">
     <section className="account-card">
-      <div className="account-brand"><span className="account-brand-ball" aria-hidden="true">⚽</span><div><p className="eyebrow">FOOTBALL IDLE CLUB</p><strong>Goal Clicker</strong></div></div>
+      <div className="account-brand"><span className="account-brand-ball" aria-hidden="true">⚽</span><div><p className="eyebrow">FOOTBALL IDLE CLUB</p><h1>Goal Clicker</h1></div></div>
+      <p className="account-pitch">{t("gate.pitch")}</p>
       <LanguagePicker className="theme-picker language-picker account-language" />
       {phase.name === "signed-out" && <LoginForm message={phase.message} onSignedIn={() => void enter()} onGuest={playAsGuest} />}
       {phase.name === "profile" && <ProfileSetup user={phase.user} onCreated={(profile) => { writeProfileCache(phase.user, profile); void syncAndStart(phase.user, profile); }} onSignOut={() => void signOut()} />}

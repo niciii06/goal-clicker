@@ -15,6 +15,9 @@ import { THEME_BOOT_SCRIPT, THEME_COLORS } from "./theme";
 
 export const dynamic = 'force-dynamic';
 
+// The public description of the game (Notion SEO ticket): the same sentence the start page shows to visitors.
+const SITE_DESCRIPTION = "Goal Clicker ist ein kostenloses Fussball-Idle-Spiel mit Sammelkarten, Packs, Ligaaufstieg, Karriere und Koop-Multiplayer. Spiele direkt im Browser.";
+
 export const metadata: Metadata = {
   // Link previews need absolute image URLs; the preview image itself is app/opengraph-image.jpg.
   metadataBase: new URL("https://goalclicker.ch"),
@@ -22,16 +25,16 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
   robots: { index: true, follow: true },
   title: "Goal Clicker | Football Idle Club",
-  description: "Klick den Ball, sammle Tore und baue dein eigenes Fussball Imperium.",
+  description: SITE_DESCRIPTION,
   openGraph: {
     title: "Goal Clicker | Football Idle Club",
-    description: "Klick den Ball, sammle Tore und baue dein eigenes Fussball Imperium.",
+    description: SITE_DESCRIPTION,
     url: "/",
     siteName: "Goal Clicker",
     locale: "de_CH",
     type: "website",
   },
-  twitter: { card: "summary_large_image" },
+  twitter: { card: "summary_large_image", description: SITE_DESCRIPTION },
   other: { "google-adsense-account": "ca-pub-8639135654787161" },
   appleWebApp: { capable: true, title: "Goal Clicker", statusBarStyle: "black-translucent" },
   icons: {

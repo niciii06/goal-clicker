@@ -150,6 +150,14 @@ test('without a session the login is the first thing, not the game', { skip }, a
   await page.getByRole('button', { name: 'Mit Google anmelden' }).waitFor();
   assert.equal(await page.getByRole('tab', { name: 'Konto erstellen' }).count(), 1);
   assert.equal(await page.getByRole('button', { name: 'Fussball anklicken' }).count(), 0);
+  // SEO ticket: a visitor without login (and a crawler) reads what the game is, in the served HTML and on the page.
+  const pitch = 'Goal Clicker ist ein kostenloses Fussball-Idle-Spiel mit Sammelkarten, Packs, Ligaaufstieg, Karriere und Koop-Multiplayer. Spiele direkt im Browser.';
+  const served = await (await fetch(BASE)).text();
+  assert.match(served, /<h1 class="account-boot-title">Goal Clicker<\/h1>/);
+  assert.ok(served.includes(pitch), 'the description is in the served HTML');
+  assert.match(served, /<meta name="description" content="Goal Clicker ist ein kostenloses/);
+  assert.equal(await page.getByRole('heading', { level: 1, name: 'Goal Clicker' }).count(), 1);
+  assert.equal(await page.getByText(pitch, { exact: true }).isVisible(), true);
 });
 
 test('a new account with username and password starts the game and saves to the cloud', { skip }, async () => {

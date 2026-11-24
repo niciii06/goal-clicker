@@ -77,7 +77,7 @@ test("the start page and a tab address name the canonical address and allow inde
     assert.match(html, /<meta name="robots" content="index, follow"\/>/, path);
     assert.doesNotMatch(html, /noindex|nofollow/i, path);
     assert.match(html, /<title>Goal Clicker \| Football Idle Club<\/title>/, path);
-    assert.match(html, /<meta name="description" content="Klick den Ball, sammle Tore und baue dein eigenes Fussball Imperium."\/>/, path);
+    assert.match(html, /<meta name="description" content="Goal Clicker ist ein kostenloses Fussball-Idle-Spiel mit Sammelkarten, Packs, Ligaaufstieg, Karriere und Koop-Multiplayer\. Spiele direkt im Browser\."\/>/, path);
   }
 });
 

@@ -329,6 +329,9 @@ test('while the login is checked the start screen shows an animated ball, not on
     const html = renderToStaticMarkup(createElement(AccountGate, null, createElement('div', { id: 'game-secret' }, 'Spielstand')));
     assert.match(html, /account-boot-ball/);
     assert.match(html, /role="status"[^>]*>Anmeldung wird geprüft/);
+    // Before any script runs the page says what the game is (SEO ticket), with one heading.
+    assert.match(html, /<h1 class="account-boot-title">Goal Clicker<\/h1>/);
+    assert.match(html, /<p class="account-boot-pitch">Goal Clicker ist ein kostenloses Fussball-Idle-Spiel mit Sammelkarten, Packs, Ligaaufstieg, Karriere und Koop-Multiplayer\. Spiele direkt im Browser\.<\/p>/);
     assert.doesNotMatch(html, /game-secret|Spielstand/, 'no game or account data before the identity and save check');
     assert.doesNotMatch(html, /account-card/, 'the bare card with only a status line is gone');
   } finally {
