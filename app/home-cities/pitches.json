@@ -335,15 +335,30 @@
     "5": [
      {
       "ground": {
-       "name": "Fussball-Sportanlage Dornau",
-       "osm": "way/323153186",
-       "lat": 47.41035,
-       "lon": 8.41129,
-       "municipality": "Weiningen (ZH)",
+       "name": "Sportanlage Chlösterli, Platz 1",
+       "osm": "way/38913829",
+       "lat": 47.38219,
+       "lon": 8.41885,
+       "municipality": "Urdorf",
        "canton": "ZH",
-       "kind": "sports_centre"
+       "kind": "pitch"
       },
-      "distanceKm": 10.84
+      "distanceKm": 10.62,
+      "real": {
+       "name": "FC Urdorf",
+       "source": "https://www.fcurdorf.ch/verein",
+       "quote": "FC Urdorf 1: Heimspiel 163525 gegen FC Adliswil am 24.10.2026 auf Chlösterli, Platz 1 (Hauptspielfeld Naturrasen, Platz 2 ist der Kunstrasen); keine Zufahrt zum Clubhaus, Parkplatz Zwischenbächen",
+       "place": "https://matchcenter.fvrz.ch/Default.aspx?lng=1&ls=24592&oid=11&sg=68012&t=37539&tg=4378864&v=1461",
+       "replaces": {
+        "name": "Fussball-Sportanlage Dornau",
+        "osm": "way/323153186",
+        "lat": 47.41035,
+        "lon": 8.41129,
+        "municipality": "Weiningen (ZH)",
+        "canton": "ZH",
+        "kind": "sports_centre"
+       }
+      }
      },
      {
       "ground": {
@@ -421,15 +436,30 @@
      },
      {
       "ground": {
-       "name": "Sportanlage Im See",
-       "osm": "way/36957475",
-       "lat": 47.49572,
-       "lon": 8.87011,
-       "municipality": "Elgg",
+       "name": "Sportanlage Chalchbüel, Platz 1",
+       "osm": "way/80588668",
+       "lat": 47.19852,
+       "lon": 8.70037,
+       "municipality": "Richterswil",
        "canton": "ZH",
-       "kind": "sports_centre"
+       "kind": "pitch"
       },
-      "distanceKm": 25.66
+      "distanceKm": 25.62,
+      "real": {
+       "name": "FC Richterswil",
+       "source": "https://www.richterswil.ch/sportfreizeit",
+       "quote": "FC Richterswil 1: Heimspiel 163910 gegen FC Thalwil 2 am 06.09.2026 auf Chalchbüel, Platz 1; die Gemeinde bestätigt Chalchbüel als Heimspielfeld des FC Richterswil",
+       "place": "https://matchcenter.fvrz.ch/Default.aspx?lng=1&ls=25849&oid=11&sg=70356&t=49363&tg=4379327&v=1464",
+       "replaces": {
+        "name": "Sportanlage Im See",
+        "osm": "way/36957475",
+        "lat": 47.49572,
+        "lon": 8.87011,
+        "municipality": "Elgg",
+        "canton": "ZH",
+        "kind": "sports_centre"
+       }
+      }
      },
      {
       "ground": {

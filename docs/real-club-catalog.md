@@ -35,7 +35,7 @@ Pro Welt 89 Clubs, 15 Ligen. Fiktiv und zu ersetzen:
 | Heimstadt | Gemeinsame Plätze Liga 4 bis 7 | Regionale Ligen 8 bis 14 (42 Clubs) | Summe |
 |---|---|---|---|
 | Bern | 0 | 0 fiktiv, 42 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil, Goldstern, Orpund Safnern, Ittigen ersetzt, siehe unten) | 0 |
-| Zürich | 0 | 39 fiktiv, 3 echt (FC Oerlikon/Polizei ZH, FC Seefeld ZH, FC Wiedikon ZH) | 39 |
+| Zürich | 0 | 37 fiktiv, 5 echt (FC Oerlikon/Polizei ZH, FC Seefeld ZH, FC Wiedikon ZH, FC Urdorf, FC Richterswil) | 37 |
 | Basel | 0 | 35 fiktiv, 7 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach, FC Black Stars, SV Muttenz, FC Allschwil, SC Binningen) | 35 |
 | Genève | 0 | 37 fiktiv, 5 echt (Signal FC Bernex-Confignon, Meyrin FC, Lancy FC, FC Vernier, FC Veyrier Sports) | 37 |
 
@@ -336,3 +336,15 @@ Der Unterscheider ist da: das offizielle [FVNWS Anlagenverzeichnis](https://matc
 | Anreise | Die Route endet auf dem Ziegelweg (OSM way 1229492075 und 23075751, `residential`, keine Zugangsbeschränkung) bei 47.533422, 7.568294 an der Anschrift der Anlage, 53 m vom Marker. Route 7,3 km, 11 Minuten |
 
 Der Slot `bs-2-2` (5,65 km vom Basler Heimpunkt, nächstes freies Distanzprofil) verliert den fiktiven «Atletico Morgestraich» (Sportplatz Dorf); der Name bleibt als Alias erreichbar. Quelle im Katalog ist die Vereinsseite scbinningen.ch (nennt das Spiegelfeld auf der Startseite nicht), der Platzbeleg das FVNWS Verzeichnis. Eine neue Route im Cache. Die Zuordnung zu den gemalten Linien ist eine Messung am Orthofoto (Genauigkeit rund 1 bis 2 m), nicht eine vermessene Koordinate.
+
+## FC Urdorf (Zürich, Liga 11, `zh-5-1`) und FC Richterswil (Zürich, Liga 10, `zh-6-2`)
+
+Beide Vereine fehlten in allen Welten (Duplikatprüfung). Heimspiele der ersten Mannschaft laut FVRZ: Urdorf 163525 (Chlösterli, Platz 1), Richterswil 163910 (Chalchbüel, Platz 1). Slots nach Distanzprofil (10,62 und 25,62 km vom Zürcher Heimpunkt); die fiktiven «SV Limmattal Lerchen» und «Olympia Türlersee» bleiben als Alias erreichbar. Beide Messungen sind Kartenmessungen am Orthofoto und OSM, nicht vermessen (Genauigkeit rund 3 bis 5 m).
+
+| | FC Urdorf | FC Richterswil |
+|---|---|---|
+| Feld | OSM way 38913829, Naturrasen, 102,1 × 68,4 m, Mittelpunkt 47.382185, 8.418846. Platz 2 (Kunstrasen, way 1014284327) ist ein anderes Feld | OSM way 80588668, 101,6 × 71,4 m, Mittelpunkt 47.198515, 8.700365; einziges Rasenfeld mit Mittelkreis, daneben eine Sand- bzw. Hartfläche |
+| Beleg Platz | Gemeinde unterscheidet Hauptspielfeld und Kunstrasen; FVRZ 163473 führt den Kunstrasen als Platz 2 | Gemeinde bestätigt Chalchbüel als Heimspielfeld; Anlagenbauer nennt Chalchbüel 1 |
+| Anreise | Route endet am Eingang des Parkplatzes Zwischenbächen (OSM way 66959601, `access=yes`, `fee=yes`, 160 Plätze; der Endpunkt 47.383891, 8.421416 liegt auf dem Rand des Polygons) via Birmensdorferstrasse; der Pin des Vereins (47.383692, 8.4211888) liegt im selben Parkplatz, 244 m vom Mittelpunkt. Der Verein schliesst eine Zufahrt zum Clubhaus aus. Route 19,4 km, 18 Minuten | Route endet im Parkplatz way 296774112 (`access=yes`, `fee=no`) bei 47.199292, 8.699035 via Mülibachstrasse (`residential`, `access=permissive`, `motor_vehicle=yes`), 140 m vom Mittelpunkt. Route 32,2 km, 31 Minuten. Der nähere Serviceweg wurde mangels Zugangsangabe verworfen |
+
+**Grenzen:** Eine Befahrbarkeit für Reisebusse (Wenden, Fahrzeughöhe) ist weder für Urdorf noch für Richterswil belegt; die Spiellogik nutzt ein Teambus-Modell ohne Fahrzeugmasse. Für Richterswil fehlt eine Vereinsanfahrt, das Strassenende stützt sich auf OSM Tags. Offizielle FVRZ Platzmasse waren von hier nicht abrufbar. Zwei neue Routen im Cache, die anderen unverändert.

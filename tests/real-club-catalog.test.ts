@@ -43,7 +43,7 @@ test("the world league has six real clubs with official names in all four home c
  */
 const BACKLOG: Record<string, Record<number, number>> = {
   bern: {},
-  zurich: { 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 4, 14: 5 },
+  zurich: { 8: 6, 9: 6, 10: 5, 11: 5, 12: 6, 13: 4, 14: 5 },
   basel: { 8: 5, 9: 4, 10: 6, 11: 6, 12: 5, 13: 6, 14: 3 },
   geneve: { 8: 6, 9: 5, 10: 6, 11: 5, 12: 5, 13: 6, 14: 4 },
 };
@@ -574,6 +574,12 @@ const VEYRIER_PITCH: [number, number][] = [[46.1669091, 6.1789867], [46.1663277,
 // around its centre circle (the halfway line measures 63 m on the photo), checked by overlaying the rectangle on the painted lines. The marker is the centre circle.
 const SPIEGELFELD_AREA: [number, number][] = [[47.5349421, 7.5684751], [47.5345734, 7.5697376], [47.5334072, 7.5690211], [47.5337628, 7.567747], [47.5346211, 7.5682769]];
 const SPIEGELFELD_PITCH1: [number, number][] = [[47.5337798, 7.5677743], [47.5343091, 7.5681069], [47.5339582, 7.5693317], [47.5334289, 7.5689991]];
+// FC Urdorf (Zürich, Liga 11) and FC Richterswil (Zürich, Liga 10): FVRZ first-team home games 163525 (Chlösterli, Platz 1) and 163910 (Chalchbüel, Platz 1).
+// Urdorf: Platz 1 is the natural main pitch (OSM way 38913829), Platz 2 the artificial turf (way 1014284327, 127 x 67 m); the club allows no vehicle access to the clubhouse and names the
+// public paid car park Zwischenbächen (way 66959601), pin 47.383692, 8.4211888. Richterswil: the only grass pitch of the Chalchbüel (way 80588668); the car park way 296774112 (access yes, fee no) on the Mülibachstrasse.
+const URDORF_PITCH: [number, number][] = [[47.3825067, 8.4181827], [47.3827225, 8.4190328], [47.3818635, 8.4195068], [47.3816489, 8.4186602]];
+const ZWISCHENBAECHEN: [number, number][] = [[47.3838911, 8.4214157], [47.3835434, 8.421729], [47.3833877, 8.4218096], [47.3832927, 8.4211764], [47.3842251, 8.4207718], [47.3843165, 8.4211182], [47.3843764, 8.4213455], [47.3842364, 8.4214196], [47.3839728, 8.4213805]];
+const CHALCHBUEEL_PITCH: [number, number][] = [[47.1990573, 8.7001725], [47.1985761, 8.6995484], [47.1979724, 8.7005566], [47.1984536, 8.7011807]];
 const REGIONAL_REPLACED = [
   { city: "zurich", id: "zh-3-6", name: "FC Seefeld ZH", league: 13, oldName: "Sporting Seebach Frösche", polygon: LENGG_PITCH, length: [105, 115], width: [66, 75], end: [47.348989, 8.570622], endMetres: 60 },
   { city: "basel", id: "bs-7-1", name: "FC Black Stars", league: 9, oldName: "Inter Gondel Reigoldswil", polygon: BUSCHWEILER_PITCH, length: [100, 112], width: [64, 74], end: [47.559355, 7.563063], endMetres: 60 },
@@ -583,6 +589,8 @@ const REGIONAL_REPLACED = [
   { city: "geneve", id: "ge-5-3", name: "FC Vernier", league: 11, oldName: "FC Jura Vaudois", polygon: VERNIER_AREA, length: [123, 128], width: [69, 73], end: [46.220044, 6.081715], endMetres: 100 },
   { city: "geneve", id: "ge-2-2", name: "FC Veyrier Sports", league: 14, oldName: "FC Plainpalais Puces", polygon: VEYRIER_PITCH, length: [99, 103], width: [63, 67], end: [46.166198, 6.179552], endMetres: 100 },
   { city: "basel", id: "bs-2-2", name: "SC Binningen", league: 14, oldName: "Atletico Morgestraich", polygon: SPIEGELFELD_PITCH1, length: [99.5, 100.5], width: [63.5, 64.5], end: [47.533422, 7.568294], endMetres: 100 },
+  { city: "zurich", id: "zh-5-1", name: "FC Urdorf", league: 11, oldName: "SV Limmattal Lerchen", polygon: URDORF_PITCH, length: [101, 103], width: [67.5, 69.5], end: [47.383891, 8.421416], endMetres: 300 },
+  { city: "zurich", id: "zh-6-2", name: "FC Richterswil", league: 10, oldName: "Olympia Türlersee", polygon: CHALCHBUEEL_PITCH, length: [100.5, 103], width: [70, 73], end: [47.199292, 8.699035], endMetres: 200 },
   { city: "geneve", id: "ge-2-1", name: "Lancy FC", league: 14, oldName: "Athletic Cornavin Express", polygon: MARIGNAC_PITCH, length: [99, 104], width: [63, 67], end: [46.17769, 6.123535], endMetres: 170 },
 ] as const;
 
@@ -633,7 +641,7 @@ test("Lengg R1, Buschweilerhof and Marignac Terrain 1: the points lie inside the
     const roadEnd = route.points.at(-2)!;
     assert.ok(metresBetween([roadEnd.lat, roadEnd.lon], [item.end[0], item.end[1]]) < 10, `${item.name}: road ends at the checked street point`);
     assert.ok(metresBetween([roadEnd.lat, roadEnd.lon], [club.venue.lat, club.venue.lon]) < item.endMetres, `${item.name}: street end next to the pitch`);
-    assert.ok(route.km > 3 && route.km < 12, `${item.name}: ${route.km.toFixed(1)} km`);
+    assert.ok(route.km > 3 && route.km < 40, `${item.name}: ${route.km.toFixed(1)} km`);
     const plan = planJourney(club.venue, undefined, city.homeVenue, STATIONS[city.station]);
     assert.ok(plan.segments.some((segment) => segment.geometry === "road"), `${item.name}: the journey uses the cached road`);
   }
@@ -641,6 +649,10 @@ test("Lengg R1, Buschweilerhof and Marignac Terrain 1: the points lie inside the
   assert.equal(HOME_CITIES.basel.regionalClubs.find((c) => c.id === "bs-7-1")!.venue.coordinateSource, "https://www.openstreetmap.org/way/39976253");
   assert.equal(HOME_CITIES.geneve.regionalClubs.find((c) => c.id === "ge-2-1")!.venue.coordinateSource, "https://www.openstreetmap.org/way/49722965");
   assert.equal(HOME_CITIES.zurich.regionalClubs.find((c) => c.id === "zh-3-3")!.venue.coordinateSource, "https://www.openstreetmap.org/way/34945595");
+  assert.equal(HOME_CITIES.zurich.regionalClubs.find((c) => c.id === "zh-5-1")!.venue.coordinateSource, "https://www.openstreetmap.org/way/38913829");
+  assert.equal(HOME_CITIES.zurich.regionalClubs.find((c) => c.id === "zh-6-2")!.venue.coordinateSource, "https://www.openstreetmap.org/way/80588668");
+  assert.ok(inPolygon(47.383692, 8.4211888, ZWISCHENBAECHEN), "the club's pin lies inside the public car park Zwischenbächen");
+  assert.ok(metresBetween([47.383891, 8.421416], ZWISCHENBAECHEN[0]) < 5, "the road route of FC Urdorf ends at the entrance of that car park (on the edge of its polygon)");
   assert.equal(HOME_CITIES.basel.regionalClubs.find((c) => c.id === "bs-2-2")!.venue.coordinateSource, "https://www.openstreetmap.org/way/435937555");
   assert.ok(inPolygon(47.53387, 7.56855, SPIEGELFELD_AREA), "the marker also lies inside the only mapped polygon of the Spiegelfeld");
   assert.equal(HOME_CITIES.geneve.regionalClubs.find((c) => c.id === "ge-2-2")!.venue.coordinateSource, "https://www.openstreetmap.org/way/133087559");
