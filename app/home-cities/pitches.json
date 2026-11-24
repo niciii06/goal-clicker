@@ -1105,16 +1105,30 @@
      },
      {
       "ground": {
-       "name": "Sportplatz Au",
-       "osm": "way/29312043",
-       "lat": 47.5139,
-       "lon": 7.61158,
-       "municipality": "Münchenstein",
+       "name": "Sportanlage Margelacker",
+       "osm": "way/946997664",
+       "lat": 47.53013,
+       "lon": 7.63209,
+       "municipality": "Muttenz",
        "canton": "BL",
-       "kind": "sports_centre"
+       "kind": "pitch"
       },
-      "distanceKm": 5.81,
-      "shared": true
+      "distanceKm": 3.87,
+      "real": {
+       "name": "SV Muttenz",
+       "source": "https://www.svmuttenz.ch/kontakt_und_situationsplan",
+       "quote": "Parkplatz Margelacker, Beschränkung der Parkdauer auf 3 Stunden; Heimspiele der 1. Mannschaft (1. Liga) auf der Sportanlage Margelacker, Sandgrubenweg 10",
+       "place": "https://matchcenter.fvnws.ch/Default.aspx?a=sa&lng=1&oid=8&sa=610216&v=498",
+       "replaces": {
+        "name": "Sportplatz Au",
+        "osm": "way/29312043",
+        "lat": 47.5139,
+        "lon": 7.61158,
+        "municipality": "Münchenstein",
+        "canton": "BL",
+        "kind": "sports_centre"
+       }
+      }
      },
      {
       "ground": {

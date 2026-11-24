@@ -44,7 +44,7 @@ test("the world league has six real clubs with official names in all four home c
 const BACKLOG: Record<string, Record<number, number>> = {
   bern: {},
   zurich: { 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 5, 14: 5 },
-  basel: { 8: 5, 9: 5, 10: 6, 11: 6, 12: 5, 13: 6, 14: 5 },
+  basel: { 8: 5, 9: 4, 10: 6, 11: 6, 12: 5, 13: 6, 14: 5 },
   geneve: { 8: 6, 9: 5, 10: 6, 11: 6, 12: 5, 13: 6, 14: 5 },
 };
 test("fictional clubs outside Liga 15 are only the documented backlog, and the world league is not part of it", () => {
@@ -553,9 +553,13 @@ test("Hubelgut and Aare: the points lie inside the mapped main pitches, which ma
 const LENGG_PITCH: [number, number][] = [[47.348926, 8.5718066], [47.3486606, 8.5709586], [47.3495519, 8.5703449], [47.3498213, 8.5711932]];
 const BUSCHWEILER_PITCH: [number, number][] = [[47.558916, 7.5620943], [47.5598614, 7.5619736], [47.5599141, 7.5628854], [47.5589568, 7.5630314]];
 const MARIGNAC_PITCH: [number, number][] = [[46.179308, 6.1234728], [46.1787331, 6.1235219], [46.1786813, 6.1222228], [46.1792584, 6.1221748]];
+// SV Muttenz (Basel, Liga 9): FVNWS and Erste Liga facility entry sa=610216: field 1, main pitch natural grass 100 x 64 m, Sandgrubenweg 10, 1. Liga; first-team home
+// game 105642 on 07.11. The only mapped grass pitch of that size is way 946997664 (101 x 65 m); the others are 96 x 68, 109 x 70 (larger) and the artificial turf 97 x 60 m.
+const MARGELACKER_PITCH: [number, number][] = [[47.5305912, 7.6316866], [47.5301927, 7.6328842], [47.529675, 7.6325029], [47.5300723, 7.6313017]];
 const REGIONAL_REPLACED = [
   { city: "zurich", id: "zh-3-6", name: "FC Seefeld ZH", league: 13, oldName: "Sporting Seebach Frösche", polygon: LENGG_PITCH, length: [105, 115], width: [66, 75], end: [47.348989, 8.570622], endMetres: 60 },
   { city: "basel", id: "bs-7-1", name: "FC Black Stars", league: 9, oldName: "Inter Gondel Reigoldswil", polygon: BUSCHWEILER_PITCH, length: [100, 112], width: [64, 74], end: [47.559355, 7.563063], endMetres: 60 },
+  { city: "basel", id: "bs-7-2", name: "SV Muttenz", league: 9, oldName: "Real Homburg", polygon: MARGELACKER_PITCH, length: [99, 104], width: [63, 67], end: [47.529627, 7.631809], endMetres: 100 },
   { city: "geneve", id: "ge-2-1", name: "Lancy FC", league: 14, oldName: "Athletic Cornavin Express", polygon: MARIGNAC_PITCH, length: [99, 104], width: [63, 67], end: [46.17769, 6.123535], endMetres: 170 },
 ] as const;
 
@@ -577,7 +581,7 @@ test("Seefeld ZH, Black Stars and Lancy FC are real clubs in their slots with th
     assert.notEqual(old.id, undefined);
     // Black Stars take over the very ground the old fictional club already used; the other two moved to the real home pitch.
     const moved = metresBetween([old.lat, old.lon], [club.venue.lat, club.venue.lon]);
-    assert.ok(item.city === "basel" ? moved < 1 : moved > 500, `${item.oldName} keeps its old ground`);
+    assert.ok(item.id === "bs-7-1" ? moved < 1 : moved > 500, `${item.oldName} keeps its old ground`);
   }
   // Names of the remaining fictional clubs did not move when a slot became real.
   const names = (city: Parameters<typeof worldCatalog>[0], ids: string[]) => ids.map((id) => worldCatalog(city).find((c) => c.id === id)!.name);
@@ -612,6 +616,7 @@ test("Lengg R1, Buschweilerhof and Marignac Terrain 1: the points lie inside the
   assert.equal(HOME_CITIES.zurich.regionalClubs.find((c) => c.id === "zh-3-6")!.venue.coordinateSource, "https://www.openstreetmap.org/way/40808587");
   assert.equal(HOME_CITIES.basel.regionalClubs.find((c) => c.id === "bs-7-1")!.venue.coordinateSource, "https://www.openstreetmap.org/way/39976253");
   assert.equal(HOME_CITIES.geneve.regionalClubs.find((c) => c.id === "ge-2-1")!.venue.coordinateSource, "https://www.openstreetmap.org/way/49722965");
+  assert.equal(HOME_CITIES.basel.regionalClubs.find((c) => c.id === "bs-7-2")!.venue.coordinateSource, "https://www.openstreetmap.org/way/946997664");
 });
 
 // ---- CS Chênois (already a real club of Liga 6 in all four worlds): its ground was only the municipality centre. ACGF stadium entry

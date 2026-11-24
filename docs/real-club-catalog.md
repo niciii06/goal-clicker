@@ -36,7 +36,7 @@ Pro Welt 89 Clubs, 15 Ligen. Fiktiv und zu ersetzen:
 |---|---|---|---|
 | Bern | 0 | 0 fiktiv, 42 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil, Goldstern, Orpund Safnern, Ittigen ersetzt, siehe unten) | 0 |
 | Zürich | 0 | 40 fiktiv, 2 echt (FC Oerlikon/Polizei ZH, FC Seefeld ZH) | 40 |
-| Basel | 0 | 38 fiktiv, 4 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach, FC Black Stars) | 38 |
+| Basel | 0 | 37 fiktiv, 5 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach, FC Black Stars, SV Muttenz) | 37 |
 | Genève | 0 | 39 fiktiv, 3 echt (Signal FC Bernex-Confignon, Meyrin FC, Lancy FC) | 39 |
 
 **Gemeinsame Plätze (wirken in allen vier Welten, deshalb zuerst):** ~~`extra-4-fc-alpenfestung`~~ (ersetzt durch Yverdon Sport FC), ~~`extra-5-fc-gotthard-murmeltiere`~~ (ersetzt durch FC Wil 1900), ~~`extra-6-fc-l-man-mouettes`~~ (ersetzt durch FC Rapperswil-Jona), ~~`extra-7-fc-z-risee-b-tler`~~ (ersetzt durch FC Locarno). Ihre Spielorte sind geliehene geprüfte Plätze anderer Clubs der Liga.
@@ -248,10 +248,10 @@ Geprüft nach dem Notion Hinweis vom 23.11. auf Stand `8bea2d7`. Keiner der drei
 | Club | Ergebnis | Grund |
 |---|---|---|
 | CS Chênois | **Übersprungen, schon vertreten** | Steht als echter Club `cs-chenois` (Stade des Trois-Chêne, Liga 6) in `app/swiss-clubs.json` und damit in allen vier Welten. Ein zweiter Eintrag in der Genfer Regionalliga wäre ein Doppelgänger. Das fiktive Genfer Feld «Stade des Trois-Chêne» wurde schon vom Lancy FC Slot abgelöst |
-| SV Muttenz | **Zurückgestellt, Feld nicht eindeutig** | Der Club nennt den öffentlichen Parkplatz Margelacker (max. drei Stunden, [svmuttenz.ch](https://www.svmuttenz.ch/kontakt_und_situationsplan)). Die Gemeinde nennt für Margelacker aber nur «Kunstrasen» ([Muttenz Sport](https://www.muttenz.ch/sport), [Verordnung 13.300](https://www.muttenz.ch/reglemente/73016)), europlan führt den Platz 4 als Kunstrasen. OSM kennt mehrere Vollfelder: Rasen 101 × 65 m am Leichtathletikstreifen (way 946997664), Kunstrasen 97 × 60 m (way 113617204), Rasen 96 × 68 m (way 450070177), Rasen 109 × 70 m (way 59609073). Eine offizielle Grösse oder ein Plan für «Feld 1» liegt nicht vor |
+| SV Muttenz | **Nachträglich übernommen** (siehe unten) | Der fehlende amtliche Beleg kam später (FVNWS und Erste Liga) |
 | FC Altstetten | **Zurückgestellt, Feld nicht eindeutig** | Das Sportzentrum Buchlern hat laut [Sportamt Zürich](https://www.stadt-zuerich.ch/de/stadtleben/sport-und-erholung/sport-und-badeanlagen/rasensportanlagen/buchlern.html) elf Plätze, darunter mehrere Naturrasen der Grössen 100 × 64 m (R4, R10), 104 × 66 m (R9, 1. Liga) und 100 × 59 m (R8). Die Platznummer des Heimspiels 164081 ist vor Ort variabel, ohne Zusatzbeleg lässt sich kein Feldpolygon zuordnen. Öffentliche Parkplätze (kostenpflichtig) sind vorhanden |
 
-**Was zur Freigabe fehlt:** Muttenz: offizielle Grösse und Belag von Margelacker Feld 1 (FVNWS Anlagenverzeichnis oder Gemeindeplan), danach way 946997664 oder 113617204 wählen; der Strassenendpunkt wäre der öffentliche Parkplatz Margelacker (OSM way 216256986). Altstetten: die Platznummer des Heimspiels (Verband oder Vereinsseite).
+**Was zur Freigabe fehlt:** Altstetten: die Platznummer des Heimspiels (Verband oder Vereinsseite).
 
 ## CS Chênois: Platz und Anreise nachgeführt (Liga 6, alle vier Welten)
 
@@ -264,3 +264,15 @@ Der Club war schon vertreten, sein Platz aber nur die Gemeindemitte von Chêne-B
 | Anreise | Route endet am öffentlichen P+R Sous-Moulin (OSM way 35514353, `access=yes`, mehrstöckig), konkret auf der Route Blanche (`primary`) am Eingang, 9 m von der Strasse, ca. 220 m vom Feld. Bern bis Stade: 156,3 km, 113 Minuten; letzte Strecke ab Genève Cornavin 5,6 km, 10 Minuten |
 
 Nur zwei neue Routeneinträge, die alten Routen zur früheren Gemeindemitte bleiben ungenutzt im Cache. ID `cs-chenois`, Name und Liga sind unverändert. Wichtig für Muttenz und Altstetten: Eine Freigabe verlangt den genauen Spielfeldnachweis; die Stadt Zürich nennt auf Buchlern mehrere für die 1. und 2. Liga taugliche Felder.
+
+## SV Muttenz (Basel, Liga 9, `bs-7-2`)
+
+Der amtliche Beleg ist da: FVNWS ([Anlage](https://matchcenter.fvnws.ch/Default.aspx?a=sa&lng=1&oid=8&sa=610216&v=498)) und Erste Liga ([Anlage](https://matchcenter.el-pl.ch/default.aspx?a=sa&lng=1&oid=3&sa=610216&v=498)) nennen Feld 1 als Hauptplatz, Naturrasen 100 × 64 m, Sandgrubenweg 10, 1. Liga. Dazu das Heimspiel 105642 (07.11.) und der Parkplatz auf [svmuttenz.ch](https://www.svmuttenz.ch/kontakt_und_situationsplan). Duplikat: «SV Muttenz» kommt in keiner Welt vor. Der Slot `bs-7-2` (Distanzprofil, 3,87 km vom Basler Heimpunkt) verliert den fiktiven «Real Homburg» (Name und Platz Sportplatz Au bleiben als Alias erreichbar).
+
+| | Beleg |
+|---|---|
+| Feld | OSM way 946997664, Rasen, 101 × 65 m (100 × 64 m plus 1 m), 6477 m², Mittelpunkt 47.53013, 7.63209. Andere Felder der Anlage passen nicht: way 450070177 (96 × 68 m), way 59609073 (109 × 70 m, grösser) und der Kunstrasen way 113617204 (97 × 60 m) |
+| Anschrift | swisstopo Sandgrubenweg 10 bei 47.530617, 7.632445, 60 m vom Feld |
+| Parkplatz | OSM way 216256986 «Sportanlage Margelacker», `access=yes`, `fee=no`, höchstens 3 Stunden (passt zur Angabe des Clubs). Die Route endet im Parkplatz bei 47.529627, 7.631809 (60 m vom Feld) nach der Münchensteinerstrasse (`secondary`). Route 6,5 km, 8 Minuten |
+
+Quelle im Katalog: svmuttenz.ch (Parkplatzangabe) und die FVNWS Anlage. Eine neue Route im Cache, die übrigen blieben unverändert.

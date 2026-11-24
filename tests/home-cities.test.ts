@@ -75,7 +75,7 @@ test('real clubs only with their own website as source and never in the Chaoslig
   }
   // Documented share per city (docs/home-cities-data.md).
   const share = Object.fromEntries(OTHERS.map((id) => [id, HOME_CITIES[id].regionalClubs.filter((c) => c.clubSource).length]));
-  assert.deepEqual(share, { zurich: 2, basel: 4, geneve: 3 });
+  assert.deepEqual(share, { zurich: 2, basel: 5, geneve: 3 });
   // Fictional names never copy a real club of the catalogue or a verified one, and are unique within a world.
   const catalogNames = new Set(SEASON_CLUBS.map((c) => c.name));
   for (const id of OTHERS) {
