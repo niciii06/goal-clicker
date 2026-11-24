@@ -9,14 +9,14 @@
 import { randomUUID } from "node:crypto";
 import { getDb } from "../db";
 import type { AccountRecovery, AuthIdentity, CloudSave, GoalClickerDatabase, Profile, RecoveryCompletion } from "../db";
-import { authConfigured, authIssuer } from "./auth/config";
+import { authConfigured, authIssuer, emailSignupEnabled } from "./auth/config";
 import { checkGoogleLinks, forgetIdentity, lookupAccount, resolveAccount } from "./auth/identity";
 import type { AccountResolution } from "./auth/identity";
 import { legacyBridgeConfigured, verifyLegacyPassword, retireLegacyPassword } from "./auth/legacy-bridge";
 import { hashRecoveryCode } from "./auth/recovery-code";
 import type { LegacyCheck } from "./auth/legacy-bridge";
-import { deleteNeonUser, endAllSessions, signInEmail, signOutSession, signUpEmail } from "./auth/neon-accounts";
-import type { DeleteOutcome, NeonLogin } from "./auth/neon-accounts";
+import { deleteNeonUser, endAllSessions, resetPasswordWithCode, sendPasswordResetCode, sendVerificationCode, signInEmail, signOutSession, signUpEmail, verifyEmailCode } from "./auth/neon-accounts";
+import type { CodeResult, DeleteOutcome, NeonLogin } from "./auth/neon-accounts";
 import { forgetAccountLink } from "./auth/player";
 import { AuthUnavailableError, browserSetCookies, forgetSession, getAuthSession, publicOrigin, sameOrigin } from "./auth/server";
 import type { AuthSession } from "./auth/server";
@@ -36,7 +36,7 @@ const t = translator(SOURCE_LOCALE);
 type Store = Pick<GoalClickerDatabase,
   | "getProfile" | "getProfileByUsername" | "isUsernameTaken" | "createProfile" | "updateDisplayName" | "changeUsername"
   | "getCloudSave" | "getCloudSaveSince" | "putCloudSave"
-  | "getIdentity" | "getIdentityForAccount" | "bindIdentity" | "lockFailedLogin" | "listLegacyIdentities"
+  | "getIdentity" | "getIdentityForAccount" | "getIdentityByLoginEmail" | "bindIdentity" | "lockFailedLogin" | "listLegacyIdentities"
   | "openRecoveryClaim" | "rotateRecoveryDestination" | "completeRecovery" | "findRecoveryCode"
   | "deleteAccountData" | "finishAccountDeletion">
   // Optional: a store without it accepts every upload, as before the schema check existed.
@@ -55,7 +55,14 @@ export type AccountApiDeps = {
     deleteUser: (sessionCookie: string, origin: string, password?: string) => Promise<DeleteOutcome>;
     /** Ends every session of the signed in login (Better Auth revoke-sessions) and this one. */
     endAllSessions: (sessionCookie: string, origin: string) => Promise<void>;
+    /** One time e-mail codes: confirm the address, reset the password (Email OTP at Neon Auth). */
+    sendVerification: (email: string, origin: string) => Promise<boolean>;
+    verifyEmail: (email: string, otp: string, origin: string) => Promise<CodeResult>;
+    sendReset: (email: string, origin: string) => Promise<boolean>;
+    resetPassword: (email: string, otp: string, password: string, origin: string) => Promise<CodeResult>;
   };
+  /** New registrations need a confirmed e-mail address (GOAL_CLICKER_EMAIL_SIGNUP). */
+  emailSignup: () => boolean;
   /** TEMPORARY: checks an old password at the original Supabase project. */
   legacy: { configured: () => boolean; verify: (email: string, password: string) => Promise<LegacyCheck>; retire?: (accountId: string) => Promise<void> };
   rateLimit: (request: Request, name: RateLimitName, subject?: string) => Promise<Response | null>;
@@ -69,7 +76,8 @@ const defaults: AccountApiDeps = {
   db: getDb,
   now: () => new Date(),
   newId: randomUUID,
-  neon: { signUp: signUpEmail, signIn: signInEmail, signOut: signOutSession, deleteUser: deleteNeonUser, endAllSessions },
+  neon: { signUp: signUpEmail, signIn: signInEmail, signOut: signOutSession, deleteUser: deleteNeonUser, endAllSessions, sendVerification: sendVerificationCode, verifyEmail: verifyEmailCode, sendReset: sendPasswordResetCode, resetPassword: resetPasswordWithCode },
+  emailSignup: emailSignupEnabled,
   legacy: { configured: legacyBridgeConfigured, verify: verifyLegacyPassword, retire: retireLegacyPassword },
   rateLimit: (request, name, subject) => sharedRateLimited(request, name, subject),
   issuer: authIssuer,
@@ -87,7 +95,16 @@ const MAX_PROFILE_BODY_BYTES = 4096;
 const CLAIM_MS = 10 * 60_000;
 const INVALID_LOGIN = { error: t("account.invalidLogin"), errorCode: "INVALID_LOGIN" };
 const loginEmail = () => `p-${randomUUID()}@${PASSWORD_LOGIN_DOMAIN}`;
-const PASSWORD_METHODS = new Set(["password", "legacy-password", "owner-code"]);
+const PASSWORD_METHODS = new Set(["password", "legacy-password", "owner-code", "email"]);
+/** The address a player may see: the real one of a Google or e-mail login, never a generated one. */
+const visibleEmail = (method: string, session: AuthSession) => method === "email" || !PASSWORD_METHODS.has(method) ? session.email : null;
+/** A real, plain e-mail address in lower case, or "" (never the generated login domain). */
+export function normalizeEmail(value: unknown) {
+  const email = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.endsWith(`@${PASSWORD_LOGIN_DOMAIN}`)) return "";
+  return email;
+}
+const CODE_PATTERN = /^\d{6}$/;
 
 export function publicProfile(profile: Profile): PublicProfile {
   return { username: profile.username, displayName: profile.displayName, usernameChangedAt: profile.usernameChangedAt, nextUsernameChangeAt: nextUsernameChangeAt(profile.usernameChangedAt) };
@@ -150,7 +167,7 @@ async function withoutAccount(request: Request, deps: AccountApiDeps, handler: (
 export function getProfileResponse(request: Request, deps = defaults) {
   return withAccount(request, deps, { fresh: false }, async ({ session, accountId, method }) => {
     const profile = await deps.db().getProfile(accountId);
-    return json({ email: PASSWORD_METHODS.has(method) ? null : session.email, profile: profile ? publicProfile(profile) : null });
+    return json({ email: visibleEmail(method, session), profile: profile ? publicProfile(profile) : null });
   });
 }
 
@@ -283,12 +300,13 @@ export function usernameAvailabilityResponse(request: Request, deps = defaults) 
  */
 export function registerResponse(request: Request, deps = defaults) {
   return withoutAccount(request, deps, async () => {
-    const body = await readJsonBody<{ username?: unknown; displayName?: unknown; password?: unknown }>(request, MAX_PROFILE_BODY_BYTES);
+    const body = await readJsonBody<{ username?: unknown; displayName?: unknown; password?: unknown; email?: unknown }>(request, MAX_PROFILE_BODY_BYTES);
     const username = typeof body.username === "string" ? body.username.trim() : "";
     const displayName = cleanDisplayName(typeof body.displayName === "string" ? body.displayName : "");
     const password = typeof body.password === "string" ? body.password : "";
     const invalid = usernameError(username) ?? displayNameError(displayName) ?? passwordError(password);
     if (invalid) return json({ error: invalid, errorCode: "INVALID" }, 400);
+    if (deps.emailSignup()) return registerWithEmail(request, deps, { username, displayName, password, email: normalizeEmail(body.email) });
     const limited = await deps.rateLimit(request, "register");
     if (limited) return limited;
     const store = deps.db();
@@ -326,6 +344,118 @@ export function registerResponse(request: Request, deps = defaults) {
   });
 }
 
+/**
+ * Registration with a real e-mail address (GOAL_CLICKER_EMAIL_SIGNUP): the Neon login carries the address, the
+ * account is bound to that login by its subject (never by the address) and opens only once the mailed code confirmed
+ * the address (EMAIL_UNVERIFIED in app/auth/identity.ts). The username stays the player's name in the game.
+ */
+async function registerWithEmail(request: Request, deps: AccountApiDeps, values: { username: string; displayName: string; password: string; email: string }) {
+  if (!values.email) return json({ error: t("account.emailInvalid"), errorCode: "INVALID_EMAIL" }, 400);
+  const limited = await deps.rateLimit(request, "register");
+  if (limited) return limited;
+  const store = deps.db();
+  const taken = { error: t("account.usernameTaken"), errorCode: "USERNAME_TAKEN" };
+  if (await store.isUsernameTaken(usernameKey(values.username))) return json(taken, 409);
+  const origin = publicOrigin(request);
+  const login = await deps.neon.signUp(values.email, values.password, values.displayName, origin);
+  if (!login.ok) {
+    if (login.reason === "rate-limited") return json({ error: t("request.rateLimited"), errorCode: "RATE_LIMITED" }, 429);
+    // The same answer whether the address is taken or refused: an existing login is never joined to this account.
+    if (login.reason === "exists") return json({ error: t("account.emailUnavailable"), errorCode: "EMAIL_UNAVAILABLE" }, 409);
+    return json({ error: t("account.signupFailed"), errorCode: "SIGNUP_FAILED" }, 503);
+  }
+  const issuer = deps.issuer();
+  const accountId = deps.newId();
+  const undo = async () => {
+    const deleted = await deps.neon.deleteUser(login.sessionCookie, origin).catch(() => "not-deleted" as const);
+    if (deleted !== "deleted") {
+      await store.lockFailedLogin({ issuer, subject: login.subject, accountId, loginEmail: values.email, now: deps.now().toISOString() }).catch(() => undefined);
+      await deps.neon.endAllSessions(login.sessionCookie, origin).catch(() => undefined);
+    }
+  };
+  try {
+    const bound = await store.bindIdentity({ issuer, subject: login.subject, accountId, method: "email", loginEmail: values.email, createdAt: deps.now().toISOString() });
+    if (!bound.ok) { await undo(); return json({ error: t("account.signupFailed"), errorCode: "SIGNUP_FAILED" }, 503); }
+    const result = await store.createProfile(accountId, values.username, values.displayName, deps.now().toISOString(), null);
+    if (!result.profile) { await undo(); return json(taken, 409); }
+    // A failed mail is not fatal: the player asks for a new code on the next screen.
+    const sent = login.emailVerified === true ? true : await deps.neon.sendVerification(values.email, origin).catch(() => false);
+    return json({ profile: publicProfile(result.profile), verificationRequired: login.emailVerified !== true, codeSent: sent }, 201, browserSetCookies(login.setCookies));
+  } catch (error) {
+    await undo();
+    throw error;
+  }
+}
+
+const CODE_INVALID = { error: t("account.codeInvalid"), errorCode: "INVALID_CODE" };
+const CODE_LOCKED = { error: t("account.codeLocked"), errorCode: "CODE_LOCKED" };
+const codeFailure = (result: Exclude<CodeResult, { ok: true }>) =>
+  result.reason === "too-many" ? json(CODE_LOCKED, 429) : result.reason === "rate-limited" ? json({ error: t("request.rateLimited"), errorCode: "RATE_LIMITED" }, 429) : result.reason === "invalid" ? json(CODE_INVALID, 400) : json({ error: t("account.authUnavailable"), errorCode: "AUTH_UNAVAILABLE" }, 503);
+
+/** The e-mail login (method "email") of an address, or null. Generated, Google and deleted logins never qualify. */
+async function emailIdentity(store: Store, issuer: string, email: string) {
+  if (!email) return null;
+  const identity = await store.getIdentityByLoginEmail(issuer, email);
+  return identity && identity.method === "email" && !identity.deletedAt ? identity : null;
+}
+
+/** POST /api/email/verify { email, code }: confirms the address of an e-mail account with the mailed code. */
+export function verifyEmailResponse(request: Request, deps = defaults) {
+  return withoutAccount(request, deps, async () => {
+    const body = await readJsonBody<{ email?: unknown; code?: unknown }>(request, MAX_PROFILE_BODY_BYTES);
+    const email = normalizeEmail(body.email);
+    const code = typeof body.code === "string" ? body.code.replace(/\s/g, "") : "";
+    const limited = await deps.rateLimit(request, "emailCode", email);
+    if (limited) return limited;
+    if (!email || !CODE_PATTERN.test(code)) return json(CODE_INVALID, 400);
+    const result = await deps.neon.verifyEmail(email, code, publicOrigin(request));
+    if (!result.ok) return codeFailure(result);
+    // The cached session still says "not confirmed": the next request asks Neon Auth again.
+    forgetSession(request);
+    return json({ verified: true }, 200, browserSetCookies(result.setCookies));
+  });
+}
+
+/** POST /api/email/resend { email }: a new confirmation code. Always the same answer, whether the address exists or not. */
+export function resendVerificationResponse(request: Request, deps = defaults) {
+  return withoutAccount(request, deps, async () => {
+    const body = await readJsonBody<{ email?: unknown }>(request, MAX_PROFILE_BODY_BYTES);
+    const email = normalizeEmail(body.email);
+    const limited = await deps.rateLimit(request, "emailCode", email);
+    if (limited) return limited;
+    if (await emailIdentity(deps.db(), deps.issuer(), email)) await deps.neon.sendVerification(email, publicOrigin(request)).catch(() => false);
+    return json({ sent: true }, 202);
+  });
+}
+
+/**
+ * POST /api/password-reset: { email } mails a reset code, { email, code, password } sets the new password. Only
+ * e-mail accounts take part; every other address gets the same neutral answer, so the form tells nobody which
+ * addresses exist. Neon Auth makes each code single use and time limited.
+ */
+export function passwordResetResponse(request: Request, deps = defaults) {
+  return withoutAccount(request, deps, async () => {
+    const body = await readJsonBody<{ email?: unknown; code?: unknown; password?: unknown }>(request, MAX_PROFILE_BODY_BYTES);
+    const email = normalizeEmail(body.email);
+    const origin = publicOrigin(request);
+    const limited = await deps.rateLimit(request, "passwordReset", email);
+    if (limited) return limited;
+    const store = deps.db();
+    if (body.code === undefined) {
+      if (await emailIdentity(store, deps.issuer(), email)) await deps.neon.sendReset(email, origin).catch(() => false);
+      return json({ sent: true }, 202);
+    }
+    const password = typeof body.password === "string" ? body.password : "";
+    const invalidPassword = passwordError(password);
+    if (invalidPassword) return json({ error: invalidPassword, errorCode: "INVALID" }, 400);
+    const code = typeof body.code === "string" ? body.code.replace(/\s/g, "") : "";
+    if (!CODE_PATTERN.test(code) || !(await emailIdentity(store, deps.issuer(), email))) return json(CODE_INVALID, 400);
+    const result = await deps.neon.resetPassword(email, code, password, origin);
+    if (!result.ok) return codeFailure(result);
+    return json({ reset: true }, 200);
+  });
+}
+
 type ProfileLookup = Pick<Profile, "userId" | "loginEmail" | "displayName">;
 
 /** Profile and Neon login of a username, or null. Every failure of a login looks the same to the client. */
@@ -352,6 +482,8 @@ export function loginResponse(request: Request, deps = defaults) {
     const store = deps.db();
     const issuer = deps.issuer();
     const origin = publicOrigin(request);
+    // An address instead of a username: only an e-mail account (method "email") may open, by its login subject.
+    if (username.includes("@")) return loginWithEmail(deps, { email: normalizeEmail(username), password, origin });
     const target = await loginTarget(store, issuer, username);
     if (!target) return json(INVALID_LOGIN, 401);
     const { profile, identity } = target;
@@ -375,6 +507,15 @@ export function loginResponse(request: Request, deps = defaults) {
     if (check.result !== "valid" || check.userId !== profile.userId) return json(INVALID_LOGIN, 401);
     return migratePasswordLogin(deps, { accountId: profile.userId, password, name: profile.displayName, method: "legacy-password", origin });
   });
+}
+
+async function loginWithEmail(deps: AccountApiDeps, values: { email: string; password: string; origin: string }) {
+  if (!values.email) return json(INVALID_LOGIN, 401);
+  const login = await deps.neon.signIn(values.email, values.password, values.origin);
+  if (!login.ok) return login.reason === "rate-limited" ? json({ error: t("request.rateLimited"), errorCode: "RATE_LIMITED" }, 429) : json(INVALID_LOGIN, 401);
+  const identity = await deps.db().getIdentity(deps.issuer(), login.subject);
+  if (!identity || identity.deletedAt || identity.method !== "email") { await deps.neon.signOut(login.sessionCookie, values.origin); return json(INVALID_LOGIN, 401); }
+  return json({ signedIn: true, verificationRequired: login.emailVerified !== true }, 200, browserSetCookies(login.setCookies));
 }
 
 async function isLegacyPasswordAccount(store: Store, accountId: string) {
@@ -524,7 +665,7 @@ export async function accountSessionResponse(request: Request, deps: SessionDeps
     const playerId = claimed ? await deps.linkPlayer({ session, accountId: account.accountId }, claimed) : null;
     if (claimed && !playerId) return json({ error: t("account.playerTaken"), errorCode: "PLAYER_TAKEN" }, 409);
     const passwordLogin = PASSWORD_METHODS.has(account.method);
-    return json({ signedIn: true, accountId: account.accountId, email: passwordLogin ? null : session.email, passwordLogin, suggestedName: session.name, created: account.created, ...(google ? { google } : {}), ...(playerId ? { playerId } : {}) }, 200, browserSetCookies(session.refreshCookies ?? []));
+    return json({ signedIn: true, accountId: account.accountId, email: visibleEmail(account.method, session), passwordLogin, suggestedName: session.name, created: account.created, ...(google ? { google } : {}), ...(playerId ? { playerId } : {}) }, 200, browserSetCookies(session.refreshCookies ?? []));
   } catch (error) {
     return failure(error);
   }

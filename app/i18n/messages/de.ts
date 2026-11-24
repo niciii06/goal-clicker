@@ -9,6 +9,10 @@ export const de = {
   "update.multiplayer": "Eine neue Goal Clicker Version ist verfügbar. Lade die Seite einmal neu. Dein Raum und Spielstand bleiben vollständig erhalten.",
   "pack.fragmentsBack": "+{amount} Fragmente zurück.",
   // Account and cloud save answers of app/account-api.ts.
+  "account.emailInvalid": "Bitte gib eine gültige E-Mail-Adresse ein.",
+  "account.emailUnavailable": "Mit dieser E-Mail-Adresse kann kein Konto erstellt werden.",
+  "account.codeInvalid": "Der Code stimmt nicht oder ist abgelaufen.",
+  "account.codeLocked": "Zu viele Versuche. Fordere einen neuen Code an.",
   "account.invalidLogin": "Benutzername oder Passwort stimmt nicht.",
   "request.invalid": "Die Anfrage ist ungültig.",
   "account.authUnavailable": "Die Anmeldung kann gerade nicht geprüft werden. Bitte versuche es gleich nochmal.",

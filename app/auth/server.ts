@@ -14,6 +14,8 @@ export type AuthSession = {
   issuer: string;
   subject: string;
   email: string | null;
+  /** Whether Neon Auth has confirmed the address (a one time code). Accounts registered with an e-mail need it. */
+  emailVerified?: boolean;
   name: string;
   /** "name=value" of the session cookie, to call Neon Auth as this user. */
   sessionCookie: string;
@@ -136,7 +138,7 @@ export function sessionCookieFromSetCookies(setCookies: readonly string[]) {
   return "";
 }
 
-type UpstreamSession = { session?: { id?: string; userId?: string; expiresAt?: string } | null; user?: { id?: string; email?: string | null; name?: string | null; banned?: boolean | null } | null } | null;
+type UpstreamSession = { session?: { id?: string; userId?: string; expiresAt?: string } | null; user?: { id?: string; email?: string | null; emailVerified?: boolean | null; name?: string | null; banned?: boolean | null } | null } | null;
 
 /** Checks a session cookie with Neon Auth itself (/get-session), never with a cached copy of the session. */
 export async function verifySessionCookie(sessionCookie: string, origin: string): Promise<AuthSession | null> {
@@ -146,7 +148,7 @@ export async function verifySessionCookie(sessionCookie: string, origin: string)
   if (result.status !== 200 || !session || !user?.id || session.userId !== user.id || user.banned === true) return null;
   const expiresAt = Date.parse(session.expiresAt ?? "");
   if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return null;
-  return { issuer: authIssuer(), subject: user.id, email: typeof user.email === "string" ? user.email : null, name: typeof user.name === "string" ? user.name : "", sessionCookie, refreshCookies: result.setCookies.length ? result.setCookies : undefined };
+  return { issuer: authIssuer(), subject: user.id, email: typeof user.email === "string" ? user.email : null, emailVerified: user.emailVerified === true, name: typeof user.name === "string" ? user.name : "", sessionCookie, refreshCookies: result.setCookies.length ? result.setCookies : undefined };
 }
 
 /**

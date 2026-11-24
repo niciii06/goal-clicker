@@ -1,13 +1,15 @@
 "use client";
-// Once Neon Auth is configured the game starts with a login: Google, or username and password (no e-mail involved).
+// Once Neon Auth is configured the game starts with a login: Google, or username and password. With e-mail sign-up
+// switched on (GOAL_CLICKER_EMAIL_SIGNUP), a new account also gives a real address and opens only after the code sent
+// to it is entered; such accounts sign in with the address too and can reset a forgotten password with a code.
 // Every account has a profile with a unique username and a display name; Google accounts create it after their
 // first login, username accounts when they register. Before the game starts, the account's cloud save is written
 // to localStorage; while it runs, CloudSync uploads every change. A guest plays single player only, with a save
 // in this browser; signing in later takes that save into a new account.
 import { createContext, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { authErrorMessage, refreshAuthSession, registerWithUsername, signInWithGoogle, signInWithUsername, signOutOfAuth } from "./auth/browser";
-import { browserAuthMode } from "./auth/config";
+import { authErrorMessage, refreshAuthSession, registerWithUsername, requestPasswordReset, resendEmailCode, resetPasswordWithCode, signInWithGoogle, signInWithUsername, signOutOfAuth, verifyEmailWithCode } from "./auth/browser";
+import { browserAuthMode, browserEmailSignup } from "./auth/config";
 import { adoptOwnUpload, applyCloudSave, clearLocalAccountData, CloudSync, FLUSH_SAVE_EVENT, fetchCloudSave, holdsOtherAccountSave, NEWER_VERSION_MESSAGE, planInitialSync, readCloudMeta, readCloudMetaOwner, readLocalSaveKeys, reportSyncProblem, STORAGE_FULL_MESSAGE, writeCloudMeta } from "./cloud-sync";
 import type { CloudSaveState } from "./cloud-sync";
 import { cleanCloudSaveKeys, summarizeSave } from "./cloud-save-rules";
@@ -62,6 +64,8 @@ type Phase =
   | { name: "profile"; user: SessionUser }
   | { name: "unreachable"; message: string; user: SessionUser | null; offlineProfile: PublicProfile | null }
   | { name: "deletion"; message: string }
+  // A new e-mail account waits for the code sent to its address (only with e-mail sign-up switched on).
+  | { name: "verify-email"; email: string; message?: string }
   // A save from a newer version of the game is in this browser or the cloud: this (older) page must not touch it.
   | { name: "outdated" }
   // The browser storage could not take the account's save; nothing was replaced.
@@ -98,6 +102,14 @@ function sessionUser(body: AccountSession): SessionUser {
 
 /** Answers of POST /api/account that mean this login cannot open a game account; it is signed out again. */
 const REFUSED_LOGINS = new Set(["ACCOUNT_ALREADY_CLAIMED", "IDENTITY_UNBOUND", "LEGACY_ACCOUNT_MISSING", "AUTH_NOT_CONFIGURED"]);
+
+/** The address a new account waits to confirm, so a reload of the code step still knows it (this tab only). */
+const PENDING_EMAIL_KEY = "goalClickerPendingEmailV1";
+function readPendingEmail() { try { return sessionStorage.getItem(PENDING_EMAIL_KEY) ?? ""; } catch { return ""; } }
+function rememberPendingEmail(email: string) { try { sessionStorage.setItem(PENDING_EMAIL_KEY, email); } catch { /* the field stays editable */ } }
+function forgetPendingEmail() { try { sessionStorage.removeItem(PENDING_EMAIL_KEY); } catch { /* nothing kept */ } }
+const CODE_LENGTH = 6;
+const cleanCode = (value: string) => value.replace(/\D/g, "").slice(0, CODE_LENGTH);
 
 async function readJson<T>(response: Response) {
   return await response.json().catch(() => ({})) as T & { error?: string; errorCode?: string };
@@ -186,6 +198,7 @@ function RequiredAccount({ children }: { children: ReactNode }) {
         return;
       }
       if (response.status === 410) { setPhase({ name: "deletion", message: body.error ?? "Dein Konto wird gerade gelöscht." }); return; }
+      if (body.errorCode === "EMAIL_UNVERIFIED") { setPhase({ name: "verify-email", email: readPendingEmail(), message: body.error }); return; }
       if (body.errorCode && REFUSED_LOGINS.has(body.errorCode)) {
         await signOutOfAuth();
         setPhase({ name: "signed-out", message: body.error });
@@ -338,9 +351,10 @@ function RequiredAccount({ children }: { children: ReactNode }) {
   return <main className="account-screen">
     <section className="account-card">
       <div className="account-brand"><span className="account-brand-ball" aria-hidden="true">⚽</span><div><p className="eyebrow">FOOTBALL IDLE CLUB</p><strong>Goal Clicker</strong></div></div>
-      {phase.name === "signed-out" && <LoginForm message={phase.message} onSignedIn={() => void enter()} onGuest={playAsGuest} />}
+      {phase.name === "signed-out" && <LoginForm message={phase.message} onSignedIn={() => void enter()} onVerify={(email) => { rememberPendingEmail(email); setPhase({ name: "verify-email", email }); }} onGuest={playAsGuest} />}
       {phase.name === "profile" && <ProfileSetup user={phase.user} onCreated={(profile) => { writeProfileCache(phase.user, profile); void syncAndStart(phase.user, profile); }} onSignOut={() => void signOut()} />}
       {phase.name === "deletion" && <FinishDeletion message={phase.message} />}
+      {phase.name === "verify-email" && <VerifyEmail email={phase.email} message={phase.message} onVerified={() => { forgetPendingEmail(); void enter(); }} onSignOut={() => { forgetPendingEmail(); void signOutOfAuth().then(() => setPhase({ name: "signed-out" })); }} />}
       {phase.name === "outdated" && <>
         <h2>Neue Version verfügbar</h2>
         <p role="alert">{NEWER_VERSION_MESSAGE}</p>
@@ -456,18 +470,21 @@ export function PasswordInput({ fieldName, labelId, value, onChange, autoComplet
   </span>;
 }
 
-function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSignedIn: () => void; onGuest: () => void }) {
-  const [mode, setMode] = useState<"login" | "register">("login");
+function LoginForm({ message, onSignedIn, onVerify, onGuest }: { message?: string; onSignedIn: () => void; onVerify: (email: string) => void; onGuest: () => void }) {
+  const emailSignup = browserEmailSignup();
+  const [mode, setMode] = useState<"login" | "register" | "reset">("login");
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [passwordRepeat, setPasswordRepeat] = useState("");
   const [error, setError] = useState("");
+  const [resetNote, setResetNote] = useState("");
   const [busy, setBusy] = useState(false);
   const check = useUsernameCheck(mode === "register" ? username : "");
   const passwordLabelId = useId(), repeatLabelId = useId();
 
-  function switchMode(next: "login" | "register") {
+  function switchMode(next: "login" | "register" | "reset") {
     setMode(next);
     setError("");
     setPassword("");
@@ -484,8 +501,13 @@ function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSigne
     setBusy(true);
     setError("");
     try {
-      if (mode === "login") await signInWithUsername(username.trim(), password);
-      else await registerWithUsername(username.trim(), displayName, password);
+      if (mode === "login") {
+        const signedIn = await signInWithUsername(username.trim(), password);
+        if (signedIn.verificationRequired && username.includes("@")) { onVerify(username.trim()); return; }
+      } else if (emailSignup) {
+        const created = await registerWithUsername(username.trim(), displayName, password, email.trim());
+        if (created.verificationRequired) { onVerify(email.trim()); return; }
+      } else await registerWithUsername(username.trim(), displayName, password);
       onSignedIn();
     } catch (failure) {
       setError(authErrorMessage(failure));
@@ -493,30 +515,139 @@ function LoginForm({ message, onSignedIn, onGuest }: { message?: string; onSigne
     }
   }
 
+  if (mode === "reset") return <PasswordReset initialEmail={username.includes("@") ? username.trim() : ""} onDone={(note) => { switchMode("login"); setResetNote(note); }} />;
+
   return <>
     <h2>{mode === "login" ? "Anmelden" : "Konto erstellen"}</h2>
     <p>Melde dich an, damit dein Spielstand auf allen deinen Geräten gleich ist.</p>
-    {message && <p className="account-notice" role="status">{message}</p>}
+    {(resetNote || message) && <p className="account-notice" role="status">{resetNote || message}</p>}
     <button type="button" className="account-google" disabled={busy} onClick={() => void signInWithGoogle(window.location.pathname).catch((failure: unknown) => setError(authErrorMessage(failure)))}><span aria-hidden="true">G</span>Mit Google anmelden</button>
-    <div className="account-divider"><span>oder mit Benutzername</span></div>
+    <div className="account-divider"><span>{emailSignup ? "oder mit Benutzername oder E-Mail" : "oder mit Benutzername"}</span></div>
     <div className="account-tabs" role="tablist">
       <button type="button" role="tab" aria-selected={mode === "login"} className={mode === "login" ? "active" : ""} onClick={() => switchMode("login")}>Anmelden</button>
       <button type="button" role="tab" aria-selected={mode === "register"} className={mode === "register" ? "active" : ""} onClick={() => switchMode("register")}>Konto erstellen</button>
     </div>
     <form className="account-form" onSubmit={(event) => void submit(event)}>
-      <label className="account-field"><span>Benutzername</span><input className="mode-input" autoComplete="username" autoCapitalize="none" spellCheck={false} maxLength={USERNAME_MAX} required value={username} onChange={(event) => setUsername(event.target.value)} /></label>
+      <label className="account-field"><span>{emailSignup && mode === "login" ? "Benutzername oder E-Mail" : "Benutzername"}</span><input className="mode-input" autoComplete="username" autoCapitalize="none" spellCheck={false} maxLength={emailSignup && mode === "login" ? 254 : USERNAME_MAX} required value={username} onChange={(event) => setUsername(event.target.value)} /></label>
       {mode === "register" && <UsernameHint check={check} />}
       {mode === "register" && <><label className="account-field"><span>Anzeigename</span><input className="mode-input" autoComplete="nickname" maxLength={DISPLAY_NAME_MAX} required value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
         <small className="account-hint">So heisst du im Spiel und im Multiplayer. Jederzeit änderbar.</small></>}
+      {mode === "register" && emailSignup && <><label className="account-field"><span>E-Mail</span><input className="mode-input" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} maxLength={254} required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+        <small className="account-hint">Wir schicken dir einen Code, um die Adresse zu bestätigen. Mit ihr kannst du später dein Passwort zurücksetzen.</small></>}
       <label className="account-field"><span id={passwordLabelId}>{mode === "register" ? `Passwort (mindestens ${PASSWORD_MIN} Zeichen)` : "Passwort"}</span><PasswordInput key={`password-${mode}`} fieldName="Passwort" labelId={passwordLabelId} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? undefined : PASSWORD_MIN} value={password} onChange={setPassword} /></label>
       {mode !== "login" && <label className="account-field"><span id={repeatLabelId}>Passwort wiederholen</span><PasswordInput fieldName="Passwort wiederholen" labelId={repeatLabelId} autoComplete="new-password" value={passwordRepeat} onChange={setPasswordRepeat} /></label>}
-      {mode === "register" && <small className="account-hint">Merk dir dein Passwort gut: Ohne E-Mail Adresse lässt es sich nicht zurücksetzen.</small>}
+      {mode === "register" && !emailSignup && <small className="account-hint">Merk dir dein Passwort gut: Ohne E-Mail Adresse lässt es sich nicht zurücksetzen.</small>}
       <button type="submit" className="mode-primary" disabled={busy || (mode === "register" && check.blocked)}>{mode === "login" ? "Anmelden" : "Konto erstellen"}</button>
+      {mode === "login" && emailSignup && <button type="button" className="mode-secondary quiet" disabled={busy} onClick={() => switchMode("reset")}>Passwort vergessen?</button>}
     </form>
     {error && <p className="account-error" role="alert">{error}</p>}
     <div className="account-guest">
       <button type="button" className="mode-secondary quiet" disabled={busy} onClick={onGuest}>Als Gast fortfahren</button>
       <small className="account-hint">Als Gast spielst du nur Einzelspieler, und dein Spielstand bleibt in diesem Browser. Anmelden kannst du dich jederzeit.</small>
+    </div>
+  </>;
+}
+
+/** The code step of a new e-mail account: the game opens only once the address is confirmed. */
+function VerifyEmail({ email: initialEmail, message, onVerified, onSignOut }: { email: string; message?: string; onVerified: () => void; onSignOut: () => void }) {
+  const [email, setEmail] = useState(initialEmail);
+  const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+  const [note, setNote] = useState(message ?? "");
+  const [busy, setBusy] = useState(false);
+  const codeLabelId = useId();
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    if (code.length !== CODE_LENGTH) { setError(`Der Code hat ${CODE_LENGTH} Ziffern.`); return; }
+    setBusy(true);
+    setError("");
+    try {
+      await verifyEmailWithCode(email.trim(), code);
+      onVerified();
+    } catch (failure) {
+      setError(authErrorMessage(failure));
+      setCode("");
+      setBusy(false);
+    }
+  }
+
+  async function resend() {
+    if (busy || !email.trim()) return;
+    setBusy(true);
+    setError("");
+    try {
+      await resendEmailCode(email.trim());
+      setNote(`Wir haben einen neuen Code an ${email.trim()} geschickt.`);
+    } catch (failure) {
+      setError(authErrorMessage(failure));
+    }
+    setBusy(false);
+  }
+
+  return <>
+    <h2>E-Mail bestätigen</h2>
+    <p>{initialEmail ? `Wir haben dir einen Code an ${initialEmail} geschickt. Gib ihn hier ein, dann geht es los.` : "Gib die E-Mail-Adresse deines Kontos und den Code ein, den wir dir geschickt haben."}</p>
+    {note && <p className="account-notice" role="status">{note}</p>}
+    <form className="account-form" onSubmit={(event) => void submit(event)}>
+      {!initialEmail && <label className="account-field"><span>E-Mail</span><input className="mode-input" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} maxLength={254} required value={email} onChange={(event) => setEmail(event.target.value)} /></label>}
+      <label className="account-field"><span id={codeLabelId}>Code</span><input className="mode-input account-code" aria-labelledby={codeLabelId} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={CODE_LENGTH} required value={code} onChange={(event) => setCode(cleanCode(event.target.value))} /></label>
+      <button type="submit" className="mode-primary" disabled={busy}>Bestätigen</button>
+    </form>
+    {error && <p className="account-error" role="alert">{error}</p>}
+    <div className="account-actions">
+      <button type="button" className="mode-secondary" disabled={busy || !email.trim()} onClick={() => void resend()}>Neuen Code senden</button>
+      <button type="button" className="mode-secondary quiet" disabled={busy} onClick={onSignOut}>Abmelden</button>
+    </div>
+  </>;
+}
+
+/** Forgotten password of an e-mail account: a code to the address, then a new password. Never says whether it exists. */
+function PasswordReset({ initialEmail, onDone }: { initialEmail: string; onDone: (note: string) => void }) {
+  const [step, setStep] = useState<"request" | "code">("request");
+  const [email, setEmail] = useState(initialEmail);
+  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordRepeat, setPasswordRepeat] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const passwordLabelId = useId(), repeatLabelId = useId();
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    if (step === "code") {
+      const problem = code.length !== CODE_LENGTH ? `Der Code hat ${CODE_LENGTH} Ziffern.` : passwordError(password) ?? (password !== passwordRepeat ? "Die beiden Passwörter stimmen nicht überein." : null);
+      if (problem) { setError(problem); return; }
+    }
+    setBusy(true);
+    setError("");
+    try {
+      if (step === "request") { await requestPasswordReset(email.trim()); setStep("code"); }
+      else { await resetPasswordWithCode(email.trim(), code, password); onDone("Dein Passwort ist geändert. Melde dich jetzt mit dem neuen Passwort an."); return; }
+    } catch (failure) {
+      setError(authErrorMessage(failure));
+    }
+    setBusy(false);
+  }
+
+  return <>
+    <h2>Passwort zurücksetzen</h2>
+    <p>{step === "request" ? "Gib die E-Mail-Adresse deines Kontos ein. Wir schicken dir einen Code." : `Falls zu ${email.trim()} ein Konto gehört, ist ein Code unterwegs. Gib ihn mit deinem neuen Passwort ein.`}</p>
+    <form className="account-form" onSubmit={(event) => void submit(event)}>
+      {step === "request" && <label className="account-field"><span>E-Mail</span><input className="mode-input" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} maxLength={254} required value={email} onChange={(event) => setEmail(event.target.value)} /></label>}
+      {step === "code" && <>
+        <label className="account-field"><span>Code</span><input className="mode-input account-code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={CODE_LENGTH} required value={code} onChange={(event) => setCode(cleanCode(event.target.value))} /></label>
+        <label className="account-field"><span id={passwordLabelId}>{`Neues Passwort (mindestens ${PASSWORD_MIN} Zeichen)`}</span><PasswordInput fieldName="Neues Passwort" labelId={passwordLabelId} autoComplete="new-password" minLength={PASSWORD_MIN} value={password} onChange={setPassword} /></label>
+        <label className="account-field"><span id={repeatLabelId}>Passwort wiederholen</span><PasswordInput fieldName="Passwort wiederholen" labelId={repeatLabelId} autoComplete="new-password" value={passwordRepeat} onChange={setPasswordRepeat} /></label>
+      </>}
+      <button type="submit" className="mode-primary" disabled={busy}>{step === "request" ? "Code senden" : "Passwort ändern"}</button>
+    </form>
+    {error && <p className="account-error" role="alert">{error}</p>}
+    <div className="account-actions">
+      {step === "code" && <button type="button" className="mode-secondary" disabled={busy} onClick={() => { setStep("request"); setCode(""); setError(""); }}>Neuen Code anfordern</button>}
+      <button type="button" className="mode-secondary quiet" disabled={busy} onClick={() => onDone("")}>Zurück zur Anmeldung</button>
     </div>
   </>;
 }

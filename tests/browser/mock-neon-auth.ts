@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { randomBytes, randomUUID } from 'node:crypto';
 
-type User = { id: string; email: string; name: string; password: string | null; google: string | null; createdAt: string };
+type User = { id: string; email: string; name: string; password: string | null; google: string | null; createdAt: string; emailVerified?: boolean };
 type Pending = { challenge: string; callbackURL: string; errorCallbackURL: string; linkUser: string | null; sub: string | null };
 
 const COOKIE = '__Secure-neon-auth.session_token';
@@ -23,6 +23,10 @@ export function startMockNeonAuth(port: number) {
   /** The old Supabase project: login address → user ID and password (TEMPORARY bridge). */
   const legacy = new Map<string, { id: string; password: string }>();
   const log: string[] = [];
+  /** Email OTP like Managed Better Auth: six digits, 15 minutes, three wrong tries, each code once; mails land here. */
+  const codes = new Map<string, { otp: string; expiresAt: number; tries: number }>();
+  const outbox: { type: string; email: string; otp: string }[] = [];
+  const otpSettings = { revokeOnReset: false };
 
   const cookies = (request: IncomingMessage) => new Map((request.headers.cookie ?? '').split(';').map((part) => part.trim().split('=')).filter((pair) => pair.length >= 2).map(([name, ...value]) => [name, value.join('=')]));
   const sessionUser = (request: IncomingMessage) => {
@@ -35,7 +39,7 @@ export function startMockNeonAuth(port: number) {
     sessions.set(token, { userId, expiresAt: Date.now() + 7 * 86_400_000 });
     return { token, cookie: `${COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=604800` };
   };
-  const sessionBody = (token: string, user: User) => ({ session: { id: token.slice(0, 8), token, userId: user.id, expiresAt: new Date(sessions.get(token)!.expiresAt).toISOString() }, user: { id: user.id, email: user.email, name: user.name, emailVerified: Boolean(user.google), image: null, createdAt: user.createdAt, updatedAt: user.createdAt } });
+  const sessionBody = (token: string, user: User) => ({ session: { id: token.slice(0, 8), token, userId: user.id, expiresAt: new Date(sessions.get(token)!.expiresAt).toISOString() }, user: { id: user.id, email: user.email, name: user.name, emailVerified: user.emailVerified === true || Boolean(user.google), image: null, createdAt: user.createdAt, updatedAt: user.createdAt } });
 
   const server: Server = createServer((request: IncomingMessage, response: ServerResponse) => {
     const url = new URL(request.url ?? '/', origin);
@@ -96,13 +100,47 @@ export function startMockNeonAuth(port: number) {
         const user: User = { id: randomUUID(), email: String(body.email), name: String(body.name ?? ''), password: String(body.password), google: null, createdAt: new Date().toISOString() };
         users.set(user.id, user);
         const { token, cookie } = newSession(user.id);
-        return send(200, { token, user: { id: user.id, email: user.email, name: user.name } }, [cookie]);
+        return send(200, { token, user: { id: user.id, email: user.email, name: user.name, emailVerified: false } }, [cookie]);
       }
       if (path === 'sign-in/email') {
         const user = [...users.values()].find((u) => u.email === body.email);
         if (!user || user.password === null || user.password !== body.password) return fail(401, 'INVALID_EMAIL_OR_PASSWORD');
         const { token, cookie } = newSession(user.id);
-        return send(200, { token, user: { id: user.id, email: user.email, name: user.name } }, [cookie]);
+        return send(200, { token, user: { id: user.id, email: user.email, name: user.name, emailVerified: user.emailVerified === true } }, [cookie]);
+      }
+      // ---- Email OTP (no session needed) ----
+      const byEmail = (email: unknown) => [...users.values()].find((u) => u.email === String(email ?? '').toLowerCase());
+      const issue = (type: string, email: string) => {
+        const otp = String(randomBytes(4).readUInt32BE(0) % 900000 + 100000);
+        codes.set(`${type}:${email}`, { otp, expiresAt: Date.now() + 15 * 60_000, tries: 0 });
+        outbox.push({ type, email, otp });
+      };
+      const consume = (type: string, email: string, otp: string) => {
+        const entry = codes.get(`${type}:${email}`);
+        if (!entry || entry.expiresAt < Date.now()) return 'INVALID_OTP';
+        if (entry.otp !== otp) { entry.tries += 1; if (entry.tries >= 3) { codes.delete(`${type}:${email}`); return 'TOO_MANY_ATTEMPTS'; } return 'INVALID_OTP'; }
+        codes.delete(`${type}:${email}`);
+        return '';
+      };
+      if (path === 'email-otp/send-verification-otp' || path === 'forget-password/email-otp') {
+        const user = byEmail(body.email);
+        if (user) issue(path === 'forget-password/email-otp' ? 'forget-password' : String(body.type ?? 'email-verification'), user.email);
+        return send(200, { success: true });
+      }
+      if (path === 'email-otp/verify-email') {
+        const user = byEmail(body.email);
+        const problem = user ? consume('email-verification', user.email, String(body.otp)) : 'INVALID_OTP';
+        if (problem) return fail(problem === 'TOO_MANY_ATTEMPTS' ? 403 : 400, problem);
+        user!.emailVerified = true;
+        return send(200, { status: true, user: { id: user!.id, email: user!.email, emailVerified: true } });
+      }
+      if (path === 'email-otp/reset-password') {
+        const user = byEmail(body.email);
+        const problem = user ? consume('forget-password', user.email, String(body.otp)) : 'INVALID_OTP';
+        if (problem) return fail(problem === 'TOO_MANY_ATTEMPTS' ? 403 : 400, problem);
+        user!.password = String(body.password);
+        if (otpSettings.revokeOnReset) for (const [token, session] of sessions) if (session.userId === user!.id) sessions.delete(token);
+        return send(200, { success: true });
       }
       if (path === 'sign-in/social' || path === 'link-social') {
         const current = sessionUser(request);
@@ -145,5 +183,7 @@ export function startMockNeonAuth(port: number) {
     users.delete(userId);
     for (const [token, session] of sessions) if (session.userId === userId) sessions.delete(token);
   };
-  return { server, users, sessions, google, legacy, log, adminDelete, baseUrl: `${origin}${base}`, origin, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
+  return { server, users, sessions, google, legacy, log, adminDelete, codes, outbox, otpSettings,
+    /** The last code mailed to an address. */
+    lastCode: (email: string, type = 'email-verification') => [...outbox].reverse().find((m) => m.email === email && m.type === type)?.otp ?? '', baseUrl: `${origin}${base}`, origin, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
 }
