@@ -36,7 +36,7 @@ Pro Welt 89 Clubs, 15 Ligen. Fiktiv und zu ersetzen:
 |---|---|---|---|
 | Bern | 0 | 0 fiktiv, 42 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil, Goldstern, Orpund Safnern, Ittigen ersetzt, siehe unten) | 0 |
 | Zürich | 0 | 39 fiktiv, 3 echt (FC Oerlikon/Polizei ZH, FC Seefeld ZH, FC Wiedikon ZH) | 39 |
-| Basel | 0 | 37 fiktiv, 5 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach, FC Black Stars, SV Muttenz) | 37 |
+| Basel | 0 | 36 fiktiv, 6 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach, FC Black Stars, SV Muttenz, FC Allschwil) | 36 |
 | Genève | 0 | 39 fiktiv, 3 echt (Signal FC Bernex-Confignon, Meyrin FC, Lancy FC) | 39 |
 
 **Gemeinsame Plätze (wirken in allen vier Welten, deshalb zuerst):** ~~`extra-4-fc-alpenfestung`~~ (ersetzt durch Yverdon Sport FC), ~~`extra-5-fc-gotthard-murmeltiere`~~ (ersetzt durch FC Wil 1900), ~~`extra-6-fc-l-man-mouettes`~~ (ersetzt durch FC Rapperswil-Jona), ~~`extra-7-fc-z-risee-b-tler`~~ (ersetzt durch FC Locarno). Ihre Spielorte sind geliehene geprüfte Plätze anderer Clubs der Liga.
@@ -287,3 +287,18 @@ FVRZ Heimspiele der ersten Mannschaft 163483 und 163522 auf Heuried. Die [Stadt 
 | Parkplatz | OSM way 505081213, `access=yes`, `fee=yes`, 214 m vom Feld (die Stadt nennt kostenpflichtige öffentliche Parkplätze). Die Route endet im Parkplatz bei 47.365132, 8.501444, erreicht über die Paul-Clairmont-Strasse (`residential`, 30 km/h, `motor_vehicle=destination`: nur Zufahrt zum Ziel, was die Anreise zur Anlage ist) und eine Zufahrt ohne Einschränkung. Route 7,7 km, 13 Minuten |
 
 Eine neue Route im Cache, alle anderen unverändert. Der Club hat keine erreichbare eigene Seite; Quelle im Katalog ist die Seite der Stadt, die Spielnummern stammen aus dem Notion Hinweis (FVRZ). FC Altstetten bleibt zurückgestellt, bis die genaue Platznummer des ersten Teams belegt ist.
+
+## FC Allschwil (Basel, Liga 14, `bs-2-1`)
+
+FVNWS belegt die Meisterschaftsspiele 110808 und 110795 der ersten Mannschaft auf Im Brüel, Feld 1; das [Anlagenverzeichnis](https://matchcenter.fvnws.ch/default.aspx?a=sa&lng=1&oid=8&sa=696821&v=483) führt das Hauptfeld als Naturrasen 105 × 68 m, die kleinere Kunstrasenfläche 2 getrennt. Die Vereinsseite [fcallschwil.ch](https://www.fcallschwil.ch/) nennt die «Sportanlage im Brüel». Der frühere Hinweis in `docs/home-cities-data.md` (Hauspunkt Hegenheimermattweg 132 beim Restaurant, kein Feld bestätigt) ist damit überholt. Duplikat: «FC Allschwil» kommt in keiner Welt vor. Der Slot `bs-2-1` (nächstes Distanzprofil, 6,11 km vom Basler Heimpunkt) verliert den fiktiven «Sporting Dreiländereck» (Sportplatz am Rhein), der Name bleibt als Alias erreichbar.
+
+| | Beleg |
+|---|---|
+| Feld | OSM way 503051595, Rasen, beleuchtet, 6747 m², kartiert 104 × 67 m, Mittelpunkt 47.55652, 7.54764. Das ist 1 m weniger als das offizielle Mass (die Karte enthält keinen Auslauf). Die anderen Rasenfelder der Anlage passen nicht: 102 × 69 m (way 503051598, zu kurz), 106 × 61 m (way 503051599, zu schmal), 96 × 63 m (way 503051596, kleiner; wohl die Fläche 2). Eindeutig ist die Zuordnung nur über diese Masse, nicht über eine Platzbezeichnung in OSM |
+| Anreise | Die Route endet auf dem Grabenmattweg (OSM way 30080971, `residential`, `access=permissive`, `motor_vehicle=destination`: Zufahrt zum Ziel), 72 m vom Feld, bei 47.555876, 7.54751. Route 8,1 km, 13 Minuten. Der Parkplatz am Hegenheimermattweg (way 503051581, `access=yes`, `fee=no`) liegt 324 m vom Feld und wurde nicht gewählt |
+
+Eine neue Route im Cache, die anderen blieben unverändert.
+
+## FC Vernier (Genève): zurückgestellt
+
+ACGF belegt die erste Mannschaft in den Spielen 108678 und 108691 auf Hauptfeld A (Kunstrasen); die Anlage nennt 100 × 64 m, Avenue Louis-Pictet 17 (swisstopo: 46.21907, 6.08513). In OSM liegen im Centre sportif de Vernier aber zwei Vollfelder fast gleicher Grösse nebeneinander: way 87345719 (106 × 70 m, 75 m von der Adresse) und way 83048664 (106 × 71 m, 160 m von der Adresse), dazu way 87345848 (125 × 71 m); keines trägt einen Belag oder eine Platzbezeichnung. Eine eindeutige Zuordnung von Hauptfeld A ist damit nicht möglich. **Freigabe:** Plan der Anlage mit Platznummern oder der Belag (Kunstrasen) der beiden Felder. Es gab keinen Duplikat: «FC Vernier» fehlt in allen Welten.

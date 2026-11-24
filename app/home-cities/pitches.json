@@ -707,15 +707,30 @@
     "2": [
      {
       "ground": {
-       "name": "Sportplatz am Rhein",
-       "osm": "way/620784479",
-       "lat": 47.54068,
-       "lon": 7.72066,
-       "municipality": "Kaiseraugst",
-       "canton": "AG",
+       "name": "Sportplatz im Brüel",
+       "osm": "way/503051595",
+       "lat": 47.55652,
+       "lon": 7.54764,
+       "municipality": "Allschwil",
+       "canton": "BL",
        "kind": "pitch"
       },
-      "distanceKm": 7.45
+      "distanceKm": 6.11,
+      "real": {
+       "name": "FC Allschwil",
+       "source": "https://www.fcallschwil.ch/",
+       "quote": "Sportanlage im Brüel (Vereinsseite); erste Mannschaft: Meisterschaftsspiele 110808 und 110795 auf Im Brüel, Feld 1, Naturrasen 105 x 68 m (FVNWS)",
+       "place": "https://matchcenter.fvnws.ch/default.aspx?a=sa&lng=1&oid=8&sa=696821&v=483",
+       "replaces": {
+        "name": "Sportplatz am Rhein",
+        "osm": "way/620784479",
+        "lat": 47.54068,
+        "lon": 7.72066,
+        "municipality": "Kaiseraugst",
+        "canton": "AG",
+        "kind": "pitch"
+       }
+      }
      },
      {
       "ground": {
