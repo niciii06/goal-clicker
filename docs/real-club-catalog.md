@@ -37,7 +37,7 @@ Pro Welt 89 Clubs, 15 Ligen. Fiktiv und zu ersetzen:
 | Bern | 0 | 0 fiktiv, 42 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil, Goldstern, Orpund Safnern, Ittigen ersetzt, siehe unten) | 0 |
 | Zürich | 0 | 39 fiktiv, 3 echt (FC Oerlikon/Polizei ZH, FC Seefeld ZH, FC Wiedikon ZH) | 39 |
 | Basel | 0 | 36 fiktiv, 6 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach, FC Black Stars, SV Muttenz, FC Allschwil) | 36 |
-| Genève | 0 | 38 fiktiv, 4 echt (Signal FC Bernex-Confignon, Meyrin FC, Lancy FC, FC Vernier) | 38 |
+| Genève | 0 | 37 fiktiv, 5 echt (Signal FC Bernex-Confignon, Meyrin FC, Lancy FC, FC Vernier, FC Veyrier Sports) | 37 |
 
 **Gemeinsame Plätze (wirken in allen vier Welten, deshalb zuerst):** ~~`extra-4-fc-alpenfestung`~~ (ersetzt durch Yverdon Sport FC), ~~`extra-5-fc-gotthard-murmeltiere`~~ (ersetzt durch FC Wil 1900), ~~`extra-6-fc-l-man-mouettes`~~ (ersetzt durch FC Rapperswil-Jona), ~~`extra-7-fc-z-risee-b-tler`~~ (ersetzt durch FC Locarno). Ihre Spielorte sind geliehene geprüfte Plätze anderer Clubs der Liga.
 
@@ -312,3 +312,15 @@ ACGF belegt die erste Mannschaft in den Spielen 108678 und 108691 auf Hauptfeld 
 | Anreise | Die Strasse zur Adresse führt über Servicewege ohne öffentliche Angabe, deshalb endet die Route auf dem Chemin de Morglas (OSM way 27461834, `unclassified`, 50 km/h, keine Zugangsbeschränkung) bei 46.220044, 6.081715, 76 m vom Marker. Route 9,3 km, 16 Minuten |
 
 Der Slot `ge-5-3` (7,17 km vom Genfer Heimpunkt) verliert den fiktiven «FC Jura Vaudois»; er stand schon im selben Sportzentrum (alter Marker 70 m entfernt), der Name bleibt als Alias erreichbar. Duplikat: «FC Vernier» fehlt in allen Welten. Eine neue Route im Cache.
+
+## FC Veyrier Sports (Genève, Liga 14, `ge-2-2`)
+
+ACGF belegt die erste Mannschaft in den Spielen 108625 und 108681 auf Veyrier-Village, Feld A; das einzige Feld der Anlage ist ein Naturrasen von 100 × 64 m am Chemin des Rasses (Angaben aus dem Notion Beleg, die ACGF Seiten selbst sind von hier nicht abrufbar). Duplikat: «FC Veyrier Sports» kommt in keiner Welt vor.
+
+| | Beleg |
+|---|---|
+| Feld | OSM way 133087559, 100 × 65 m (6478 m²), Mittelpunkt 46.16663, 6.17965, innerhalb des Sportzentrums way 38346111 (105 × 70 m). Es ist das einzige Spielfeld der Anlage; das 1 m breitere Mass ist die Karte, nicht ein zweites Feld |
+| Widerspruch | Ein Verzeichnis eines Dritten (sporteden.com) nennt für Veyrier Sports das Stade du Grand-Donzel (Chemin des Sylvains 20, Vessy), das rund 1,1 km entfernt zwei grössere Felder hat (114 × 74 und 106 × 70 m). Die Verbandsangabe (ACGF, Spielort Veyrier-Village, 100 × 64 m am Chemin des Rasses) passt zur Grösse des Rasses Feldes und hat Vorrang; das Verzeichnis wird nicht verwendet |
+| Anreise | Die Route endet auf dem Chemin des Rasses (OSM way 26300046, `residential`, 30 km/h, keine Zugangsbeschränkung) bei 46.166198, 6.179552, 55 m vom Feld. Route 4,3 km, 8 Minuten. P+R de l'Uche (`access=yes`) liegt 260 m weiter nordöstlich |
+
+Der Slot `ge-2-2` (2,36 km, nächstes Distanzprofil) verliert den fiktiven «FC Plainpalais Puces» (Centre sportif de Sous-Moulin); der Name bleibt als Alias erreichbar. Quelle im Katalog ist das ACGF Matchcenter (ohne Einzellink, die Spielnummern stehen im Zitat). Eine neue Route im Cache.

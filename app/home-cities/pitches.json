@@ -1402,15 +1402,29 @@
      },
      {
       "ground": {
-       "name": "Centre sportif de Sous-Moulin",
-       "osm": "way/134279144",
-       "lat": 46.18919,
-       "lon": 6.19293,
-       "municipality": "Thônex",
+       "name": "Veyrier-Village, Terrain A",
+       "osm": "way/133087559",
+       "lat": 46.16663,
+       "lon": 6.17965,
+       "municipality": "Veyrier",
        "canton": "GE",
-       "kind": "sports_centre"
+       "kind": "pitch"
       },
-      "distanceKm": 2.94
+      "distanceKm": 2.36,
+      "real": {
+       "name": "FC Veyrier Sports",
+       "source": "https://matchcenter.acgf.ch/",
+       "quote": "FC Veyrier Sports, 1. Mannschaft: Spiele 108625 und 108681 auf Veyrier-Village, Terrain A; einziges Naturrasenfeld der Anlage am Chemin des Rasses, 100 x 64 m (ACGF)",
+       "replaces": {
+        "name": "Centre sportif de Sous-Moulin",
+        "osm": "way/134279144",
+        "lat": 46.18919,
+        "lon": 6.19293,
+        "municipality": "Thônex",
+        "canton": "GE",
+        "kind": "sports_centre"
+       }
+      }
      },
      {
       "ground": {
