@@ -613,3 +613,31 @@ test("Lengg R1, Buschweilerhof and Marignac Terrain 1: the points lie inside the
   assert.equal(HOME_CITIES.basel.regionalClubs.find((c) => c.id === "bs-7-1")!.venue.coordinateSource, "https://www.openstreetmap.org/way/39976253");
   assert.equal(HOME_CITIES.geneve.regionalClubs.find((c) => c.id === "ge-2-1")!.venue.coordinateSource, "https://www.openstreetmap.org/way/49722965");
 });
+
+// ---- CS Chênois (already a real club of Liga 6 in all four worlds): its ground was only the municipality centre. ACGF stadium entry
+// (dev-matchcenter.acgf.ch, sa=628516): Stade des Trois-Chêne, main field A natural grass 105 x 68 m, Route de Sous-Moulin 22; direct vehicle
+// access is blocked by construction, the P+R Sous-Moulin is recommended. The journey therefore ends at the P+R and walks to the field.
+const CHENOIS_PITCH: [number, number][] = [[46.1912763, 6.1911046], [46.1918777, 6.1915538], [46.1923464, 6.190243], [46.1917447, 6.1897955]];
+test("CS Chênois: stable id, official name, the point lies in main field A (105 x 68 m plus run-off), the road ends at the public P+R Sous-Moulin", () => {
+  for (const city of HOME_CITY_IDS) {
+    const club = worldCatalog(city).find((item) => item.id === "cs-chenois")!;
+    assert.equal(club.name, "CS Chênois");
+    assert.equal(club.league, 6);
+    assert.equal(worldCatalog(city).filter((item) => item.name === "CS Chênois").length, 1);
+    assert.equal(club.venue.verification, "stadium");
+    assert.equal(club.venue.address, "Route de Sous-Moulin 22");
+  }
+  const venue = worldCatalog("bern").find((item) => item.id === "cs-chenois")!.venue;
+  assert.equal(venue.coordinateSource, "https://www.openstreetmap.org/way/132470618");
+  assert.ok(inPolygon(venue.lat, venue.lon, CHENOIS_PITCH), "inside the pitch polygon");
+  const best = minRectangle(CHENOIS_PITCH);
+  assert.ok(best.length >= 105 && best.length <= 118 && best.width >= 68 && best.width <= 78, `${best.length.toFixed(1)} x ${best.width.toFixed(1)}`);
+  // The other mapped pitches of the site are too short for 105 x 68 m (99 x 66, 106 x 65 m).
+  assert.ok(metresBetween([venue.lat, venue.lon], [46.19226, 6.19159]) < 120, "Route de Sous-Moulin 22 (swisstopo) is next to the pitch");
+  const route = (routes as Record<string, { points: { lat: number; lon: number }[]; geometry: string }>)[`bus:46.94689,7.39373:${venue.lat.toFixed(5)},${venue.lon.toFixed(5)}`];
+  assert.ok(route && route.geometry === "road", "cached road route from Bern");
+  assert.deepEqual(route.points.at(-1), { lat: venue.lat, lon: venue.lon });
+  const end = route.points.at(-2)!;
+  assert.ok(metresBetween([end.lat, end.lon], [46.190308, 6.192606]) < 40, "the road ends at the P+R Sous-Moulin (OSM way 35514353)");
+  assert.ok(metresBetween([end.lat, end.lon], [venue.lat, venue.lon]) > 150, "not at the blocked direct access");
+});

@@ -581,7 +581,19 @@
     },
     {
       "club": "CS Chênois",
-      "error": "HTTP Error 509: Unknown Error"
+      "venueId": "venue-cs-chenois",
+      "oldLat": 46.19952,
+      "oldLon": 6.199239,
+      "lat": 46.191811,
+      "lon": 6.190674,
+      "distanceMetres": 1082,
+      "osmWay": "132470618",
+      "osmName": "",
+      "registeredStadium": "Stade des Trois-Chêne",
+      "status": "official-ground-match",
+      "source": "https://www.openstreetmap.org/way/132470618",
+      "verifiedAt": "2026-11-24",
+      "pitchAreaSquareMetres": 8562
     },
     {
       "club": "FC La Chaux-de-Fonds",

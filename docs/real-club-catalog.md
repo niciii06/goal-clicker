@@ -252,3 +252,15 @@ Geprüft nach dem Notion Hinweis vom 23.11. auf Stand `8bea2d7`. Keiner der drei
 | FC Altstetten | **Zurückgestellt, Feld nicht eindeutig** | Das Sportzentrum Buchlern hat laut [Sportamt Zürich](https://www.stadt-zuerich.ch/de/stadtleben/sport-und-erholung/sport-und-badeanlagen/rasensportanlagen/buchlern.html) elf Plätze, darunter mehrere Naturrasen der Grössen 100 × 64 m (R4, R10), 104 × 66 m (R9, 1. Liga) und 100 × 59 m (R8). Die Platznummer des Heimspiels 164081 ist vor Ort variabel, ohne Zusatzbeleg lässt sich kein Feldpolygon zuordnen. Öffentliche Parkplätze (kostenpflichtig) sind vorhanden |
 
 **Was zur Freigabe fehlt:** Muttenz: offizielle Grösse und Belag von Margelacker Feld 1 (FVNWS Anlagenverzeichnis oder Gemeindeplan), danach way 946997664 oder 113617204 wählen; der Strassenendpunkt wäre der öffentliche Parkplatz Margelacker (OSM way 216256986). Altstetten: die Platznummer des Heimspiels (Verband oder Vereinsseite).
+
+## CS Chênois: Platz und Anreise nachgeführt (Liga 6, alle vier Welten)
+
+Der Club war schon vertreten, sein Platz aber nur die Gemeindemitte von Chêne-Bourg (Näherung, die Prüfung in `app/stadium-audit.json` war mit HTTP 509 gescheitert). Nach dem amtlichen ACGF Eintrag ([Stade des Trois-Chêne](https://dev-matchcenter.acgf.ch/Default.aspx?a=sa&lng=2&oid=14&sa=628516&v=829)): Hauptfeld A Naturrasen 105 × 68 m, Route de Sous-Moulin 22, direkte Zufahrt wegen Bauarbeiten gesperrt, empfohlen wird der P+R Sous-Moulin.
+
+| | Beleg |
+|---|---|
+| Feld | OSM way 132470618, 114 × 75 m (105 × 68 m plus Auslauf), 8562 m², Mittelpunkt 46.191811, 6.190674. Die anderen Felder der Anlage sind kürzer (way 132470606: 99 × 66 m, way 132470670: 106 × 65 m, schmaler als 68 m) |
+| Anschrift | swisstopo Route de Sous-Moulin 22 bei 46.19226, 6.19159, 86 m vom Feld; Gebäude «Stade des Trois-Chêne» 40 m vom Feld |
+| Anreise | Route endet am öffentlichen P+R Sous-Moulin (OSM way 35514353, `access=yes`, mehrstöckig), konkret auf der Route Blanche (`primary`) am Eingang, 9 m von der Strasse, ca. 220 m vom Feld. Bern bis Stade: 156,3 km, 113 Minuten; letzte Strecke ab Genève Cornavin 5,6 km, 10 Minuten |
+
+Nur zwei neue Routeneinträge, die alten Routen zur früheren Gemeindemitte bleiben ungenutzt im Cache. ID `cs-chenois`, Name und Liga sind unverändert. Wichtig für Muttenz und Altstetten: Eine Freigabe verlangt den genauen Spielfeldnachweis; die Stadt Zürich nennt auf Buchlern mehrere für die 1. und 2. Liga taugliche Felder.
