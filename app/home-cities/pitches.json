@@ -1642,15 +1642,30 @@
      },
      {
       "ground": {
-       "name": "Centre sportif de Vernier",
-       "osm": "way/87345756",
-       "lat": 46.21933,
-       "lon": 6.08334,
+       "name": "Centre sportif de Vernier, Terrain A",
+       "osm": "way/87345848",
+       "lat": 46.21964,
+       "lon": 6.08251,
        "municipality": "Vernier",
        "canton": "GE",
-       "kind": "sports_centre"
+       "kind": "pitch"
       },
-      "distanceKm": 7.1
+      "distanceKm": 7.17,
+      "real": {
+       "name": "FC Vernier",
+       "source": "https://matchcenter.acgf.ch/default.aspx?lng=2&oid=14&tg=4319042&v=886",
+       "quote": "FC Vernier, 1. Mannschaft: Spiele 108678 und 108691 auf Hauptfeld A, Kunstrasen 100 x 64 m, Avenue Louis-Pictet 17 (ACGF); Terrain A: gazon synthétique 100 x 64 m plus aire d'entraînement 25 x 64 m (SABERT, Ville de Vernier)",
+       "place": "https://www.sabert.ch/wp-content/uploads/2023/08/3371-Vernier-Transformation-Terrain-A-site-ok.pdf",
+       "replaces": {
+        "name": "Centre sportif de Vernier",
+        "osm": "way/87345756",
+        "lat": 46.21933,
+        "lon": 6.08334,
+        "municipality": "Vernier",
+        "canton": "GE",
+        "kind": "sports_centre"
+       }
+      }
      },
      {
       "ground": {

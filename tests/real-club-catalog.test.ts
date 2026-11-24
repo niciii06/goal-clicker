@@ -45,7 +45,7 @@ const BACKLOG: Record<string, Record<number, number>> = {
   bern: {},
   zurich: { 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 4, 14: 5 },
   basel: { 8: 5, 9: 4, 10: 6, 11: 6, 12: 5, 13: 6, 14: 4 },
-  geneve: { 8: 6, 9: 5, 10: 6, 11: 6, 12: 5, 13: 6, 14: 5 },
+  geneve: { 8: 6, 9: 5, 10: 6, 11: 5, 12: 5, 13: 6, 14: 5 },
 };
 test("fictional clubs outside Liga 15 are only the documented backlog, and the world league is not part of it", () => {
   for (const city of HOME_CITY_IDS) {
@@ -562,12 +562,17 @@ const HEURIED_PITCH: [number, number][] = [[47.3660113, 8.5030756], [47.3669721,
 // FC Allschwil (Basel, Liga 14): FVNWS first-team games 110808 and 110795 on Im Brüel, field 1; facility entry: natural grass main pitch 105 x 68 m (field 2, artificial turf, is smaller).
 // Mapped grass pitches at Im Brüel: 104 x 67 (way 503051595), 102 x 69, 106 x 61 and 96 x 63 m; only the first is within 1 m of 105 x 68 m. The mapped size is the official one minus 1 m: no run-off included.
 const BRUEEL_PITCH: [number, number][] = [[47.5568245, 7.5468779], [47.5572203, 7.5475486], [47.5565099, 7.5484471], [47.5562109, 7.5479507], [47.5562525, 7.5478622], [47.5561801, 7.5477308], [47.556318, 7.5475496], [47.5566228, 7.5471438]];
+// FC Vernier (Genève, Liga 11): ACGF first-team games 108678 and 108691 on main field A (artificial turf, 100 x 64 m, Avenue Louis-Pictet 17). SABERT (project engineer of the City of Vernier,
+// file 3371): Terrain A converted in 2017 to synthetic turf 100 x 64 m plus a practice area 25 x 64 m. The only mapped pitch of that length is OSM way 87345848 (125 x 70.5 m, mapped from 2011 orthophotos);
+// the swissimage orthophoto shows the painted match pitch at its south end and the practice area (small goals, penalty box) contiguous at the other end. The marker is the centre circle of the match pitch.
+const VERNIER_AREA: [number, number][] = [[46.219475, 6.081697], [46.2190563, 6.0823839], [46.2199, 6.0834582], [46.2203187, 6.0827713]];
 const REGIONAL_REPLACED = [
   { city: "zurich", id: "zh-3-6", name: "FC Seefeld ZH", league: 13, oldName: "Sporting Seebach Frösche", polygon: LENGG_PITCH, length: [105, 115], width: [66, 75], end: [47.348989, 8.570622], endMetres: 60 },
   { city: "basel", id: "bs-7-1", name: "FC Black Stars", league: 9, oldName: "Inter Gondel Reigoldswil", polygon: BUSCHWEILER_PITCH, length: [100, 112], width: [64, 74], end: [47.559355, 7.563063], endMetres: 60 },
   { city: "basel", id: "bs-7-2", name: "SV Muttenz", league: 9, oldName: "Real Homburg", polygon: MARGELACKER_PITCH, length: [99, 104], width: [63, 67], end: [47.529627, 7.631809], endMetres: 100 },
   { city: "zurich", id: "zh-3-3", name: "FC Wiedikon ZH", league: 13, oldName: "SV Hönggerberg Igel", polygon: HEURIED_PITCH, length: [105, 112], width: [66, 74], end: [47.365132, 8.501444], endMetres: 260 },
   { city: "basel", id: "bs-2-1", name: "FC Allschwil", league: 14, oldName: "Sporting Dreiländereck", polygon: BRUEEL_PITCH, length: [103, 108], width: [66, 70], end: [47.5558757, 7.5475097], endMetres: 100 },
+  { city: "geneve", id: "ge-5-3", name: "FC Vernier", league: 11, oldName: "FC Jura Vaudois", polygon: VERNIER_AREA, length: [123, 128], width: [69, 73], end: [46.220044, 6.081715], endMetres: 100 },
   { city: "geneve", id: "ge-2-1", name: "Lancy FC", league: 14, oldName: "Athletic Cornavin Express", polygon: MARIGNAC_PITCH, length: [99, 104], width: [63, 67], end: [46.17769, 6.123535], endMetres: 170 },
 ] as const;
 
@@ -589,7 +594,8 @@ test("Seefeld ZH, Black Stars and Lancy FC are real clubs in their slots with th
     assert.notEqual(old.id, undefined);
     // Black Stars take over the very ground the old fictional club already used; the other two moved to the real home pitch.
     const moved = metresBetween([old.lat, old.lon], [club.venue.lat, club.venue.lon]);
-    assert.ok(item.id === "bs-7-1" ? moved < 1 : moved > 500, `${item.oldName} keeps its old ground`);
+    // Black Stars take over the very ground the old fictional club already used, FC Vernier the same sports centre (about 70 m away).
+    assert.ok(item.id === "bs-7-1" ? moved < 1 : item.id === "ge-5-3" ? moved < 150 : moved > 500, `${item.oldName} keeps its old ground`);
   }
   // Names of the remaining fictional clubs did not move when a slot became real.
   const names = (city: Parameters<typeof worldCatalog>[0], ids: string[]) => ids.map((id) => worldCatalog(city).find((c) => c.id === id)!.name);
@@ -625,6 +631,17 @@ test("Lengg R1, Buschweilerhof and Marignac Terrain 1: the points lie inside the
   assert.equal(HOME_CITIES.basel.regionalClubs.find((c) => c.id === "bs-7-1")!.venue.coordinateSource, "https://www.openstreetmap.org/way/39976253");
   assert.equal(HOME_CITIES.geneve.regionalClubs.find((c) => c.id === "ge-2-1")!.venue.coordinateSource, "https://www.openstreetmap.org/way/49722965");
   assert.equal(HOME_CITIES.zurich.regionalClubs.find((c) => c.id === "zh-3-3")!.venue.coordinateSource, "https://www.openstreetmap.org/way/34945595");
+  assert.equal(HOME_CITIES.geneve.regionalClubs.find((c) => c.id === "ge-5-3")!.venue.coordinateSource, "https://www.openstreetmap.org/way/87345848");
+  // The 100 x 64 m match area around the marker lies inside the mapped area, along its long axis, and the rest is the practice area (25 m minus the run-off).
+  {
+    const venue = HOME_CITIES.geneve.regionalClubs.find((c) => c.id === "ge-5-3")!.venue, m = METRES(venue.lat);
+    const [b, c] = [VERNIER_AREA[1], VERNIER_AREA[2]];
+    const axis = { x: (c[1] - b[1]) * m.x, y: (c[0] - b[0]) * m.y }, length = Math.hypot(axis.x, axis.y), u = { x: axis.x / length, y: axis.y / length }, v = { x: -u.y, y: u.x };
+    const corners: [number, number][] = [[-50, -32], [-50, 32], [50, 32], [50, -32]].map(([along, across]) => [venue.lat + (u.y * along + v.y * across) / m.y, venue.lon + (u.x * along + v.x * across) / m.x]);
+    assert.ok(corners.every(([lat, lon]) => inPolygon(lat, lon, VERNIER_AREA)), "the 100 x 64 m match area lies inside the mapped area");
+    const toEnd = (VERNIER_AREA[2][1] - venue.lon) * m.x * u.x + (VERNIER_AREA[2][0] - venue.lat) * m.y * u.y;
+    assert.ok(toEnd - 50 > 10 && toEnd - 50 < 30, `${(toEnd - 50).toFixed(1)} m of practice area behind the match area`);
+  }
   assert.equal(HOME_CITIES.basel.regionalClubs.find((c) => c.id === "bs-2-1")!.venue.coordinateSource, "https://www.openstreetmap.org/way/503051595");
   assert.equal(HOME_CITIES.basel.regionalClubs.find((c) => c.id === "bs-7-2")!.venue.coordinateSource, "https://www.openstreetmap.org/way/946997664");
 });

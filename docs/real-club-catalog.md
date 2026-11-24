@@ -37,7 +37,7 @@ Pro Welt 89 Clubs, 15 Ligen. Fiktiv und zu ersetzen:
 | Bern | 0 | 0 fiktiv, 42 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil, Goldstern, Orpund Safnern, Ittigen ersetzt, siehe unten) | 0 |
 | Zürich | 0 | 39 fiktiv, 3 echt (FC Oerlikon/Polizei ZH, FC Seefeld ZH, FC Wiedikon ZH) | 39 |
 | Basel | 0 | 36 fiktiv, 6 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach, FC Black Stars, SV Muttenz, FC Allschwil) | 36 |
-| Genève | 0 | 39 fiktiv, 3 echt (Signal FC Bernex-Confignon, Meyrin FC, Lancy FC) | 39 |
+| Genève | 0 | 38 fiktiv, 4 echt (Signal FC Bernex-Confignon, Meyrin FC, Lancy FC, FC Vernier) | 38 |
 
 **Gemeinsame Plätze (wirken in allen vier Welten, deshalb zuerst):** ~~`extra-4-fc-alpenfestung`~~ (ersetzt durch Yverdon Sport FC), ~~`extra-5-fc-gotthard-murmeltiere`~~ (ersetzt durch FC Wil 1900), ~~`extra-6-fc-l-man-mouettes`~~ (ersetzt durch FC Rapperswil-Jona), ~~`extra-7-fc-z-risee-b-tler`~~ (ersetzt durch FC Locarno). Ihre Spielorte sind geliehene geprüfte Plätze anderer Clubs der Liga.
 
@@ -299,6 +299,16 @@ FVNWS belegt die Meisterschaftsspiele 110808 und 110795 der ersten Mannschaft au
 
 Eine neue Route im Cache, die anderen blieben unverändert.
 
-## FC Vernier (Genève): zurückgestellt
+## FC Vernier (Genève, Liga 11, `ge-5-3`)
 
-ACGF belegt die erste Mannschaft in den Spielen 108678 und 108691 auf Hauptfeld A (Kunstrasen); die Anlage nennt 100 × 64 m, Avenue Louis-Pictet 17 (swisstopo: 46.21907, 6.08513). In OSM liegen im Centre sportif de Vernier aber zwei Vollfelder fast gleicher Grösse nebeneinander: way 87345719 (106 × 70 m, 75 m von der Adresse) und way 83048664 (106 × 71 m, 160 m von der Adresse), dazu way 87345848 (125 × 71 m); keines trägt einen Belag oder eine Platzbezeichnung. Eine eindeutige Zuordnung von Hauptfeld A ist damit nicht möglich. **Freigabe:** Plan der Anlage mit Platznummern oder der Belag (Kunstrasen) der beiden Felder. Es gab keinen Duplikat: «FC Vernier» fehlt in allen Welten.
+ACGF belegt die erste Mannschaft in den Spielen 108678 und 108691 auf Hauptfeld A, Kunstrasen 100 × 64 m, Avenue Louis-Pictet 17 ([Spiel](https://matchcenter.acgf.ch/default.aspx?lng=2&oid=14&tg=4319042&v=886), [Anlage](https://matchcenter.acgf.ch/Default.aspx?a=sa&lng=2&oid=14&sa=599480&v=512919)). Der frühere Stand («zurückgestellt», `cfa40ac`) fand im Centre sportif zwei fast gleich grosse Vollfelder (106 × 70 und 106 × 71 m) und verwarf das 125 × 71 m Polygon. Das war falsch gewichtet: der Projektingenieur der Stadt, [SABERT SA, Dossier 3371](https://www.sabert.ch/wp-content/uploads/2023/08/3371-Vernier-Transformation-Terrain-A-site-ok.pdf) (Bauherrin Ville de Vernier, Projekt 2017), nennt für das Terrain A «gazon synthétique (100 × 64 m) sur un terrain en gazon naturel» und «une aire d'entraînement (25 × 64 m)». Das Terrain A ist also **ein** zusammenhängendes Kunstrasenfeld von rund 125 m Länge: Spielfläche plus Trainingsfläche.
+
+| | Beleg |
+|---|---|
+| Polygon | OSM way 87345848, 125,2 × 70,5 m (aus Orthophotos 2011 kartiert, also noch das frühere Naturrasenfeld), die einzige Fläche der Anlage dieser Länge. Die 106 × 70 und 106 × 71 m grossen Felder daneben sind andere Plätze |
+| Orthofoto | swisstopo swissimage (aktuell), Zoom 19 und 20, mit dem OSM Polygon überlagert: auf einem durchgehenden Kunstrasen liegt am südlichen Ende das aufgemalte Spielfeld mit Mittelkreis und Strafraum, am anderen Ende folgen die kleineren Tore und der Strafraum der Trainingsfläche. Die Aufteilung entspricht 100 m plus 25 m |
+| Marker | Mittelpunkt des Mittelkreises, 46.21964, 6.08251. Er liegt 55 m von der südlichen und 70 m von der nördlichen Kante des Polygons; das 100 × 64 m Spielfeld um ihn liegt vollständig im Polygon, hinter ihm bleiben rund 20 m Trainingsfläche (25 m minus Auslauf). Der alte Marker (Mittelpunkt des ganzen Sportzentrums) lag 70 m daneben |
+| Anschrift | swisstopo Avenue Louis-Pictet 17 bei 46.21907, 6.08513, 79 m vom Marker |
+| Anreise | Die Strasse zur Adresse führt über Servicewege ohne öffentliche Angabe, deshalb endet die Route auf dem Chemin de Morglas (OSM way 27461834, `unclassified`, 50 km/h, keine Zugangsbeschränkung) bei 46.220044, 6.081715, 76 m vom Marker. Route 9,3 km, 16 Minuten |
+
+Der Slot `ge-5-3` (7,17 km vom Genfer Heimpunkt) verliert den fiktiven «FC Jura Vaudois»; er stand schon im selben Sportzentrum (alter Marker 70 m entfernt), der Name bleibt als Alias erreichbar. Duplikat: «FC Vernier» fehlt in allen Welten. Eine neue Route im Cache.
