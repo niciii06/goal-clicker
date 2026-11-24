@@ -84,8 +84,9 @@ function finishedMatch(now: number) {
 }
 
 /** `whatsNewSeen: false` leaves the newest release notes unread, so the "Was ist neu" window opens. */
-async function openWithSave(viewport: { width: number; height: number }, saveJson: string, colorScheme: 'light' | 'dark' = 'light', whatsNewSeen = true) {
-  const page = await browser.newPage({ viewport, colorScheme });
+async function openWithSave(viewport: { width: number; height: number }, saveJson: string, colorScheme: 'light' | 'dark' = 'light', whatsNewSeen = true, touch = false) {
+  // `touch` emulates a phone: coarse pointer (media query pointer: coarse) and a mobile viewport.
+  const page = await browser.newPage({ viewport, colorScheme, ...(touch ? { hasTouch: true, isMobile: true } : {}) });
   // tsx keeps function names with a __name helper; functions passed to page.evaluate need it in the browser too.
   await page.addInitScript('globalThis.__name = (fn) => fn;');
   const problems: string[] = [];
@@ -717,4 +718,132 @@ test('the layout checker itself reports overlapping text, unreadable text and ho
   assert.match(found, /low contrast .*Kaum lesbar/);
   assert.match(found, /horizontal overflow/);
   await page.close();
+});
+
+// Touch targets (Apple HIG: controls are at least 44 x 44 pt, CLAUDE.md "Frontend"). The buttons below were 26 to 40 px
+// high on a phone: the coarse pointer rules in base.css lost the cascade to later 40 px rules, and some chips and rows
+// had no rule at all. The test measures real layout on a touch viewport, light and dark, on the screens that show them.
+const TOUCH_SCREENS: { path: string; label: string; features: (now: number) => GameFeatures; selectors: string[] }[] = [
+  { path: '/', label: 'Home', features: richFeatures, selectors: ['.buy-button', '.next-step-chip', '.bulk-options button', '.season-roadmap > summary'] },
+  { path: '/packs', label: 'Packs', features: (now) => { const f = richFeatures(now); f.starXI.fragments = 200000; return f; }, selectors: ['.feature-buy-button'] },
+  { path: '/kader', label: 'Kader', features: richFeatures, selectors: ['.starxi-best-button', '.card-favorite-toggle', '.starxi-filter-row button', '.starxi-pagination button', '.starxi-squad-tools .mode-secondary'] },
+  { path: '/saison', label: 'Saison', features: richFeatures, selectors: ['.season-hub-day-card > summary'] },
+  { path: '/karriere', label: 'Karriere', features: richFeatures, selectors: ['.career-view-switch button'] },
+  { path: '/club', label: 'Club', features: richFeatures, selectors: ['.club-choice-row button'] },
+  { path: '/spiele', label: 'Spiele (Reise)', features: (now) => { const f = richFeatures(now); f.travel.journey = createJourney(fixtureFor(f, 'tournament', 'stadium'), now - 600000, () => 0.5, f); return normalizeGameFeatures(f); }, selectors: ['.travel-map-controls button', '.season-overview > summary'] },
+];
+const SIZE_OF = `(selector) => [...document.querySelectorAll(selector)].filter((e) => { const r = e.getBoundingClientRect(); const s = getComputedStyle(e); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && !e.disabled; }).map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.width * 10) / 10, Math.round(r.height * 10) / 10]; })`;
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`touch targets ${colorScheme}: the buttons of the 44 px patch are at least 44 x 44 on a phone`, async () => {
+    const failures: string[] = [];
+    for (const screen of TOUCH_SCREENS) {
+      const now = Date.now();
+      const { page, problems } = await openWithSave({ width: 390, height: 844 }, save(screen.features(now), now), colorScheme, true, true);
+      await page.goto(BASE + screen.path, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(800);
+      assert.equal(await page.evaluate(() => matchMedia('(pointer: coarse)').matches), true, 'the viewport has a coarse pointer');
+      for (const selector of screen.selectors) {
+        const sizes = (await page.evaluate(`(${SIZE_OF})(${JSON.stringify(selector)})`)) as [number, number][];
+        if (!sizes.length) { failures.push(`${screen.label}: nothing matches ${selector} (the check would be empty)`); continue; }
+        const small = sizes.filter(([w, h]) => w < 44 || h < 44);
+        if (small.length) failures.push(`${screen.label} ${selector}: ${small.length} of ${sizes.length} below 44 px, smallest ${Math.min(...small.map(([w]) => w))} x ${Math.min(...small.map(([, h]) => h))}`);
+      }
+      // The travel screen asks /api/travel, which has no database in this run (503); everything else must be clean.
+      assert.deepEqual(problems.filter((problem) => !problem.includes('/api/travel')), []);
+      await page.close();
+    }
+    assert.deepEqual(failures, []);
+  });
+}
+
+// Automatic audit of every visible button on the covered screens (and one dialog) on a touch phone. A new or changed button
+// that is smaller than 44 x 44 fails here unless it is listed below with a reason. The list is the only place to excuse a button.
+const BUTTON_SELECTOR = 'button, summary, [role="button"], [role="tab"], [role="switch"]';
+const BUTTON_EXCEPTIONS: { selector: string; reason: string }[] = [];
+/** Live match: opens the live tab and one of its views, like the player does. */
+const liveView = (view: string) => async (page: Page) => {
+  assert.ok(await openTab(page, 'Spiele · LIVE'), 'live tab missing');
+  await page.locator('canvas.gc-viewer-pitch').first().waitFor({ timeout: 15000 });
+  await page.getByRole('button', { name: view, exact: true }).first().click();
+  await page.waitForTimeout(600);
+};
+const AUDIT_SCREENS: { path: string; label: string; features: (now: number) => GameFeatures; state?: (page: Page) => Promise<void> }[] = [
+  ...TOUCH_SCREENS.map(({ path, label, features }) => ({ path, label, features })),
+  { path: '/spiele', label: 'Spiele (Auswahl)', features: richFeatures },
+  { path: '/kader', label: 'Kader, Dialog Beste Startelf', features: (now) => { const f = richFeatures(now); f.starXI.lineupIds = [...f.starXI.lineupIds].reverse(); return f; }, state: async (page) => { await page.locator('button.starxi-best-button').click(); await page.getByRole('alertdialog').waitFor(); await page.waitForTimeout(400); } },
+  // The running live match in each of its four views (the fixture of the live match smoke test).
+  ...['2D', 'Live Ticker', 'Statistik', 'Wechsel'].map((view) => ({ path: '/spiele', label: `Live Match, ${view}`, features: liveMatch, state: liveView(view) })),
+  // The away journey after arrival: the map with its controls and the button that starts the match.
+  // After the final whistle: the press conference answers.
+  { path: '/spiele', label: 'Nach dem Spiel, Pressekonferenz', features: finishedMatch, state: async (page) => { await page.locator('.press-conference').waitFor({ timeout: 10000 }); } },
+  { path: '/spiele', label: 'Reise, angekommen', features: (now) => { const f = richFeatures(now); f.travel.journey = createJourney(fixtureFor(f, 'tournament', 'stadium'), now - 3 * 86400000, () => 0.5, f); return normalizeGameFeatures(f); }, state: async (page) => { await page.locator('.travel-start').waitFor({ timeout: 10000 }); } },
+];
+const AUDIT_BUTTONS = `((selector, exceptions) => {
+  const sig = (el) => el.tagName.toLowerCase() + (el.getAttribute('class') || '').split(/\\s+/).filter(Boolean).slice(0, 2).map((name) => '.' + name).join('');
+  const rows = [];
+  for (const el of document.querySelectorAll(selector)) {
+    const r = el.getBoundingClientRect(), s = getComputedStyle(el);
+    if (r.width <= 2 && r.height <= 2) continue; // visually hidden helpers (clipped to one pixel)
+    if (s.visibility === 'hidden' || s.display === 'none' || el.closest('[hidden], [aria-hidden="true"]')) continue;
+    if (exceptions.some((selector) => el.matches(selector))) continue;
+    rows.push({ sig: sig(el), w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10, text: (el.getAttribute('aria-label') || el.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 24) });
+  }
+  return rows;
+})`;
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`touch audit ${colorScheme}: every visible button of the covered screens and one dialog, the live match, the press conference and the arrived journey are at least 44 x 44 on a phone, except the documented ones`, async () => {
+    const failures: string[] = [];
+    let checked = 0;
+    for (const screen of AUDIT_SCREENS) {
+      const now = Date.now();
+      const { page, problems } = await openWithSave({ width: 390, height: 844 }, save(screen.features(now), now), colorScheme, true, true);
+      await page.goto(BASE + screen.path, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(800);
+      if (screen.state) await screen.state(page);
+      assert.equal(await page.evaluate(() => matchMedia('(pointer: coarse)').matches), true, 'the viewport has a coarse pointer');
+      const rows = (await page.evaluate(`${AUDIT_BUTTONS}(${JSON.stringify(BUTTON_SELECTOR)}, ${JSON.stringify(BUTTON_EXCEPTIONS.map((exception) => exception.selector))})`)) as { sig: string; w: number; h: number; text: string }[];
+      assert.ok(rows.length > 3, `${screen.label}: the audit found only ${rows.length} buttons (the check would be empty)`);
+      checked += rows.length; if (process.env.AUDIT_VERBOSE) console.log('AUDIT', screen.label, rows.length, 'buttons, smallest', Math.min(...rows.map((row) => Math.min(row.w, row.h))));
+      const groups = new Map<string, { n: number; w: number; h: number; text: string }>();
+      for (const row of rows) {
+        if (row.w >= 44 && row.h >= 44) continue;
+        const group = groups.get(row.sig) ?? { n: 0, w: 999, h: 999, text: row.text };
+        groups.set(row.sig, { n: group.n + 1, w: Math.min(group.w, row.w), h: Math.min(group.h, row.h), text: group.text });
+      }
+      for (const [sig, group] of groups) failures.push(`${screen.label} ${sig}: ${group.n} below 44 px, smallest ${group.w} x ${group.h} ("${group.text}")`);
+      assert.deepEqual(problems.filter((problem) => !problem.includes('/api/travel')), []);
+      await page.close();
+    }
+    assert.ok(checked > 150, `${checked} buttons audited`);
+    assert.deepEqual(failures, []);
+  });
+}
+
+test('touch targets: with a mouse the compact sizes stay, only a coarse pointer gets the large targets', async () => {
+  const now = Date.now();
+  const { page } = await openWithSave({ width: 1280, height: 900 }, save(richFeatures(now), now));
+  await page.goto(`${BASE}/kader`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(500);
+  assert.equal(await page.evaluate(() => matchMedia('(pointer: coarse)').matches), false);
+  const sizes = (await page.evaluate(`(${SIZE_OF})('.card-favorite-toggle')`)) as [number, number][];
+  assert.ok(sizes.length > 0);
+  assert.ok(sizes.every(([w, h]) => w === 32 && h === 32), 'the favourite star keeps its compact 32 px with a mouse');
+  // Career: with a mouse the statistics pills keep their compact 32 px and the filter reset button gets no 44 px minimum.
+  await page.goto(`${BASE}/karriere`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(500);
+  const pills = (await page.evaluate(`(${SIZE_OF})('.player-stats-heading button')`)) as [number, number][];
+  assert.ok(pills.length === 2, 'the Karriere / Saison pills are found');
+  assert.ok(pills.every(([, h]) => h === 32), `the statistics pills keep their compact 32 px with a mouse (${JSON.stringify(pills)})`);
+  const minimum = (await page.evaluate(`[...document.querySelectorAll('.career-filters button')].map((e) => getComputedStyle(e).minHeight)`)) as string[];
+  assert.ok(minimum.length > 0 && minimum.every((value) => value !== '44px'), `the filter reset button has no 44 px minimum with a mouse (${JSON.stringify(minimum)})`);
+  // The kickoff checklist (here: the open press conference after a match) keeps its 36 px action buttons with a mouse.
+  await page.close();
+  const kickoff = await openWithSave({ width: 1280, height: 900 }, save(finishedMatch(now), now));
+  assert.ok(await openTab(kickoff.page, 'Spiele'), 'games tab missing');
+  await kickoff.page.locator('.kickoff-checklist .mode-secondary').first().waitFor({ timeout: 10000 });
+  const actions = (await kickoff.page.evaluate(`(${SIZE_OF})('.kickoff-checklist .mode-secondary')`)) as [number, number][];
+  assert.ok(actions.length > 0 && actions.every(([, h]) => h === 36), `the kickoff action buttons keep their compact 36 px with a mouse (${JSON.stringify(actions)})`);
+  await kickoff.page.close();
 });
