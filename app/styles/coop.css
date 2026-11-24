@@ -180,8 +180,8 @@
 .mode-primary, .mode-secondary { min-height: var(--tap); padding: 0 var(--space-5); border-radius: var(--radius-pill); font-size: var(--text-subhead); font-weight: 600; }
 .mode-primary { border-color: var(--accent); }
 .mode-primary:hover:not(:disabled) { box-shadow: none; filter: brightness(1.06); transform: none; }
-.mode-secondary { border-color: transparent; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.mode-secondary:hover:not(:disabled) { border-color: transparent; color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.mode-secondary { border-color: transparent; color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.mode-secondary:hover:not(:disabled) { border-color: transparent; color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .mode-secondary.quiet { color: var(--text); background: var(--fill); }
 .mode-primary:disabled, .mode-secondary:disabled { border-color: transparent; color: color-mix(in srgb, var(--text) 40%, transparent); background: var(--fill); }
 .mode-input { min-height: var(--tap); border-color: transparent; border-radius: var(--radius-sm); background: var(--fill); font-size: var(--text-body); }

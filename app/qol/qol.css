@@ -5,7 +5,7 @@
 
 /* Bell with unread count */
 .bell-button { position: relative; }
-.bell-count { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; color: #fff; background: #ff3b30; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center; box-sizing: border-box; }
+.bell-count { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; color: #fff; background: #d70015; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center; box-sizing: border-box; }
 
 .header-prestige-ready { margin-left: 6px; padding: 3px 8px; border: 0; border-radius: 999px; color: var(--surface-raised); background: var(--accent); font-size: var(--text-caption2); font-weight: 800; cursor: pointer; white-space: nowrap; }
 

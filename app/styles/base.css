@@ -12,6 +12,8 @@
   --muted: #5f6b65;
   --accent: #0a7d43;
   --accent-soft: #e5f4ec;
+  /* Accent as text colour on the tinted pills of the header and tab bar: the plain accent reaches only 4.2 to 4.4 to 1 there. */
+  --accent-ink: #086a38;
   --on-accent: #ffffff;
   --gold: #8a6100;
   --score: var(--text);
@@ -126,6 +128,7 @@
     --muted: #93aa9d;
     --accent: #3ddc84;
     --accent-soft: #143826;
+    --accent-ink: #3ddc84;
     --on-accent: #04170d;
     --gold: #ffd60a;
     --score: #ffd60a;
@@ -177,6 +180,7 @@
   --muted: #93aa9d;
   --accent: #3ddc84;
   --accent-soft: #143826;
+  --accent-ink: #3ddc84;
   --on-accent: #04170d;
   --gold: #ffd60a;
   --score: #ffd60a;
@@ -822,7 +826,7 @@ button { font: inherit; }
 .header-goals { position: absolute; top: 50%; left: 50%; display: flex; align-items: baseline; gap: 7px; padding: 8px 14px; border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent); border-radius: 980px; background: color-mix(in srgb, var(--surface-raised) 76%, transparent); box-shadow: 0 6px 20px rgba(29,29,31,.05); transform: translate(-50%, -50%); white-space: nowrap; }
 .header-goals span { color: var(--muted); font-size: var(--text-footnote); font-weight: 800; letter-spacing: .12em; }
 .header-goals strong { color: var(--score); font-size: 18px; font-weight: 760; letter-spacing: -.05em; line-height: 1; }
-.header-goals small { color: var(--accent); font-size: var(--text-footnote); font-weight: 850; letter-spacing: .08em; }
+.header-goals small { color: var(--accent-ink); font-size: var(--text-footnote); font-weight: 850; letter-spacing: .08em; }
 .header-goals.goal-boost-active { border-color: rgba(198,146,20,.38); background: linear-gradient(135deg, color-mix(in srgb, var(--surface-raised) 94%, transparent), color-mix(in srgb, color-mix(in srgb, #e6bf00 21%, var(--surface-raised)) 94%, transparent)); box-shadow: 0 8px 24px rgba(168,119,0,.13), inset 0 1px 0 rgba(255,255,255,.8); }
 .header-goal-boost { display: inline-flex; align-items: center; margin-left: 3px; padding-left: 10px; border-left: 1px solid rgba(148,105,0,.22); color: color-mix(in oklab, #765400, var(--text) var(--tone-mix)); font-size: var(--text-footnote); font-style: normal; font-weight: 900; letter-spacing: .075em; }
 .star-pack-roulette { margin: 28px auto 0; }
@@ -1188,7 +1192,7 @@ button { font: inherit; }
 .section-navigation button { display: inline-flex; min-height: var(--tap); align-items: center; gap: var(--space-2); padding: 0 var(--space-4); border: 0; border-radius: var(--radius-pill); color: var(--soft); cursor: pointer; background: transparent; font: inherit; font-size: var(--text-subhead); font-weight: 600; white-space: nowrap; transition: background 200ms var(--ease), color 200ms var(--ease); }
 .section-navigation button .svg-icon { flex: none; width: 20px; height: 20px; }
 .section-navigation button:hover { color: var(--text); background: var(--fill); }
-.section-navigation button.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.section-navigation button.active { color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 14%, transparent); }
 /* Tutorial: the tab of the current step pulses, the tabs of later steps are dimmed and cannot be opened. */
 .section-navigation button:disabled { opacity: .38; cursor: not-allowed; }
 .section-navigation button.tutorial-focus { position: relative; color: var(--accent); }
@@ -1204,7 +1208,7 @@ button { font: inherit; }
 .section-navigation .tab-icon { position: relative; display: inline-flex; }
 .section-navigation .tab-label-full { display: inline-flex; align-items: center; }
 /* A running match: a LIVE capsule next to the label on wide screens, a badge on the symbol in the phone tab bar. */
-.section-navigation .tab-live-badge { display: inline-flex; align-items: center; margin-left: var(--space-2); padding: 2px 6px; border-radius: 6px; color: #fff; background: #ff3b30; font-size: var(--text-caption2); font-weight: 700; letter-spacing: .04em; line-height: 1.2; }
+.section-navigation .tab-live-badge { display: inline-flex; align-items: center; margin-left: var(--space-2); padding: 2px 6px; border-radius: 6px; color: #fff; background: #d70015; font-size: var(--text-caption2); font-weight: 700; letter-spacing: .04em; line-height: 1.2; }
 .section-navigation .tab-live-dot { display: none; position: absolute; top: -1px; right: -3px; width: 9px; height: 9px; border: 2px solid var(--surface-raised); border-radius: 50%; background: #ff3b30; box-sizing: content-box; }
 .section-navigation .tab-live-dot.offer { background: #e6a800; }
 .section-navigation .tab-label-short { display: none; }
@@ -1422,7 +1426,7 @@ button { font: inherit; }
 @keyframes star-celebrate-clap-right { 0% { transform: rotate(-6deg); } 16% { transform: rotate(24deg) scaleY(.78); } 24%, 40%, 56% { transform: rotate(15deg) scaleY(.78); } 32%, 48%, 64% { transform: rotate(25deg) scaleY(.78); } 80%, 100% { transform: rotate(-6deg); } }
 @keyframes star-celebrate-nod { 0%, 24%, 40%, 56%, 72%, 100% { translate: 0 0; } 32%, 48%, 64% { translate: 0 2px; } }
 /* Prestige: bonus next to the goal counter, reason a running operation blocks it, and the card choice. */
-.header-prestige { display: inline-flex; align-items: center; margin-left: 3px; padding-left: 10px; border-left: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); font-size: var(--text-footnote); font-style: normal; font-weight: 850; letter-spacing: .02em; }
+.header-prestige { display: inline-flex; align-items: center; margin-left: 3px; padding-left: 10px; border-left: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent-ink); font-size: var(--text-footnote); font-style: normal; font-weight: 850; letter-spacing: .02em; }
 @media (max-width: 540px) {
   .header-prestige { padding-left: 7px; }
   .header-prestige-long { display: none; }
