@@ -324,3 +324,15 @@ ACGF belegt die erste Mannschaft in den Spielen 108625 und 108681 auf Veyrier-Vi
 | Anreise | Die Route endet auf dem Chemin des Rasses (OSM way 26300046, `residential`, 30 km/h, keine Zugangsbeschränkung) bei 46.166198, 6.179552, 55 m vom Feld. Route 4,3 km, 8 Minuten. P+R de l'Uche (`access=yes`) liegt 260 m weiter nordöstlich |
 
 Der Slot `ge-2-2` (2,36 km, nächstes Distanzprofil) verliert den fiktiven «FC Plainpalais Puces» (Centre sportif de Sous-Moulin); der Name bleibt als Alias erreichbar. Quelle im Katalog ist das ACGF Matchcenter (ohne Einzellink, die Spielnummern stehen im Zitat). Eine neue Route im Cache.
+
+## SC Binningen (Basel): zurückgestellt, Feld nicht eindeutig
+
+Notion Beleg: Heimspiel 142866 und das Spiel gegen Zwingen auf Spiegelfeld, Feld 1. Duplikat: «SC Binningen» und Spiegelfeld kommen in keiner Welt und nicht in `app/swiss-clubs.json` vor. Die Anlage liegt bei Im Spiegelfeld 1 (swisstopo 47.53609, 7.57088), die Gemeinde Binningen nennt in der [Vorlage zum Kunststoffrasen](https://www.binningen.ch/public/upload/assets/6939/119_Investitionskredit%20Kunststoffrasen%20Spiegelfeld.pdf?fp=1) **zwei** Fussballfelder, ein Naturrasenfeld und ein Kunstrasenfeld (erstellt 2005, Teppich 2020er Jahre ersetzt). Die Gemeinde führt keine Platznummern.
+
+| Befund | Wert |
+|---|---|
+| OSM | nur ein Polygon `way 435937555`, 142 × 104 m, `sport=soccer`, ohne Belag, das beide Felder und den Auslauf zusammenfasst; daneben nur ein 60 × 25 m Kleinfeld (`way 422856415`). Es gibt kein Polygon pro Feld |
+| swissimage (aktuell, Zoom 19) | Das Naturrasenfeld liegt im Rund der Laufbahn mit Tribünenseite, das Kunstrasenfeld unmittelbar südlich davon mit Linien mehrerer Felder. Welches davon Feld 1 ist, zeigt das Bild nicht |
+| Grösse | Ein offizielles Mass für ein Feld fehlt (ältere Gemeindeunterlage 2003: zwei Rasenfelder zu je rund 100 × 70 m, nicht auf die Felder zugeordnet) |
+
+**Fehlender Unterscheider:** das FVNWS Anlagenverzeichnis (Spiegelfeld, Feld 1: Belag und Grösse, Platznummer 1 oder 2) oder ein Plan der Gemeinde mit Platznummern. Mit dem Belag lässt sich Feld 1 dem Naturrasen im Laufbahnrund oder dem Kunstrasen im Süden zuordnen; danach sind der Feldmittelpunkt aus dem Orthofoto (wie bei FC Vernier) und die Strassenanfahrt (Im Spiegelfeld, öffentliche Strasse) schnell geprüft. Ohne das wäre der Marker bis zu rund 70 m daneben und die Feldgrösse geraten. Kein Code, kein Alias und keine ID geändert.
