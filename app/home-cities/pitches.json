@@ -734,15 +734,30 @@
      },
      {
       "ground": {
-       "name": "Sportplatz Dorf",
-       "osm": "way/620776322",
-       "lat": 47.53989,
-       "lon": 7.72267,
-       "municipality": "Kaiseraugst",
-       "canton": "AG",
+       "name": "Sportanlage Spiegelfeld, Platz 1",
+       "osm": "way/435937555",
+       "lat": 47.53387,
+       "lon": 7.56855,
+       "municipality": "Binningen",
+       "canton": "BL",
        "kind": "pitch"
       },
-      "distanceKm": 7.62
+      "distanceKm": 5.65,
+      "real": {
+       "name": "SC Binningen",
+       "source": "https://www.scbinningen.ch/",
+       "quote": "SC Binningen, 1. Mannschaft: Heimspiel 142866 und Spiel gegen Zwingen auf Spiegelfeld, Platz 1 (FVNWS); Platz 1 Hauptplatz Kunstrasen FIFA 1 Star, 100 x 64 m, Ziegelweg 4a",
+       "place": "https://matchcenter.fvnws.ch/default.aspx?a=sa&lng=1&oid=8&sa=583085&v=487",
+       "replaces": {
+        "name": "Sportplatz Dorf",
+        "osm": "way/620776322",
+        "lat": 47.53989,
+        "lon": 7.72267,
+        "municipality": "Kaiseraugst",
+        "canton": "AG",
+        "kind": "pitch"
+       }
+      }
      },
      {
       "ground": {

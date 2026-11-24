@@ -36,7 +36,7 @@ Pro Welt 89 Clubs, 15 Ligen. Fiktiv und zu ersetzen:
 |---|---|---|---|
 | Bern | 0 | 0 fiktiv, 42 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil, Goldstern, Orpund Safnern, Ittigen ersetzt, siehe unten) | 0 |
 | Zürich | 0 | 39 fiktiv, 3 echt (FC Oerlikon/Polizei ZH, FC Seefeld ZH, FC Wiedikon ZH) | 39 |
-| Basel | 0 | 36 fiktiv, 6 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach, FC Black Stars, SV Muttenz, FC Allschwil) | 36 |
+| Basel | 0 | 35 fiktiv, 7 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach, FC Black Stars, SV Muttenz, FC Allschwil, SC Binningen) | 35 |
 | Genève | 0 | 37 fiktiv, 5 echt (Signal FC Bernex-Confignon, Meyrin FC, Lancy FC, FC Vernier, FC Veyrier Sports) | 37 |
 
 **Gemeinsame Plätze (wirken in allen vier Welten, deshalb zuerst):** ~~`extra-4-fc-alpenfestung`~~ (ersetzt durch Yverdon Sport FC), ~~`extra-5-fc-gotthard-murmeltiere`~~ (ersetzt durch FC Wil 1900), ~~`extra-6-fc-l-man-mouettes`~~ (ersetzt durch FC Rapperswil-Jona), ~~`extra-7-fc-z-risee-b-tler`~~ (ersetzt durch FC Locarno). Ihre Spielorte sind geliehene geprüfte Plätze anderer Clubs der Liga.
@@ -325,14 +325,14 @@ ACGF belegt die erste Mannschaft in den Spielen 108625 und 108681 auf Veyrier-Vi
 
 Der Slot `ge-2-2` (2,36 km, nächstes Distanzprofil) verliert den fiktiven «FC Plainpalais Puces» (Centre sportif de Sous-Moulin); der Name bleibt als Alias erreichbar. Quelle im Katalog ist das ACGF Matchcenter (ohne Einzellink, die Spielnummern stehen im Zitat). Eine neue Route im Cache.
 
-## SC Binningen (Basel): zurückgestellt, Feld nicht eindeutig
+## SC Binningen (Basel, Liga 14, `bs-2-2`)
 
-Notion Beleg: Heimspiel 142866 und das Spiel gegen Zwingen auf Spiegelfeld, Feld 1. Duplikat: «SC Binningen» und Spiegelfeld kommen in keiner Welt und nicht in `app/swiss-clubs.json` vor. Die Anlage liegt bei Im Spiegelfeld 1 (swisstopo 47.53609, 7.57088), die Gemeinde Binningen nennt in der [Vorlage zum Kunststoffrasen](https://www.binningen.ch/public/upload/assets/6939/119_Investitionskredit%20Kunststoffrasen%20Spiegelfeld.pdf?fp=1) **zwei** Fussballfelder, ein Naturrasenfeld und ein Kunstrasenfeld (erstellt 2005, Teppich 2020er Jahre ersetzt). Die Gemeinde führt keine Platznummern.
+Der Unterscheider ist da: das offizielle [FVNWS Anlagenverzeichnis](https://matchcenter.fvnws.ch/default.aspx?a=sa&lng=1&oid=8&sa=583085&v=487) führt Platz 1 als Hauptplatz, Kunstrasen FIFA 1 Star, 100 × 64 m, Ziegelweg 4a, und Platz 2 als Naturrasen 100 × 64 m. Dazu Heimspiel 142866 und das Spiel gegen Zwingen auf Spiegelfeld Platz 1 (Notion Beleg). Platz 1 ist damit das Kunstrasenfeld unmittelbar südlich der Laufbahn. Duplikat: «SC Binningen» kommt in keiner Welt vor.
 
-| Befund | Wert |
+| | Beleg |
 |---|---|
-| OSM | nur ein Polygon `way 435937555`, 142 × 104 m, `sport=soccer`, ohne Belag, das beide Felder und den Auslauf zusammenfasst; daneben nur ein 60 × 25 m Kleinfeld (`way 422856415`). Es gibt kein Polygon pro Feld |
-| swissimage (aktuell, Zoom 19) | Das Naturrasenfeld liegt im Rund der Laufbahn mit Tribünenseite, das Kunstrasenfeld unmittelbar südlich davon mit Linien mehrerer Felder. Welches davon Feld 1 ist, zeigt das Bild nicht |
-| Grösse | Ein offizielles Mass für ein Feld fehlt (ältere Gemeindeunterlage 2003: zwei Rasenfelder zu je rund 100 × 70 m, nicht auf die Felder zugeordnet) |
+| Polygon | OSM kennt nur das gemeinsame Polygon `way 435937555` (142 × 104 m). Das Feld stammt deshalb aus dem swissimage Orthofoto (aktuell, Zoom 20): Der Mittelkreis des Kunstrasenfelds liegt bei 47.533869, 7.568553, die Mittellinie misst auf dem Foto 63 m (Spielfeldbreite 64 m). Das 100 × 64 m Rechteck um den Mittelkreis, parallel zu den Linien, wurde über das Foto gelegt und deckt die gemalten Seiten- und Torlinien; seine vier Ecken stehen im Test. Der Marker (47.53387, 7.56855) liegt auf dem Mittelkreis und innerhalb des OSM Polygons |
+| Anschrift | swisstopo Ziegelweg 4a bei 47.533466, 7.568282, 53 m vom Marker (Anschrift der Anlage laut FVNWS) |
+| Anreise | Die Route endet auf dem Ziegelweg (OSM way 1229492075 und 23075751, `residential`, keine Zugangsbeschränkung) bei 47.533422, 7.568294 an der Anschrift der Anlage, 53 m vom Marker. Route 7,3 km, 11 Minuten |
 
-**Fehlender Unterscheider:** das FVNWS Anlagenverzeichnis (Spiegelfeld, Feld 1: Belag und Grösse, Platznummer 1 oder 2) oder ein Plan der Gemeinde mit Platznummern. Mit dem Belag lässt sich Feld 1 dem Naturrasen im Laufbahnrund oder dem Kunstrasen im Süden zuordnen; danach sind der Feldmittelpunkt aus dem Orthofoto (wie bei FC Vernier) und die Strassenanfahrt (Im Spiegelfeld, öffentliche Strasse) schnell geprüft. Ohne das wäre der Marker bis zu rund 70 m daneben und die Feldgrösse geraten. Kein Code, kein Alias und keine ID geändert.
+Der Slot `bs-2-2` (5,65 km vom Basler Heimpunkt, nächstes freies Distanzprofil) verliert den fiktiven «Atletico Morgestraich» (Sportplatz Dorf); der Name bleibt als Alias erreichbar. Quelle im Katalog ist die Vereinsseite scbinningen.ch (nennt das Spiegelfeld auf der Startseite nicht), der Platzbeleg das FVNWS Verzeichnis. Eine neue Route im Cache. Die Zuordnung zu den gemalten Linien ist eine Messung am Orthofoto (Genauigkeit rund 1 bis 2 m), nicht eine vermessene Koordinate.

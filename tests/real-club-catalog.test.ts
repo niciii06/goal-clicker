@@ -44,7 +44,7 @@ test("the world league has six real clubs with official names in all four home c
 const BACKLOG: Record<string, Record<number, number>> = {
   bern: {},
   zurich: { 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 4, 14: 5 },
-  basel: { 8: 5, 9: 4, 10: 6, 11: 6, 12: 5, 13: 6, 14: 4 },
+  basel: { 8: 5, 9: 4, 10: 6, 11: 6, 12: 5, 13: 6, 14: 3 },
   geneve: { 8: 6, 9: 5, 10: 6, 11: 5, 12: 5, 13: 6, 14: 4 },
 };
 test("fictional clubs outside Liga 15 are only the documented backlog, and the world league is not part of it", () => {
@@ -569,6 +569,11 @@ const VERNIER_AREA: [number, number][] = [[46.219475, 6.081697], [46.2190563, 6.
 // FC Veyrier Sports (Genève, Liga 14): ACGF first-team games 108625 and 108681 on Veyrier-Village, field A; the facility's only (natural grass) pitch is 100 x 64 m, Chemin des Rasses.
 // Mapped: OSM way 133087559 (100 x 65 m) inside the sports centre way 38346111, the only pitch of the site. A third-party directory lists the Stade du Grand-Donzel (about 1.1 km away, two larger pitches) for the club; ACGF is followed.
 const VEYRIER_PITCH: [number, number][] = [[46.1669091, 6.1789867], [46.1663277, 6.1790154], [46.1663542, 6.1803112], [46.1669383, 6.1802786]];
+// SC Binningen (Basel, Liga 14): FVNWS first-team home game 142866 and the game against Zwingen on Spiegelfeld; facility list sa=583085: pitch 1 main pitch artificial turf FIFA 1 Star 100 x 64 m (Ziegelweg 4a),
+// pitch 2 natural grass 100 x 64 m. OSM has only one polygon for both (way 435937555, 142 x 104 m), so the pitch is taken from the swissimage orthophoto: the synthetic pitch south of the running track, 100 x 64 m
+// around its centre circle (the halfway line measures 63 m on the photo), checked by overlaying the rectangle on the painted lines. The marker is the centre circle.
+const SPIEGELFELD_AREA: [number, number][] = [[47.5349421, 7.5684751], [47.5345734, 7.5697376], [47.5334072, 7.5690211], [47.5337628, 7.567747], [47.5346211, 7.5682769]];
+const SPIEGELFELD_PITCH1: [number, number][] = [[47.5337798, 7.5677743], [47.5343091, 7.5681069], [47.5339582, 7.5693317], [47.5334289, 7.5689991]];
 const REGIONAL_REPLACED = [
   { city: "zurich", id: "zh-3-6", name: "FC Seefeld ZH", league: 13, oldName: "Sporting Seebach Frösche", polygon: LENGG_PITCH, length: [105, 115], width: [66, 75], end: [47.348989, 8.570622], endMetres: 60 },
   { city: "basel", id: "bs-7-1", name: "FC Black Stars", league: 9, oldName: "Inter Gondel Reigoldswil", polygon: BUSCHWEILER_PITCH, length: [100, 112], width: [64, 74], end: [47.559355, 7.563063], endMetres: 60 },
@@ -577,6 +582,7 @@ const REGIONAL_REPLACED = [
   { city: "basel", id: "bs-2-1", name: "FC Allschwil", league: 14, oldName: "Sporting Dreiländereck", polygon: BRUEEL_PITCH, length: [103, 108], width: [66, 70], end: [47.5558757, 7.5475097], endMetres: 100 },
   { city: "geneve", id: "ge-5-3", name: "FC Vernier", league: 11, oldName: "FC Jura Vaudois", polygon: VERNIER_AREA, length: [123, 128], width: [69, 73], end: [46.220044, 6.081715], endMetres: 100 },
   { city: "geneve", id: "ge-2-2", name: "FC Veyrier Sports", league: 14, oldName: "FC Plainpalais Puces", polygon: VEYRIER_PITCH, length: [99, 103], width: [63, 67], end: [46.166198, 6.179552], endMetres: 100 },
+  { city: "basel", id: "bs-2-2", name: "SC Binningen", league: 14, oldName: "Atletico Morgestraich", polygon: SPIEGELFELD_PITCH1, length: [99.5, 100.5], width: [63.5, 64.5], end: [47.533422, 7.568294], endMetres: 100 },
   { city: "geneve", id: "ge-2-1", name: "Lancy FC", league: 14, oldName: "Athletic Cornavin Express", polygon: MARIGNAC_PITCH, length: [99, 104], width: [63, 67], end: [46.17769, 6.123535], endMetres: 170 },
 ] as const;
 
@@ -635,6 +641,8 @@ test("Lengg R1, Buschweilerhof and Marignac Terrain 1: the points lie inside the
   assert.equal(HOME_CITIES.basel.regionalClubs.find((c) => c.id === "bs-7-1")!.venue.coordinateSource, "https://www.openstreetmap.org/way/39976253");
   assert.equal(HOME_CITIES.geneve.regionalClubs.find((c) => c.id === "ge-2-1")!.venue.coordinateSource, "https://www.openstreetmap.org/way/49722965");
   assert.equal(HOME_CITIES.zurich.regionalClubs.find((c) => c.id === "zh-3-3")!.venue.coordinateSource, "https://www.openstreetmap.org/way/34945595");
+  assert.equal(HOME_CITIES.basel.regionalClubs.find((c) => c.id === "bs-2-2")!.venue.coordinateSource, "https://www.openstreetmap.org/way/435937555");
+  assert.ok(inPolygon(47.53387, 7.56855, SPIEGELFELD_AREA), "the marker also lies inside the only mapped polygon of the Spiegelfeld");
   assert.equal(HOME_CITIES.geneve.regionalClubs.find((c) => c.id === "ge-2-2")!.venue.coordinateSource, "https://www.openstreetmap.org/way/133087559");
   assert.equal(HOME_CITIES.geneve.regionalClubs.find((c) => c.id === "ge-5-3")!.venue.coordinateSource, "https://www.openstreetmap.org/way/87345848");
   // The 100 x 64 m match area around the marker lies inside the mapped area, along its long axis, and the rest is the practice area (25 m minus the run-off).
