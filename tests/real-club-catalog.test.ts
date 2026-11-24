@@ -3,7 +3,9 @@
 // the work visible as an exact backlog that can only shrink (docs/real-club-catalog.md).
 import assert from "node:assert/strict";
 import test from "node:test";
-import { HOME_CITY_IDS, catalogOf, worldCatalog } from "../app/home-cities.ts";
+import { HOME_CITIES, HOME_CITY_IDS, catalogOf, worldCatalog } from "../app/home-cities.ts";
+import routes from "../app/travel-route-cache.ts";
+import { STATIONS, journeyCandidates } from "../app/journey-routing.ts";
 import { OWN_CLUB_ID, advanceAiLeagues, normalizeAiLeagues } from "../app/season-leagues.ts";
 import { LEAGUE_MEMBERS, SEASON_CLUBS, VENUES, defaultAiLeagues, seasonClubsOf, venueForClubName } from "../app/travel-geography.ts";
 import { matchColours } from "../app/match-colours.ts";
@@ -41,9 +43,9 @@ test("the world league has six real clubs with official names in all four home c
  */
 const BACKLOG: Record<string, Record<number, number>> = {
   bern: {},
-  zurich: { 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 6, 14: 5 },
-  basel: { 8: 5, 9: 6, 10: 6, 11: 6, 12: 5, 13: 6, 14: 5 },
-  geneve: { 8: 6, 9: 5, 10: 6, 11: 6, 12: 5, 13: 6, 14: 6 },
+  zurich: { 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 5, 14: 5 },
+  basel: { 8: 5, 9: 5, 10: 6, 11: 6, 12: 5, 13: 6, 14: 5 },
+  geneve: { 8: 6, 9: 5, 10: 6, 11: 6, 12: 5, 13: 6, 14: 5 },
 };
 test("fictional clubs outside Liga 15 are only the documented backlog, and the world league is not part of it", () => {
   for (const city of HOME_CITY_IDS) {
@@ -540,4 +542,74 @@ test("Hubelgut and Aare: the points lie inside the mapped main pitches, which ma
   assert.ok(metresBetween([hubelgut.lat, hubelgut.lon], [46.9799, 7.45598]) < 200, "Hubelgutstrasse 1 (swisstopo) is next to the pitch");
   assert.ok(metresBetween([hubelgut.lat, hubelgut.lon], [46.97871, 7.457047]) < 100, "road endpoint of the route: Tiefenaustrasse");
   assert.ok(metresBetween([aare.lat, aare.lon], [47.137119, 7.310013]) < 100, "road endpoint of the route: Byfangstrasse / service road at the Aare grounds");
+});
+
+// ---- FC Seefeld ZH (Zürich, Liga 13), FC Black Stars (Basel, Liga 9) and Lancy FC (Genève, Liga 14) replace one fictional slot each in their own world.
+// Étoile Carouge (professional club) stays out of the Genève regional leagues (docs/home-cities-data.md); Lancy FC takes the Genève place.
+// Evidence: Sportamt Zürich, Lengg: R1 Naturrasen 100 x 64 m, 1. Liga, "Keine Parkplätze vorhanden"; FVRZ first-team home game at Lengg R1.
+// FVNWS home game 105653 on Buschweilerhof A (the only full pitch of the site is the grass one, the training pitch is 46 x 30 m artificial turf).
+// ACGF: Stade de Marignac, Terrain 1 (Naturrasen, 100/64), first-team home games on 12.09. and 26.09.
+/** Corners of OpenStreetMap ways 40808587 (Lengg), 39976253 (Buschweilerhof), 49722965 (Marignac), as (lat, lon). */
+const LENGG_PITCH: [number, number][] = [[47.348926, 8.5718066], [47.3486606, 8.5709586], [47.3495519, 8.5703449], [47.3498213, 8.5711932]];
+const BUSCHWEILER_PITCH: [number, number][] = [[47.558916, 7.5620943], [47.5598614, 7.5619736], [47.5599141, 7.5628854], [47.5589568, 7.5630314]];
+const MARIGNAC_PITCH: [number, number][] = [[46.179308, 6.1234728], [46.1787331, 6.1235219], [46.1786813, 6.1222228], [46.1792584, 6.1221748]];
+const REGIONAL_REPLACED = [
+  { city: "zurich", id: "zh-3-6", name: "FC Seefeld ZH", league: 13, oldName: "Sporting Seebach Frösche", polygon: LENGG_PITCH, length: [105, 115], width: [66, 75], end: [47.348989, 8.570622], endMetres: 60 },
+  { city: "basel", id: "bs-7-1", name: "FC Black Stars", league: 9, oldName: "Inter Gondel Reigoldswil", polygon: BUSCHWEILER_PITCH, length: [100, 112], width: [64, 74], end: [47.559355, 7.563063], endMetres: 60 },
+  { city: "geneve", id: "ge-2-1", name: "Lancy FC", league: 14, oldName: "Athletic Cornavin Express", polygon: MARIGNAC_PITCH, length: [99, 104], width: [63, 67], end: [46.17769, 6.123535], endMetres: 170 },
+] as const;
+
+test("Seefeld ZH, Black Stars and Lancy FC are real clubs in their slots with the old ids, official names, no duplicates in any world and unchanged names for the other clubs", () => {
+  for (const item of REGIONAL_REPLACED) {
+    const catalog = worldCatalog(item.city);
+    const club = catalog.find((c) => c.id === item.id)!;
+    assert.ok(club, `${item.name}: the slot id stays`);
+    assert.equal(club.name, item.name);
+    assert.equal(club.league, item.league);
+    assert.ok(!club.fictional);
+    assert.equal(club.venue.verification, "stadium");
+    assert.equal(catalog.filter((c) => c.league === item.league).length, 6);
+    assert.equal(catalog.filter((c) => c.name === item.name).length, 1);
+    for (const other of HOME_CITY_IDS) if (other !== item.city) assert.ok(!worldCatalog(other).some((c) => c.name === item.name), `${item.name} exists in the ${item.city} world only`);
+    // The old fictional name is still known and finds its old ground, which is not the new one.
+    assert.ok(!catalog.some((c) => c.name === item.oldName));
+    const old = venueForClubName(item.oldName, item.league, 0, catalog);
+    assert.notEqual(old.id, undefined);
+    // Black Stars take over the very ground the old fictional club already used; the other two moved to the real home pitch.
+    const moved = metresBetween([old.lat, old.lon], [club.venue.lat, club.venue.lon]);
+    assert.ok(item.city === "basel" ? moved < 1 : moved > 500, `${item.oldName} keeps its old ground`);
+  }
+  // Names of the remaining fictional clubs did not move when a slot became real.
+  const names = (city: Parameters<typeof worldCatalog>[0], ids: string[]) => ids.map((id) => worldCatalog(city).find((c) => c.id === id)!.name);
+  assert.deepEqual(names("zurich", ["zh-3-5", "zh-8-6"]), ["Real Dolder Bähnli", "Sporting Schanzengraben"]);
+  assert.deepEqual(names("basel", ["bs-8-6"]), ["Inter Rebberg"]);
+  assert.deepEqual(names("geneve", ["ge-8-6"]), ["Racing Barque des Pâquis"]);
+  // Étoile Carouge is a professional club and not part of any regional league.
+  for (const city of HOME_CITY_IDS) assert.ok(!worldCatalog(city).some((c) => /Étoile Carouge/.test(c.name)));
+});
+
+test("Lengg R1, Buschweilerhof and Marignac Terrain 1: the points lie inside the mapped main pitches with the official size plus run-off, the routes end on public streets next to them", () => {
+  for (const item of REGIONAL_REPLACED) {
+    const city = HOME_CITIES[item.city];
+    const club = city.regionalClubs.find((c) => c.id === item.id)!;
+    assert.ok(inPolygon(club.venue.lat, club.venue.lon, [...item.polygon]), `${item.name}: inside the pitch polygon`);
+    const best = minRectangle([...item.polygon]);
+    assert.ok(best.length >= item.length[0] && best.length <= item.length[1], `${item.name}: length ${best.length.toFixed(1)}`);
+    assert.ok(best.width >= item.width[0] && best.width <= item.width[1], `${item.name}: width ${best.width.toFixed(1)}`);
+    assert.ok(best.length * best.width >= 3500);
+    // The cached road starts at the city home, ends at the pitch, and its last road point is the public street checked in OSM.
+    const leg = journeyCandidates(club.venue, city.homeVenue, STATIONS[city.station]).road[0];
+    const route = (routes as Record<string, { points: { lat: number; lon: number }[]; geometry: string; km: number }>)[leg.id];
+    assert.ok(route && route.geometry === "road" && route.points.length > 10, `${item.name}: cached road route`);
+    assert.deepEqual(route.points.at(-1), { lat: club.venue.lat, lon: club.venue.lon });
+    const roadEnd = route.points.at(-2)!;
+    assert.ok(metresBetween([roadEnd.lat, roadEnd.lon], [item.end[0], item.end[1]]) < 10, `${item.name}: road ends at the checked street point`);
+    assert.ok(metresBetween([roadEnd.lat, roadEnd.lon], [club.venue.lat, club.venue.lon]) < item.endMetres, `${item.name}: street end next to the pitch`);
+    assert.ok(route.km > 3 && route.km < 12, `${item.name}: ${route.km.toFixed(1)} km`);
+    const plan = planJourney(club.venue, undefined, city.homeVenue, STATIONS[city.station]);
+    assert.ok(plan.segments.some((segment) => segment.geometry === "road"), `${item.name}: the journey uses the cached road`);
+  }
+  assert.equal(HOME_CITIES.zurich.regionalClubs.find((c) => c.id === "zh-3-6")!.venue.coordinateSource, "https://www.openstreetmap.org/way/40808587");
+  assert.equal(HOME_CITIES.basel.regionalClubs.find((c) => c.id === "bs-7-1")!.venue.coordinateSource, "https://www.openstreetmap.org/way/39976253");
+  assert.equal(HOME_CITIES.geneve.regionalClubs.find((c) => c.id === "ge-2-1")!.venue.coordinateSource, "https://www.openstreetmap.org/way/49722965");
 });

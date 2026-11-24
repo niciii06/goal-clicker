@@ -35,9 +35,9 @@ Pro Welt 89 Clubs, 15 Ligen. Fiktiv und zu ersetzen:
 | Heimstadt | Gemeinsame Plätze Liga 4 bis 7 | Regionale Ligen 8 bis 14 (42 Clubs) | Summe |
 |---|---|---|---|
 | Bern | 0 | 0 fiktiv, 42 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil, Goldstern, Orpund Safnern, Ittigen ersetzt, siehe unten) | 0 |
-| Zürich | 0 | 41 fiktiv, 1 echt (FC Oerlikon/Polizei ZH) | 41 |
-| Basel | 0 | 39 fiktiv, 3 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach) | 39 |
-| Genève | 0 | 40 fiktiv, 2 echt (Signal FC Bernex-Confignon, Meyrin FC) | 40 |
+| Zürich | 0 | 40 fiktiv, 2 echt (FC Oerlikon/Polizei ZH, FC Seefeld ZH) | 40 |
+| Basel | 0 | 38 fiktiv, 4 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach, FC Black Stars) | 38 |
+| Genève | 0 | 39 fiktiv, 3 echt (Signal FC Bernex-Confignon, Meyrin FC, Lancy FC) | 39 |
 
 **Gemeinsame Plätze (wirken in allen vier Welten, deshalb zuerst):** ~~`extra-4-fc-alpenfestung`~~ (ersetzt durch Yverdon Sport FC), ~~`extra-5-fc-gotthard-murmeltiere`~~ (ersetzt durch FC Wil 1900), ~~`extra-6-fc-l-man-mouettes`~~ (ersetzt durch FC Rapperswil-Jona), ~~`extra-7-fc-z-risee-b-tler`~~ (ersetzt durch FC Locarno). Ihre Spielorte sind geliehene geprüfte Plätze anderer Clubs der Liga.
 
@@ -218,3 +218,25 @@ Der FVBJ Anlageneintrag und die Spielansetzung (Matchcenter) sind für automatis
 |---|---|
 | FC Steffisburg, Schönau | FVBJ: aktuelle Spiele auf dem Hauptplatz Schönau, Anlage Schönauweg 46 (3612 Steffisburg, Schulhaus Schönau), Hauptplatz 100 × 64 m. In OpenStreetMap ist dort **kein Fussballfeld** kartiert: die Anlage ist neu. Das nächste Grasfeld (way 334213888, 110 × 81 m, `sport=multi`, bearbeitet am 3.11.2025) liegt 285 m von der Adresse entfernt und passt nicht zu 100 × 64 m (+10/+17 m). Ohne Feldpolygon bleibt der Mittelpunkt offen (kein provisorischer Punkt). Der Parkplatz beim Schulhaus ist in OSM kartiert (way 124614207, 10 m von der Adresse) |
 | FC Schaffhausen, Stadion Breite | Zwei verschachtelte OSM Umrisse mit demselben Namen (111.0 × 76.5 m und 107.7 × 73.9 m), kein Mass des Clubs, das den Feldumriss bestimmt |
+
+## Phase 6: erste regionale Plätze ausserhalb Berns (Zürich, Basel, Genève)
+
+Je ein fiktiver Platz pro Welt wird echt. Die Slot ID (`zh-3-6`, `bs-7-1`, `ge-2-1`) bleibt. Die Liga folgt wie bei allen regionalen Plätzen dem Distanzprofil des Slots (`docs/home-cities-data.md`), nicht der echten Spielklasse. Die Namen der übrigen fiktiven Clubs bleiben gleich: der ersetzte Platz verbraucht seinen fiktiven Namen weiter (`legacy` in `app/home-cities.ts`), der alte Name führt über `venueForClubName` zum alten Platz.
+
+**Étoile Carouge ist ausgenommen.** `docs/home-cities-data.md` schliesst den Profiklub aus den Genfer Regionalligen aus. Stattdessen gilt Lancy FC (1. Liga Classic).
+
+**Duplikate:** Keiner der drei Namen steht in einer der vier Welten oder in `app/swiss-clubs.json`. Lancy FC ist nicht Servette (dessen Stade de Genève liegt auf Lancyer Gemeindegebiet, ist aber ein anderer Platz).
+
+| Club | Welt, Liga | Platz | Beleg Feld | Strassenende (OSM) |
+|---|---|---|---|---|
+| FC Seefeld ZH | Zürich, Liga 13 (`zh-3-6`) | Sportanlage Lengg, R1, OSM way 40808587, Mittelpunkt 47.34924, 8.57108 | Sportamt Zürich: R1 Naturrasen 100 × 64 m, 1. Liga tauglich, Betrieb FC Seefeld, «Keine Parkplätze vorhanden». Kartiert 110 × 71 m (Feld plus Auslauf), 7739 m². FVRZ Heimspiel der ersten Mannschaft auf Lengg R1 | Auf der Anlage gibt es keine Parkplätze, deshalb endet die Route auf der Bleulerstrasse (OSM way 652006889, `residential`, öffentlich) bei 47.348989, 8.570622, 50 m vom Feld. Route 8,4 km, 15 Minuten |
+| FC Black Stars | Basel, Liga 9 (`bs-7-1`) | Sportplatz Buschweilerhof, OSM way 39976253, Mittelpunkt 47.55941, 7.5625 (derselbe Platz, den der alte fiktive Club schon hatte) | Heimspiel 105653 gegen SC Buochs am 15.11.2026 auf Platz A (FVNWS); Vereinsseite blackstars.ch nennt Restaurant Buschweilerhof und Platzwart. Einziges Grasvollfeld der Anlage, kartiert 107 × 71 m, 7407 m²; der Trainingsplatz way 147639501 (Kunstrasen 46 × 30 m) scheidet aus. Offizielle Platzmasse waren nicht abrufbar (Verbandsseite sperrt Automaten), die Zuordnung beruht auf dem einzigen Vollfeld | Nidwaldnerstrasse (OSM way 24511727, `residential`, 30 km/h) bei 47.559355, 7.563063, 49 m vom Feld. Route 7,9 km, 11 Minuten |
+| Lancy FC | Genève, Liga 14 (`ge-2-1`) | Stade de Marignac, Terrain 1, OSM way 49722965, Mittelpunkt 46.179, 6.12285 | Erste Mannschaft (1. Liga Classic) am 12.09. und 26.09. auf Terrain 1 (Naturrasen); Verband ACGF: 100/64 m (Suchtreffer; die Seite selbst sperrt Automaten, nicht umgangen). Kartiert 100 × 64 m, 6439 m², einziges Vollfeld der Anlage | Chemin des Rambossons (OSM way 27951875, `residential`, 30 km/h) bei 46.17769, 6.123535, 158 m vom Feld. Die letzten 86 m bis zum Stadion sind ein Servicezugang ohne Zugangsangabe in OSM, deshalb endet die Route vorher auf der öffentlichen Strasse. Route 4,3 km, 7 Minuten |
+
+**Quellen:** Seefeld [Sportamt Zürich](https://www.stadt-zuerich.ch/de/stadtleben/sport-und-erholung/sport-und-badeanlagen/rasensportanlagen/lengg.html) und [FVRZ](https://matchcenter.fvrz.ch/default.aspx?lng=1&oid=11&tg=4314168&v=1590) (eine eigene Vereinsseite war nicht erreichbar); Black Stars [blackstars.ch](https://www.blackstars.ch/), [FVNWS](https://matchcenter.fvnws.ch/default.aspx?lng=1&oid=8&tg=4315770&v=409), [Kanton Basel-Stadt](https://www.bs.ch/medienmitteilungen/bvd/2004-sportplatz-buschweilerhof-saniert); Lancy FC [Verbandsmatch 105351](https://matchcenter-acvf.football.ch/default.aspx?lng=2&ls=25795&oid=16&sg=70237&t=66170&tg=4315468&v=1364768) und [105366](https://matchcenter-acvf.football.ch/Default.aspx?ln=&lng=2&oid=16&tg=4315483&v=777823).
+
+**Routen:** Je eine neue Strassenroute vom Heimplatz der Stadt (nur diese drei Einträge im Cache, `app/route-cache/part-10.json`). Alle anderen Routen blieben unverändert.
+
+**Tests:** `tests/real-club-catalog.test.ts` (Backlog Zürich 13: 5, Basel 9: 5, Genève 14: 5; Namen, Alias, Eindeutigkeit, Feldpolygon mit Grösse, Strassenende, Reise), `tests/home-cities.test.ts` (Quellenregel: eigene Vereinsseite oder offizielle Seite, die den Heimplatz nennt).
+
+**Offen:** Verbandsseiten sperren Automaten; für Black Stars und Lancy FC stammen die Platzgrössen daher nicht aus einem abgerufenen Anlagenverzeichnis. Alle drei Plätze sind durch die jeweils einzige passende Vollfeldfläche der Anlage eindeutig. Echtes iPhone, iPad und Safari wurden nicht geprüft.

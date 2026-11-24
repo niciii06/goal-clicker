@@ -27,7 +27,7 @@ export type HomeCity = {
 };
 
 type Ground = { name: string; osm: string; lat: number; lon: number; municipality: string; canton: string; kind: string };
-type Slot = { ground: Ground; distanceKm: number; real?: { name: string; source: string; quote: string; place?: string }; shared?: boolean };
+type Slot = { ground: Ground; distanceKm: number; real?: { name: string; source: string; quote: string; place?: string; replaces?: Ground }; shared?: boolean };
 type CityData = { canton: string; home: Ground; divisions: Record<string, Slot[]> };
 const DATA = (pitches as unknown as { cities: Record<string, CityData> }).cities;
 
@@ -82,10 +82,14 @@ function buildCity(id: Exclude<HomeCityId, "bern">): HomeCity {
     data.divisions[division].forEach((slot, index) => {
       const real = slot.real;
       const clubId = `${meta.prefix}-${division}-${index + 1}`;
+      // A real club that took over a fictional slot (`replaces`) still uses up that slot's fictional name, so the other
+      // fictional clubs keep their names; the old name and ground stay reachable through `legacy` (saved tables, journeys).
+      const legacy = real?.replaces ? { name: fictionalName(id, fictional++), venue: venueOf(`${clubId}-ground`, real.replaces, false) } : undefined;
       regionalClubs.push({
         id: clubId, name: real ? real.name : fictionalName(id, fictional++), league: 16 - division,
         venue: venueOf(`${clubId}-ground`, slot.ground, Boolean(real)),
         ...(real ? { clubSource: { url: real.source, quote: real.quote, ...(real.place ? { placeUrl: real.place } : {}) } } : { fictional: true }),
+        ...(legacy ? { legacy } : {}),
       });
     });
   }

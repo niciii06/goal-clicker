@@ -77,7 +77,8 @@ const LEGACY_POOLS: readonly (readonly [string, string][])[] = [
  [['Galácticos XI','madrid'],['FC Sushi Tokio','tokyo'],['Flamengö Rio','rio'],['Sydney Feierabend FC','sydney'],['Inter Miami','miami']],
 ];
 
-export type SeasonClub = {id:string;name:string;league:number;venue:Venue;fictional?:boolean};
+/** `legacy`: the fictional name and ground a real club replaced, so a saved table or journey that still carries it finds a ground. */
+export type SeasonClub = {id:string;name:string;league:number;venue:Venue;fictional?:boolean;legacy?:{name:string;venue:Venue}};
 const FICTIONAL_NAMES = ['FC Tabellenkeller','SV Unentschieden','Real Zufall','FC Feierabendbier','Inter Timeout'];
 const FICTIONAL_GROUNDS = ['Stolperacker','Remiswiese','Zufallsrasen','Bierdeckel-Arena','Timeout-Platz'];
 const FICTIONAL = FICTIONAL_NAMES.map((name,i):SeasonClub=>({id:`geo-1-${i+1}`,name,league:15,fictional:true,venue:{...HOME_VENUE,id:`chaos-ground-${i+1}`,stadium:FICTIONAL_GROUNDS[i],lat:HOME_VENUE.lat+[.003,-.006,.009,-.003,.006][i],lon:HOME_VENUE.lon+[.009,-.005,.005,-.009,.012][i],verification:'fictional',source:'Fiktives Spielfeld in Bern',coordinateNote:'Absichtlich fiktiver Platz in Bern'}}));
@@ -276,6 +277,7 @@ export function regionForDivision(division:number) { return DIVISION_REGIONS[Mat
 export function venueForClubName(name:string,division:number,index:number,catalog:readonly SeasonClub[]=SEASON_CLUBS):Venue {
  const current=catalog.find(c=>c.name===name)??SEASON_CLUBS.find(c=>c.name===name);if(current)return current.venue;
  const legacy=LEGACY_POOLS.flat().find(([n])=>n===name);if(legacy)return VENUES[legacy[1]];
+ const replacedRegional=catalog.find(c=>c.legacy?.name===name);if(replacedRegional)return replacedRegional.legacy!.venue;
  const replaced=REPLACED_CLUB_GROUNDS[name];if(replaced)return replaced();
  return seasonGeography(division,index,undefined,catalog).venue;
 }

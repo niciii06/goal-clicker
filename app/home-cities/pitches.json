@@ -218,15 +218,30 @@
      },
      {
       "ground": {
-       "name": "Sportplatz Halsrüti",
-       "osm": "way/45876720",
-       "lat": 47.42138,
-       "lon": 8.63824,
-       "municipality": "Brüttisellen",
+       "name": "Sportanlage Lengg",
+       "osm": "way/40808587",
+       "lat": 47.34924,
+       "lon": 8.57108,
+       "municipality": "Zürich",
        "canton": "ZH",
        "kind": "pitch"
       },
-      "distanceKm": 6.45
+      "distanceKm": 6.51,
+      "real": {
+       "name": "FC Seefeld ZH",
+       "source": "https://www.stadt-zuerich.ch/de/stadtleben/sport-und-erholung/sport-und-badeanlagen/rasensportanlagen/lengg.html",
+       "quote": "Für den Betrieb zuständiger Verein: FC Seefeld. R1: 100 x 64 m, Naturrasen, 1. Liga. Keine Parkplätze vorhanden",
+       "place": "https://matchcenter.fvrz.ch/default.aspx?lng=1&oid=11&tg=4314168&v=1590",
+       "replaces": {
+        "name": "Sportplatz Halsrüti",
+        "osm": "way/45876720",
+        "lat": 47.42138,
+        "lon": 8.63824,
+        "municipality": "Brüttisellen",
+        "canton": "ZH",
+        "kind": "pitch"
+       }
+      }
      }
     ],
     "4": [
@@ -1072,7 +1087,21 @@
        "kind": "pitch"
       },
       "distanceKm": 4.96,
-      "shared": true
+      "real": {
+       "name": "FC Black Stars",
+       "source": "https://www.blackstars.ch/",
+       "quote": "FC Black Stars, 1. Mannschaft: Meisterschaftsspiel gegen SC Buochs am 15.11.2026 auf dem Sportplatz Buschweilerhof (Restaurant Buschweilerhof, Platzwart)",
+       "place": "https://matchcenter.fvnws.ch/default.aspx?lng=1&oid=8&tg=4315770&v=409",
+       "replaces": {
+        "name": "Sportplatz Buschweilerhof",
+        "osm": "way/39976253",
+        "lat": 47.55941,
+        "lon": 7.5625,
+        "municipality": "Basel",
+        "canton": "BS",
+        "kind": "pitch"
+       }
+      }
      },
      {
       "ground": {
@@ -1303,15 +1332,30 @@
     "2": [
      {
       "ground": {
-       "name": "Stade des Trois-Chêne",
-       "osm": "way/45742098",
-       "lat": 46.19145,
-       "lon": 6.1904,
-       "municipality": "Chêne-Bourg",
+       "name": "Stade de Marignac",
+       "osm": "way/49722965",
+       "lat": 46.179,
+       "lon": 6.12285,
+       "municipality": "Lancy",
        "canton": "GE",
-       "kind": "sports_centre"
+       "kind": "pitch"
       },
-      "distanceKm": 2.86
+      "distanceKm": 2.61,
+      "real": {
+       "name": "Lancy FC",
+       "source": "https://matchcenter-acvf.football.ch/default.aspx?lng=2&ls=25795&oid=16&sg=70237&t=66170&tg=4315468&v=1364768",
+       "quote": "Lancy FC, 1. Liga Classic: Heimspiele 12.09. und 26.09. auf Stade de Marignac, Terrain 1 (Naturrasen, 100 x 64 m)",
+       "place": "https://matchcenter-acvf.football.ch/Default.aspx?ln=&lng=2&oid=16&tg=4315483&v=777823",
+       "replaces": {
+        "name": "Stade des Trois-Chêne",
+        "osm": "way/45742098",
+        "lat": 46.19145,
+        "lon": 6.1904,
+        "municipality": "Chêne-Bourg",
+        "canton": "GE",
+        "kind": "sports_centre"
+       }
+      }
      },
      {
       "ground": {

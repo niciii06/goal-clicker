@@ -47,7 +47,7 @@ Die Verbände (football.ch, FVRZ, FVNWS, ACGF) untersagen maschinellen Zugriff a
 | Genfer Platzverzeichnis (agfc.ch) | Bestätigt die Plätze von Meyrin FC und Signal FC. Es ordnet keine Teams zu und wird deshalb nur als zweite Quelle für den Platz verwendet. |
 
 **Weitere Prüfungen:**
-* Étoile Carouge: Profiklub, gehört nicht in eine Regionalliga.
+* Étoile Carouge: Profiklub, gehört nicht in eine Regionalliga. Für Genève gilt stattdessen Lancy FC (Stade de Marignac, Terrain 1).
 * Kloten, Altstetten, Witikon: Platz genannt, aber nicht als Heimspielort.
 * Nicht erreichbar: Red Star, Seefeld, Concordia, Black Stars, Lancy, Onex, Vernier.
 
@@ -55,9 +55,9 @@ Die Verbände (football.ch, FVRZ, FVNWS, ACGF) untersagen maschinellen Zugriff a
 
 | Stadt | Echt | Fiktiv |
 | --- | --- | --- |
-| Zürich | 1 | 46 |
-| Basel | 3 | 44 |
-| Genève | 2 | 45 |
+| Zürich | 2 (inkl. FC Seefeld ZH) | 45 |
+| Basel | 4 (inkl. FC Black Stars) | 43 |
+| Genève | 3 (inkl. Lancy FC) | 44 |
 | Bern | unverändert | wie heute |
 
 Echte Clubs spielen nie in der Chaosliga (Division 1). Die bleibt wie in Bern eine Spassliga fiktiver Clubs.
