@@ -182,15 +182,29 @@
      },
      {
       "ground": {
-       "name": "Sportanlage Letzi",
-       "osm": "way/53560489",
-       "lat": 47.37146,
-       "lon": 8.49618,
+       "name": "Rasensportanlage Heuried",
+       "osm": "way/34945595",
+       "lat": 47.36655,
+       "lon": 8.50341,
        "municipality": "Zürich",
        "canton": "ZH",
-       "kind": "sports_centre"
+       "kind": "pitch"
       },
-      "distanceKm": 5.93
+      "distanceKm": 5.95,
+      "real": {
+       "name": "FC Wiedikon ZH",
+       "source": "https://www.stadt-zuerich.ch/de/stadtleben/sport-und-erholung/sport-und-badeanlagen/rasensportanlagen/heuried.html",
+       "quote": "Rasensportanlage Heuried: 1 Kunstrasen (KR1: 100 x 64 m, 2. Liga), öffentliche Parkplätze (kostenpflichtig); Heimspiele der 1. Mannschaft 163483 und 163522 (FVRZ)",
+       "replaces": {
+        "name": "Sportanlage Letzi",
+        "osm": "way/53560489",
+        "lat": 47.37146,
+        "lon": 8.49618,
+        "municipality": "Zürich",
+        "canton": "ZH",
+        "kind": "sports_centre"
+       }
+      }
      },
      {
       "ground": {

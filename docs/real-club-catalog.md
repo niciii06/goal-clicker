@@ -35,7 +35,7 @@ Pro Welt 89 Clubs, 15 Ligen. Fiktiv und zu ersetzen:
 | Heimstadt | Gemeinsame Plätze Liga 4 bis 7 | Regionale Ligen 8 bis 14 (42 Clubs) | Summe |
 |---|---|---|---|
 | Bern | 0 | 0 fiktiv, 42 echt (Heimberg, Stettlen 08, Oberdiessbach, Grosshöchstetten-Schlosswil, Goldstern, Orpund Safnern, Ittigen ersetzt, siehe unten) | 0 |
-| Zürich | 0 | 40 fiktiv, 2 echt (FC Oerlikon/Polizei ZH, FC Seefeld ZH) | 40 |
+| Zürich | 0 | 39 fiktiv, 3 echt (FC Oerlikon/Polizei ZH, FC Seefeld ZH, FC Wiedikon ZH) | 39 |
 | Basel | 0 | 37 fiktiv, 5 echt (FC Amicitia Riehen, FC Pratteln, SC Dornach, FC Black Stars, SV Muttenz) | 37 |
 | Genève | 0 | 39 fiktiv, 3 echt (Signal FC Bernex-Confignon, Meyrin FC, Lancy FC) | 39 |
 
@@ -276,3 +276,14 @@ Der amtliche Beleg ist da: FVNWS ([Anlage](https://matchcenter.fvnws.ch/Default.
 | Parkplatz | OSM way 216256986 «Sportanlage Margelacker», `access=yes`, `fee=no`, höchstens 3 Stunden (passt zur Angabe des Clubs). Die Route endet im Parkplatz bei 47.529627, 7.631809 (60 m vom Feld) nach der Münchensteinerstrasse (`secondary`). Route 6,5 km, 8 Minuten |
 
 Quelle im Katalog: svmuttenz.ch (Parkplatzangabe) und die FVNWS Anlage. Eine neue Route im Cache, die übrigen blieben unverändert.
+
+## FC Wiedikon ZH (Zürich, Liga 13, `zh-3-3`)
+
+FVRZ Heimspiele der ersten Mannschaft 163483 und 163522 auf Heuried. Die [Stadt Zürich](https://www.stadt-zuerich.ch/de/stadtleben/sport-und-erholung/sport-und-badeanlagen/rasensportanlagen/heuried.html) führt dort genau einen Platz: KR1 Kunstrasen 100 × 64 m, beleuchtet, 2. Liga tauglich, öffentliche Parkplätze (kostenpflichtig). Duplikat: «FC Wiedikon ZH» kommt in keiner Welt vor. Der Slot `zh-3-3` (Distanzprofil, 5,95 km vom Zürcher Heimpunkt) verliert den fiktiven «SV Hönggerberg Igel» (Sportanlage Letzi), der Name bleibt als Alias erreichbar.
+
+| | Beleg |
+|---|---|
+| Feld | OSM way 34945595, Kunstrasen, 109 × 70 m (100 × 64 m plus Auslauf), 7641 m², Mittelpunkt 47.36655, 8.50341; in OSM mit `alt_name=KR1` und Betreiber Sportamt Zürich getaggt. Andere Felder im Umkreis sind kleiner (way 34945596: 51 × 47 m, way 32857644: 64 × 54 m) |
+| Parkplatz | OSM way 505081213, `access=yes`, `fee=yes`, 214 m vom Feld (die Stadt nennt kostenpflichtige öffentliche Parkplätze). Die Route endet im Parkplatz bei 47.365132, 8.501444, erreicht über die Paul-Clairmont-Strasse (`residential`, 30 km/h, `motor_vehicle=destination`: nur Zufahrt zum Ziel, was die Anreise zur Anlage ist) und eine Zufahrt ohne Einschränkung. Route 7,7 km, 13 Minuten |
+
+Eine neue Route im Cache, alle anderen unverändert. Der Club hat keine erreichbare eigene Seite; Quelle im Katalog ist die Seite der Stadt, die Spielnummern stammen aus dem Notion Hinweis (FVRZ). FC Altstetten bleibt zurückgestellt, bis die genaue Platznummer des ersten Teams belegt ist.
