@@ -94,3 +94,16 @@ export function safeReturnPath(value: string | null | undefined): string {
   if (url.origin !== "https://app.local" || url.pathname.startsWith("/auth/") || url.pathname.startsWith("/api/")) return "/";
   return `${url.pathname}${url.search}${url.hash}`;
 }
+
+/**
+ * Server: new password accounts register with a real e-mail address and confirm it with a one time code before the
+ * account opens (docs: Notion «E-Mail-Pflicht, E-Mail-Verifizierung und Passwort-Zurücksetzen»). Off by default
+ * until the Neon Auth settings for production are in place; without it registration works exactly as before.
+ */
+export function emailSignupEnabled() {
+  return process.env.GOAL_CLICKER_EMAIL_SIGNUP === "1";
+}
+/** Browser: whether the registration form asks for an e-mail address (baked in at build time, next.config.ts). */
+export function browserEmailSignup() {
+  return process.env.NEXT_PUBLIC_EMAIL_SIGNUP === "1";
+}

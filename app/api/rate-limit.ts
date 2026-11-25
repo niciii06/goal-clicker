@@ -9,6 +9,9 @@ export const RATE_LIMITS = {
   register: { limit: 5, windowMs: 10 * 60_000 },
   login: { limit: 20, windowMs: 60_000 },
   recovery: { limit: 10, windowMs: 10 * 60_000 },
+  // E-mail confirmation and password reset codes: few mails, few guesses (Neon also limits every code itself).
+  emailCode: { limit: 10, windowMs: 10 * 60_000 },
+  passwordReset: { limit: 5, windowMs: 10 * 60_000 },
   username: { limit: 60, windowMs: 60_000 },
   profile: { limit: 30, windowMs: 60_000 },
   account: { limit: 30, windowMs: 60_000 },

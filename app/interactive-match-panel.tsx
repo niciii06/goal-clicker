@@ -1,8 +1,9 @@
 'use client';
 import { useMatchPresentation } from './use-match-presentation';
-import { useEffect, useState } from 'react';
+import { clubIsOnLeft, readInteractiveFrame } from './interactive-frame-data';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { GameFeatures } from './feature-data';
-import { getStarXIPlayer } from './feature-data';
+import { getCupRegularDurationMs, getStarXIPlayer } from './feature-data';
 import { MatchPitchCanvas } from './match-pitch-canvas';
 import { getViewerEvents, eventLabel, MatchStatistics } from './match-viewer';
 import { goalLabel } from './match-goals';
@@ -15,6 +16,8 @@ import { useReducedMotion } from './use-reduced-motion';
 import { readPref, writePref } from './qol/prefs';
 import { t } from './i18n/runtime';
 import { eventText } from './i18n/data-text';
+import { useInjuryAutoOpen } from './match-injury';
+import type { PendingInjury } from './match-injury';
 
 // The chosen view (pitch, ticker, statistics) stays on this device (Q54).
 const INTERACTIVE_VIEW_KEY = 'goal-clicker-interactive-view';
@@ -22,6 +25,8 @@ export type InteractivePanelProps={features:GameFeatures;now:number;clubName:str
 export function InteractiveMatchPanel({features,now,clubName,clubColor,disabled,onEdit,onBatch,onResume}:InteractivePanelProps){
  const [view,setViewState]=useState<'pitch'|'ticker'|'stats'>(()=>{const saved=readPref(INTERACTIVE_VIEW_KEY);return saved==='ticker'||saved==='stats'?saved:'pitch';}),[editing,setEditing]=useState(features.cup.simulation?.status==='editing');
  const setView=(next:'pitch'|'ticker'|'stats')=>{setViewState(next);writePref(INTERACTIVE_VIEW_KEY,next);};
+ // An own player's injury opens the substitutions by itself, once per injury (app/match-injury.ts).
+ const injury=useInjuryAutoOpen(features,()=>setEditing(true),()=>setEditing(false));
  const reducedMotion=useReducedMotion();
  const c=features.cup,s=c.simulation!,away=c.fixture?.away;
  const {wall,minute}=useMatchPresentation(c,now),events=getViewerEvents(c);
@@ -29,21 +34,34 @@ export function InteractiveMatchPanel({features,now,clubName,clubColor,disabled,
  const halftime=useLingering(s.status==='halftime'&&c.matchPaused,450);
  const extraPause=c.phase==='extra-time'&&s.status==='halftime',pauseTitle=extraPause?(s.time>=6300?t("live.etHalftime"):t("live.beforeEt")):t("live.halftimeBreak");
  const status=s.status==='halftime'?(extraPause?(s.time>=6300?t("live.etHalftimeCaps"):t("live.etCaps")):t("live.halftimeCaps")):s.status==='editing'?t("live.pausedCaps"):s.pauseRequested?t("live.completingMove"):c.phase==='penalties'?t("live.shootoutCaps"):'LIVE';
- const scorers=(side:'home'|'away')=>c.matchEvents.filter(e=>e.side===side).map(e=><span key={e.id}>{goalLabel(e)}</span>);
+ // The two labels under the pitch stand on the side where that team plays: the club is on the right in an away game and after the teams changed ends
+ // (the same frame the pitch draws decides). The colour dot is the kit colour of the pitch.
+ const legendClub={key:'club',name:clubName,colour:clubColor||'#17875f'},legendOpponent={key:'opponent',name:c.opponent,colour:clubColor==='#ffc857'?'#3e75dd':'#ffc857'};
+ const presentedTime=Math.max(0,(wall.current-c.matchStartedAt)*(5400/getCupRegularDurationMs(c))),legendTeams=clubIsOnLeft(readInteractiveFrame(s,presentedTime))?[legendClub,legendOpponent]:[legendOpponent,legendClub];
+ // The scorer zone of the scoreboard has a fixed height (two lines), so a goal never makes the scoreboard taller: the newest goals come first, older ones scroll.
+ const scorers=(side:'home'|'away')=>c.matchEvents.filter(e=>e.side===side).map(e=><span key={e.id}>{goalLabel(e)}</span>).reverse();
+ const scorerZone=(side:'home'|'away',team:string)=>{const list=scorers(side);return <div className="gc-score-scorers" {...(list.length?{role:'group','aria-label':t("live.scorersOf",{team})}:{})} {...(list.length>2?{tabIndex:0}:{})}>{list}</div>;};
+ // Live ticker: newest first. Only the presentation is reversed (the event log and the replay keep their order); a status line above the list is not an event.
+ const tickerEvents=events.slice().reverse();
+ const tickerRef=useRef<HTMLDivElement>(null),tickerHeight=useRef(0);
+ // New events arrive on top. While the player reads further down, the list keeps its place (scroll anchoring is off in the CSS, so every browser behaves the same).
+ useLayoutEffect(()=>{const el=tickerRef.current;if(!el){tickerHeight.current=0;return;}const grown=el.scrollHeight-tickerHeight.current;if(tickerHeight.current&&grown>0&&el.scrollTop>4)el.scrollTop+=grown;tickerHeight.current=el.scrollHeight;},[tickerEvents.length,view]);
  return <section className="gc-match-viewer gc-interactive-match" aria-label={t("live.simulation")}>
-  <div className="gc-viewer-scoreboard"><div><small>{t("live.homeCaps")}</small><strong>{away?c.opponent:clubName}</strong><div className="gc-score-scorers">{scorers(away?'away':'home')}</div></div><div className="gc-viewer-score"><span>{away?c.awayScore:c.homeScore} : {away?c.homeScore:c.awayScore}</span><small>{status} · {minute}′</small></div><div><small>{t("live.awayCaps")}</small><strong>{away?clubName:c.opponent}</strong><div className="gc-score-scorers">{scorers(away?'home':'away')}</div></div></div>
-  {c.phase!=='penalties'&&view==='pitch'&&<div className="gc-viewer-pitch-shell">{halftime.visible&&<HalftimeOverlay features={features} clubName={clubName} leaving={halftime.leaving} disabled={disabled} onSubstitutions={()=>{setEditing(true);onEdit?.();}} onResume={()=>{setEditing(false);onResume?.();}}/>}<MatchPitchCanvas features={features} now={now} playbackWall={wall} colours={{club:clubColor||'#17875f',opponent:clubColor==='#ffc857'?'#3e75dd':'#ffc857'}} camera="full" reducedMotion={reducedMotion} onSelect={()=>{}} onFps={()=>{}}/><div className="gc-viewer-legend"><span>{clubName}</span><span>{c.opponent}</span><span className="gc-stadium-label">{stadiumLabel(matchStadium(features))}</span></div></div>}
-  {view==='ticker'&&<div className="gc-viewer-events gc-interactive-ticker" role="log" aria-label={t("live.ticker")}>{events.length?events.map(e=><div key={e.id}><time>{e.minute}′</time><span>{eventText(eventLabel(e))} · {e.player}{e.assistId?` (${getStarXIPlayer(e.assistId)?.name??c.simulation?.committed.players.find(p=>p.id===e.assistId)?.name??''})`:''}{e.kind==='shot'?` · ${e.outcome==='save'?'Gehalten':e.outcome==='blocked'?'Geblockt':'Vorbei'}`:''}</span></div>):<p>{t("live.kickoff")}</p>}<div>{status} · {minute}′</div></div>}
+  <div className="gc-viewer-scoreboard"><div><small>{t("live.homeCaps")}</small><strong title={away?c.opponent:clubName}>{away?c.opponent:clubName}</strong>{scorerZone(away?'away':'home',away?c.opponent:clubName)}</div><div className="gc-viewer-score"><span>{away?c.awayScore:c.homeScore} : {away?c.homeScore:c.awayScore}</span><small>{status} · {minute}′</small></div><div><small>{t("live.awayCaps")}</small><strong title={away?clubName:c.opponent}>{away?clubName:c.opponent}</strong>{scorerZone(away?'home':'away',away?clubName:c.opponent)}</div></div>
+  {c.phase!=='penalties'&&view==='pitch'&&<div className="gc-viewer-pitch-shell">{halftime.visible&&<HalftimeOverlay features={features} clubName={clubName} leaving={halftime.leaving} disabled={disabled} onSubstitutions={()=>{setEditing(true);onEdit?.();}} onResume={()=>{setEditing(false);onResume?.();}}/>}<MatchPitchCanvas features={features} now={now} playbackWall={wall} colours={{club:clubColor||'#17875f',opponent:clubColor==='#ffc857'?'#3e75dd':'#ffc857'}} camera="full" reducedMotion={reducedMotion} onSelect={()=>{}} onFps={()=>{}}/><div className="gc-viewer-legend">{legendTeams.map(team=><span key={team.key} className={team===legendTeams[0]?'gc-legend-left':'gc-legend-right'} title={team.name}><i style={{background:team.colour}} aria-hidden="true"/>{team.name}</span>)}<span className="gc-stadium-label">{stadiumLabel(matchStadium(features))}</span></div></div>}
+  {view==='ticker'&&<><div className="gc-ticker-status" aria-hidden="true">{status} · {minute}′</div><div ref={tickerRef} className="gc-viewer-events gc-interactive-ticker" role="log" aria-label={t("live.ticker")}>{events.length?tickerEvents.map(e=><div key={e.id}><time>{e.minute}′</time><span>{eventText(eventLabel(e))} · {e.player}{e.assistId?` (${getStarXIPlayer(e.assistId)?.name??c.simulation?.committed.players.find(p=>p.id===e.assistId)?.name??''})`:''}{e.kind==='shot'?` · ${e.outcome==='save'?'Gehalten':e.outcome==='blocked'?'Geblockt':'Vorbei'}`:''}</span></div>):<p>{t("live.kickoff")}</p>}</div></>}
   {view==='stats'&&<MatchStatistics features={features} clubName={clubName}/>}
   {events.at(-1)&&now-events.at(-1)!.at<3500&&<div className="gc-viewer-caption" role="status"><time>{events.at(-1)!.minute}′</time><strong>{eventText(eventLabel(events.at(-1)!))} · {events.at(-1)!.player}</strong></div>}
   {c.matchPaused&&!(s.status==='halftime'&&view==='pitch'&&c.phase!=='penalties')&&<div className="gc-interactive-pause" role="status"><strong>{s.status==='halftime'?pauseTitle:t("live.paused")}</strong><button type="button" disabled={disabled} onClick={()=>{setEditing(false);onResume?.();}}>{t("live.continue")}</button></div>}
   <div className="gc-interactive-controls"><button type="button" disabled={disabled||c.phase==='penalties'} onClick={()=>{setEditing(true);onEdit?.();}}>{t("live.subs")}</button><button type="button" aria-pressed={view==='pitch'} onClick={()=>setView('pitch')}>2D</button><button type="button" aria-pressed={view==='ticker'} onClick={()=>setView('ticker')}>{t("live.ticker")}</button><button type="button" aria-pressed={view==='stats'} onClick={()=>setView('stats')}>{t("live.stats")}</button></div>
-  {editing&&(c.matchPaused?<BatchEditor key={s.committed.sequence} features={features} disabled={Boolean(disabled)} onConfirm={d=>{onBatch?.(d);setEditing(false);}} onCancel={()=>{setEditing(false);onResume?.();}}/>:<p role="status">{t("live.finishingMove")}</p>)}
+  {editing&&(c.matchPaused?<BatchEditor key={s.committed.sequence} features={features} injury={injury} disabled={Boolean(disabled)} onConfirm={d=>{onBatch?.(d);setEditing(false);}} onCancel={()=>{setEditing(false);onResume?.();}}/>:<p role="status">{t("live.finishingMove")}</p>)}
  </section>;
 }
-function BatchEditor({features:f,disabled,onConfirm,onCancel}:{features:GameFeatures;disabled:boolean;onConfirm:(d:MatchDraft)=>void;onCancel:()=>void}){
+function BatchEditor({features:f,injury,disabled,onConfirm,onCancel}:{features:GameFeatures;injury:PendingInjury|null;disabled:boolean;onConfirm:(d:MatchDraft)=>void;onCancel:()=>void}){
  const formation=f.starXI.formationId;
- return <MatchSquadEditor features={f} title={t("live.editLineup")} intro={t("live.editIntro")} disabled={disabled} validate={lineup=>validateMatchDraft(f,{lineup,formation})} confirmLabel={()=>t("live.confirmAll")} onConfirm={lineup=>onConfirm({lineup,formation})} onCancel={onCancel}/>;
+ // After an injury the injured player's place is already chosen; closing plays on without a substitution.
+ const intro=injury?t("live.injuryIntro",{player:injury.player,place:injury.slot+1,position:f.starXI.formationPositions[injury.slot]??''}):t("live.editIntro");
+ return <MatchSquadEditor features={f} title={injury?t("live.injuryTitle"):t("live.editLineup")} intro={intro} initialSlot={injury?.slot??null} cancelLabel={injury?t("live.playOnWithoutSub"):t("subs.cancel")} disabled={disabled} validate={lineup=>validateMatchDraft(f,{lineup,formation})} confirmLabel={()=>t("live.confirmAll")} onConfirm={lineup=>onConfirm({lineup,formation})} onCancel={onCancel}/>;
 }
 
 /** Keeps an element mounted for its exit animation after `visible` turns false. */

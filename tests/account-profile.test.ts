@@ -353,8 +353,9 @@ test('password fields start masked and carry an accessible eye button that is no
   assert.match(html, /autoComplete|autocomplete="new-password"/i, 'password managers keep working');
   assert.match(html, /<input[^>]*aria-labelledby="label-1"/, 'the field is named by its visible label, not by the eye button');
   const source = await readFile(new URL('../app/account-gate.tsx', import.meta.url), 'utf8');
-  // Login, register and the repeat field all use it; nothing stores the visibility or the password.
-  assert.equal((source.match(/<PasswordInput /g) ?? []).length, 2);
+  // Login, register, the repeat field and the new password of the e-mail reset (with its repeat field) all use it;
+  // nothing stores the visibility or the password.
+  assert.equal((source.match(/<PasswordInput /g) ?? []).length, 4);
   assert.doesNotMatch(source, /type="password"/);
   assert.doesNotMatch(source.slice(source.indexOf('export function PasswordInput'), source.indexOf('function LoginForm(')), /localStorage|sessionStorage|console\./);
 });

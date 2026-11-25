@@ -165,6 +165,7 @@
 .app-shell:not(.section-home) .coop-world-tools{display:none}
 .account-form .mode-primary, .account-form .mode-secondary { min-height: 44px; font-size: var(--text-footnote); }
 .account-field .mode-input { min-height: 44px; font-size: 16px; }
+.account-field .account-code { font-variant-numeric: tabular-nums; letter-spacing: .3em; font-size: 20px; text-align: center; }
 .account-field .account-password { position: relative; display: block; color: inherit; font-size: inherit; font-weight: inherit; }
 .account-password .mode-input { width: 100%; padding-right: 48px; }
 .account-password-toggle { position: absolute; top: 0; right: 0; display: grid; width: 44px; height: 100%; min-height: 44px; place-items: center; padding: 0; border: 0; border-radius: 0 12px 12px 0; background: transparent; color: var(--soft); cursor: pointer; }

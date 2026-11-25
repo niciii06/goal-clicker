@@ -4,7 +4,7 @@
 import type { AccountApiDeps } from '../../app/account-api.ts';
 import type { AccountRecovery, AuthIdentity, CloudSave, LegacyIdentity, Profile } from '../../db/index.ts';
 import type { AuthSession } from '../../app/auth/server.ts';
-import type { NeonLogin } from '../../app/auth/neon-accounts.ts';
+import type { CodeResult, NeonLogin } from '../../app/auth/neon-accounts.ts';
 
 export const ISSUER = 'https://ep-test.neonauth.example/neondb/auth';
 
@@ -65,6 +65,7 @@ export function memoryStore() {
       return { save };
     },
     getIdentity: async (issuer: string, subject: string) => { await tick(); return identities.find((i) => i.issuer === issuer && i.subject === subject) ?? null; },
+    getIdentityByLoginEmail: async (issuer: string, loginEmail: string) => { await tick(); return identities.find((i) => i.issuer === issuer && i.loginEmail === loginEmail) ?? null; },
     getIdentityForAccount: async (issuer: string, accountId: string) => { await tick(); return identities.find((i) => i.issuer === issuer && i.accountId === accountId) ?? null; },
     bindIdentity: async (values: { issuer: string; subject: string; accountId: string; method: string; loginEmail?: string | null; createdAt: string }) => {
       await tick();
@@ -143,17 +144,53 @@ export type MemoryStore = ReturnType<typeof memoryStore>;
 /** A stand-in for Neon Auth: users with password and/or Google, sessions as cookies. */
 export function fakeNeon() {
   let next = 0;
-  const users = new Map<string, { id: string; email: string; password: string | null; name: string; google: string | null }>();
+  const users = new Map<string, { id: string; email: string; password: string | null; name: string; google: string | null; emailVerified?: boolean }>();
+  /** Email OTP like Managed Better Auth: six digits, 15 minutes, three wrong tries, each code once. */
+  const codes = new Map<string, { otp: string; expiresAt: number; tries: number }>();
+  const outbox: { type: 'email-verification' | 'forget-password'; email: string; otp: string }[] = [];
+  let otpSeq = 0;
   const sessions = new Map<string, string>();
   const calls: string[] = [];
   const login = (userId: string): NeonLogin => {
     const token = `token-${++next}`;
     sessions.set(token, userId);
     const cookie = `__Secure-neon-auth.session_token=${token}`;
-    return { ok: true, subject: userId, setCookies: [`${cookie}; Path=/; HttpOnly; Secure; SameSite=Lax`], sessionCookie: cookie };
+    return { ok: true, subject: userId, setCookies: [`${cookie}; Path=/; HttpOnly; Secure; SameSite=Lax`], sessionCookie: cookie, emailVerified: users.get(userId)?.emailVerified === true };
+  };
+  const issue = (type: 'email-verification' | 'forget-password', email: string) => {
+    const otp = String(100000 + ((++otpSeq * 7919) % 900000));
+    codes.set(`${type}:${email}`, { otp, expiresAt: neon.clock() + 15 * 60_000, tries: 0 });
+    outbox.push({ type, email, otp });
+  };
+  const consume = (type: 'email-verification' | 'forget-password', email: string, otp: string): CodeResult => {
+    const entry = codes.get(`${type}:${email}`);
+    if (!entry || entry.expiresAt < neon.clock()) return { ok: false, reason: 'invalid' };
+    if (entry.otp !== otp) { entry.tries += 1; if (entry.tries >= 3) { codes.delete(`${type}:${email}`); return { ok: false, reason: 'too-many' }; } return { ok: false, reason: 'invalid' }; }
+    codes.delete(`${type}:${email}`);
+    return { ok: true, setCookies: [] };
   };
   const neon = {
-    users, sessions, calls,
+    users, sessions, calls, codes, outbox,
+    clock: () => Date.now(),
+    /** Revoke sessions on password reset (a per branch setting at Neon, off by default). */
+    revokeOnReset: false,
+    /** The last code mailed to an address. */
+    lastCode: (email: string, type: 'email-verification' | 'forget-password' = 'email-verification') => [...outbox].reverse().find((m) => m.email === email && m.type === type)?.otp ?? '',
+    sendVerification: async (email: string) => { calls.push(`send-verification:${email}`); await Promise.resolve(); if ([...users.values()].some((u) => u.email === email)) issue('email-verification', email); return true; },
+    verifyEmail: async (email: string, otp: string): Promise<CodeResult> => {
+      calls.push(`verify-email:${email}`); await Promise.resolve();
+      const result = consume('email-verification', email, otp);
+      if (result.ok) { const user = [...users.values()].find((u) => u.email === email); if (user) user.emailVerified = true; }
+      return result;
+    },
+    sendReset: async (email: string) => { calls.push(`send-reset:${email}`); await Promise.resolve(); if ([...users.values()].some((u) => u.email === email)) issue('forget-password', email); return true; },
+    resetPassword: async (email: string, otp: string, password: string): Promise<CodeResult> => {
+      calls.push(`reset-password:${email}`); await Promise.resolve();
+      const result = consume('forget-password', email, otp);
+      const user = [...users.values()].find((u) => u.email === email);
+      if (result.ok && user) { user.password = password; if (neon.revokeOnReset) for (const [token, owner] of sessions) if (owner === user.id) sessions.delete(token); }
+      return result;
+    },
     /** Fails the next N sign ups (simulating a Neon Auth outage at that moment). */
     failSignUps: 0,
     /** Like the real Managed Better Auth: no self service delete-user. */
@@ -194,13 +231,13 @@ export function fakeNeon() {
     /** A Google sign in: a new Neon user with a Google account (Neon creates one per Google sub). */
     googleLogin: (sub: string, email = `${sub}@gmail.example`) => {
       let user = [...users.values()].find((u) => u.google === sub);
-      if (!user) { user = { id: `neon-user-${++next}`, email, password: null, name: 'Google Spieler', google: sub }; users.set(user.id, user); }
+      if (!user) { user = { id: `neon-user-${++next}`, email, password: null, name: 'Google Spieler', google: sub, emailVerified: true }; users.set(user.id, user); }
       return login(user.id);
     },
     session: (cookie: string): AuthSession | null => {
       const userId = sessions.get(cookie.split('=')[1]);
       const user = userId ? users.get(userId) : undefined;
-      return user ? { issuer: ISSUER, subject: user.id, email: user.email, name: user.name, sessionCookie: cookie } : null;
+      return user ? { issuer: ISSUER, subject: user.id, email: user.email, emailVerified: user.emailVerified === true, name: user.name, sessionCookie: cookie } : null;
     },
     listAccounts: async (session: AuthSession) => {
       const user = users.get(session.subject);
@@ -224,7 +261,7 @@ export function cookieOf(request: Request) {
 }
 
 /** AccountApiDeps wired to the memory store and the fake Neon Auth. */
-export function accountDeps(store: MemoryStore, neon: FakeNeon, options: { now?: () => Date; legacy?: Record<string, { userId: string; password: string }>; legacyDown?: () => boolean } = {}): AccountApiDeps {
+export function accountDeps(store: MemoryStore, neon: FakeNeon, options: { now?: () => Date; legacy?: Record<string, { userId: string; password: string }>; legacyDown?: () => boolean; emailSignup?: boolean } = {}): AccountApiDeps {
   let ids = 0;
   return {
     getSession: async (request) => { const cookie = cookieOf(request); return cookie ? neon.session(cookie) : null; },
@@ -232,12 +269,15 @@ export function accountDeps(store: MemoryStore, neon: FakeNeon, options: { now?:
       const identity = store.identities.find((i) => i.issuer === session.issuer && i.subject === session.subject);
       if (!identity) return { ok: false, status: 409, errorCode: 'ACCOUNT_SETUP_REQUIRED', error: 'setup' };
       if (identity.deletedAt) return { ok: false, status: 410, errorCode: 'ACCOUNT_DELETION_PENDING', error: 'pending' };
+      // Same rule as app/auth/identity.ts: an e-mail account opens only with a confirmed address.
+      if (identity.method === 'email' && session.emailVerified !== true) return { ok: false, status: 403, errorCode: 'EMAIL_UNVERIFIED', error: 'unverified' };
       return { ok: true, accountId: identity.accountId, method: identity.method, created: false };
     },
     db: () => store,
     now: options.now ?? (() => new Date('2026-11-02T10:00:00.000Z')),
     newId: () => `00000000-0000-4000-8000-${String(++ids).padStart(12, '0')}`,
-    neon: { signUp: (e, p, n) => neon.signUp(e, p, n), signIn: (e, p) => neon.signIn(e, p), signOut: (c) => neon.signOut(c), deleteUser: (c) => neon.deleteUser(c), endAllSessions: (c) => neon.endAllSessions(c) },
+    neon: { signUp: (e, p, n) => neon.signUp(e, p, n), signIn: (e, p) => neon.signIn(e, p), signOut: (c) => neon.signOut(c), deleteUser: (c) => neon.deleteUser(c), endAllSessions: (c) => neon.endAllSessions(c), sendVerification: (e) => neon.sendVerification(e), verifyEmail: (e, o) => neon.verifyEmail(e, o), sendReset: (e) => neon.sendReset(e), resetPassword: (e, o, p) => neon.resetPassword(e, o, p) },
+    emailSignup: () => options.emailSignup === true,
     legacy: {
       configured: () => Boolean(options.legacy),
       verify: async (email, password) => {
