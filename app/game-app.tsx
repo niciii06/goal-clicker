@@ -44,7 +44,7 @@ import { answerPressConference, getPressReward } from "./press-conference";
 import { canVibrate, readVibrationSetting, setVibrationOn, vibrate, vibrationOn } from "./game/device";
 import { albumMilestonesFromStorage, claimAlbumRewards, getCareerCard, getPlayerForm, prepareCareerMatch, recordCareerMatch, rivalryKey } from "./career-data";
 import { competitionFor, competitionLabel, competitionOfCup, getBannedPlayerIds, nextCompetition, squadBanError, suspensionLabel } from "./discipline";
-import { WORLD_DAILY_KEY, claimDailyReward, mergeDailyRewardsForWorld } from "./daily-reward";
+import { WORLD_DAILY_KEY, claimDailyReward, describeDailyReward, mergeDailyRewardsForWorld } from "./daily-reward";
 import { confirmMatchDraft, requestMatchEdit } from "./match-commands";
 import { consumeTravel, eligibilityError, fixtureFor, journeyView, payTravelFines, settleTravel, travelTiming } from "./travel-data";
 import { COOP_UPDATE_REQUIRED_EVENT, coopLastActiveLabel, coopRetryDelay, coopRoleLabel, createCoopGameNormalizer, isCoopRole, multiplayerUrl, newCoopActionId, notifyCoopOffline, occupiedCoopPlayers, prestigeVoteMessage, readCoopResponse, reloadForUpdate, upsertSavedRoom } from "./game/coop";
@@ -81,7 +81,7 @@ import { bestRatingPerFormation, benchChangeCount, describeReplacements, fillSta
 import type { LineupChange } from "./game/lineup-tools";
 import { KickoffChecklist, type KickoffItem } from "./qol/kickoff-checklist";
 import { abandonTournamentBlockReason, abandonTournamentRun } from "./game/tournament-abandon";
-import { HISTORY_TOPICS, filterHistory, historyActors, type HistoryTopic } from "./qol/history-filter";
+import { HISTORY_TOPICS, filterHistory, historyActors, historyLine, type HistoryTopic } from "./qol/history-filter";
 import { inviteUrl, joinCodeFromSearch, shortcutFor } from "./qol/invite";
 import { newNotifiableActions, setAppBadge, showLocalNotification } from "./qol/notifications";
 import { DeviceSettingsPanel, type SoundPrefs } from "./qol/device-settings";
@@ -276,6 +276,9 @@ export function App() {
   const [tutorial, setTutorialState] = useState<TutorialState>(finishedTutorial);
   // Ending the tutorial before the welcome pack was opened asks first: the pack would be lost for good.
   const [tutorialEndDialog, setTutorialEndDialog] = useState(false);
+  // Counts every change of the tutorial by the player or the game. A deferred tick (below) applies only when nothing
+  // changed in between, so skipping, starting or ending the tutorial is never undone by an older result.
+  const tutorialVersionRef = useRef(0);
   const [appMode, setAppMode] = useState<AppMode>("single");
   const [playerId, setPlayerId] = useState("");
   const [playerName, setPlayerName] = useState("");
@@ -696,6 +699,8 @@ export function App() {
   const starWalkoutElapsed = Math.min(starWalkoutAnimationDuration, Math.max(0, starRevealLag - starRevealTrollDelay));
   const starRareElapsed = Math.min(STAR_RARE_REVEAL_DURATION_MS, starRevealLag);
   const starWalkoutPresentation = starReveal ? getWalkoutPresentation(starReveal.player) : null;
+  // Screen readers hear the card (tier, name, country, position, rating) only once the reveal is ready, never earlier than the sighted player sees it.
+  const starWalkoutAnnouncement = starReveal && starWalkoutPresentation && starWalkoutReady && !starRevealTrollActive ? t("reveal.announce", { tier: t(starRevealIsLegendary ? "reveal.announceLegendary" : starRevealIsIconic ? "reveal.announceIcon" : starWalkoutIsTop ? "reveal.announceTop" : "reveal.announceWalkout"), name: starReveal.player.name, country: starWalkoutPresentation.country, positions: formatStarXIPositions(starReveal.player), rating: starReveal.player.rating }) : "";
   const starWalkoutStyle = starWalkoutPresentation ? {
     "--walkout-skin": starWalkoutPresentation.skin,
     "--walkout-hair": starWalkoutPresentation.hairColor,
@@ -3081,7 +3086,8 @@ export function App() {
       try {
         const data = await sendCoopAction("daily-claim");
         if (data?.dailyReward) {
-          showToast(`${t("logic.dailyToast", { day: data.dailyReward.dayIndex, amount: formatNumber(data.dailyReward.amount) })}${data.dailyReward.pack ? t("logic.dailyPackWorld") : ""}`);
+          // A pack only day (day 7) names the pack and never a zero amount (app/daily-reward.ts describeDailyReward).
+          showToast(data.dailyReward.pack && data.dailyReward.amount <= 0 ? t("logic.dailyToastPackOnlyWorld", { day: data.dailyReward.dayIndex }) : `${t("logic.dailyToast", { day: data.dailyReward.dayIndex, amount: formatNumber(data.dailyReward.amount) })}${data.dailyReward.pack ? t("logic.dailyPackWorld") : ""}`);
           vibrate([40, 30, 90]);
         }
       } finally {
@@ -3098,11 +3104,12 @@ export function App() {
       const features = normalizeGameFeatures(current.features);
       features.dailyRewards = claim.state;
       if (claim.pack && !features.earnedPacks.some((pack) => pack.id === claim.pack!.id)) features.earnedPacks.push(claim.pack);
-      addHistory(features, { title: `Tägliche Prämie · Tag ${claim.dayIndex}`, detail: `+${formatNumber(claim.amount)} Tore${claim.pack ? " und ein Spezialkarten-Pack" : ""}. Serie: ${claim.streak} ${claim.streak === 1 ? "Tag" : "Tage"}.`, tone: "positive" }, now);
+      addHistory(features, { title: `Tägliche Prämie · Tag ${claim.dayIndex}`, detail: `${describeDailyReward(claim.amount, Boolean(claim.pack), formatNumber)}. Serie: ${claim.streak} ${claim.streak === 1 ? "Tag" : "Tage"}.`, tone: "positive" }, now);
       return { ...current, goals: current.goals + claim.amount, seasonGoals: current.seasonGoals + claim.amount, totalGoals: current.totalGoals + claim.amount, features };
     });
-    addFeed(t("logic.dailyAmount", { dayIndex: preview.dayIndex, amount: formatNumber(preview.amount) }), "star");
-    showToast(`${t("logic.dailyToast", { day: preview.dayIndex, amount: formatNumber(preview.amount) })}${preview.pack ? t("logic.dailyPackAlbum") : ""}`);
+    const packOnly = Boolean(preview.pack) && preview.amount <= 0;
+    addFeed(packOnly ? t("logic.dailyPackOnly", { dayIndex: preview.dayIndex }) : t("logic.dailyAmount", { dayIndex: preview.dayIndex, amount: formatNumber(preview.amount) }), "star");
+    showToast(packOnly ? t("logic.dailyToastPackOnlyAlbum", { day: preview.dayIndex }) : `${t("logic.dailyToast", { day: preview.dayIndex, amount: formatNumber(preview.amount) })}${preview.pack ? t("logic.dailyPackAlbum") : ""}`);
     playTone(659, 0.1, "triangle", 0.04);
     playTone(988, 0.18, "triangle", 0.045, 0.1);
     vibrate([40, 30, 90]);
@@ -3252,6 +3259,7 @@ export function App() {
   }
 
   function setTutorial(next: TutorialState) {
+    tutorialVersionRef.current += 1;
     setTutorialState(next);
     try {
       // A synced key: the cloud upload carries the progress to the player's other devices.
@@ -3526,7 +3534,10 @@ export function App() {
     const next = advanceTutorial(tutorial, game, featureTab);
     if (next === tutorial) return;
     const finished = next.status === "done";
+    const version = tutorialVersionRef.current;
     window.setTimeout(() => {
+      // Skipped, started or ended meanwhile: this result is out of date; the effect runs again on the new state.
+      if (tutorialVersionRef.current !== version) return;
       setTutorial(next);
       if (finished) {
         showToast(t("logic.tutorialDone"));
@@ -3847,7 +3858,7 @@ export function App() {
           {featureTab === "missions" && <WeeklyGoalsPanel features={displayGame.features} minigameWins={displayGame.minigameWins} coop={isCoopLive} busy={coopBusy} now={getTravelTime()} onClaim={(goalId) => void claimWeeklyGoalReward(goalId)} />}
 
           {featureTab === "leaderboard" && <LeaderboardPanel playerId={playerId} />}
-          {featureTab === "history" && <div className="feature-panel"><div className="feature-panel-heading"><div><p className="eyebrow">{t("club.matchCenterEyebrow")}</p><h3>{t("club.whatHappens")}</h3></div><span className="feature-stat">{featureHistory.length} {t("club.entries")}</span></div><div className="history-filters"><div className="starxi-filter-row" role="group" aria-label={t("club.historyFilter")}>{HISTORY_TOPICS.map((topic) => <button type="button" key={topic.id} className={historyTopic === topic.id ? "active" : ""} aria-pressed={historyTopic === topic.id} onClick={() => setHistoryTopic(topic.id)}>{topic.label}</button>)}</div>{featureHistoryActors.length > 0 && <select className="starxi-position-filter" value={historyActor} onChange={(event) => setHistoryActor(event.target.value)} aria-label={t("club.historyByPlayer")}><option value="">{t("club.allTeammates")}</option>{featureHistoryActors.map((actor) => <option key={actor} value={actor}>{actor}</option>)}</select>}</div><div className="history-list">{featureHistory.length ? featureHistory.map((entry) => <div className={`history-row ${entry.tone}`} key={entry.id}><span><Icon name={entry.tone === "negative" ? "screen" : entry.title.includes("Pokal") ? "crown" : "star"} size={15} /></span><div><strong>{localizeText(entry.title)}</strong><small>{entry.actor ? `${entry.actor} · ` : ""}{localizeText(entry.detail)}</small></div><em>{formatHistoryTime(entry.timestamp)}</em></div>) : <div className="feature-empty"><Icon name="broadcast" size={25} /><p>{t("club.noEntries")}</p></div>}</div></div>}
+          {featureTab === "history" && <div className="feature-panel"><div className="feature-panel-heading"><div><p className="eyebrow">{t("club.matchCenterEyebrow")}</p><h3>{t("club.whatHappens")}</h3></div><span className="feature-stat">{featureHistory.length} {t("club.entries")}</span></div><div className="history-filters"><div className="starxi-filter-row" role="group" aria-label={t("club.historyFilter")}>{HISTORY_TOPICS.map((topic) => <button type="button" key={topic.id} className={historyTopic === topic.id ? "active" : ""} aria-pressed={historyTopic === topic.id} onClick={() => setHistoryTopic(topic.id)}>{topic.label}</button>)}</div>{featureHistoryActors.length > 0 && <select className="starxi-position-filter" value={historyActor} onChange={(event) => setHistoryActor(event.target.value)} aria-label={t("club.historyByPlayer")}><option value="">{t("club.allTeammates")}</option>{featureHistoryActors.map((actor) => <option key={actor} value={actor}>{actor}</option>)}</select>}</div><div className="history-list">{featureHistory.length ? featureHistory.map((entry) => <div className={`history-row ${entry.tone}`} key={entry.id}><span><Icon name={entry.tone === "negative" ? "screen" : entry.title.includes("Pokal") ? "crown" : "star"} size={15} /></span><div><strong>{localizeText(entry.title)}</strong><small>{historyLine(entry.actor, localizeText(entry.detail))}</small></div><em>{formatHistoryTime(entry.timestamp)}</em></div>) : <div className="feature-empty"><Icon name="broadcast" size={25} /><p>{t("club.noEntries")}</p></div>}</div></div>}
           {featureTab === "history" && displayGame.features.gazetteIssues.length > 0 && <section className="gazette-archive"><div className="gazette-archive-heading"><div><p className="eyebrow">{t("club.gazetteArchive")}</p><h3>{t("club.frontPages")}</h3></div><span>{displayGame.features.gazetteIssues.length} {t("club.spending")}</span></div><div>{[...displayGame.features.gazetteIssues].reverse().map((issue) => <article className={issue.tone} key={`gazette-archive-${issue.id}`}><small>{dataText(getTournament(issue.tournamentId)?.label) || t("club.tournament")} · {formatHistoryTime(issue.createdAt)}</small><strong>{issue.headline}</strong><p>{issue.strapline}</p></article>)}</div></section>}
         </section>
 
@@ -3924,7 +3935,7 @@ export function App() {
             {/* The tier (86+, 90+, Icon, Legendary) is a spoiler: its label appears only once the walkout is over. */}
             <span className={`star-reveal-walkout-label${starWalkoutReady || starRevealTrollActive ? "" : " pending"}`} aria-hidden={!starWalkoutReady && !starRevealTrollActive}>{starRevealTrollActive ? t("reveal.something") : !starWalkoutReady ? "\u00a0" : starRevealIsLegendary ? t("reveal.legendaryWalkout") : starRevealIsIconic ? t("reveal.iconSilver") : starWalkoutIsTop ? "TOP WALKOUT · 90+" : "WALKOUT · 86+"}</span>
             <span className="star-reveal-kicker">{starRevealTrollActive ? t("reveal.falseTrail") : starRevealIsCustomDraw ? t("reveal.randomDraw") : t("reveal.packStadium", { packName: dataText(starReveal.packName) })}</span>
-            {starRevealTrollActive ? <div className="star-pack-troll-stage" aria-live="assertive"><div className="star-pack-troll-mascot" aria-hidden="true"><i className="mascot-ear left" /><i className="mascot-ear right" /><span>GC</span><b>⚽</b></div><strong>{t("reveal.mascot")}</strong><small>{t("reveal.fakeWalkout")}</small></div> : <div className="star-walkout-stage" aria-live="assertive" style={starWalkoutStyle}>
+            {starRevealTrollActive ? <div className="star-pack-troll-stage" aria-live="assertive"><div className="star-pack-troll-mascot" aria-hidden="true"><i className="mascot-ear left" /><i className="mascot-ear right" /><span>GC</span><b>⚽</b></div><strong>{t("reveal.mascot")}</strong><small>{t("reveal.fakeWalkout")}</small></div> : <div className="star-walkout-stage" aria-hidden="true" style={starWalkoutStyle}>
               <div className="star-walkout-pyro" aria-hidden="true">{Array.from({ length: starWalkoutIsTop ? 17 : 11 }, (_, index) => <i key={index} style={{ "--pyro-index": index } as CSSProperties} />)}</div>
               <div className="star-walkout-confetti" aria-hidden="true">{GOAL_CONFETTI.map((particle, index) => <i key={index} style={{ left: particle.left, animationDelay: `calc(${900 + index * 28}ms + var(--walkout-delay, 0ms))`, animationDuration: particle.duration, background: starWalkoutConfetti ? starWalkoutConfetti[index % starWalkoutConfetti.length] : particle.color }} />)}</div>
               {starWalkoutPresentation && <>
@@ -3934,6 +3945,7 @@ export function App() {
                 <div className="star-walkout-nameplate"><span><WalkoutCountryFlag compact code={starWalkoutPresentation.countryCode} country={starWalkoutPresentation.country} /> {starWalkoutPresentation.countryCode} · {formatStarXIPositions(starReveal.player)}</span><h2>{starReveal.player.name}</h2></div>
               </>}
             </div>}
+            <span className="sr-only" role="status">{starWalkoutAnnouncement}</span>
             <p className={`star-walkout-copy${starWalkoutReady ? " ready" : ""}`}>{starRevealTrollActive ? t("reveal.trolled") : !starWalkoutReady ? "\u00a0" : `${isCoopLive ? t(starRevealIsCustomDraw ? "reveal.openedByDrew" : "reveal.openedByOpened", { name: starReveal.openedBy }) : ""}${starReveal.duplicate ? t("reveal.duplicateBody", { fragments: formatNumber(starReveal.fragmentCompensation) }) : t("reveal.walkoutBody", { positions: formatStarXIPositions(starReveal.player), rating: starReveal.player.rating })}`}</p>
             <span className={`star-reveal-status star-walkout-status${starWalkoutReady ? " ready" : ""}`}>{starRevealTrollActive ? t("reveal.packTroll") : starWalkoutReady ? starReveal.duplicate ? t("reveal.duplicate") : starRevealIsLegendary ? t("reveal.legendaryStar") : starRevealIsIconic ? t("reveal.iconStar") : t("reveal.walkoutStar") : t("reveal.walkoutRunning")}</span>
             {starWalkoutReady && !starRevealTrollActive && revealLineupButton}
@@ -3963,7 +3975,7 @@ export function App() {
       {eventAnnouncement && <div key={`${eventAnnouncement.id}:${eventAnnouncement.createdAt}`} className={`gc-notification ${eventAnnouncement.tone}`} role="status" aria-live="polite"><span aria-hidden="true">{eventAnnouncement.id==='var'?'📺':eventAnnouncement.tone==='negative'?'⚠️':'🏟️'}</span><div><strong>{eventAnnouncement.title}</strong><p>{eventAnnouncement.message}</p><small>{eventAnnouncement.amount<0?t("event.minusGoals", { amount: formatNumber(Math.abs(eventAnnouncement.amount)) }):eventAnnouncement.amount>0?t("event.plusGoals", { amount: formatNumber(eventAnnouncement.amount) }):t("event.noChange")}</small></div></div>}
       {offline && <div className="offline-banner" role="alert"><span className="offline-mark">Ⅱ</span><p>{localizeText(offline)}</p>{offline === SAVE_FAILED_MESSAGE && <button type="button" className="mode-secondary" style={{ minHeight: 44, flexShrink: 0, color: "var(--text)", fontSize: "var(--text-caption2)" }} onClick={() => showToast(exportCurrentSave(gameRef.current) ? t("club.saveFileDone") : t("game.saveFileFailed"))}>{t("club.saveAsFile")}</button>}{offline === NEWER_VERSION_MESSAGE && <button type="button" className="mode-secondary" style={{ minHeight: 44, flexShrink: 0, color: "var(--text)", fontSize: "var(--text-caption2)" }} onClick={() => window.location.reload()}>{t("game.reload")}</button>}<button type="button" style={{ minWidth: 44, minHeight: 44 }} onClick={() => setOffline("")} aria-label={t("game.closeHint")}>×</button></div>}
       <footer className="footer-note">Made by xevihans</footer>
-      {toast && <div className="toast" aria-hidden="true">{toast}</div>}
+      {toast && <div className={`toast${displayGame.features.welcomePack === "available" && featureTab === "packs" ? " toast-top" : ""}`} aria-hidden="true">{toast}</div>}
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{srAnnouncement}</div>
     </div>
   );

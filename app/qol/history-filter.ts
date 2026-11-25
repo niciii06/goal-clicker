@@ -24,3 +24,14 @@ export function filterHistory<T extends Pick<MatchHistoryEntry, "title" | "kind"
 export function historyActors(entries: readonly Pick<MatchHistoryEntry, "actor">[]) {
   return [...new Set(entries.map((entry) => entry.actor).filter((actor): actor is string => Boolean(actor)))].sort((a, b) => a.localeCompare(b, "de-CH"));
 }
+
+/**
+ * The visible line of a history entry: "Lea · Pack geöffnet." names the member who did it. A text that already
+ * starts with that name ("Lea holt ein Spezialkarten-Pack.", "Lea hat die Welt verlassen.") keeps it once. Display
+ * only; the stored entry stays as it is. `actor` is cut to 24 characters, so a longer name matches by its start.
+ */
+export function historyLine(actor: string | undefined, detail: string) {
+  if (!actor) return detail;
+  const named = detail.startsWith(`${actor} `) || (actor.length >= 24 && detail.startsWith(actor));
+  return named ? detail : `${actor} · ${detail}`;
+}
