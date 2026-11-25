@@ -1374,7 +1374,7 @@ export const gameEn = {
   "logic.youSuffix": " · you",
   "map.change": "Change",
   "map.follow": "Follow",
-  "map.fromBernTo": "Travel map from Bern to {city}",
+  "map.fromTo": "Travel map from {from} to {city}",
   "map.reportError": "Report a map error",
   "map.route": "Route",
   "map.tilesUnavailable": "Map tiles unavailable. Route and trip continue.",

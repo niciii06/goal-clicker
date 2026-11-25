@@ -6,6 +6,7 @@ import type { MapPoint, VehicleState } from './travel-map-geometry';
 import { routeCache, routeCacheReady } from './journey-routing';
 import { loadRouteCache } from './travel-route-cache-lazy';
 import { t } from './i18n/runtime';
+import { homeVenueOf } from './home-cities';
 const ICONS={walk:'🚶',bike:'🚲',car:'🚗',bus:'🚌',train:'🚆',plane:'✈️'};
 const VIEW={width:800,height:340,cx:400,cy:170};
 /** Map props arrive about every 100 ms; between them the vehicle is extrapolated for at most this long. */
@@ -21,6 +22,9 @@ function vehicleTransforms(vehicle:VehicleState,scale:number){
   shadow:`translate(${lift*7},${lift*9}) scale(${1-lift*.25})`,
  };
 }
+
+/** The city the trip leaves from: the saved origin of the journey, else the home city of its fixture (Bern for old saves). */
+export function mapOriginCity(journey:Pick<Journey,'origin'|'fixture'>){return journey.origin?.city??homeVenueOf(journey.fixture.home).city;}
 
 export function TravelMap({journey,now,progress}:{journey:Journey;now:number;progress:number}) {
  // The route data loads in the background; once it is there, legs saved without road geometry are redrawn on the road.
@@ -91,7 +95,7 @@ export function TravelMap({journey,now,progress}:{journey:Journey;now:number;pro
  const start=routes[0].projected[0],end=routes.at(-1)!.projected.at(-1)!;
  const activeIcon=vehicle.mode==='wait'?'⌛':ICONS[vehicle.mode];
 
- return <div className="travel-map-wrap"><svg ref={svg} className="travel-map" viewBox={`0 0 ${VIEW.width} ${VIEW.height}`} role="img" aria-label={t("map.fromBernTo", { city: journey.fixture.venue.city })}
+ return <div className="travel-map-wrap"><svg ref={svg} className="travel-map" viewBox={`0 0 ${VIEW.width} ${VIEW.height}`} role="img" aria-label={t("map.fromTo", { from: mapOriginCity(journey), city: journey.fixture.venue.city })}
   onPointerDown={e=>{pointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});e.currentTarget.setPointerCapture(e.pointerId);if(pointers.current.size===1)startPan({x:e.clientX,y:e.clientY});else{pan.current=null;pinch.current=spread();}}}
   onPointerMove={e=>{
    if(!pointers.current.has(e.pointerId))return;pointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});

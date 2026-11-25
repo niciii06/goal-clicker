@@ -1375,7 +1375,7 @@ export const gameDe = {
   "logic.youSuffix": " · du",
   "map.change": "Umstieg",
   "map.follow": "Folgen",
-  "map.fromBernTo": "Reisekarte von Bern nach {city}",
+  "map.fromTo": "Reisekarte von {from} nach {city}",
   "map.reportError": "Kartenfehler melden",
   "map.route": "Route",
   "map.tilesUnavailable": "Kartenkacheln nicht verfügbar. Route und Reise laufen weiter.",
