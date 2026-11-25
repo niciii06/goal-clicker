@@ -7,13 +7,14 @@ import { getCareerCard } from './career-data';
 import { CareerPlayerBadge } from './career-panels';
 import { StarXIPositionBadges } from './game/ui';
 import type { SquadArea, SquadDragSource, SquadDropTarget } from './game/types';
+import { t } from './i18n/runtime';
 
 // One set of squad components for the "Kader" tab and every in-match substitution view,
 // so drag and drop, graphics and milestone ratings stay identical everywhere.
 export const SQUAD_DRAG_MIME = 'application/x-goal-clicker-player';
 
 export function formatStarXIPositions(player: Parameters<typeof getStarXIPositions>[0], compact = false) {
-  return player.benchOnly ? `${player.symbol} Nur Bank` : player.id === 'star-goat-nicu' ? 'Alle Positionen' : getStarXIPositions(player).join(compact ? '/' : ' / ');
+  return player.benchOnly ? t("board.benchOnly", { symbol: player.symbol }) : player.id === 'star-goat-nicu' ? t("board.allPositions") : getStarXIPositions(player).join(compact ? '/' : ' / ');
 }
 
 /** Rating shown on squad cards: the strongest unlocked milestone card, capped at 100. */
@@ -181,22 +182,22 @@ export function useSquadDrag({ canDrop, onDrop, onBlocked, locked, picked }: Squ
 export type SquadDrag = ReturnType<typeof useSquadDrag>;
 
 function matchRatingBadge(liveRating: number | null) {
-  return liveRating !== null && <span className={`starxi-match-rating${liveRating < 6 ? ' poor' : liveRating >= 8 ? ' great' : ''}`}>NOTE {liveRating.toFixed(1)}</span>;
+  return liveRating !== null && <span className={`starxi-match-rating${liveRating < 6 ? ' poor' : liveRating >= 8 ? ' great' : ''}`}>{t("board.ratingCaps")} {liveRating.toFixed(1)}</span>;
 }
 
 export function SquadPitchSlot({ features, drag, index, position, x, y, player, selected, liveRating, draggable, disabled, touchDrag = false, detail, banLabel, onClick }: {
   features: GameFeatures; drag: SquadDrag; index: number; position: string; x: number; y: number; player: StarXIPlayer | null; selected: boolean; liveRating: number | null;
-  draggable: boolean; disabled: boolean; touchDrag?: boolean; detail?: string; /** The player is banned for the coming match ("GESPERRT · LIGA"). */ banLabel?: string; onClick: () => void;
+  draggable: boolean; disabled: boolean; touchDrag?: boolean; detail?: string; /** The player is banned for the coming match (t("board.leagueBan")). */ banLabel?: string; onClick: () => void;
 }) {
   const sentOff = Boolean(player && features.cup.sentOffPlayerIds.includes(player.id));
   const injured = Boolean(player && Number(features.cup.injuredPlayerIds[player.id]) > 0);
   const slotStyle = { '--slot-x': `${x}%`, '--slot-y': `${y}%` } as CSSProperties;
   const dragSource: SquadDragSource | null = player ? { playerId: player.id, area: 'lineup', index } : null;
-  return <button type="button" style={slotStyle} data-squad-area="lineup" data-squad-index={index} className={`starxi-pitch-slot${selected ? ' selected' : ''}${player ? ' filled' : ' empty'}${sentOff ? ' red-carded' : ''}${injured ? ' injured' : ''}${banLabel ? ' banned' : ''}${liveRating !== null && liveRating < 6 ? ' match-poor' : ''}${drag.dragging?.playerId === player?.id ? ' squad-dragging' : ''}${touchDrag && dragSource && draggable ? ' squad-touch-drag' : ''}${drag.squadDropClass('lineup', index)}`} onClick={() => { if (!drag.consumeDragClick()) onClick(); }} disabled={disabled} draggable={Boolean(dragSource && draggable)} onDragStart={(event) => dragSource && drag.handleSquadDragStart(event, dragSource)} onDragOver={(event) => drag.handleSquadDragOver(event, { area: 'lineup', index })} onDrop={(event) => void drag.handleSquadDrop(event, { area: 'lineup', index })} onDragEnd={drag.handleSquadDragEnd} {...(touchDrag && draggable ? drag.touchHandlers(dragSource) : {})} aria-pressed={selected} aria-label={`${position}: ${player?.name ?? 'offener Platz'}${sentOff ? ', Rote Karte' : injured ? ', verletzt' : player ? ', zum Wechseln ziehen' : ', Spieler hier ablegen'}`}>
-    <span className="starxi-slot-position">{position}</span><strong>{player?.name ?? 'Offener Platz'}</strong>
-    <small>{sentOff ? 'ROTE KARTE · NÄCHSTE PARTIE GESPERRT' : banLabel ? banLabel : injured ? `VERLETZT · FEHLT NOCH ${features.cup.injuredPlayerIds[player?.id ?? '']} SPIELE` : player ? `OVR ${squadCardRating(features, player)} · ${formatStarXIPositions(player)}${detail ? ` · ${detail}` : ''}` : `Nur ${position}`}</small>
+  return <button type="button" style={slotStyle} data-squad-area="lineup" data-squad-index={index} className={`starxi-pitch-slot${selected ? ' selected' : ''}${player ? ' filled' : ' empty'}${sentOff ? ' red-carded' : ''}${injured ? ' injured' : ''}${banLabel ? ' banned' : ''}${liveRating !== null && liveRating < 6 ? ' match-poor' : ''}${drag.dragging?.playerId === player?.id ? ' squad-dragging' : ''}${touchDrag && dragSource && draggable ? ' squad-touch-drag' : ''}${drag.squadDropClass('lineup', index)}`} onClick={() => { if (!drag.consumeDragClick()) onClick(); }} disabled={disabled} draggable={Boolean(dragSource && draggable)} onDragStart={(event) => dragSource && drag.handleSquadDragStart(event, dragSource)} onDragOver={(event) => drag.handleSquadDragOver(event, { area: 'lineup', index })} onDrop={(event) => void drag.handleSquadDrop(event, { area: 'lineup', index })} onDragEnd={drag.handleSquadDragEnd} {...(touchDrag && draggable ? drag.touchHandlers(dragSource) : {})} aria-pressed={selected} aria-label={`${position}: ${player?.name ?? t('board.openPlaceLower')}${sentOff ? t('board.redCardSuffix') : injured ? t('board.injuredSuffix') : player ? t('board.dragToSwapSuffix') : t('board.dropPlayerSuffix')}`}>
+    <span className="starxi-slot-position">{position}</span><strong>{player?.name ?? t("board.openPlace")}</strong>
+    <small>{sentOff ? t("board.redNext") : banLabel ? banLabel : injured ? t("board.injuredMatches", { matches: features.cup.injuredPlayerIds[player?.id ?? ''] }) : player ? `OVR ${squadCardRating(features, player)} · ${formatStarXIPositions(player)}${detail ? ` · ${detail}` : ''}` : t("board.onlyPosition", { position })}</small>
     {player && <CareerPlayerBadge features={features} player={player} compact />}{matchRatingBadge(liveRating)}
-    {player && features.starXI.pinnedPlayerIds?.includes(player.id) && <em className="starxi-pin-chip">FIXIERT</em>}
+    {player && features.starXI.pinnedPlayerIds?.includes(player.id) && <em className="starxi-pin-chip">{t("board.pinned")}</em>}
   </button>;
 }
 
@@ -206,17 +207,17 @@ export function SquadBenchCard({ features, drag, index, player, selected, incomp
 }) {
   const dragSource: SquadDragSource = { playerId: player.id, area: 'bench', index };
   return <button type="button" data-squad-area="bench" data-squad-index={index} className={`starxi-player-card bank${selected ? ' selected' : ''}${incompatible ? ' incompatible' : ''}${banLabel ? ' banned' : ''}${liveRating !== null && liveRating < 6 ? ' match-poor' : ''}${drag.dragging?.playerId === player.id ? ' squad-dragging' : ''}${touchDrag && draggable ? ' squad-touch-drag' : ''}${drag.squadDropClass('bench', index)}`} onClick={() => { if (!drag.consumeDragClick()) onClick(); }} disabled={disabled} draggable={draggable} onDragStart={(event) => drag.handleSquadDragStart(event, dragSource)} onDragEnd={drag.handleSquadDragEnd} onDragOver={(event) => drag.handleSquadDragOver(event, { area: 'bench', index })} onDrop={(event) => void drag.handleSquadDrop(event, { area: 'bench', index })} {...(touchDrag && draggable ? drag.touchHandlers(dragSource) : {})} aria-pressed={selected}>
-    <StarXIPositionBadges player={player} variant="compact" /><div><strong>{player.name}</strong><CareerPlayerBadge features={features} player={player} /><small>{liveRating !== null ? `NOTE ${liveRating.toFixed(1)} · ` : ''}{banLabel ?? status}</small></div><b>{squadCardRating(features, player)}</b>
+    <StarXIPositionBadges player={player} variant="compact" /><div><strong>{player.name}</strong><CareerPlayerBadge features={features} player={player} /><small>{liveRating !== null ? t("board.rating", { rating: liveRating.toFixed(1) }) : ''}{banLabel ?? status}</small></div><b>{squadCardRating(features, player)}</b>
   </button>;
 }
 
 export function SquadBenchSlot({ drag, index, selected, disabled, onClick }: { drag: SquadDrag; index: number; selected: boolean; disabled: boolean; onClick: () => void }) {
-  return <button type="button" data-squad-area="bench" data-squad-index={index} className={`starxi-bank-slot${selected ? ' selected' : ''}${drag.squadDropClass('bench', index)}`} onClick={onClick} disabled={disabled} onDragOver={(event) => drag.handleSquadDragOver(event, { area: 'bench', index })} onDrop={(event) => void drag.handleSquadDrop(event, { area: 'bench', index })}><span>BANK {index + 1}</span><small>{selected ? 'gewählt' : drag.dragging ? 'hier ablegen' : 'frei'}</small></button>;
+  return <button type="button" data-squad-area="bench" data-squad-index={index} className={`starxi-bank-slot${selected ? ' selected' : ''}${drag.squadDropClass('bench', index)}`} onClick={onClick} disabled={disabled} onDragOver={(event) => drag.handleSquadDragOver(event, { area: 'bench', index })} onDrop={(event) => void drag.handleSquadDrop(event, { area: 'bench', index })}><span>{t("board.benchCaps")} {index + 1}</span><small>{selected ? t("board.chosen") : drag.dragging ? t("board.dropHere") : 'frei'}</small></button>;
 }
 
 export function SquadPitchPanel({ status, controls, help, children }: { status: ReactNode; controls?: ReactNode; help: string; children: ReactNode }) {
-  return <section className="starxi-pitch-panel" aria-label="Startelf Aufstellung">
-    <div className="starxi-pitch-toolbar"><span>STARTELF · 11 PLÄTZE</span><small>{status}</small></div>
+  return <section className="starxi-pitch-panel" aria-label={t("board.lineup")}>
+    <div className="starxi-pitch-toolbar"><span>{t("board.xiCaps")}</span><small>{status}</small></div>
     {controls}
     <div className="starxi-pitch"><div className="starxi-pitch-markings" aria-hidden="true" /><div className="starxi-formation-grid">{children}</div></div>
     <p className="starxi-pitch-help">{help}</p>
@@ -224,8 +225,8 @@ export function SquadPitchPanel({ status, controls, help, children }: { status: 
 }
 
 export function SquadBenchPanel({ id, count, size, children }: { id?: string; count: number; size: number; children: ReactNode }) {
-  return <section className="starxi-bank-panel" id={id} aria-label="Bank">
-    <div className="starxi-subheading"><div><span className="eyebrow">BANK / LIVE WECHSEL</span><h4>Deine Bank</h4></div><strong>{count} / {size}</strong></div>
+  return <section className="starxi-bank-panel" id={id} aria-label={t("board.bench")}>
+    <div className="starxi-subheading"><div><span className="eyebrow">{t("board.benchLive")}</span><h4>{t("board.yourBench")}</h4></div><strong>{count} / {size}</strong></div>
     <div className="starxi-bank-grid">{children}</div>
   </section>;
 }

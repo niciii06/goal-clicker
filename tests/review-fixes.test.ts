@@ -6,6 +6,7 @@ import { uploadSchemaVersion } from '../app/game/save-schema.ts';
 import { GAME_FEATURES_SCHEMA_VERSION, STAR_XI_PLAYERS } from '../app/feature-data.ts';
 import { emptyPlayerStats, initialCareerState, rebaseCareerForPrestige } from '../app/career-data.ts';
 import { STORAGE_KEY } from '../app/game/constants.ts';
+import { germanSource } from './helpers/german-source.mjs';
 
 test('a cloud upload announces at least the client schema, also for a save without schemaVersion', async () => {
   const withoutSchema = { [STORAGE_KEY]: JSON.stringify({ goals: 5, features: {} }) };
@@ -33,7 +34,7 @@ test('prestige keeps season stats only for retained cards, so awards cannot name
 });
 
 test('the prestige dialog names the real number of upgrades', async () => {
-  const dialog = await readFile(new URL('../app/prestige-dialog.tsx', import.meta.url), 'utf8');
+  const dialog = await readFile(new URL('../app/prestige-dialog.tsx', import.meta.url), 'utf8').then(germanSource);
   assert.doesNotMatch(dialog, /Alle 27 Upgrades/);
-  assert.match(dialog, /Alle \{UPGRADES\.length\} Upgrades/);
+  assert.match(dialog, /Alle \$?\{UPGRADES\.length\} Upgrades/);
 });

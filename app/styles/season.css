@@ -134,7 +134,9 @@
 .season-button:hover:not(:disabled) { background: var(--accent); box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 20%, transparent); }
 .season-button:disabled { border-color: var(--line); color: var(--muted); cursor: not-allowed; background: var(--surface-soft); box-shadow: none; }
 .tournament-picker { margin-top: 18px; padding: 16px; border: 1px solid color-mix(in srgb, var(--accent) 15%, transparent); border-radius: 18px; background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 4%, var(--surface-raised)), var(--surface-raised) 74%); }
-.tournament-picker-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.tournament-picker-heading { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+/* The title takes the free room but never less than its longest word; when that and the badge do not fit side by side (long English badge on a phone), the badge moves below instead of pushing the page sideways. */
+.tournament-picker-heading > div { flex: 1 1 0; }
 .tournament-picker-heading h4 { margin: 0; color: var(--text); font-size: 19px; font-weight: 720; letter-spacing: -.05em; }
 .tournament-picker-heading > span { padding: 6px 8px; border-radius: 980px; color: var(--accent); background: var(--accent-soft); font-size: var(--text-footnote); font-weight: 800; letter-spacing: .08em; white-space: nowrap; }
 .tournament-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; min-width: 0; padding: 13px; border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: 14px; color: var(--text); cursor: pointer; background: var(--surface-raised); text-align: left; transition: 160ms ease; }

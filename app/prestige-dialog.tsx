@@ -6,6 +6,7 @@ import { useDialogFocus } from "./confirm-dialog";
 import { PRESTIGE_GOAL_BONUS_PER_LEVEL, getPrestigeKeepCandidates, getPrestigeRetainedSpecials, getStarXIPositions } from "./feature-data";
 import type { GameFeatures } from "./feature-data";
 import { formatNumber } from "./game/format";
+import { t } from "./i18n/runtime";
 import { UPGRADES } from "./game/upgrades";
 import { getCareerCard } from "./career-data";
 import { getTravelTime } from "./game/clock";
@@ -21,7 +22,7 @@ const percent = prestigeBonusPercent;
 
 /** "Prestige 2 · +20 % Tore" next to the goal counter; nothing before the first Prestige. */
 export function prestigeBonusLabel(prestigeCount: number) {
-  return prestigeCount > 0 ? `Prestige ${prestigeCount} · +${percent(prestigeCount)} % Tore` : "";
+  return prestigeCount > 0 ? t("prestige.bonusLabel", { count: prestigeCount, percent: percent(prestigeCount) }) : "";
 }
 
 /**
@@ -44,42 +45,42 @@ export function PrestigeDialog({ features, goals, upgradeLevels, busy, error, on
   const query = search.trim().toLocaleLowerCase("de-CH");
   const shown = candidates.filter((player) => !query || player.name.toLocaleLowerCase("de-CH").includes(query) || player.id === keepId);
   const statusOf = (playerId: string) => [
-    favorites.has(playerId) ? "★ Favorit" : "",
-    features.transferSaga.loans.some((loan) => loan.playerId === playerId) ? "verliehen" : "",
-    Number(features.cup.injuredPlayerIds?.[playerId]) > 0 ? "verletzt" : "",
-    features.transferSaga.pendingOffer?.playerId === playerId ? "Angebot offen" : "",
+    favorites.has(playerId) ? t("prestige.favorite") : "",
+    features.transferSaga.loans.some((loan) => loan.playerId === playerId) ? t("prestige.onLoan") : "",
+    Number(features.cup.injuredPlayerIds?.[playerId]) > 0 ? t("prestige.injured") : "",
+    features.transferSaga.pendingOffer?.playerId === playerId ? t("prestige.offerOpen") : "",
   ].filter(Boolean);
   const next = features.seasonMode.prestigeCount + 1;
   const squadAfter = specials.length + (keepId ? 1 : 0);
   const canConfirm = !busy && (candidates.length === 0 || Boolean(keepId));
   return createPortal(<div className="account-overlay" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) onCancel(); }}>
     <div ref={dialogRef} className="account-dialog confirm-dialog prestige-dialog" role="dialog" aria-modal="true" aria-labelledby="prestige-dialog-title">
-      <h2 id="prestige-dialog-title">Prestige {next} starten?</h2>
-      <p>Der Aufstiegslauf beginnt wieder in Saison 1. Alle {UPGRADES.length} Upgrades im Club Office starten wieder bei Stufe 0. Upgrades und Packs werden wie in einem neuen Spiel ab Liga 15 wieder Liga für Liga freigeschaltet. Fragmente, ungeöffnete Packs und Vereinssterne bleiben.</p>
+      <h2 id="prestige-dialog-title">{t("prestige.title", { next })}</h2>
+      <p>{t("prestige.intro", { count: UPGRADES.length })}</p>
       <dl className="prestige-summary">
-        <div><dt>Torbonus</dt><dd>+{percent(next - 1)} % → <strong>+{percent(next)} % Tore</strong> auf Klicks und passives Einkommen</dd></div>
-        <div><dt>Torkontostand</dt><dd>{formatNumber(goals)} → <strong>0</strong></dd></div>
-        <div><dt>Upgrades</dt><dd>{formatNumber(upgradeLevels)} {upgradeLevels === 1 ? "Stufe" : "Stufen"} → <strong>Stufe 0</strong>. Upgrades und Packs werden ab Liga 15 wieder Liga für Liga freigeschaltet.</dd></div>
-        <div><dt>Heimstadt</dt><dd>{homeCityOf(features.seasonMode.homeCity).name} → <strong>{HOME_CITIES[homeCity].name}</strong>. Der neue Lauf startet in den Ligen dieser Stadt, Auswärtsreisen beginnen dort.</dd></div>
-        <div><dt>Kader</dt><dd>{features.starXI.ownedIds.length} Karten → <strong>{squadAfter} Karten</strong>. Alle anderen bleiben im Album («Nicht im Kader»).</dd></div>
-        <div><dt>Kartenboni</dt><dd>Spezialkarten und die gewählte Karte behalten Meilensteine und Wachstum. Abgegebene Karten verlieren ihre Verbesserungen: Ziehst du sie wieder, starten sie mit ihrer Grundwertung. Statistiken und abgeholte Albumprämien bleiben.</dd></div>
+        <div><dt>{t("prestige.goalBonus")}</dt><dd>+{percent(next - 1)} % → <strong>{t("prestige.percentGoals", { percent: percent(next) })}</strong> {t("prestige.onClicksIncome")}</dd></div>
+        <div><dt>{t("prestige.goalBalance")}</dt><dd>{formatNumber(goals)} → <strong>0</strong></dd></div>
+        <div><dt>{t("prestige.upgrades")}</dt><dd>{t("prestige.levels", { count: upgradeLevels, levels: formatNumber(upgradeLevels) })} → <strong>{t("prestige.level0")}</strong>{t("prestige.rebuy")}</dd></div>
+        <div><dt>{t("prestige.homeCity")}</dt><dd>{homeCityOf(features.seasonMode.homeCity).name} → <strong>{HOME_CITIES[homeCity].name}</strong>{t("prestige.homeCityNote")}</dd></div>
+        <div><dt>{t("prestige.squad")}</dt><dd>{t("prestige.cards", { count: features.starXI.ownedIds.length })} → <strong>{t("prestige.cards", { count: squadAfter })}</strong>{t("prestige.othersStay")}</dd></div>
+        <div><dt>{t("prestige.cardBonuses")}</dt><dd>{t("prestige.cardBonusesBody")}</dd></div>
       </dl>
-      <h3>Spezialkarten bleiben ({specials.length})</h3>
-      <p className="prestige-names">{specials.length ? specials.map((player) => player.name).join(", ") : "Keine Spezialkarten im Kader."}</p>
-      <h3>Eine normale Karte behalten</h3>
-      {candidates.length > 8 && <input className="mode-input prestige-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Karte suchen" aria-label="Karte zum Behalten suchen" />}
-      {candidates.length ? <fieldset className="prestige-choices" aria-label="Normale Karte behalten">
+      <h3>{t("prestige.specialsStay", { count: specials.length })}</h3>
+      <p className="prestige-names">{specials.length ? specials.map((player) => player.name).join(", ") : t("prestige.noSpecials")}</p>
+      <h3>{t("prestige.keepOne")}</h3>
+      {candidates.length > 8 && <input className="mode-input prestige-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("prestige.searchCard")} aria-label={t("prestige.searchKeep")} />}
+      {candidates.length ? <fieldset className="prestige-choices" aria-label={t("prestige.keepNormal")}>
         {shown.map((player) => <label key={player.id} className={keepId === player.id ? "selected" : ""}>
           <input type="radio" name="prestige-keep" value={player.id} checked={keepId === player.id} onChange={() => setKeepId(player.id)} />
           <b>{ratingOf(player)}</b><span>{player.name}</span><small>{getStarXIPositions(player).join(" / ")}{statusOf(player.id).map((status) => <em key={status} className="prestige-status-chip">{status}</em>)}</small>
         </label>)}
-      </fieldset> : <p>Du hast keine normale Karte im Kader. Du startest nur mit deinen Spezialkarten.</p>}
-      <HomeCityPicker value={homeCity} onChange={setHomeCity} name="prestige-home-city" legend="Heimstadt für den neuen Lauf" />
-      {voteMembers > 0 && <p className="prestige-vote-note" role="note">Koop Abstimmung: {voteMembers === 1 ? "Dein Mitspieler, der gerade online ist, muss" : `Alle ${voteMembers} Mitspieler, die gerade online sind, müssen`} innerhalb von {PRESTIGE_VOTE_SECONDS} Sekunden zustimmen. Wer offline ist, wird nicht gefragt. Alle sehen deine behaltene Karte.</p>}
+      </fieldset> : <p>{t("prestige.noNormal")}</p>}
+      <HomeCityPicker value={homeCity} onChange={setHomeCity} name="prestige-home-city" legend={t("prestige.homeCityLegend")} />
+      {voteMembers > 0 && <p className="prestige-vote-note" role="note">{voteMembers === 1 ? t("prestige.voteNoteOne", { seconds: PRESTIGE_VOTE_SECONDS }) : t("prestige.voteNoteMany", { count: voteMembers, seconds: PRESTIGE_VOTE_SECONDS })}</p>}
       {error && <p className="prestige-error" role="alert">{error}</p>}
       <div className="confirm-dialog-actions">
-        <button type="button" className="mode-secondary" onClick={onCancel}>Abbrechen</button>
-        <button type="button" className="mode-primary" disabled={!canConfirm} onClick={() => onConfirm(keepId, homeCity)}>{candidates.length && !keepId ? "Karte wählen" : voteMembers > 0 ? "Abstimmung starten" : `Prestige ${next} starten`}</button>
+        <button type="button" className="mode-secondary" onClick={onCancel}>{t("prestige.cancel")}</button>
+        <button type="button" className="mode-primary" disabled={!canConfirm} onClick={() => onConfirm(keepId, homeCity)}>{candidates.length && !keepId ? t("prestige.chooseCard") : voteMembers > 0 ? t("prestige.startVote") : t("prestige.start", { next })}</button>
       </div>
     </div>
   </div>, document.body);
@@ -104,31 +105,31 @@ export function PrestigeVoteDialog({ vote, room, busy, onApprove, onDecline, onH
   useEffect(() => { const timer = window.setInterval(() => setTick((value) => value + 1), 1000); return () => window.clearInterval(timer); }, []);
   const seconds = prestigeVoteSecondsLeft(vote);
   const nameOf = (role: CoopRoom["players"][number]["role"]) => room.players.find((player) => player.role === role)?.name ?? coopRoleLabel(role);
-  const card = vote.keepName ?? (vote.keepNormalId ? "eine normale Karte" : "keine normale Karte");
+  const card = vote.keepName ?? (vote.keepNormalId ? t("prestige.aNormalCard") : t("prestige.noNormalCard"));
   return createPortal(<div className="account-overlay" role="presentation">
     <div ref={dialogRef} className="account-dialog confirm-dialog prestige-dialog prestige-vote-dialog" role="alertdialog" aria-modal="true" aria-labelledby="prestige-vote-title" aria-describedby="prestige-vote-description">
-      <h2 id="prestige-vote-title">Prestige {vote.prestigeCount + 1}: Abstimmung</h2>
+      <h2 id="prestige-vote-title">{t("prestige.voteTitle", { next: vote.prestigeCount + 1 })}</h2>
       <div id="prestige-vote-description">
-        <p>{vote.viewerIsProposer ? "Du hast" : `${vote.proposerName} hat`} Prestige {vote.prestigeCount + 1} für die ganze Welt vorgeschlagen. Der Aufstiegslauf beginnt wieder in Saison 1, der Torkontostand geht auf 0 und alle Upgrades starten wieder bei Stufe 0.</p>
+        <p>{vote.viewerIsProposer ? t("prestige.youProposed", { next: vote.prestigeCount + 1 }) : t("prestige.nameProposed", { name: vote.proposerName, next: vote.prestigeCount + 1 })}</p>
         <dl className="prestige-summary">
-          <div><dt>Heimstadt</dt><dd><strong>{homeCityOf(vote.homeCity).name}</strong></dd></div>
-          <div><dt>Behaltene Karte</dt><dd><strong>{card}</strong> und alle Spezialkarten</dd></div>
-          <div><dt>Torbonus</dt><dd>+{percent(vote.prestigeCount)} % → <strong>+{percent(vote.prestigeCount + 1)} % Tore</strong></dd></div>
-          <div><dt>Zugestimmt</dt><dd>{vote.approvedRoles.map(nameOf).join(", ") || "noch niemand"}</dd></div>
-          <div><dt>Noch offen</dt><dd>{vote.waitingRoles.length ? vote.waitingRoles.map(nameOf).join(", ") : "niemand, Prestige startet gleich"}</dd></div>
+          <div><dt>{t("prestige.homeCity")}</dt><dd><strong>{homeCityOf(vote.homeCity).name}</strong></dd></div>
+          <div><dt>{t("prestige.keptCard")}</dt><dd><strong>{card}</strong> {t("prestige.andAllSpecials")}</dd></div>
+          <div><dt>{t("prestige.goalBonus")}</dt><dd>+{percent(vote.prestigeCount)} % → <strong>{t("prestige.percentGoals", { percent: percent(vote.prestigeCount + 1) })}</strong></dd></div>
+          <div><dt>{t("prestige.agreed")}</dt><dd>{vote.approvedRoles.map(nameOf).join(", ") || t("prestige.nobodyYet")}</dd></div>
+          <div><dt>{t("prestige.stillOpen")}</dt><dd>{vote.waitingRoles.length ? vote.waitingRoles.map(nameOf).join(", ") : t("prestige.nobodyStarting")}</dd></div>
         </dl>
-        <p className="prestige-vote-timer" role="timer" aria-live="off">Noch {seconds} {seconds === 1 ? "Sekunde" : "Sekunden"}. Wer offline ist, blockiert nicht. Eine Ablehnung beendet die Abstimmung für alle.</p>
+        <p className="prestige-vote-timer" role="timer" aria-live="off">{t("prestige.voteTimer", { count: seconds })}</p>
       </div>
       <div className="confirm-dialog-actions">
         {vote.viewerMustVote ? <>
-          <button type="button" className="mode-secondary" disabled={busy} onClick={onDecline}>Ablehnen</button>
-          <button type="button" className="mode-primary" disabled={busy} onClick={onApprove}>Zustimmen</button>
+          <button type="button" className="mode-secondary" disabled={busy} onClick={onDecline}>{t("prestige.decline")}</button>
+          <button type="button" className="mode-primary" disabled={busy} onClick={onApprove}>{t("prestige.approve")}</button>
         </> : vote.viewerIsProposer ? <>
-          <button type="button" className="mode-secondary" onClick={onHide}>Ausblenden</button>
-          <button type="button" className="mode-secondary danger" disabled={busy} onClick={onDecline}>Abstimmung abbrechen</button>
+          <button type="button" className="mode-secondary" onClick={onHide}>{t("prestige.hide")}</button>
+          <button type="button" className="mode-secondary danger" disabled={busy} onClick={onDecline}>{t("prestige.cancelVote")}</button>
         </> : <>
-          {!vote.viewerApproved && <button type="button" className="mode-secondary" disabled={busy} onClick={onDecline}>Ablehnen</button>}
-          <button type="button" className="mode-primary" onClick={onHide}>{vote.viewerApproved ? "Schliessen" : "Ausblenden"}</button>
+          {!vote.viewerApproved && <button type="button" className="mode-secondary" disabled={busy} onClick={onDecline}>{t("prestige.decline")}</button>}
+          <button type="button" className="mode-primary" onClick={onHide}>{vote.viewerApproved ? t("prestige.close") : t("prestige.hide")}</button>
         </>}
       </div>
     </div>
