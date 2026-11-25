@@ -18,6 +18,9 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   // Link previews need absolute image URLs; the preview image itself is app/opengraph-image.jpg.
   metadataBase: new URL("https://goalclicker.ch"),
+  // Every host and tab address serves this page; search engines are told the one public address (app/site-url.ts).
+  alternates: { canonical: "/" },
+  robots: { index: true, follow: true },
   title: "Goal Clicker | Football Idle Club",
   description: "Klick den Ball, sammle Tore und baue dein eigenes Fussball Imperium.",
   openGraph: {

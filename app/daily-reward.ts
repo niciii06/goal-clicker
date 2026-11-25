@@ -3,7 +3,8 @@ import type { EarnedPack, EarnedPackId } from './feature-data';
 /** One entry per claimer: "solo" in singleplayer, "world" for a whole shared world (older worlds kept one per seat role). */
 export type DailyRewardEntry = { day: string; streak: number };
 export type DailyRewardState = Record<string, DailyRewardEntry>;
-export type DailyRewardDay = { day: number; minutes: number; floor: number; pack?: EarnedPackId; label: string };
+/** `packOnly`: the day gives the pack and no goals at all (no floor, no income based amount). */
+export type DailyRewardDay = { day: number; minutes: number; floor: number; pack?: EarnedPackId; packOnly?: boolean; label: string };
 
 export const DAILY_REWARD_TIME_ZONE = 'Europe/Zurich';
 export const DAILY_REWARD_DAYS: readonly DailyRewardDay[] = [
@@ -13,7 +14,8 @@ export const DAILY_REWARD_DAYS: readonly DailyRewardDay[] = [
   { day: 4, minutes: 20, floor: 4000, label: 'Abschlusstraining' },
   { day: 5, minutes: 30, floor: 6500, label: 'Teambus' },
   { day: 6, minutes: 45, floor: 10000, label: 'Kabinenansprache' },
-  { day: 7, minutes: 60, floor: 15000, pack: 'special', label: 'Matchday' },
+  // Day 7 (and every seventh day of the cycle) is the special card pack only, never goals.
+  { day: 7, minutes: 0, floor: 0, pack: 'special', packOnly: true, label: 'Matchday' },
 ];
 /** A shared world claims once per day for everybody, under this key. */
 export const WORLD_DAILY_KEY = 'world';
@@ -97,9 +99,16 @@ export function getDailyRewardStatus(state: DailyRewardState | undefined, key: s
 }
 
 export function getDailyRewardAmount(day: DailyRewardDay, passivePerSecond: number, clickPower: number) {
+  if (day.packOnly) return 0;
   const passive = Math.max(0, Number.isFinite(passivePerSecond) ? passivePerSecond : 0) * day.minutes * 60;
   const clicks = Math.max(0, Number.isFinite(clickPower) ? clickPower : 0) * day.minutes * 40;
   return Math.max(day.floor, Math.floor(Math.max(passive, clicks)));
+}
+
+/** What a claim gave, in words. A pack only day names the pack and never a zero amount; other days name their goals (and the pack they bring). */
+export function describeDailyReward(amount: number, hasPack: boolean, format: (value: number) => string, packWhere = '') {
+  const pack = `Spezialkarten-Pack${packWhere}`;
+  return hasPack && amount <= 0 ? `Ein ${pack}` : `+${format(amount)} Tore${hasPack ? ` und ein ${pack}` : ''}`;
 }
 
 export type DailyRewardClaim = { amount: number; dayIndex: number; streak: number; reward: DailyRewardDay; pack?: EarnedPack; state: DailyRewardState };

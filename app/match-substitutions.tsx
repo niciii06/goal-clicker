@@ -32,10 +32,10 @@ export function matchMoveError(validate:(lineup:string[])=>string,currentError:s
  const reason=validate(next);return !reason||reason===currentError?'':reason;
 }
 
-type EditorProps={features:GameFeatures;title:string;intro:string;disabled:boolean;initialSlot?:number|null;validate:(lineup:string[])=>string;confirmBlocked?:boolean;confirmLabel:(changes:number)=>string;onConfirm:(lineup:string[])=>void;onCancel:()=>void};
+type EditorProps={features:GameFeatures;title:string;intro:string;disabled:boolean;initialSlot?:number|null;cancelLabel?:string;validate:(lineup:string[])=>string;confirmBlocked?:boolean;confirmLabel:(changes:number)=>string;onConfirm:(lineup:string[])=>void;onCancel:()=>void};
 
 /** The squad board from the t("subs.squad") tab, in a match: same cards, drag and drop and milestone ratings. */
-export function MatchSquadEditor({features:f,title,intro,disabled,initialSlot=null,validate,confirmBlocked=false,confirmLabel,onConfirm,onCancel}:EditorProps) {
+export function MatchSquadEditor({features:f,title,intro,disabled,initialSlot=null,cancelLabel,validate,confirmBlocked=false,confirmLabel,onConfirm,onCancel}:EditorProps) {
  const panel=useRef<HTMLDivElement>(null),applying=useRef(false);
  useEffect(()=>{const previous=document.activeElement as HTMLElement|null;panel.current?.scrollIntoView({block:'start'});panel.current?.querySelector<HTMLButtonElement>('button')?.focus();return()=>{previous?.focus();};},[]);
  const [lineup,setLineup]=useState(()=>[...f.starXI.lineupIds]),[past,setPast]=useState<string[][]>([]);
@@ -94,7 +94,7 @@ export function MatchSquadEditor({features:f,title,intro,disabled,initialSlot=nu
    {!changed&&<strong>{t("subs.tapTwo")}</strong>}
    <small>{message||error}</small>
    <button type="button" disabled={!past.length||disabled} onClick={()=>{setLineup(past.at(-1)!);setPast(p=>p.slice(0,-1));setMessage('');}}>{t("subs.undo")}</button>
-   <button type="button" onClick={onCancel}>{t("subs.cancel")}</button>
+   <button type="button" onClick={onCancel}>{cancelLabel??t("subs.cancel")}</button>
    <button type="button" disabled={disabled||!changed||Boolean(error)||confirmBlocked} onClick={()=>{const reason=validate(lineup);if(reason){setMessage(reason);return;}if(applying.current)return;applying.current=true;onConfirm(lineup);}}>{confirmLabel(incoming.length)}</button>
   </div>
  </div>;

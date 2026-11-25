@@ -68,7 +68,7 @@
 .trophy-room { margin: 0 0 18px; padding: 15px; border: 1px solid rgba(198,146,20,.2); border-radius: 17px; background: linear-gradient(145deg, color-mix(in srgb, #e69900 6%, var(--surface-raised)), var(--surface-raised) 68%); }
 .trophy-room-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .trophy-room-heading h4 { margin: 0; color: var(--text); font-size: 16px; font-weight: 740; letter-spacing: -.045em; }
-.trophy-room-heading > span { padding: 6px 9px; border-radius: 980px; color: color-mix(in oklab, #745300, var(--text) var(--tone-mix)); background: color-mix(in srgb, #e6b500 25%, var(--surface-raised)); font-size: var(--text-footnote); font-weight: 850; letter-spacing: .08em; white-space: nowrap; }
+.trophy-room-heading > span { padding: 6px 9px; border-radius: 980px; color: color-mix(in oklab, #745300, var(--text) calc(var(--tone-mix) + 24%)); background: color-mix(in srgb, #e6b500 25%, var(--surface-raised)); font-size: var(--text-footnote); font-weight: 850; letter-spacing: .08em; white-space: nowrap; }
 .trophy-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .trophy-card { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 9px; min-width: 0; padding: 10px; border: 1px solid color-mix(in srgb, var(--trophy-accent) 28%, color-mix(in srgb, var(--text) 9%, var(--surface-raised))); border-radius: 13px; background: color-mix(in srgb, var(--surface-raised) 82%, transparent); }
 .trophy-card.locked { filter: grayscale(1); opacity: .52; }
