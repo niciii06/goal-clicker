@@ -1,17 +1,17 @@
 "use client";
 // The signed in account in the game: the account button in the header with the profile settings, the link
 // between account and player ID, and the save file export/import in the club tab.
-import { useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useContext, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import type { FormEvent } from "react";
-import { AccountContext, GuestContext } from "./account-gate";
+import { AccountContext, GuestContext, PasswordInput } from "./account-gate";
 import { useDialogFocus } from "./confirm-dialog";
 import { authErrorMessage, linkGoogleAccount, linkedGoogleEmail, setAccountPassword } from "./auth/browser";
 import { subscribeSyncStatus } from "./cloud-sync";
 import type { SyncStatus } from "./cloud-sync";
 import { getInstallState, promptInstall, subscribeInstallState } from "./pwa";
 import type { InstallState } from "./pwa";
-import { DISPLAY_NAME_MAX, displayNameError, PASSWORD_MAX, PASSWORD_MIN, passwordError, USERNAME_MAX, usernameError } from "./profile-rules";
+import { DISPLAY_NAME_MAX, displayNameError, PASSWORD_MIN, passwordError, USERNAME_MAX, usernameError } from "./profile-rules";
 import type { PublicProfile } from "./profile-rules";
 import { readThemePreference, setThemePreference, THEME_OPTIONS } from "./theme";
 import { currentIntlTag, localizeText, t } from "./i18n/runtime";
@@ -84,6 +84,8 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
   const [displayName, setDisplayName] = useState(account?.profile.displayName ?? "");
   const [username, setUsername] = useState(account?.profile.username ?? "");
   const [currentPassword, setCurrentPassword] = useState("");
+  // The three password fields share the eye button of the sign in form; each field is named by its visible label.
+  const passwordIds = useId();
   const [password, setPassword] = useState("");
   const [passwordRepeat, setPasswordRepeat] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -158,7 +160,7 @@ export function ProfilePanel({ onMessage }: { onMessage: (text: string) => void 
     <form className="profile-row" onSubmit={saveDisplayName}><label><span>{t("panel.displayName")}</span><input className="mode-input" maxLength={DISPLAY_NAME_MAX} value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || displayName.trim() === profile.displayName}>{t("panel.save")}</button></form>
     <form className="profile-row" onSubmit={saveUsername}><label><span>{t("panel.username")}</span><input className="mode-input" maxLength={USERNAME_MAX} autoCapitalize="none" spellCheck={false} value={username} onChange={(event) => setUsername(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || usernameLocked || username.trim() === profile.username}>{t("panel.change")}</button>
       <small>{nextChange.getTime() > now ? t("panel.nextChange", { date: nextChange.toLocaleDateString(currentIntlTag()) }) : t("panel.changeNow")}{account.passwordLogin ? ` ${t("panel.signInWithNew")}` : ""}</small></form>
-    {account.passwordLogin && <form className="profile-row" onSubmit={savePassword}><label><span>{t("panel.currentPassword")}</span><input className="mode-input" type="password" autoComplete="current-password" maxLength={PASSWORD_MAX} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} /></label><label><span>{t("panel.newPassword")}</span><input className="mode-input" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} maxLength={PASSWORD_MAX} value={password} onChange={(event) => setPassword(event.target.value)} /></label><label><span>{t("panel.repeat")}</span><input className="mode-input" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} maxLength={PASSWORD_MAX} value={passwordRepeat} onChange={(event) => setPasswordRepeat(event.target.value)} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || !password || !currentPassword}>{t("panel.changePassword")}</button>
+    {account.passwordLogin && <form className="profile-row" onSubmit={savePassword}><label><span id={`${passwordIds}-current`}>{t("panel.currentPassword")}</span><PasswordInput fieldName={t("panel.currentPassword")} labelId={`${passwordIds}-current`} autoComplete="current-password" value={currentPassword} onChange={setCurrentPassword} /></label><label><span id={`${passwordIds}-new`}>{t("panel.newPassword")}</span><PasswordInput fieldName={t("panel.newPassword")} labelId={`${passwordIds}-new`} autoComplete="new-password" minLength={PASSWORD_MIN} value={password} onChange={setPassword} /></label><label><span id={`${passwordIds}-repeat`}>{t("panel.repeat")}</span><PasswordInput fieldName={t("panel.repeat")} labelId={`${passwordIds}-repeat`} autoComplete="new-password" minLength={PASSWORD_MIN} value={passwordRepeat} onChange={setPasswordRepeat} /></label><button type="submit" className="mode-secondary" disabled={Boolean(busy) || !password || !currentPassword}>{t("panel.changePassword")}</button>
       <small>{t("panel.passwordHint")}</small></form>}
     {account.passwordLogin && <div className="profile-row profile-google">
       {typeof googleEmail === "string" ? <p><strong>{t("panel.googleLinked")}</strong><small>{googleEmail ? `${googleEmail} · ` : ""}{t("panel.googleLinkedHint")}</small></p>
