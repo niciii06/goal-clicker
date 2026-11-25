@@ -1350,11 +1350,10 @@ async function handlePost(request: Request) {
       const claim = claimDailyReward(game.features.dailyRewards, WORLD_DAILY_KEY, getBasePassivePower(game.upgrades, game.stars, game.features), getBaseClickPower(game.upgrades, game.stars, game.features), Date.now());
       if (!claim) return jsonError("Die tägliche Prämie für heute ist schon abgeholt.", 409);
       game.features.dailyRewards = claim.state;
-      game.goals += claim.amount;
-      game.seasonGoals += claim.amount;
-      game.totalGoals += claim.amount;
+      // A pack only day (day 7) books no goals at all: the shared balance stays exactly as it was.
+      if (claim.amount > 0) { game.goals += claim.amount; game.seasonGoals += claim.amount; game.totalGoals += claim.amount; }
       if (claim.pack && !game.features.earnedPacks.some((pack) => pack.id === claim.pack!.id)) game.features.earnedPacks.push(claim.pack);
-      addHistory(game.features, { title: `Tägliche Prämie · Tag ${claim.dayIndex}`, detail: `${getRoomPlayer(room, role).name ?? "Ein Spieler"} holt ${Math.floor(claim.amount).toLocaleString("de-CH")} Tore${claim.pack ? " und ein Prämienpack" : ""}. Serie: ${claim.streak} Tage.`, tone: "positive" });
+      addHistory(game.features, { title: `Tägliche Prämie · Tag ${claim.dayIndex}`, detail: `${getRoomPlayer(room, role).name ?? "Ein Spieler"} holt ${claim.amount > 0 ? `${Math.floor(claim.amount).toLocaleString("de-CH")} Tore${claim.pack ? " und ein Prämienpack" : ""}` : "ein Spezialkarten-Pack"}. Serie: ${claim.streak} Tage.`, tone: "positive" });
       return persistGameResponse(db, room, game, timestamp, playerId, role, {}, { dailyReward: { amount: claim.amount, dayIndex: claim.dayIndex, streak: claim.streak, pack: Boolean(claim.pack) } });
     }
 

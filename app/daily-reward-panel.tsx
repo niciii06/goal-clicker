@@ -22,11 +22,11 @@ export function DailyRewardCard({ state, claimKey, now, passivePerSecond, clickP
       return <li key={day.day} className={`${claimed ? 'claimed' : ''}${current ? ' current' : ''}${day.pack ? ' pack' : ''}`} aria-current={current ? 'step' : undefined}>
         <small>{t("daily.day")} {day.day}</small>
         <strong>{claimed ? '✓' : day.pack ? '🎁' : '⚽'}</strong>
-        <span>{format(getDailyRewardAmount(day, passivePerSecond, clickPower))}{day.pack === 'special' ? t("daily.plusSpecialPack") : day.pack ? t("daily.plusPack") : ''}</span>
+        <span>{day.packOnly ? t("daily.specialPackOnly") : <>{format(getDailyRewardAmount(day, passivePerSecond, clickPower))}{day.pack === 'special' ? t("daily.plusSpecialPack") : day.pack ? t("daily.plusPack") : ''}</>}</span>
       </li>;
     })}</ol>
     {status.available
-      ? <button type="button" className="daily-reward-claim" disabled={busy} onClick={onClaim}>{t("daily.claim")}{format(getDailyRewardAmount(status.reward, passivePerSecond, clickPower))}{t("daily.goalsSuffix")}{status.reward.pack === 'special' ? t("daily.plusSpecialCardPack") : status.reward.pack ? t("daily.plusRewardPack") : ''}</button>
+      ? <button type="button" className="daily-reward-claim" disabled={busy} onClick={onClaim}>{status.reward.packOnly ? t("daily.claimPackOnly") : <>{t("daily.claim")}{format(getDailyRewardAmount(status.reward, passivePerSecond, clickPower))}{t("daily.goalsSuffix")}{status.reward.pack === 'special' ? t("daily.plusSpecialCardPack") : status.reward.pack ? t("daily.plusRewardPack") : ''}</>}</button>
       : <p className="daily-reward-next" aria-live="off">{t("daily.nextIn")} <b>{countdown(status.msUntilNext)}</b>{t("daily.tomorrow")}</p>}
   </section>;
 }
