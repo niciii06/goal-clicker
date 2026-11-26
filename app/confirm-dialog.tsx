@@ -15,7 +15,7 @@ export function useDialogFocus(open: boolean, dialogRef: RefObject<HTMLElement |
   useEffect(() => {
     if (!open) return;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const focusable = () => [...(dialogRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), summary, [tabindex]:not([tabindex='-1'])") ?? [])].filter((element) => element.offsetParent !== null);
+    const focusable = () => [...(dialogRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), summary, [tabindex]:not([tabindex='-1'])") ?? [])].filter((element) => element.offsetParent !== null);
     focusable()[0]?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") { closeRef.current(); return; }
