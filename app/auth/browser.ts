@@ -2,7 +2,7 @@
 // Browser side login. Google goes through the Neon Auth SDK (@neon/auth/next) and this site's /api/auth proxy, so
 // the session cookie belongs to this site and the API routes see it. Username and password go to this server
 // (/api/login, /api/register), which knows the generated login address behind a username and signs in at Neon Auth.
-import { createAuthClient } from "@neon/auth/next";
+import type { createAuthClient } from "@neon/auth/next";
 import { AUTH_CALLBACK_PATH, AUTH_SIGNOUT_PATH, browserAuthMode } from "./config";
 
 type AuthClient = ReturnType<typeof createAuthClient>;
@@ -12,9 +12,13 @@ export function authEnabled() {
   return browserAuthMode() === "neon";
 }
 
-function authClient() {
+/**
+ * The Neon Auth SDK (with zod, about 65 KB gzip) is only needed for Google, linking, the password change and the
+ * session renewal after the start, so it is loaded on first use instead of with the first screen.
+ */
+async function authClient() {
   if (!authEnabled()) throw new LoginError("Der Login ist auf diesem Server nicht eingerichtet.");
-  client ??= createAuthClient();
+  if (!client) { const { createAuthClient } = await import("@neon/auth/next"); client ??= createAuthClient(); }
   return client;
 }
 
@@ -39,7 +43,7 @@ function follow(data: { url?: string } | null) {
 }
 
 export async function signInWithGoogle(returnTo = "/") {
-  const data = unwrap(await authClient().signIn.social({ provider: "google", callbackURL: callbackUrl({ next: returnTo }), errorCallbackURL: callbackUrl({ failed: "1" }) }) as Result<{ url?: string }>);
+  const data = unwrap(await (await authClient()).signIn.social({ provider: "google", callbackURL: callbackUrl({ next: returnTo }), errorCallbackURL: callbackUrl({ failed: "1" }) }) as Result<{ url?: string }>);
   follow(data);
 }
 
@@ -75,19 +79,19 @@ export async function recoverWithCode(username: string, code: string, password: 
  * Returns through /auth/callback?link=google, where the server checks the link (app/auth/callback/route.ts).
  */
 export async function linkGoogleAccount(returnTo = "/") {
-  const data = unwrap(await authClient().linkSocial({ provider: "google", callbackURL: callbackUrl({ link: "google", next: returnTo }), errorCallbackURL: callbackUrl({ link: "google", next: returnTo, failed: "1" }) }) as Result<{ url?: string }>);
+  const data = unwrap(await (await authClient()).linkSocial({ provider: "google", callbackURL: callbackUrl({ link: "google", next: returnTo }), errorCallbackURL: callbackUrl({ link: "google", next: returnTo, failed: "1" }) }) as Result<{ url?: string }>);
   follow(data);
 }
 
 /** "" when Google is linked to the signed in account (Neon Auth does not list its address), null without Google. */
 export async function linkedGoogleEmail() {
-  const accounts = unwrap(await authClient().listAccounts() as Result<{ providerId?: string }[]>) ?? [];
+  const accounts = unwrap(await (await authClient()).listAccounts() as Result<{ providerId?: string }[]>) ?? [];
   return accounts.some((account) => account.providerId === "google") ? "" : null;
 }
 
 /** Changes the password of the signed in username account; other devices are signed out. */
 export async function setAccountPassword(currentPassword: string, newPassword: string) {
-  unwrap(await authClient().changePassword({ currentPassword, newPassword, revokeOtherSessions: true }) as Result<unknown>);
+  unwrap(await (await authClient()).changePassword({ currentPassword, newPassword, revokeOtherSessions: true }) as Result<unknown>);
 }
 
 /** Ends the session at Neon Auth and removes the cookies (server route, works even if the SDK is not loaded). */
@@ -99,7 +103,8 @@ export async function signOutOfAuth() {
 /** Asks the SDK for the session through the proxy, which also renews the session cookie when Neon Auth does. */
 export async function refreshAuthSession() {
   if (!authEnabled()) return;
-  await authClient().getSession().catch(() => undefined);
+  // A failed SDK download is ignored like a failed renewal: the next start tries again.
+  try { await (await authClient()).getSession(); } catch { /* not renewed this time */ }
 }
 
 const AUTH_ERRORS: Record<string, string> = {
