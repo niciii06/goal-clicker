@@ -166,6 +166,7 @@ export const en = {
   "gate.hidePassword": "Hide {field}",
   "gate.signIn": "Sign in",
   "gate.createAccount": "Create account",
+  "gate.pitch": "Goal Clicker is a free football idle game with collectible cards, packs, league promotion, a career and co-op multiplayer. Play right in your browser.",
   "gate.intro": "Sign in so your save is the same on all your devices.",
   "gate.google": "Sign in with Google",
   "gate.orUsername": "or with username",

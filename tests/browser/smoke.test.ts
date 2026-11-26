@@ -84,8 +84,9 @@ function finishedMatch(now: number) {
 }
 
 /** `whatsNewSeen: false` leaves the newest release notes unread, so the "Was ist neu" window opens. */
-async function openWithSave(viewport: { width: number; height: number }, saveJson: string, colorScheme: 'light' | 'dark' = 'light', whatsNewSeen = true) {
-  const page = await browser.newPage({ viewport, colorScheme, locale: 'de-CH' });
+async function openWithSave(viewport: { width: number; height: number }, saveJson: string, colorScheme: 'light' | 'dark' = 'light', whatsNewSeen = true, touch = false) {
+  // `touch` emulates a phone: coarse pointer (media query pointer: coarse) and a mobile viewport.
+  const page = await browser.newPage({ viewport, colorScheme, locale: 'de-CH', ...(touch ? { hasTouch: true, isMobile: true } : {}) });
   // tsx keeps function names with a __name helper; functions passed to page.evaluate need it in the browser too.
   await page.addInitScript('globalThis.__name = (fn) => fn;');
   const problems: string[] = [];
@@ -416,6 +417,38 @@ test('a new player gets the welcome window first (no walkout), then guided tasks
   }
 });
 
+test('skipping the restarted welcome window while a tutorial step ticks off keeps it closed (no stale update)', async () => {
+  // The tutorial ticks steps off one timer slot later. Escape pressed in exactly that gap used to be undone by the older
+  // result, so the welcome window came back and covered the page (the sporadic "account-overlay intercepts" timeout).
+  const page = await browser.newPage({ viewport: VIEWPORTS[0], locale: 'de-CH' });
+  await page.addInitScript('globalThis.__name = (fn) => fn;');
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.getByRole('dialog').getByRole('button', { name: 'Überspringen' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Beenden' }).click();
+  const ball = page.getByRole('button', { name: 'Fussball anklicken' });
+  await ball.scrollIntoViewIfNeeded();
+  for (let i = 0; i < 50; i++) await ball.click({ delay: 5 });
+  await page.waitForTimeout(2500);
+  await openTab(page, 'Club & Mehr');
+  // Escape right after the next zero delay timer is set while the welcome window is open: the deferred tick of the restart.
+  await page.evaluate(() => {
+    const flag = window as unknown as { armed?: boolean; hit?: boolean };
+    const original = window.setTimeout.bind(window);
+    window.setTimeout = ((handler: TimerHandler, delay?: number, ...rest: unknown[]) => {
+      if (flag.armed && !delay && document.querySelector('.tutorial-dialog')) { flag.armed = false; flag.hit = true; queueMicrotask(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); }
+      return original(handler, delay, ...rest);
+    }) as typeof window.setTimeout;
+    flag.armed = true;
+  });
+  await page.getByRole('button', { name: 'Tutorial erneut starten' }).click();
+  await page.waitForTimeout(1500);
+  assert.equal(await page.evaluate(() => (window as unknown as { hit?: boolean }).hit), true, 'the gap was hit');
+  assert.equal(await page.locator('.tutorial-dialog').count(), 0, 'the welcome window stays closed');
+  assert.equal(JSON.parse((await page.evaluate((key) => localStorage.getItem(key), TUTORIAL_STORAGE_KEY))!).status, 'done');
+  await openTab(page, 'Packs & Album');
+  await page.close();
+});
+
 test('the welcome pack opens once from the shop at its tutorial step: one walkout, no odds, then the season match is the last step', async () => {
   const now = Date.now();
   const features = richFeatures(now);
@@ -441,6 +474,80 @@ test('the welcome pack opens once from the shop at its tutorial step: one walkou
   await page.waitForTimeout(1200);
   assert.equal(await page.getByRole('button', { name: 'Packs & Album', exact: true }).first().isDisabled(), true, 'the shop closes with its step, the pack is not offered again');
   assert.match(await page.getByRole('region', { name: 'Tutorial' }).innerText(), /SCHRITT 5 \/ 5/);
+  assert.deepEqual(problems, []);
+  await page.close();
+});
+
+// Status toasts sit above the bottom navigation on a phone, exactly where the welcome pack button of the shop lies. While the
+// pack is offered, the toasts move to the top, so the button stays visible and tappable and is still opened once.
+test('on a phone status toasts never cover the welcome pack; it opens once during them, and the toast returns to the bottom afterwards', async () => {
+  const now = Date.now();
+  const features = richFeatures(now);
+  features.welcomePack = 'available';
+  // A real phone: touch input, coarse pointer, mobile viewport.
+  const { page, problems } = await openWithSave(VIEWPORTS[1], save(features, now), 'light', true, true);
+  await page.evaluate(([key, value]) => localStorage.setItem(key, value), [TUTORIAL_STORAGE_KEY, JSON.stringify({ status: 'active', done: ['clicks', 'upgrade', 'lineup'], visited: ['squad'] })] as [string, string]);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.getByRole('region', { name: 'Tutorial' }).waitFor();
+  await openTab(page, 'Packs & Album');
+  const card = page.getByRole('article', { name: 'Willkommenspack' });
+  await card.waitFor();
+  // Where the page starts depends on the font: with the wider fallback font of the CI runner (DejaVu Sans) the card is 17 px taller and
+  // everything above it 38 px, so the button begins at 798 px, behind the fixed navigation (772 to 836 px), and the first sample hit the
+  // navigation although no toast was involved (CI run 45187295906). A player scrolls the button into the free area. The test does the same
+  // and puts it where the toast problem occurs: its lower edge 8 px above the navigation, right where a toast at the bottom would sit.
+  await page.evaluate(() => {
+    const button = [...document.querySelectorAll('button')].find((element) => /Willkommenspack öffnen/.test(element.getAttribute('aria-label') || element.textContent || ''))!;
+    const nav = document.querySelector('nav.section-navigation')!.getBoundingClientRect();
+    scrollBy({ top: button.getBoundingClientRect().bottom - (nav.top - 8), behavior: 'instant' });
+  });
+  // Ready when the position no longer changes for several frames.
+  await page.waitForFunction(() => new Promise<boolean>((resolve) => {
+    const button = [...document.querySelectorAll('button')].find((element) => /Willkommenspack öffnen/.test(element.getAttribute('aria-label') || element.textContent || ''))!;
+    let last = -1, same = 0;
+    const frame = () => { const top = button.getBoundingClientRect().top; same = top === last ? same + 1 : 0; last = top; if (same >= 5) resolve(true); else requestAnimationFrame(frame); };
+    frame();
+  }), undefined, { timeout: 5000 });
+  // The savings goal pins of the other packs answer with a status toast each time they are tapped ("Sparziel gesetzt" / "entfernt"), one after the other.
+  const tapOtherPack = (n: number) => page.evaluate((index) => {
+    const pins = [...document.querySelectorAll<HTMLElement>('.savings-pin')].filter((pin) => !pin.closest('.welcome-pack-card'));
+    pins[index % Math.max(1, pins.length)]?.click();
+  }, n);
+  const sample = () => page.evaluate(() => {
+    const button = [...document.querySelectorAll('button')].find((element) => /Willkommenspack öffnen/.test(element.getAttribute('aria-label') || element.textContent || ''))!;
+    const b = button.getBoundingClientRect(), toast = document.querySelector('.toast')?.getBoundingClientRect();
+    const top = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+    return { b: [b.left, b.top, b.width, b.height], toast: toast ? [toast.left, toast.top, toast.width, toast.height] : null, buttonHit: Boolean(top && (top === button || button.contains(top))), inView: b.top >= 0 && b.bottom <= innerHeight };
+  });
+  let withToast = 0;
+  const covered: string[] = [];
+  for (let i = 0; i < 30; i++) {
+    if (i % 4 === 0) await tapOtherPack(i);
+    const r = await sample();
+    if (r.toast) {
+      withToast++;
+      const [bx, by, bw, bh] = r.b, [tx, ty, tw, th] = r.toast;
+      if (tx < bx + bw && tx + tw > bx && ty < by + bh && ty + th > by) covered.push(`sample ${i}: toast ${JSON.stringify(r.toast.map(Math.round))} covers the button ${JSON.stringify(r.b.map(Math.round))}`);
+      assert.ok(ty >= 0 && ty + th <= 844, 'the toast stays on screen');
+    }
+    assert.ok(r.buttonHit && r.inView, `sample ${i}: the pack button is visible and the touch point hits it`);
+    await page.waitForTimeout(200);
+  }
+  assert.ok(withToast >= 20, `the messages are still shown (${withToast} of 30 samples with a toast)`);
+  assert.deepEqual(covered, []);
+  // Tapping the pack while a message is on screen opens it, once.
+  await tapOtherPack(1);
+  await card.getByRole('button', { name: 'Willkommenspack öffnen' }).tap({ timeout: 3000 });
+  await closeWelcomePack(page);
+  await page.waitForFunction(() => /SCHRITT 5 \/ 5/.test(document.querySelector('.tutorial-coach')?.textContent ?? ''), undefined, { timeout: 10000 });
+  assert.equal(await page.getByRole('article', { name: 'Willkommenspack' }).count(), 0, 'given once');
+  await page.waitForTimeout(2500);
+  assert.equal(JSON.parse((await page.evaluate((key) => localStorage.getItem(key), SAVE_KEY))!).features.welcomePack, 'claimed');
+  // Without the offered pack the toast is back at the bottom, above the navigation, as before.
+  await tapOtherPack(2);
+  await page.locator('.toast').waitFor({ timeout: 3000 });
+  const after = (await page.locator('.toast').boundingBox())!;
+  assert.ok(after.y > 844 / 2, `the toast is back at the bottom (top at ${Math.round(after.y)} px)`);
   assert.deepEqual(problems, []);
   await page.close();
 });
@@ -717,4 +824,132 @@ test('the layout checker itself reports overlapping text, unreadable text and ho
   assert.match(found, /low contrast .*Kaum lesbar/);
   assert.match(found, /horizontal overflow/);
   await page.close();
+});
+
+// Touch targets (Apple HIG: controls are at least 44 x 44 pt, CLAUDE.md "Frontend"). The buttons below were 26 to 40 px
+// high on a phone: the coarse pointer rules in base.css lost the cascade to later 40 px rules, and some chips and rows
+// had no rule at all. The test measures real layout on a touch viewport, light and dark, on the screens that show them.
+const TOUCH_SCREENS: { path: string; label: string; features: (now: number) => GameFeatures; selectors: string[] }[] = [
+  { path: '/', label: 'Home', features: richFeatures, selectors: ['.buy-button', '.next-step-chip', '.bulk-options button', '.season-roadmap > summary'] },
+  { path: '/packs', label: 'Packs', features: (now) => { const f = richFeatures(now); f.starXI.fragments = 200000; return f; }, selectors: ['.feature-buy-button'] },
+  { path: '/kader', label: 'Kader', features: richFeatures, selectors: ['.starxi-best-button', '.card-favorite-toggle', '.starxi-filter-row button', '.starxi-pagination button', '.starxi-squad-tools .mode-secondary'] },
+  { path: '/saison', label: 'Saison', features: richFeatures, selectors: ['.season-hub-day-card > summary'] },
+  { path: '/karriere', label: 'Karriere', features: richFeatures, selectors: ['.career-view-switch button'] },
+  { path: '/club', label: 'Club', features: richFeatures, selectors: ['.club-choice-row button'] },
+  { path: '/spiele', label: 'Spiele (Reise)', features: (now) => { const f = richFeatures(now); f.travel.journey = createJourney(fixtureFor(f, 'tournament', 'stadium'), now - 600000, () => 0.5, f); return normalizeGameFeatures(f); }, selectors: ['.travel-map-controls button', '.season-overview > summary'] },
+];
+const SIZE_OF = `(selector) => [...document.querySelectorAll(selector)].filter((e) => { const r = e.getBoundingClientRect(); const s = getComputedStyle(e); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && !e.disabled; }).map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.width * 10) / 10, Math.round(r.height * 10) / 10]; })`;
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`touch targets ${colorScheme}: the buttons of the 44 px patch are at least 44 x 44 on a phone`, async () => {
+    const failures: string[] = [];
+    for (const screen of TOUCH_SCREENS) {
+      const now = Date.now();
+      const { page, problems } = await openWithSave({ width: 390, height: 844 }, save(screen.features(now), now), colorScheme, true, true);
+      await page.goto(BASE + screen.path, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(800);
+      assert.equal(await page.evaluate(() => matchMedia('(pointer: coarse)').matches), true, 'the viewport has a coarse pointer');
+      for (const selector of screen.selectors) {
+        const sizes = (await page.evaluate(`(${SIZE_OF})(${JSON.stringify(selector)})`)) as [number, number][];
+        if (!sizes.length) { failures.push(`${screen.label}: nothing matches ${selector} (the check would be empty)`); continue; }
+        const small = sizes.filter(([w, h]) => w < 44 || h < 44);
+        if (small.length) failures.push(`${screen.label} ${selector}: ${small.length} of ${sizes.length} below 44 px, smallest ${Math.min(...small.map(([w]) => w))} x ${Math.min(...small.map(([, h]) => h))}`);
+      }
+      // The travel screen asks /api/travel, which has no database in this run (503); everything else must be clean.
+      assert.deepEqual(problems.filter((problem) => !problem.includes('/api/travel')), []);
+      await page.close();
+    }
+    assert.deepEqual(failures, []);
+  });
+}
+
+// Automatic audit of every visible button on the covered screens (and one dialog) on a touch phone. A new or changed button
+// that is smaller than 44 x 44 fails here unless it is listed below with a reason. The list is the only place to excuse a button.
+const BUTTON_SELECTOR = 'button, summary, [role="button"], [role="tab"], [role="switch"]';
+const BUTTON_EXCEPTIONS: { selector: string; reason: string }[] = [];
+/** Live match: opens the live tab and one of its views, like the player does. */
+const liveView = (view: string) => async (page: Page) => {
+  assert.ok(await openTab(page, 'Spiele · LIVE'), 'live tab missing');
+  await page.locator('canvas.gc-viewer-pitch').first().waitFor({ timeout: 15000 });
+  await page.getByRole('button', { name: view, exact: true }).first().click();
+  await page.waitForTimeout(600);
+};
+const AUDIT_SCREENS: { path: string; label: string; features: (now: number) => GameFeatures; state?: (page: Page) => Promise<void> }[] = [
+  ...TOUCH_SCREENS.map(({ path, label, features }) => ({ path, label, features })),
+  { path: '/spiele', label: 'Spiele (Auswahl)', features: richFeatures },
+  { path: '/kader', label: 'Kader, Dialog Beste Startelf', features: (now) => { const f = richFeatures(now); f.starXI.lineupIds = [...f.starXI.lineupIds].reverse(); return f; }, state: async (page) => { await page.locator('button.starxi-best-button').click(); await page.getByRole('alertdialog').waitFor(); await page.waitForTimeout(400); } },
+  // The running live match in each of its four views (the fixture of the live match smoke test).
+  ...['2D', 'Live Ticker', 'Statistik', 'Wechsel'].map((view) => ({ path: '/spiele', label: `Live Match, ${view}`, features: liveMatch, state: liveView(view) })),
+  // The away journey after arrival: the map with its controls and the button that starts the match.
+  // After the final whistle: the press conference answers.
+  { path: '/spiele', label: 'Nach dem Spiel, Pressekonferenz', features: finishedMatch, state: async (page) => { await page.locator('.press-conference').waitFor({ timeout: 10000 }); } },
+  { path: '/spiele', label: 'Reise, angekommen', features: (now) => { const f = richFeatures(now); f.travel.journey = createJourney(fixtureFor(f, 'tournament', 'stadium'), now - 3 * 86400000, () => 0.5, f); return normalizeGameFeatures(f); }, state: async (page) => { await page.locator('.travel-start').waitFor({ timeout: 10000 }); } },
+];
+const AUDIT_BUTTONS = `((selector, exceptions) => {
+  const sig = (el) => el.tagName.toLowerCase() + (el.getAttribute('class') || '').split(/\\s+/).filter(Boolean).slice(0, 2).map((name) => '.' + name).join('');
+  const rows = [];
+  for (const el of document.querySelectorAll(selector)) {
+    const r = el.getBoundingClientRect(), s = getComputedStyle(el);
+    if (r.width <= 2 && r.height <= 2) continue; // visually hidden helpers (clipped to one pixel)
+    if (s.visibility === 'hidden' || s.display === 'none' || el.closest('[hidden], [aria-hidden="true"]')) continue;
+    if (exceptions.some((selector) => el.matches(selector))) continue;
+    rows.push({ sig: sig(el), w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10, text: (el.getAttribute('aria-label') || el.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 24) });
+  }
+  return rows;
+})`;
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`touch audit ${colorScheme}: every visible button of the covered screens and one dialog, the live match, the press conference and the arrived journey are at least 44 x 44 on a phone, except the documented ones`, async () => {
+    const failures: string[] = [];
+    let checked = 0;
+    for (const screen of AUDIT_SCREENS) {
+      const now = Date.now();
+      const { page, problems } = await openWithSave({ width: 390, height: 844 }, save(screen.features(now), now), colorScheme, true, true);
+      await page.goto(BASE + screen.path, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(800);
+      if (screen.state) await screen.state(page);
+      assert.equal(await page.evaluate(() => matchMedia('(pointer: coarse)').matches), true, 'the viewport has a coarse pointer');
+      const rows = (await page.evaluate(`${AUDIT_BUTTONS}(${JSON.stringify(BUTTON_SELECTOR)}, ${JSON.stringify(BUTTON_EXCEPTIONS.map((exception) => exception.selector))})`)) as { sig: string; w: number; h: number; text: string }[];
+      assert.ok(rows.length > 3, `${screen.label}: the audit found only ${rows.length} buttons (the check would be empty)`);
+      checked += rows.length; if (process.env.AUDIT_VERBOSE) console.log('AUDIT', screen.label, rows.length, 'buttons, smallest', Math.min(...rows.map((row) => Math.min(row.w, row.h))));
+      const groups = new Map<string, { n: number; w: number; h: number; text: string }>();
+      for (const row of rows) {
+        if (row.w >= 44 && row.h >= 44) continue;
+        const group = groups.get(row.sig) ?? { n: 0, w: 999, h: 999, text: row.text };
+        groups.set(row.sig, { n: group.n + 1, w: Math.min(group.w, row.w), h: Math.min(group.h, row.h), text: group.text });
+      }
+      for (const [sig, group] of groups) failures.push(`${screen.label} ${sig}: ${group.n} below 44 px, smallest ${group.w} x ${group.h} ("${group.text}")`);
+      assert.deepEqual(problems.filter((problem) => !problem.includes('/api/travel')), []);
+      await page.close();
+    }
+    assert.ok(checked > 150, `${checked} buttons audited`);
+    assert.deepEqual(failures, []);
+  });
+}
+
+test('touch targets: with a mouse the compact sizes stay, only a coarse pointer gets the large targets', async () => {
+  const now = Date.now();
+  const { page } = await openWithSave({ width: 1280, height: 900 }, save(richFeatures(now), now));
+  await page.goto(`${BASE}/kader`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(500);
+  assert.equal(await page.evaluate(() => matchMedia('(pointer: coarse)').matches), false);
+  const sizes = (await page.evaluate(`(${SIZE_OF})('.card-favorite-toggle')`)) as [number, number][];
+  assert.ok(sizes.length > 0);
+  assert.ok(sizes.every(([w, h]) => w === 32 && h === 32), 'the favourite star keeps its compact 32 px with a mouse');
+  // Career: with a mouse the statistics pills keep their compact 32 px and the filter reset button gets no 44 px minimum.
+  await page.goto(`${BASE}/karriere`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(500);
+  const pills = (await page.evaluate(`(${SIZE_OF})('.player-stats-heading button')`)) as [number, number][];
+  assert.ok(pills.length === 2, 'the Karriere / Saison pills are found');
+  assert.ok(pills.every(([, h]) => h === 32), `the statistics pills keep their compact 32 px with a mouse (${JSON.stringify(pills)})`);
+  const minimum = (await page.evaluate(`[...document.querySelectorAll('.career-filters button')].map((e) => getComputedStyle(e).minHeight)`)) as string[];
+  assert.ok(minimum.length > 0 && minimum.every((value) => value !== '44px'), `the filter reset button has no 44 px minimum with a mouse (${JSON.stringify(minimum)})`);
+  // The kickoff checklist (here: the open press conference after a match) keeps its 36 px action buttons with a mouse.
+  await page.close();
+  const kickoff = await openWithSave({ width: 1280, height: 900 }, save(finishedMatch(now), now));
+  assert.ok(await openTab(kickoff.page, 'Spiele'), 'games tab missing');
+  await kickoff.page.locator('.kickoff-checklist .mode-secondary').first().waitFor({ timeout: 10000 });
+  const actions = (await kickoff.page.evaluate(`(${SIZE_OF})('.kickoff-checklist .mode-secondary')`)) as [number, number][];
+  assert.ok(actions.length > 0 && actions.every(([, h]) => h === 36), `the kickoff action buttons keep their compact 36 px with a mouse (${JSON.stringify(actions)})`);
+  await kickoff.page.close();
 });

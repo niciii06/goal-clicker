@@ -5,7 +5,7 @@
 
 /* Bell with unread count */
 .bell-button { position: relative; }
-.bell-count { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; color: #fff; background: #ff3b30; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center; box-sizing: border-box; }
+.bell-count { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; color: #fff; background: #d70015; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center; box-sizing: border-box; }
 
 .header-prestige-ready { margin-left: 6px; padding: 3px 8px; border: 0; border-radius: 999px; color: var(--surface-raised); background: var(--accent); font-size: var(--text-caption2); font-weight: 800; cursor: pointer; white-space: nowrap; }
 
@@ -124,7 +124,20 @@
 .player-compare-pickers { display: flex; flex-wrap: wrap; gap: 8px; }
 .player-compare-pickers select { flex: 1 1 160px; min-width: 0; max-width: 100%; min-height: 32px; }
 /* Touch screens: small controls of the shop, the album and the comparison get a full finger target. */
-@media (pointer: coarse) { .savings-pin, .album-missing-link, .player-compare-pickers select { min-height: 44px; } }
+@media (pointer: coarse) { .savings-pin, .album-missing-link, .player-compare-pickers select, .buy-button, .feature-buy-button, .starxi-best-button, .next-step-chip { min-height: 44px; } }
+/* More touch targets (HIG 44 pt): chips, pagination, view switches, map controls, disclosure rows. The star sits in the 44 px the card reserves on its right, so the card keeps its size. */
+@media (pointer: coarse) {
+  .card-favorite-toggle { right: 0; width: 44px; height: 44px; }
+  .starxi-filter-row button, .starxi-pagination button, .starxi-squad-tools .mode-secondary, .career-view-switch button, .bulk-options button, .club-choice-row button, .travel-map-controls button { min-width: 44px; min-height: 44px; }
+  .season-hub-day-card > summary, .season-roadmap > summary, .season-overview > summary { min-height: 44px; }
+  /* Career: the filter panel reset button (8 px padding, 32 px high) and the Karriere / Saison pills of the player statistics (min-height 32 px). */
+  .career-filters button, .player-stats-heading button { min-width: 44px; min-height: 44px; }
+  /* Kickoff checklist (open press conference, bench): the action buttons are 36 px high (min-height 36 px above). */
+  .kickoff-checklist .mode-secondary { min-width: 44px; min-height: 44px; }
+}
 .player-compare-table { width: 100%; margin-top: 10px; border-collapse: collapse; table-layout: fixed; font-size: var(--text-footnote, 13px); }
 .player-compare-table th, .player-compare-table td { padding: 5px 6px; border-bottom: 1px solid var(--line-soft); text-align: left; overflow-wrap: anywhere; }
 .player-compare-table td.better { color: var(--accent); font-weight: 800; }
+
+/* Phones: while the welcome pack is offered in the shop its button lies right above the navigation, where the status toasts sit. The toasts move to the top then and are back at the bottom once the pack is gone. */
+@media (max-width: 780px) { .toast.toast-top { top: calc(12px + env(safe-area-inset-top)); bottom: auto; } }

@@ -167,6 +167,7 @@ export const de = {
   "gate.hidePassword": "{field} verbergen",
   "gate.signIn": "Anmelden",
   "gate.createAccount": "Konto erstellen",
+  "gate.pitch": "Goal Clicker ist ein kostenloses Fussball-Idle-Spiel mit Sammelkarten, Packs, Ligaaufstieg, Karriere und Koop-Multiplayer. Spiele direkt im Browser.",
   "gate.intro": "Melde dich an, damit dein Spielstand auf allen deinen Geräten gleich ist.",
   "gate.google": "Mit Google anmelden",
   "gate.orUsername": "oder mit Benutzername",
