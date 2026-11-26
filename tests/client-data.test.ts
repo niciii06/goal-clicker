@@ -24,10 +24,14 @@ test('the browser copy of the FC 27 India export keeps every field the game read
   }
 });
 
-test('the lazily loaded route cache ends up identical to the full cache', async () => {
+test('the lazily loaded route cache ends up identical to the full cache once every home city part is loaded', async () => {
   assert.equal(await loadRouteCache(), true);
-  assert.deepEqual(lazyRoutes, fullRoutes);
-  assert.equal(await loadRouteCache(), true);
+  for (const city of ['zurich', 'basel', 'geneve']) assert.equal(await loadRouteCache(city), true);
+  // Compared key by key: a deepEqual failure on 4.6 MB of routes would print a diff of that size.
+  assert.equal(Object.keys(lazyRoutes).length, Object.keys(fullRoutes).length);
+  const full = fullRoutes as Record<string, unknown>, lazy = lazyRoutes as Record<string, unknown>;
+  for (const key of Object.keys(full)) assert.ok(JSON.stringify(lazy[key]) === JSON.stringify(full[key]), key);
+  assert.equal(await loadRouteCache('zurich'), true);
 });
 
 test('the committed browser copy is current (npm run generate:client-data)', async () => {
@@ -43,11 +47,12 @@ test('browser builds resolve the slim and lazy copies through package.json impor
 
 test('the page only loads the route cache once the Spiele tab is open (P12)', async () => {
   const page = await readFile(new URL('../app/game-app.tsx', import.meta.url), 'utf8');
-  const effects = page.split('\n').filter((line) => line.includes('loadRouteCache()'));
+  const effects = page.split('\n').filter((line) => line.includes('loadRouteCache('));
   assert.equal(effects.length, 1);
   assert.match(effects[0], /if \(!routesWanted\) return;/);
-  assert.match(effects[0], /\[routesWanted\]\);/);
+  assert.match(effects[0], /loadRouteCache\(routesCity\)/, 'only the part of the home city of the club on top of the shared part');
+  assert.match(effects[0], /\[routesWanted, routesCity\]\);/);
   assert.match(page, /const routesWanted = featureTab === "cup";/);
-  // The travel map still loads it itself wherever it is shown.
-  assert.match(await readFile(new URL('../app/travel-map.tsx', import.meta.url), 'utf8'), /loadRouteCache\(\)/);
+  // The travel map still loads it itself wherever it is shown, for the home city of the trip.
+  assert.match(await readFile(new URL('../app/travel-map.tsx', import.meta.url), 'utf8'), /loadRouteCache\(tripCity\)/);
 });

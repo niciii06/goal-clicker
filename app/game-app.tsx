@@ -1644,11 +1644,12 @@ export function App() {
   }
 
   const vibrationSupported = hydrated && canVibrate();
-  // Travel previews show an estimate ("ca.") and use exact routes as soon as the route data arrived. The 1.5 MB
-  // route data only loads once the Spiele tab is open (the travel map loads it itself), not on every start.
-  const [, setRoutesLoaded] = useState(false);
+  // Travel previews show an estimate ("ca.") and use exact routes as soon as the route data arrived. The route data
+  // (shared part plus the part of the club's home city) only loads once the Spiele tab is open, not on every start.
+  const [, setRoutesLoaded] = useState(0);
   const routesWanted = featureTab === "cup";
-  useEffect(() => { if (!routesWanted) return; let active = true; void loadRouteCache().then((loaded) => { if (active && loaded) setRoutesLoaded(true); }); return () => { active = false; }; }, [routesWanted]);
+  const routesCity = displayGame.features.seasonMode.homeCity;
+  useEffect(() => { if (!routesWanted) return; let active = true; void loadRouteCache(routesCity).then((loaded) => { if (active && loaded) setRoutesLoaded((count) => count + 1); }); return () => { active = false; }; }, [routesWanted, routesCity]);
   // Without clicks the combo drains one click per step, so a short pause costs a little instead of everything.
   const scheduleComboDecay = useCallback(function scheduleDecay(delay: number) {
     if (comboTimerRef.current) window.clearTimeout(comboTimerRef.current);

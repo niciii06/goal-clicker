@@ -3,85 +3,16 @@
 // Roads: FOSSGIS OSRM. Rails: BRouter rail profile. The private home origin is never sent to a
 // routing service: legs from the home ground keep the locally computed Overpass corridor for the
 // first kilometres and only continue from a public road point in the neighbourhood.
-// Responses are kept in ROUTE_FETCH_CACHE (default: the system temp directory) so reruns are offline.
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+// Requests, simplification and writing the cache: route-fetch-lib.mts (responses cached in ROUTE_FETCH_CACHE).
 import { journeyCandidates } from '../../app/journey-routing.ts';
 import type { Segment } from '../../app/journey-routing.ts';
 import { HOME_VENUE, SEASON_CLUBS, VENUES, distanceKm } from '../../app/travel-geography.ts';
 import type { GeoPoint } from '../../app/travel-geography.ts';
+import { anchored, brouterRail, osrm, pathKm, readCache, simplify, writeCache } from './route-fetch-lib.mts';
 
-type Cached = { points: GeoPoint[]; seconds: number; km: number; source: string; geometry: 'road'|'rail'|'approximate' };
-const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
-const cachePath = join(root, 'app/travel-route-cache.json');
-const partsDir = join(root, 'app/route-cache');
-const indexPath = join(root, 'app/travel-route-cache.ts');
-const responseDir = process.env.ROUTE_FETCH_CACHE ?? join(tmpdir(), 'goal-clicker-route-fetch');
 const DATE = '2026-10-17';
-const PART_BYTES = 165_000;
-mkdirSync(responseDir, { recursive: true });
-
-const cache: Record<string, Cached> = JSON.parse(readFileSync(cachePath, 'utf8'));
-const original: Record<string, Cached> = JSON.parse(readFileSync(cachePath, 'utf8'));
-
-let lastRequest = 0;
-function get(url: string): unknown {
-  const file = join(responseDir, `${createHash('sha1').update(url).digest('hex')}.json`);
-  if (existsSync(file)) return JSON.parse(readFileSync(file, 'utf8'));
-  // Public demo servers: at most about one request per second.
-  const pause = lastRequest + 1100 - Date.now();
-  if (pause > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, pause);
-  lastRequest = Date.now();
-  const body = execFileSync('curl', ['-sS', '-m', '120', '--retry', '3', '--retry-delay', '5', '-A', 'goal-clicker-route-cache/1.0', url], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
-  const data = JSON.parse(body);
-  writeFileSync(file, body);
-  return data;
-}
-
-function osrm(a: GeoPoint, b: GeoPoint) {
-  const url = `https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson`;
-  const data = get(url) as { code: string; routes?: { distance: number; duration: number; geometry: { coordinates: [number, number][] } }[] };
-  const route = data.code === 'Ok' ? data.routes?.[0] : undefined;
-  if (!route) throw new Error(`OSRM found no road ${JSON.stringify([a, b])}: ${data.code}`);
-  return { points: route.geometry.coordinates.map(([lon, lat]) => ({ lat, lon })), km: route.distance / 1000, seconds: route.duration };
-}
-
-function brouterRail(a: GeoPoint, b: GeoPoint) {
-  const url = `https://brouter.de/brouter?lonlats=${a.lon},${a.lat}|${b.lon},${b.lat}&profile=rail&alternativeidx=0&format=geojson`;
-  const data = get(url) as { features?: { geometry: { coordinates: number[][] }; properties: Record<string, string> }[] };
-  const feature = data.features?.[0];
-  if (!feature) throw new Error(`BRouter found no railway ${JSON.stringify([a, b])}`);
-  return { points: feature.geometry.coordinates.map(([lon, lat]) => ({ lat, lon })), km: Number(feature.properties['track-length']) / 1000 };
-}
-
-const pathKm = (points: GeoPoint[]) => points.slice(1).reduce((n, p, i) => n + distanceKm(points[i], p), 0);
-
-// Douglas-Peucker in metres; long routes are drawn on a small map, so they keep fewer vertices.
-function simplify(points: GeoPoint[], km: number) {
-  const tolerance = km < 30 ? 4 : km < 150 ? 8 : km < 400 ? 20 : 40;
-  if (points.length < 3) return points;
-  const lat = points.reduce((n, p) => n + p.lat, 0) / points.length, sx = 111320 * Math.cos(lat * Math.PI / 180), sy = 111320;
-  const keep = new Set([0, points.length - 1]), queue: [number, number][] = [[0, points.length - 1]];
-  while (queue.length) {
-    const [a, b] = queue.pop()!;
-    const ax = points[a].lon * sx, ay = points[a].lat * sy, dx = points[b].lon * sx - ax, dy = points[b].lat * sy - ay, den = dx * dx + dy * dy;
-    let worst = tolerance * tolerance, index = -1;
-    for (let i = a + 1; i < b; i++) {
-      const px = points[i].lon * sx - ax, py = points[i].lat * sy - ay, t = den ? Math.max(0, Math.min(1, (px * dx + py * dy) / den)) : 0;
-      const d = (px - t * dx) ** 2 + (py - t * dy) ** 2;
-      if (d > worst) { worst = d; index = i; }
-    }
-    if (index >= 0) { keep.add(index); queue.push([a, index], [index, b]); }
-  }
-  return [...keep].sort((x, y) => x - y).map((i) => ({ lat: +points[i].lat.toFixed(6), lon: +points[i].lon.toFixed(6) }));
-}
-
-// Exact endpoints first and last, so vehicles leave and reach the configured anchors.
-const anchored = (a: GeoPoint, points: GeoPoint[], b: GeoPoint) => [{ lat: a.lat, lon: a.lon }, ...points, { lat: b.lat, lon: b.lon }];
+const cache = readCache();
+const original = readCache();
 
 const homePrefix = `bus:${HOME_VENUE.lat.toFixed(5)},${HOME_VENUE.lon.toFixed(5)}:`;
 // Public road points on the locally computed corridors from the home ground, 0.6 to 3 km out.
@@ -144,20 +75,5 @@ for (const [key, s] of legs) {
   if (done % 10 === 0) console.log(`  ${done}/${legs.size}`);
 }
 
-writeFileSync(cachePath, JSON.stringify(cache));
-// Browser chunks: parts of about PART_BYTES each, in canonical key order.
-for (const file of readdirSync(partsDir)) if (/^part-\d+\.json$/.test(file)) rmSync(join(partsDir, file));
-const parts: Record<string, Cached>[] = [{}];
-let bytes = 0;
-for (const [key, route] of Object.entries(cache)) {
-  const size = JSON.stringify({ [key]: route }).length;
-  if (bytes + size > PART_BYTES && Object.keys(parts.at(-1)!).length) { parts.push({}); bytes = 0; }
-  parts.at(-1)![key] = route; bytes += size;
-}
-parts.forEach((part, i) => writeFileSync(join(partsDir, `part-${i}.json`), JSON.stringify(part)));
-writeFileSync(indexPath, `// Generated from travel-route-cache.json; verified against the canonical cache in tests.
-${parts.map((_, i) => `import part${i} from './route-cache/part-${i}.json';`).join('\n')}
-const routes = {${parts.map((_, i) => `...part${i}`).join(',')}};
-export default routes;
-`);
-console.log(`cache entries ${Object.keys(cache).length}, ${JSON.stringify(cache).length} bytes in ${parts.length} parts`);
+const written = writeCache(cache);
+console.log(`cache entries ${written.entries}, ${written.bytes} bytes, browser parts ${JSON.stringify(written.parts)}`);

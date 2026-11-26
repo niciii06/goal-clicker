@@ -27,9 +27,11 @@ function vehicleTransforms(vehicle:VehicleState,scale:number){
 export function mapOriginCity(journey:Pick<Journey,'origin'|'fixture'>){return journey.origin?.city??homeVenueOf(journey.fixture.home).city;}
 
 export function TravelMap({journey,now,progress}:{journey:Journey;now:number;progress:number}) {
- // The route data loads in the background; once it is there, legs saved without road geometry are redrawn on the road.
+ // The route data loads in the background (shared part plus the trip's home city); once it is there, legs saved
+ // without road geometry are redrawn on the road. A new object, so the projection below runs again.
  const [routeData,setRouteData]=useState(()=>routeCacheReady()?routeCache():undefined);
- useEffect(()=>{if(routeData)return;let active=true;void loadRouteCache().then(loaded=>{if(active&&loaded&&routeCacheReady())setRouteData(routeCache());});return()=>{active=false;};},[routeData]);
+ const tripCity=journey.fixture.home;
+ useEffect(()=>{let active=true;void loadRouteCache(tripCity).then(loaded=>{if(active&&loaded&&routeCacheReady())setRouteData({...routeCache()});});return()=>{active=false;};},[tripCity]);
  const routes=useMemo(()=>projectRoutes(journey,routeData),[journey,routeData]);
  const fit=useMemo(()=>fitRoutes(routes),[routes]);
  const vehicle=vehicleAt(routes,journey,now,progress);
