@@ -298,9 +298,9 @@ test('the profile settings change display name and password and delete the profi
   await panel.getByRole('button', { name: 'Speichern' }).click();
   // Feedback shows inside the dialog, above its dimmed background.
   await panel.getByRole('status').filter({ hasText: 'Anzeigename gespeichert.' }).waitFor();
-  await panel.getByLabel('Aktuelles Passwort').fill('anderes-passwort-2');
-  await panel.getByLabel('Neues Passwort').fill('neues-passwort-3');
-  await panel.getByLabel('Wiederholen').fill('neues-passwort-3');
+  await panel.getByLabel('Aktuelles Passwort', { exact: true }).fill('anderes-passwort-2');
+  await panel.getByLabel('Neues Passwort', { exact: true }).fill('neues-passwort-3');
+  await panel.getByLabel('Wiederholen', { exact: true }).fill('neues-passwort-3');
   await panel.getByRole('button', { name: 'Passwort ändern' }).click();
   await panel.getByRole('status').filter({ hasText: 'Neues Passwort gespeichert.' }).waitFor();
   const [{ user_id: userId }] = await admin`select user_id from profiles where username_key = 'keeper'`;
