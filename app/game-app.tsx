@@ -19,6 +19,7 @@ import { ConfirmDialog, useDialogFocus } from "./confirm-dialog";
 import { PrestigeDialog, PrestigeVoteDialog, prestigeBonusLabel, prestigeBonusPercent } from "./prestige-dialog";
 import { HomeCityCard } from "./home-city-picker";
 import { FeedbackPanel } from "./feedback-panel";
+import { TransferLedger } from "./transfer-ledger";
 import { homeCityOf, homeGroundLabel } from "./home-cities";
 import type { HomeCityId } from "./home-cities";
 import { WHATS_NEW } from "./whats-new";
@@ -728,7 +729,6 @@ export function App() {
   const benchStarXIPlayerCount = benchStarXIPlayers.filter(Boolean).length;
   const loanedStarIds = useMemo(() => displayGame.features.transferSaga.loans.map((loan) => loan.playerId), [displayGame.features.transferSaga.loans]);
   const currentTransferLoans = displayGame.features.transferSaga.loans.map((loan) => ({ loan, player: getStarXIPlayer(loan.playerId) })).filter((entry): entry is { loan: typeof entry.loan; player: NonNullable<ReturnType<typeof getStarXIPlayer>> } => Boolean(entry.player));
-  const transferArchive = [...displayGame.features.transferSaga.archive].reverse();
   const pendingTransferOffer = displayGame.features.transferSaga.pendingOffer;
   // Only cards still in the club can be banned; older saves may list sold or discarded ones.
   const ownedDisciplineBans = displayGame.features.discipline.bans.filter((ban) => displayGame.features.starXI.ownedIds.includes(ban.playerId));
@@ -3744,10 +3744,7 @@ export function App() {
             {pendingTransferOffer && <section className="transfer-offer-card" aria-live="polite"><div><span>{t("fabrizio.openOfferCaps")}</span><strong>{pendingTransferOffer.playerName} · {pendingTransferOffer.club}</strong><small>{pendingTransferOffer.message}</small></div><TransferOfferActions offer={pendingTransferOffer} features={displayGame.features} now={countdownNow} busy={coopBusy} onAnswer={answerTransferOffer} /></section>}
             {deadlineDayActive && <section className="deadline-day-banner" aria-live="polite"><div><span>{t("fabrizio.deadlineEyebrow")}</span><strong>{t("fabrizio.deadlineTitle")}</strong><small>{t("fabrizio.deadlineBody")}</small></div><b>{deadlineDayLabel}</b></section>}
             {displayGame.features.cup.active && <div className="transfer-match-lock"><span>{t("fabrizio.matchRunningCaps")}</span><strong>{t("fabrizio.noDepartures")}</strong><small>{t("fabrizio.afterMatch")}</small></div>}
-            <div className="transfer-ledger-grid">
-              <section className="transfer-ledger-card"><div className="transfer-ledger-heading"><div><p className="eyebrow">{t("fabrizio.loanStationsEyebrow")}</p><h4>{t("fabrizio.currentlyLoaned")}</h4></div><span>{currentTransferLoans.length}</span></div>{currentTransferLoans.length ? <div className="transfer-ledger-list">{currentTransferLoans.map(({ loan, player }) => <article key={`loan-${loan.playerId}`}><span>{player?.name.slice(0, 1) ?? "?"}</span><div><strong>{player?.name ?? t("fabrizio.unknownPlayer")}</strong><small>{loan.club} · {loan.status === "active" ? t("fabrizio.returnsAfterMatch") : t("fabrizio.missesNextSeasonMatch")}</small></div><b>{t("fabrizio.loanCaps")}</b></article>)}</div> : <div className="transfer-ledger-empty">{t("fabrizio.noLoans")}</div>}</section>
-              <section className="transfer-ledger-card"><div className="transfer-ledger-heading"><div><p className="eyebrow">{t("fabrizio.ledgerEyebrow")}</p><h4>{t("fabrizio.history")}</h4></div><span>{transferArchive.length}</span></div>{transferArchive.length ? <div className="transfer-ledger-list archive">{transferArchive.slice(0, 12).map((event) => <article key={`archive-${event.id}`}><span>{event.outcome === "sale" ? "↗" : event.outcome === "return" ? "↙" : event.outcome === "declined" ? "✋" : "⇄"}</span><div><strong>{event.playerName ?? t("fabrizio.severalPlayers")}</strong><small>{event.outcome === "return" ? t("fabrizio.backFrom", { club: event.club }) : event.outcome === "declined" ? t("fabrizio.keptWanted", { club: event.club }) : `${event.outcome === "sale" ? t("fabrizio.soldTo", { club: event.club }) : t("fabrizio.loanedToClub", { club: event.club })}${event.fee > 0 ? t("fabrizio.feeSuffix", { fee: formatNumber(event.fee) }) : event.outcome === "sale" ? t("fabrizio.freeSuffix") : ""}`}</small></div><b>{formatHistoryTime(event.createdAt)}</b></article>)}</div> : <div className="transfer-ledger-empty">{t("fabrizio.noDeparturesYet")}</div>}</section>
-            </div>
+            <TransferLedger loans={currentTransferLoans} archive={displayGame.features.transferSaga.archive} />
           </div>}
 
           {featureTab === "season" && <SeasonPanel features={displayGame.features} action={seasonTabAction} />}

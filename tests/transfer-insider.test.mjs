@@ -28,8 +28,11 @@ test("Fabrizio Romario transfer events are wired through singleplayer and coop",
   assert.match(pageSource, /!displayGame\.features\.cup\.active && displayGame\.features\.transferSaga\.nextAt/);
   assert.match(apiSource, /activatePendingTransferLoans/);
   assert.ok((apiSource.match(/completeTournamentRun/g) ?? []).length >= 3);
-  assert.match(pageSource, /Aktuell verliehen/);
-  assert.match(pageSource, /Transferhistorie/);
+  // The ledger cards live in their own component (modularisation step 2), placed by the Fabrizio tab.
+  const ledgerSource = germanSource(await readFile(new URL("../app/transfer-ledger.tsx", import.meta.url), "utf8"));
+  assert.match(pageSource, /<TransferLedger /);
+  assert.match(ledgerSource, /Aktuell verliehen/);
+  assert.match(ledgerSource, /Transferhistorie/);
   assert.match(pageSource, /DEADLINE DAY \/ ROMARIO LIVE/);
 });
 
@@ -59,8 +62,11 @@ test("Fabrizio stays available while the player transfer market is closed", asyn
   assert.match(pageSource, /featureTab === "fabrizio"/);
   assert.doesNotMatch(pageSource, /buyTransfer/);
   assert.doesNotMatch(pageSource, /refreshTransferMarket/);
-  assert.match(pageSource, /Aktuell verliehen/);
-  assert.match(pageSource, /Transferhistorie/);
+  // The ledger cards live in their own component (modularisation step 2), placed by the Fabrizio tab.
+  const ledgerSource = germanSource(await readFile(new URL("../app/transfer-ledger.tsx", import.meta.url), "utf8"));
+  assert.match(pageSource, /<TransferLedger /);
+  assert.match(ledgerSource, /Aktuell verliehen/);
+  assert.match(ledgerSource, /Transferhistorie/);
   assert.match(apiSource, /action === "transfer-buy"\) return jsonError\(TRANSFER_MARKET_CLOSED_MESSAGE, 410\)/);
   assert.match(apiSource, /action === "transfer-refresh"\) return jsonError\(TRANSFER_MARKET_CLOSED_MESSAGE, 410\)/);
   assert.match(apiSource, /TRANSFER_MARKET_CLOSED_MESSAGE/);
