@@ -70,6 +70,10 @@ Laptop und Handy spielen abwechselnd auf einem Konto bis Version 3 (300 Tore). D
 3. **Baseline nur nach Freigabe:** auf einem frischen Neon Branch vom Live Branch (Kopie) zuerst `baseline-drizzle-journal.sql`, dann `drizzle-kit migrate` (muss No‑op sein), dann `schema-drift.mts`. Erst danach auf dem Live Branch, und nur, wenn künftig wirklich `db:migrate` statt `psql -f` verwendet werden soll. Bis dahin gilt weiter: neue Migrationen idempotent schreiben und mit `psql -f` einspielen.
 4. **Jede neue Migration:** idempotent (`IF NOT EXISTS`), Rollback im Kopf, Code muss mit und ohne sie laufen, Probe mit `tests/db-rehearsal.test.ts` auf leerer DB und auf einer Kopie des Staging Schemas, erst Testbranch, dann Live.
 
+## Entscheid vom 25.11.2026
+
+Nicolas: Die Live-Datenbank `goalclicker-live` bleibt unverändert, 0009 wird dort vorerst nicht angewendet. Im Repository liegen dafür die Werkzeuge der Baseline-Strategie: `scripts/db-rehearsal/baseline-drizzle-journal.sql` (nicht angewendet), `scripts/db-rehearsal/schema-drift.mts` (nur lesend) und `tests/db-rehearsal.test.ts` (nur gegen einen lokalen Server, 6/6 auf main mit Merge `b23d4c8`). Der Test läuft bewusst nicht in der CI, weil er `pg_dump`/`pg_restore` und das Recht zum Anlegen von Datenbanken braucht.
+
 ## Was offen bleibt (nur der Besitzer kann es prüfen)
 
 * **Echter Neon Restore:** auf einem Testbranch Zeitpunkt merken, Testdaten ändern, Restore in einen **neuen** Branch auf den gemerkten Zeitpunkt, dann `scripts/migration/verify-accounts.mts` auf beiden Branches vergleichen. Notieren: Verlaufsfenster des Plans, Dauer, ob Rollen und Passwörter der Laufzeitrolle mitkommen.
