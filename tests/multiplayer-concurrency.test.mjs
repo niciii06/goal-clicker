@@ -88,7 +88,8 @@ test("multiplayer rooms preserve old slots and accept four players", async () =>
 
   assert.match(schemaSource, /player3PlayerId: text\("player3_player_id"\)/);
   assert.match(schemaSource, /player4PlayerId: text\("player4_player_id"\)/);
-  assert.match(apiSource, /const COOP_ROLES = \["host", "guest", "player3", "player4"\] as const/);
+  const seatsSource = await readFile(new URL("../app/api/multiplayer/seats.ts", import.meta.url), "utf8");
+  assert.match(seatsSource, /export const COOP_ROLES = \["host", "guest", "player3", "player4"\] as const/);
   assert.match(apiSource, /Maximal vier Spieler können gemeinsam spielen/);
   assert.match(apiSource, /getOccupiedRoomPlayers\(room\)\.length >= 2/);
   assert.match(pageSource, /BIS ZU VIER SPIELER/);
