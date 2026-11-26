@@ -82,7 +82,7 @@ import { bestRatingPerFormation, benchChangeCount, describeReplacements, fillSta
 import type { LineupChange } from "./game/lineup-tools";
 import { KickoffChecklist, type KickoffItem } from "./qol/kickoff-checklist";
 import { abandonTournamentBlockReason, abandonTournamentRun } from "./game/tournament-abandon";
-import { HISTORY_TOPICS, filterHistory, historyActors, type HistoryTopic } from "./qol/history-filter";
+import { HistoryPanel } from "./qol/history-panel";
 import { inviteUrl, joinCodeFromSearch, shortcutFor } from "./qol/invite";
 import { newNotifiableActions, setAppBadge, showLocalNotification } from "./qol/notifications";
 import { DeviceSettingsPanel, type SoundPrefs } from "./qol/device-settings";
@@ -459,8 +459,6 @@ export function App() {
   function setSoundPrefs(next: SoundPrefs) { setSoundPrefsState(next); writeJsonPref(PREF_KEYS.stadiumSound, next); }
   const [whatsNewArchive, setWhatsNewArchive] = useState(false);
   const [abandonDialog, setAbandonDialog] = useState(false);
-  const [historyTopic, setHistoryTopic] = useState<HistoryTopic>("all");
-  const [historyActor, setHistoryActor] = useState("");
   // A co-op action that failed: the chip offers to send it again with the same action id (Q64).
   const [coopFailed, setCoopFailed] = useState<{ action: string; extra: Record<string, unknown> } | null>(null);
   const [dailyBusy, setDailyBusy] = useState(false);
@@ -3573,9 +3571,6 @@ export function App() {
   const selectedTournament = displayGame.features.cup.pendingNextRound ? activeTournament : (getTournament(selectedTournamentId) ?? TOURNAMENTS[0]);
   const selectedTournamentUnlockLeague = getTournamentUnlockLeague(selectedTournament.id);
   const selectedTournamentLeagueUnlocked = isLeagueContentUnlocked(selectedTournamentUnlockLeague, reachedLeague, hasFullTestAccess);
-  const allFeatureHistory = [...displayGame.features.history].reverse();
-  const featureHistoryActors = historyActors(allFeatureHistory);
-  const featureHistory = filterHistory(allFeatureHistory, historyTopic, featureHistoryActors.includes(historyActor) ? historyActor : "");
   // The next match in one tap (Q44, Q46): the waiting cup round, else the next league matchday (or its journey).
   const seasonFixture = fixtureFor(displayGame.features, "season");
   const nextMatchAction = displayGame.features.cup.active || journeyUnderway ? undefined
@@ -3850,7 +3845,7 @@ export function App() {
           {featureTab === "missions" && <WeeklyGoalsPanel features={displayGame.features} minigameWins={displayGame.minigameWins} coop={isCoopLive} busy={coopBusy} now={getTravelTime()} onClaim={(goalId) => void claimWeeklyGoalReward(goalId)} />}
 
           {featureTab === "leaderboard" && <LeaderboardPanel playerId={playerId} />}
-          {featureTab === "history" && <div className="feature-panel"><div className="feature-panel-heading"><div><p className="eyebrow">{t("club.matchCenterEyebrow")}</p><h3>{t("club.whatHappens")}</h3></div><span className="feature-stat">{featureHistory.length} {t("club.entries")}</span></div><div className="history-filters"><div className="starxi-filter-row" role="group" aria-label={t("club.historyFilter")}>{HISTORY_TOPICS.map((topic) => <button type="button" key={topic.id} className={historyTopic === topic.id ? "active" : ""} aria-pressed={historyTopic === topic.id} onClick={() => setHistoryTopic(topic.id)}>{topic.label}</button>)}</div>{featureHistoryActors.length > 0 && <select className="starxi-position-filter" value={historyActor} onChange={(event) => setHistoryActor(event.target.value)} aria-label={t("club.historyByPlayer")}><option value="">{t("club.allTeammates")}</option>{featureHistoryActors.map((actor) => <option key={actor} value={actor}>{actor}</option>)}</select>}</div><div className="history-list">{featureHistory.length ? featureHistory.map((entry) => <div className={`history-row ${entry.tone}`} key={entry.id}><span><Icon name={entry.tone === "negative" ? "screen" : entry.title.includes("Pokal") ? "crown" : "star"} size={15} /></span><div><strong>{localizeText(entry.title)}</strong><small>{entry.actor ? `${entry.actor} · ` : ""}{localizeText(entry.detail)}</small></div><em>{formatHistoryTime(entry.timestamp)}</em></div>) : <div className="feature-empty"><Icon name="broadcast" size={25} /><p>{t("club.noEntries")}</p></div>}</div></div>}
+          {featureTab === "history" && <HistoryPanel history={displayGame.features.history} />}
           {featureTab === "history" && displayGame.features.gazetteIssues.length > 0 && <section className="gazette-archive"><div className="gazette-archive-heading"><div><p className="eyebrow">{t("club.gazetteArchive")}</p><h3>{t("club.frontPages")}</h3></div><span>{displayGame.features.gazetteIssues.length} {t("club.spending")}</span></div><div>{[...displayGame.features.gazetteIssues].reverse().map((issue) => <article className={issue.tone} key={`gazette-archive-${issue.id}`}><small>{dataText(getTournament(issue.tournamentId)?.label) || t("club.tournament")} · {formatHistoryTime(issue.createdAt)}</small><strong>{issue.headline}</strong><p>{issue.strapline}</p></article>)}</div></section>}
         </section>
 
