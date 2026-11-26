@@ -149,6 +149,8 @@ export class GoalClickerDatabase {
   private database: Database | null = null;
   /** Whether coop_rooms.features_key (migration 0009) exists; null until first asked. */
   private storedFeaturesKey: { present: boolean; checkedAt: number } | null = null;
+  /** Whether feedback_reports (migration 0010) exists; null until first asked. */
+  private feedbackTable: { present: boolean; checkedAt: number } | null = null;
 
   /** The pool opens on the first query, so a missing DATABASE_URL only fails requests that need it. */
   constructor(private readonly connect: () => Database) {}
@@ -396,6 +398,28 @@ export class GoalClickerDatabase {
   async findRecoveryCode(codeHash: string, issuer: string, now: string): Promise<typeof recoveryCodes.$inferSelect | null> {
     const [code] = await this.client.select().from(recoveryCodes).where(and(eq(recoveryCodes.codeHash, codeHash), eq(recoveryCodes.issuer, issuer), isNull(recoveryCodes.usedAt), gt(recoveryCodes.expiresAt, now))).limit(1);
     return code ?? null;
+  }
+
+  /** Whether the feedback table of migration 0010 exists (prepared, applied by hand); rechecked like 0009. */
+  async feedbackReady() {
+    const now = Date.now(), known = this.feedbackTable;
+    if (known && (known.present || now - known.checkedAt < COLUMN_RECHECK_MS)) return known.present;
+    let present = false;
+    try {
+      const rows = await this.client.execute(sql`select 1 from information_schema.tables where table_schema = current_schema() and table_name = 'feedback_reports' limit 1`);
+      present = Array.from(rows as ArrayLike<unknown>).length > 0;
+    } catch {
+      present = false;
+    }
+    this.feedbackTable = { present, checkedAt: now };
+    return present;
+  }
+
+  /** Stores one feedback report; only inserts, reading the reports is for the owner. Returns its id. */
+  async insertFeedback(values: { kind: string; title: string; description: string; accountId: string | null; playerId: string | null; locale: string | null; screenshotType: string | null; screenshotBase64: string | null }) {
+    const rows = await this.client.execute(sql`insert into feedback_reports (kind, title, description, account_id, player_id, locale, screenshot_type, screenshot_base64)
+      values (${values.kind}, ${values.title}, ${values.description}, ${values.accountId}::uuid, ${values.playerId}, ${values.locale}, ${values.screenshotType}, ${values.screenshotBase64}) returning id`);
+    return String((Array.from(rows as unknown as ArrayLike<{ id: unknown }>)[0])?.id ?? "");
   }
 
   /** Counts a hit in a fixed window shared by all server instances; returns the hits of this window. */

@@ -1471,3 +1471,25 @@ main :is(h2, h3, h4)[tabindex="-1"]:focus-visible { outline: 3px solid var(--acc
    sits right under the brand, without the divider line, so it can be found before signing in. */
 .account-language { margin: 0 0 14px; padding-top: 0; border-top: 0; }
 .device-settings .language-picker { margin-top: 0; }
+
+/* In game feedback (app/feedback-panel.tsx): a card under «Club & Mehr» and its dialog. Every control is 44 px. */
+.feedback-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.feedback-actions .mode-secondary { min-height: 44px; }
+.feedback-dialog { display: grid; gap: 14px; width: min(520px, 100%); }
+.feedback-dialog h2 { margin: 0; font-size: var(--text-title3); }
+.feedback-kind { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; border: 0; }
+.feedback-kind legend { margin-bottom: 6px; padding: 0; color: var(--soft); font-size: var(--text-footnote); font-weight: 700; }
+.feedback-kind label { position: relative; display: inline-flex; min-height: 44px; align-items: center; padding: 0 16px; border: 1px solid var(--line-soft); border-radius: var(--radius-pill); background: var(--fill); color: var(--text); font-weight: 600; cursor: pointer; }
+.feedback-kind label.selected { border: 2px solid var(--accent); background: var(--accent-soft); color: var(--text); font-weight: 700; }
+.feedback-kind input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.feedback-kind label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.feedback-dialog .account-field small { color: var(--muted); font-size: var(--text-footnote); }
+.feedback-description { min-height: 120px; padding-block: 10px; resize: vertical; font: inherit; line-height: 1.4; }
+.feedback-screenshot > span { color: var(--soft); font-size: var(--text-footnote); font-weight: 700; }
+/* The native field is kept for keyboard, screen readers and file pickers, but drawn as the localized button below it. */
+.feedback-file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+.feedback-file-button { display: inline-flex; justify-self: start; min-height: 44px; align-items: center; cursor: pointer; }
+.feedback-file-input:focus-visible + .feedback-file-button { outline: 2px solid var(--accent); outline-offset: 2px; }
+.feedback-preview { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.feedback-preview img { max-width: 160px; max-height: 120px; border-radius: 10px; border: 1px solid var(--line-soft); object-fit: contain; }
+.feedback-preview .mode-secondary { min-height: 44px; }

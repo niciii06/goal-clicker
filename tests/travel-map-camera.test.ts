@@ -99,3 +99,21 @@ test('legacy journeys without a stored plan still render a great circle', () => 
   assert.match(html, /Folgen/);
   assert.match(html, /aria-pressed="true"/);
 });
+
+test('the accessible map name says where the trip really leaves from, in German and English', async () => {
+  const { mapOriginCity } = await import('../app/travel-map.tsx');
+  const { HOME_CITIES } = await import('../app/home-cities.ts');
+  const runtime = await import('../app/i18n/runtime.ts');
+  const zurichTrip = { origin: HOME_CITIES.zurich.homeVenue, fixture: { ...fixture('bern'), home: 'zurich' as const } };
+  assert.equal(mapOriginCity(zurichTrip), 'Zürich');
+  // A journey saved without its origin uses the home city of its fixture; an old save without one leaves from Bern.
+  assert.equal(mapOriginCity({ fixture: { ...fixture('bern'), home: 'geneve' as const } }), HOME_CITIES.geneve.homeVenue.city);
+  assert.equal(mapOriginCity({ fixture: fixture('bern') }), 'Bern');
+  runtime.resetLocaleForTests();
+  runtime.chooseLocale('de');
+  const journey = { ...createJourney({ ...fixture('bern'), home: 'zurich' }, now, () => .5), plan: undefined };
+  assert.match(renderToStaticMarkup(createElement(TravelMap, { journey, now: now + 1000, progress: .5 })), /aria-label="Reisekarte von Zürich nach [^"]+"/);
+  runtime.chooseLocale('en');
+  assert.match(renderToStaticMarkup(createElement(TravelMap, { journey, now: now + 1000, progress: .5 })), /aria-label="Travel map from Zürich to [^"]+"/);
+  runtime.resetLocaleForTests();
+});

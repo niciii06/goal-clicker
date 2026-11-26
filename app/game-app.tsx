@@ -18,6 +18,7 @@ import { AccountButton, AccountLink } from "./account-panel";
 import { ConfirmDialog, useDialogFocus } from "./confirm-dialog";
 import { PrestigeDialog, PrestigeVoteDialog, prestigeBonusLabel, prestigeBonusPercent } from "./prestige-dialog";
 import { HomeCityCard } from "./home-city-picker";
+import { FeedbackPanel } from "./feedback-panel";
 import { homeCityOf, homeGroundLabel } from "./home-cities";
 import type { HomeCityId } from "./home-cities";
 import { WHATS_NEW } from "./whats-new";
@@ -1659,11 +1660,12 @@ export function App() {
   }
 
   const vibrationSupported = hydrated && canVibrate();
-  // Travel previews show an estimate ("ca.") and use exact routes as soon as the route data arrived. The 1.5 MB
-  // route data only loads once the Spiele tab is open (the travel map loads it itself), not on every start.
-  const [, setRoutesLoaded] = useState(false);
+  // Travel previews show an estimate ("ca.") and use exact routes as soon as the route data arrived. The route data
+  // (shared part plus the part of the club's home city) only loads once the Spiele tab is open, not on every start.
+  const [, setRoutesLoaded] = useState(0);
   const routesWanted = featureTab === "cup";
-  useEffect(() => { if (!routesWanted) return; let active = true; void loadRouteCache().then((loaded) => { if (active && loaded) setRoutesLoaded(true); }); return () => { active = false; }; }, [routesWanted]);
+  const routesCity = displayGame.features.seasonMode.homeCity;
+  useEffect(() => { if (!routesWanted) return; let active = true; void loadRouteCache(routesCity).then((loaded) => { if (active && loaded) setRoutesLoaded((count) => count + 1); }); return () => { active = false; }; }, [routesWanted, routesCity]);
   // Without clicks the combo drains one click per step, so a short pause costs a little instead of everything.
   const scheduleComboDecay = useCallback(function scheduleDecay(delay: number) {
     if (comboTimerRef.current) window.clearTimeout(comboTimerRef.current);
@@ -3863,6 +3865,7 @@ export function App() {
             <DeviceSettingsPanel sound={game.sound} soundPrefs={soundPrefs} onSound={toggleSound} onSoundPrefs={setSoundPrefs} notifications={notificationsOn} onNotifications={changeNotifications} onWhatsNew={() => setWhatsNewArchive(true)} onMessage={showToast} />
             <section className="tutorial-restart" aria-label={t("club.tutorialLabel")}><div><p className="eyebrow">{t("club.tutorialEyebrow")}</p><strong>{t("club.tutorialAgainTitle")}</strong><small>{t("club.tutorialAgainBody")}</small></div><button type="button" className="mode-secondary" onClick={restartTutorial}>{t("club.restartTutorial")}</button></section>
             <section className="tutorial-restart" aria-label={t("club.saveFileLabel")}><div><p className="eyebrow">{t("club.saveFileEyebrow")}</p><strong>{t("club.saveFileTitle")}</strong><small>{t("club.saveFileBody")}</small></div><SaveFileControls getGame={() => gameRef.current} onMessage={showToast} /></section>
+            <FeedbackPanel playerId={playerId} onMessage={showToast} />
 <section className="club-identity" aria-label={t("club.identity")}><div className="feature-panel-heading"><div><p className="eyebrow">{t("club.identityEyebrow")}</p><h3>{t("club.makeItYours")}</h3></div><span className="club-preview" role="img" aria-label={t("club.crestPreview", { badge: clubDraft.badge })} style={{ color: clubDraft.color, borderColor: clubDraft.color }}>{clubDraft.badge}</span></div><div className="club-form"><label htmlFor="club-name">{t("club.name")}</label><input id="club-name" className="mode-input" value={clubDraft.name} maxLength={22} onChange={(event) => setClubDraft((current) => ({ ...current, name: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter" && !coopBusy) { event.preventDefault(); void saveClubProfile(); } }} enterKeyHint="done" /><div><span className="club-form-label">{t("club.crest")}</span><div className="club-choice-row">{CLUB_BADGES.map((badge) => <button key={badge} className={clubDraft.badge === badge ? "selected" : ""} onClick={() => setClubDraft((current) => ({ ...current, badge }))}>{badge}</button>)}</div></div><div><span className="club-form-label">{t("club.color")}</span><div className="club-choice-row colors">{CLUB_COLORS.map((color) => <button key={color} className={clubDraft.color === color ? "selected" : ""} style={{ background: color }} aria-label={t("club.colorName", { color })} onClick={() => setClubDraft((current) => ({ ...current, color }))} />)}</div></div><button className="mode-primary" onClick={() => void saveClubProfile()} disabled={coopBusy}>{t("club.saveProfile")}</button></div></section></div>}
 
           {featureTab === "missions" && <WeeklyGoalsPanel features={displayGame.features} minigameWins={displayGame.minigameWins} coop={isCoopLive} busy={coopBusy} now={getTravelTime()} onClaim={(goalId) => void claimWeeklyGoalReward(goalId)} />}

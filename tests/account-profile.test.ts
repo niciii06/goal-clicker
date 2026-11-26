@@ -360,4 +360,9 @@ test('password fields start masked and carry an accessible eye button that is no
   assert.equal((source.match(/<PasswordInput /g) ?? []).length, 2);
   assert.doesNotMatch(source, /type="password"/);
   assert.doesNotMatch(source.slice(source.indexOf('export function PasswordInput'), source.indexOf('function LoginForm(')), /localStorage|sessionStorage|console\./);
+  // «Passwort ändern» in the profile uses the same field three times (current, new, repeat), each named by its own label.
+  const panel = await readFile(new URL('../app/account-panel.tsx', import.meta.url), 'utf8');
+  assert.equal((panel.match(/<PasswordInput /g) ?? []).length, 3);
+  assert.doesNotMatch(panel, /type="password"/);
+  for (const key of ['current', 'new', 'repeat']) assert.match(panel, new RegExp(`<span id=\\{\`\\$\\{passwordIds\\}-${key}\`\\}>[\\s\\S]*?labelId=\\{\`\\$\\{passwordIds\\}-${key}\`\\}`));
 });
