@@ -97,5 +97,6 @@ test('co-op history: the member who claimed day 7 is named once in German and En
   // A name cut to 24 characters still counts as the same member.
   const long = 'Maximilian Alexander Muster';
   assert.equal(historyLine(long.slice(0, 24), `${long} holt ein Spezialkarten-Pack. Serie: 7 Tage.`), `${long} holt ein Spezialkarten-Pack. Serie: 7 Tage.`);
-  assert.match(readFileSync('app/game-app.tsx', 'utf8'), /<small>\{historyLine\(entry\.actor, localizeText\(entry\.detail\)\)\}<\/small>/, 'the history list uses it');
+  // The history list moved into its own panel (modularisation step 1); it still renders through historyLine.
+  assert.match(readFileSync('app/qol/history-panel.tsx', 'utf8'), /<small>\{historyLine\(entry\.actor, localizeText\(entry\.detail\)\)\}<\/small>/, 'the history list uses it');
 });

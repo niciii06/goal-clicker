@@ -19,6 +19,7 @@ import { ConfirmDialog, useDialogFocus } from "./confirm-dialog";
 import { PrestigeDialog, PrestigeVoteDialog, prestigeBonusLabel, prestigeBonusPercent } from "./prestige-dialog";
 import { HomeCityCard } from "./home-city-picker";
 import { FeedbackPanel } from "./feedback-panel";
+import { TransferLedger } from "./transfer-ledger";
 import { homeCityOf, homeGroundLabel } from "./home-cities";
 import type { HomeCityId } from "./home-cities";
 import { WHATS_NEW } from "./whats-new";
@@ -82,7 +83,7 @@ import { bestRatingPerFormation, benchChangeCount, describeReplacements, fillSta
 import type { LineupChange } from "./game/lineup-tools";
 import { KickoffChecklist, type KickoffItem } from "./qol/kickoff-checklist";
 import { abandonTournamentBlockReason, abandonTournamentRun } from "./game/tournament-abandon";
-import { HISTORY_TOPICS, filterHistory, historyActors, historyLine, type HistoryTopic } from "./qol/history-filter";
+import { HistoryPanel } from "./qol/history-panel";
 import { inviteUrl, joinCodeFromSearch, shortcutFor } from "./qol/invite";
 import { newNotifiableActions, setAppBadge, showLocalNotification } from "./qol/notifications";
 import { DeviceSettingsPanel, type SoundPrefs } from "./qol/device-settings";
@@ -472,8 +473,6 @@ export function App() {
   function setSoundPrefs(next: SoundPrefs) { setSoundPrefsState(next); writeJsonPref(PREF_KEYS.stadiumSound, next); }
   const [whatsNewArchive, setWhatsNewArchive] = useState(false);
   const [abandonDialog, setAbandonDialog] = useState(false);
-  const [historyTopic, setHistoryTopic] = useState<HistoryTopic>("all");
-  const [historyActor, setHistoryActor] = useState("");
   // A co-op action that failed: the chip offers to send it again with the same action id (Q64).
   const [coopFailed, setCoopFailed] = useState<{ action: string; extra: Record<string, unknown> } | null>(null);
   const [dailyBusy, setDailyBusy] = useState(false);
@@ -740,7 +739,6 @@ export function App() {
   const benchStarXIPlayerCount = benchStarXIPlayers.filter(Boolean).length;
   const loanedStarIds = useMemo(() => displayGame.features.transferSaga.loans.map((loan) => loan.playerId), [displayGame.features.transferSaga.loans]);
   const currentTransferLoans = displayGame.features.transferSaga.loans.map((loan) => ({ loan, player: getStarXIPlayer(loan.playerId) })).filter((entry): entry is { loan: typeof entry.loan; player: NonNullable<ReturnType<typeof getStarXIPlayer>> } => Boolean(entry.player));
-  const transferArchive = [...displayGame.features.transferSaga.archive].reverse();
   const pendingTransferOffer = displayGame.features.transferSaga.pendingOffer;
   // Only cards still in the club can be banned; older saves may list sold or discarded ones.
   const ownedDisciplineBans = displayGame.features.discipline.bans.filter((ban) => displayGame.features.starXI.ownedIds.includes(ban.playerId));
@@ -3594,9 +3592,6 @@ export function App() {
   const selectedTournament = displayGame.features.cup.pendingNextRound ? activeTournament : (getTournament(selectedTournamentId) ?? TOURNAMENTS[0]);
   const selectedTournamentUnlockLeague = getTournamentUnlockLeague(selectedTournament.id);
   const selectedTournamentLeagueUnlocked = isLeagueContentUnlocked(selectedTournamentUnlockLeague, reachedLeague, hasFullTestAccess);
-  const allFeatureHistory = [...displayGame.features.history].reverse();
-  const featureHistoryActors = historyActors(allFeatureHistory);
-  const featureHistory = filterHistory(allFeatureHistory, historyTopic, featureHistoryActors.includes(historyActor) ? historyActor : "");
   // The next match in one tap (Q44, Q46): the waiting cup round, else the next league matchday (or its journey).
   const seasonFixture = fixtureFor(displayGame.features, "season");
   const nextMatchAction = displayGame.features.cup.active || journeyUnderway ? undefined
@@ -3759,10 +3754,7 @@ export function App() {
             {pendingTransferOffer && <section className="transfer-offer-card" aria-live="polite"><div><span>{t("fabrizio.openOfferCaps")}</span><strong>{pendingTransferOffer.playerName} · {pendingTransferOffer.club}</strong><small>{pendingTransferOffer.message}</small></div><TransferOfferActions offer={pendingTransferOffer} features={displayGame.features} now={countdownNow} busy={coopBusy} onAnswer={answerTransferOffer} /></section>}
             {deadlineDayActive && <section className="deadline-day-banner" aria-live="polite"><div><span>{t("fabrizio.deadlineEyebrow")}</span><strong>{t("fabrizio.deadlineTitle")}</strong><small>{t("fabrizio.deadlineBody")}</small></div><b>{deadlineDayLabel}</b></section>}
             {displayGame.features.cup.active && <div className="transfer-match-lock"><span>{t("fabrizio.matchRunningCaps")}</span><strong>{t("fabrizio.noDepartures")}</strong><small>{t("fabrizio.afterMatch")}</small></div>}
-            <div className="transfer-ledger-grid">
-              <section className="transfer-ledger-card"><div className="transfer-ledger-heading"><div><p className="eyebrow">{t("fabrizio.loanStationsEyebrow")}</p><h4>{t("fabrizio.currentlyLoaned")}</h4></div><span>{currentTransferLoans.length}</span></div>{currentTransferLoans.length ? <div className="transfer-ledger-list">{currentTransferLoans.map(({ loan, player }) => <article key={`loan-${loan.playerId}`}><span>{player?.name.slice(0, 1) ?? "?"}</span><div><strong>{player?.name ?? t("fabrizio.unknownPlayer")}</strong><small>{loan.club} · {loan.status === "active" ? t("fabrizio.returnsAfterMatch") : t("fabrizio.missesNextSeasonMatch")}</small></div><b>{t("fabrizio.loanCaps")}</b></article>)}</div> : <div className="transfer-ledger-empty">{t("fabrizio.noLoans")}</div>}</section>
-              <section className="transfer-ledger-card"><div className="transfer-ledger-heading"><div><p className="eyebrow">{t("fabrizio.ledgerEyebrow")}</p><h4>{t("fabrizio.history")}</h4></div><span>{transferArchive.length}</span></div>{transferArchive.length ? <div className="transfer-ledger-list archive">{transferArchive.slice(0, 12).map((event) => <article key={`archive-${event.id}`}><span>{event.outcome === "sale" ? "↗" : event.outcome === "return" ? "↙" : event.outcome === "declined" ? "✋" : "⇄"}</span><div><strong>{event.playerName ?? t("fabrizio.severalPlayers")}</strong><small>{event.outcome === "return" ? t("fabrizio.backFrom", { club: event.club }) : event.outcome === "declined" ? t("fabrizio.keptWanted", { club: event.club }) : `${event.outcome === "sale" ? t("fabrizio.soldTo", { club: event.club }) : t("fabrizio.loanedToClub", { club: event.club })}${event.fee > 0 ? t("fabrizio.feeSuffix", { fee: formatNumber(event.fee) }) : event.outcome === "sale" ? t("fabrizio.freeSuffix") : ""}`}</small></div><b>{formatHistoryTime(event.createdAt)}</b></article>)}</div> : <div className="transfer-ledger-empty">{t("fabrizio.noDeparturesYet")}</div>}</section>
-            </div>
+            <TransferLedger loans={currentTransferLoans} archive={displayGame.features.transferSaga.archive} />
           </div>}
 
           {featureTab === "season" && <SeasonPanel features={displayGame.features} action={seasonTabAction} />}
@@ -3871,7 +3863,7 @@ export function App() {
           {featureTab === "missions" && <WeeklyGoalsPanel features={displayGame.features} minigameWins={displayGame.minigameWins} coop={isCoopLive} busy={coopBusy} now={getTravelTime()} onClaim={(goalId) => void claimWeeklyGoalReward(goalId)} />}
 
           {featureTab === "leaderboard" && <LeaderboardPanel playerId={playerId} />}
-          {featureTab === "history" && <div className="feature-panel"><div className="feature-panel-heading"><div><p className="eyebrow">{t("club.matchCenterEyebrow")}</p><h3>{t("club.whatHappens")}</h3></div><span className="feature-stat">{featureHistory.length} {t("club.entries")}</span></div><div className="history-filters"><div className="starxi-filter-row" role="group" aria-label={t("club.historyFilter")}>{HISTORY_TOPICS.map((topic) => <button type="button" key={topic.id} className={historyTopic === topic.id ? "active" : ""} aria-pressed={historyTopic === topic.id} onClick={() => setHistoryTopic(topic.id)}>{topic.label}</button>)}</div>{featureHistoryActors.length > 0 && <select className="starxi-position-filter" value={historyActor} onChange={(event) => setHistoryActor(event.target.value)} aria-label={t("club.historyByPlayer")}><option value="">{t("club.allTeammates")}</option>{featureHistoryActors.map((actor) => <option key={actor} value={actor}>{actor}</option>)}</select>}</div><div className="history-list">{featureHistory.length ? featureHistory.map((entry) => <div className={`history-row ${entry.tone}`} key={entry.id}><span><Icon name={entry.tone === "negative" ? "screen" : entry.title.includes("Pokal") ? "crown" : "star"} size={15} /></span><div><strong>{localizeText(entry.title)}</strong><small>{historyLine(entry.actor, localizeText(entry.detail))}</small></div><em>{formatHistoryTime(entry.timestamp)}</em></div>) : <div className="feature-empty"><Icon name="broadcast" size={25} /><p>{t("club.noEntries")}</p></div>}</div></div>}
+          {featureTab === "history" && <HistoryPanel history={displayGame.features.history} />}
           {featureTab === "history" && displayGame.features.gazetteIssues.length > 0 && <section className="gazette-archive"><div className="gazette-archive-heading"><div><p className="eyebrow">{t("club.gazetteArchive")}</p><h3>{t("club.frontPages")}</h3></div><span>{displayGame.features.gazetteIssues.length} {t("club.spending")}</span></div><div>{[...displayGame.features.gazetteIssues].reverse().map((issue) => <article className={issue.tone} key={`gazette-archive-${issue.id}`}><small>{dataText(getTournament(issue.tournamentId)?.label) || t("club.tournament")} · {formatHistoryTime(issue.createdAt)}</small><strong>{issue.headline}</strong><p>{issue.strapline}</p></article>)}</div></section>}
         </section>
 
