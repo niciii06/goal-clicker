@@ -58,7 +58,7 @@ import { pronounText } from "./player-pronouns";
 import { LeaderboardPanel } from "./leaderboard-panel";
 import { SeasonPanel } from "./season-panel";
 import { expectedHomeCrowd, getTicketIncome, recordTicketIncome } from "./ticket-income";
-import { directionLabel, directionWord, formatCountdown, formatGoalDifference, formatHistoryTime, formatNumber, formatPackChance, getRandomCrossbarHeight, getRandomMatchPrediction, getRandomPenaltyDirection, heightLabel, predictionLabel } from "./game/format";
+import { directionLabel, directionWord, formatCountdown, formatGoalDifference, formatNumber, formatPackChance, getRandomCrossbarHeight, getRandomMatchPrediction, getRandomPenaltyDirection, heightLabel, predictionLabel } from "./game/format";
 import { getCurrentTime, getTravelTime, syncTravelClock } from "./game/clock";
 import { getStarCardTier, getWalkoutPresentation } from "./walkout-data";
 import { WalkoutAvatar } from "./walkout-avatar";
@@ -90,7 +90,9 @@ import { DeviceSettingsPanel, type SoundPrefs } from "./qol/device-settings";
 import { nextToast, pushToast, toastDuration, type ToastPriority, type ToastQueueState } from "./qol/toast-queue";
 import { PREF_KEYS, parsePurchaseMode, readJsonPref, readPref, writeJsonPref, writePref } from "./qol/prefs";
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { GazetteArchive, gazetteText } from "./gazette-archive";
 import { dataText } from "./i18n/data-text";
+import { TrophyRoom } from "./trophy-room";
 import { currentLocale, localizeText, t } from "./i18n/runtime";
 import { useLocale } from "./i18n/use-locale";
 
@@ -653,6 +655,7 @@ export function App() {
   const sharedRandomEvent = isCoopLive ? displayGame.features.randomEvent : null;
   const visibleTransferEvent = displayGame.features.transferSaga.latestEvent;
   const visibleGazetteIssue = displayGame.features.gazetteIssues.at(-1) ?? null;
+  const gazetteFront = gazetteAnnouncement ? gazetteText(gazetteAnnouncement) : null;
   const sharedPackReveal = isCoopLive ? displayGame.features.starPackReveal : null;
   const displayedCupGoal = displayGame.features.cup.lastGoal;
   const displayedCupCard = displayGame.features.cup.cardEvents.slice(-1)[0] ?? null;
@@ -745,7 +748,6 @@ export function App() {
   const activeFormationPositions = displayGame.features.starXI.formationPositions;
   const activeLineupPosition = activeLineupSlot !== null ? activeFormationPositions[activeLineupSlot] : null;
   const starXIRating = getStarXIRating(displayGame.features.starXI.ownedIds, displayGame.features.starXI.lineupIds);
-  const totalTrophies = TOURNAMENTS.reduce((total, tournament) => total + displayGame.features.cup.trophies[tournament.id], 0);
   const cupPenaltyHomeEvents = displayGame.features.cup.penaltyEvents.filter((event) => event.side === "home");
   const cupPenaltyAwayEvents = displayGame.features.cup.penaltyEvents.filter((event) => event.side === "away");
   const cupPenaltySlotCount = Math.max(5, cupPenaltyHomeEvents.length, cupPenaltyAwayEvents.length);
@@ -3750,7 +3752,7 @@ export function App() {
           {featureTab === "season" && <SeasonPanel features={displayGame.features} action={seasonTabAction} />}
           {featureTab === "cup" && <div className="feature-panel cup-panel">
             {!displayGame.features.cup.active && <div className="post-match-extras">
-      {gazetteAnnouncement && <div ref={gazetteCardRef} className={`inline-gazette ${gazetteAnnouncement.tone}`}  aria-label={`Goal Gazette: ${gazetteAnnouncement.headline}`}><article className="gazette-front-page"><header><span>GOAL GAZETTE</span><b>{t("club.specialEdition")}</b></header><div className="gazette-dateline"><span>{dataText(getTournament(gazetteAnnouncement.tournamentId)?.label) || t("club.tournamentCaps")}</span><strong>{displayClubName} {gazetteAnnouncement.homeScore}:{gazetteAnnouncement.awayScore} {gazetteAnnouncement.opponent}</strong></div><h2>{gazetteAnnouncement.headline}</h2><h3>{gazetteAnnouncement.strapline}</h3><p>{gazetteAnnouncement.body}</p><footer><span>{gazetteAnnouncement.tieBreak ? t("games.shootoutDecides") : t("games.roundDone", { completedRound: gazetteAnnouncement.completedRound })}</span><button className="event-takeover-dismiss" onClick={dismissGazetteAnnouncement}>{t("club.closePaper")}</button></footer></article></div>}
+      {gazetteAnnouncement && <div ref={gazetteCardRef} className={`inline-gazette ${gazetteAnnouncement.tone}`}  aria-label={`Goal Gazette: ${gazetteFront?.headline}`}><article className="gazette-front-page"><header><span>GOAL GAZETTE</span><b>{t("club.specialEdition")}</b></header><div className="gazette-dateline"><span>{dataText(getTournament(gazetteAnnouncement.tournamentId)?.label) || t("club.tournamentCaps")}</span><strong>{displayClubName} {gazetteAnnouncement.homeScore}:{gazetteAnnouncement.awayScore} {gazetteAnnouncement.opponent}</strong></div><h2>{gazetteFront?.headline}</h2><h3>{gazetteFront?.strapline}</h3><p>{gazetteFront?.body}</p><footer><span>{gazetteAnnouncement.tieBreak ? t("games.shootoutDecides") : t("games.roundDone", { completedRound: gazetteAnnouncement.completedRound })}</span><button className="event-takeover-dismiss" onClick={dismissGazetteAnnouncement}>{t("club.closePaper")}</button></footer></article></div>}
             </div>}
             {!displayGame.features.cup.active && displayGame.features.cup.matchStartedAt > 0 && <PostMatchSummary features={displayGame.features} onCareer={()=>openFeatureTab("career")} onContinue={()=>openFeatureTab("squad")} next={nextMatchAction} />}
             {!displayGame.features.cup.active && displayGame.features.cup.matchStartedAt > 0 && <PressConferencePanel features={displayGame.features} busy={pressBusy || coopBusy} reward={getPressReward(getBasePassivePower(displayGame.upgrades, displayGame.stars, displayGame.features), getBaseClickPower(displayGame.upgrades, displayGame.stars, displayGame.features))} onAnswer={(matchId, questionId, index) => { void answerPress(matchId, questionId, index); }} format={formatNumber} />}
@@ -3841,7 +3843,7 @@ export function App() {
             </div>
 
           </>}</div>}
-          {featureTab === "club" && <div className="feature-panel">{coopWorldPanel}            <section className="trophy-room" aria-label={t("club.cupsWon")}><div className="trophy-room-heading"><div><p className="eyebrow">{t("club.trophyRoom")}</p><h4>{t("club.yourCups")}</h4></div><span>{totalTrophies} {t("club.total")}</span></div><div className="trophy-grid">{TOURNAMENTS.map((tournament) => { const count = displayGame.features.cup.trophies[tournament.id]; return <article className={`trophy-card${count > 0 ? " earned" : " locked"}`} key={`trophy-${tournament.id}`} style={{ "--trophy-accent": tournament.accent } as CSSProperties}><span className="trophy-icon" aria-hidden="true">{tournament.trophyIcon}</span><div><strong>{dataText(tournament.trophyName)}</strong><small>{count > 0 ? t("club.timesWon", { count }) : t("club.roundsToCup", { rounds: tournament.rounds })}</small></div><b>{count}</b></article>; })}</div></section>
+          {featureTab === "club" && <div className="feature-panel">{coopWorldPanel}            <TrophyRoom trophies={displayGame.features.cup.trophies} />
             <section className="club-scorer-board" aria-label={t("club.allTimeScorers")}><div className="club-scorer-heading"><div><p className="eyebrow">{t("club.recordsEyebrow")}</p><h4>{t("club.topThree")}</h4></div><span>{t("club.allMatchesCaps")}</span></div>{allTimeTopScorers.length ? <ol>{allTimeTopScorers.map(({ player, goals, appearances }, index) => <li key={`all-time-${player.id}`}><span>{index + 1}</span><div><strong>{player.name}</strong><small>{formatStarXIPositions(player)} · OVR {player.rating}</small></div><b>{goals} {goals === 1 ? t("game.goalCaps") : t("game.goalsCaps")} · {appearances} {appearances === 1 ? t("game.matchCaps") : t("game.matchesCaps")}</b></li>)}</ol> : <div className="club-scorer-empty"><strong>{t("club.recordsWait")}</strong><small>{t("club.firstGoal")}</small></div>}</section>
             <TravelStatsPanel travel={displayGame.features.travel} now={getTravelTime()} clubName={displayGame.features.club.name} />
             <DeviceSettingsPanel sound={game.sound} soundPrefs={soundPrefs} onSound={toggleSound} onSoundPrefs={setSoundPrefs} notifications={notificationsOn} onNotifications={changeNotifications} onWhatsNew={() => setWhatsNewArchive(true)} onMessage={showToast} />
@@ -3854,7 +3856,7 @@ export function App() {
 
           {featureTab === "leaderboard" && <LeaderboardPanel playerId={playerId} />}
           {featureTab === "history" && <HistoryPanel history={displayGame.features.history} />}
-          {featureTab === "history" && displayGame.features.gazetteIssues.length > 0 && <section className="gazette-archive"><div className="gazette-archive-heading"><div><p className="eyebrow">{t("club.gazetteArchive")}</p><h3>{t("club.frontPages")}</h3></div><span>{displayGame.features.gazetteIssues.length} {t("club.spending")}</span></div><div>{[...displayGame.features.gazetteIssues].reverse().map((issue) => <article className={issue.tone} key={`gazette-archive-${issue.id}`}><small>{dataText(getTournament(issue.tournamentId)?.label) || t("club.tournament")} · {formatHistoryTime(issue.createdAt)}</small><strong>{issue.headline}</strong><p>{issue.strapline}</p></article>)}</div></section>}
+          {featureTab === "history" && <GazetteArchive issues={displayGame.features.gazetteIssues} />}
         </section>
 
         <aside className={layoutCardClass("side", "side-column")} style={{ order: layoutOrderNumber("side") }} onDragOver={(event) => handleLayoutDragOver(event, "side")} onDrop={(event) => handleLayoutDrop(event, "side")}>
